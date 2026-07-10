@@ -1,0 +1,69 @@
+diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
+index aacac38..05a1190 100644
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -357,6 +357,28 @@ class ChatCompletionRequest(OpenAIBaseModel):
+ 
+     # --8<-- [end:chat-completion-extra-params]
+ 
++    # --8<-- [start:deer-extra-params]
++    enable_deer: bool | None = Field(
++        default=False,
++        description="DEER功能的总开关，决定算法是否开启。",
++    )
++
++    deer_initial_thought_limit: int | None = Field(
++        default=None,
++        description="首次思考长度，模型将在这个token长度内按原生逻辑自由思考，规避早期思考长度过短时，不必要的置信度检验。",
++    )
++
++    deer_think_stride: int | None = Field(
++        default=None,
++        description="首次思考后，模型每次再思考长度。",
++    )
++
++    deer_task_is_code: bool | None = Field(
++        default=None,
++        description="prompt任务是否为code类型。",
++    )
++    # --8<-- [end:deer-extra-params]
++
+     @model_validator(mode="before")
+     @classmethod
+     def _materialize_tool_calls_before(cls, data: Any) -> Any:
+diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
+index 6a48a1b..ba0be43 100644
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -77,6 +77,8 @@ from vllm.tool_parsers.utils import partial_json_loads
+ from vllm.utils.collection_utils import as_list
+ from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser
+ 
++from deer.cot_controller import CoTController
++
+ if TYPE_CHECKING:
+     from vllm.entrypoints.serve.render.serving import OpenAIServingRender
+ 
+@@ -171,6 +173,8 @@ class OpenAIServingChat(OpenAIServing):
+         # NOTE(woosuk): While OpenAI's chat completion API supports browsing
+         # for some models, currently vLLM doesn't support it. Please use the
+         # Responses API instead.
++        self.cot_controller = CoTController()
++
+         self.supports_browsing = False
+         self.browser_tool = None
+         # NOTE(woosuk): Chat completion API does not support code interpreter.
+@@ -266,6 +270,13 @@ class OpenAIServingChat(OpenAIServing):
+ 
+         model_name = self.models.model_name(lora_request)
+ 
++        if request.enable_deer:
++            logger.info(f">>>>>Request {request_id} is using CoT Controller.")
++            return await self.cot_controller.handle_request(
++                self, conversation, engine_inputs,
++                request, request_id, tokenizer, request_metadata,
++                model_name)
++
+         # Extract data_parallel_rank from header (router can inject it)
+         data_parallel_rank = self._get_data_parallel_rank(raw_request)
+ 
