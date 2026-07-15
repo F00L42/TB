@@ -1,8 +1,8 @@
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index aacac38..05a1190 100644
+index aacac38..e649e6f 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -357,6 +357,28 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -357,6 +357,116 @@ class ChatCompletionRequest(OpenAIBaseModel):
  
      # --8<-- [end:chat-completion-extra-params]
  
@@ -28,32 +28,130 @@ index aacac38..05a1190 100644
 +    )
 +    # --8<-- [end:deer-extra-params]
 +
++    # --8<-- Think Budget 基础参数 (与 deer_think_budget patches 一致) ───
++    enable_think_budget: bool | None = Field(
++        default=False,
++        description="ThinkBudget功能总开关 — 启用后使用Think Budget算法替代原生推理。"
++    )
++
++    tb_check_length: int | None = Field(
++        default=None,
++        description="ThinkBudget: 初始思考token数 (首次API调用请求的思考量)。"
++    )
++
++    tb_think_stride: int | None = Field(
++        default=None,
++        description="ThinkBudget: 每轮思考增量token数。"
++    )
++
++    tb_num_thinking: int | None = Field(
++        default=None,
++        description="ThinkBudget: 最大迭代轮次 (budget循环最多跑几轮)。"
++    )
++
++    tb_check_answer_len: int | None = Field(
++        default=None,
++        description="ThinkBudget: trial answer长度 (每轮induced后请求多少token生成答案)。"
++    )
++
++    tb_prob_th: float | None = Field(
++        default=None,
++        description="ThinkBudget: 置信度阈值 (decision_score>=此值且think充足时接受答案)。"
++    )
++
++    tb_min_think_tokens: int | None = Field(
++        default=None,
++        description="ThinkBudget: 最低思考token数 (actual_len不足则不提前接受, 软门控)。"
++    )
++
++    tb_is_code: bool | None = Field(
++        default=None,
++        description="ThinkBudget: prompt任务是否为code类型 (影响trial answer行为)。"
++    )
++
++    tb_enable_value_min_confidence: bool | None = Field(
++        default=None,
++        description="ThinkBudget: Value Min Confidence开关 — 取答案bottom-k token概率均值。"
++    )
++
++    tb_value_min_bottom_k: int | None = Field(
++        default=None,
++        description="ThinkBudget: 取最低K个token的logprob求均值。"
++    )
++
++    tb_enable_clean_context: bool | None = Field(
++        default=None,
++        description="ThinkBudget: Clean Context开关 — 继续思考时丢弃induced部分节省token。"
++    )
++
++    tb_enable_soft_truncation: bool | None = Field(
++        default=None,
++        description="ThinkBudget: Soft Truncation开关 — 置信度达标后在自然断点截断。"
++    )
++
++    tb_consecutive_same_stop: int | None = Field(
++        default=None,
++        description="ThinkBudget: 连续相同答案早停阈值 — 连续N轮答案一致则提前接受, 0=禁用。"
++    )
++
++    # ─── Budget 决策链专属参数 (新增) ───
++    budget_token_limit: int | None = Field(
++        default=0,
++        description="Budget决策链: 固定思考token数 (Step 0.5覆盖, >0时跳过任务类型/难度/历史决策)。"
++    )
++
++    budget_disabled: bool | None = Field(
++        default=False,
++        description="Budget决策链: 总开关禁用 (Step 0, 等价于 BUDGET_ENABLED=False)。"
++    )
++
++    budget_confidence_threshold: float | None = Field(
++        default=None,
++        description="Budget决策链: 覆盖置信度阈值 (Step Final, 优先级最高)。"
++    )
++
++    budget_task_type_override: str | None = Field(
++        default=None,
++        description="Budget决策链: 手动指定任务类型 (跳过自动判断, 如 'math', 'code', 'fault_diagnosis')。"
++    )
++    # --8<-- [end:think-budget-extra-params]
++
      @model_validator(mode="before")
      @classmethod
      def _materialize_tool_calls_before(cls, data: Any) -> Any:
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 6a48a1b..ba0be43 100644
+index 6a48a1b..4bd10c7 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -77,6 +77,8 @@ from vllm.tool_parsers.utils import partial_json_loads
+@@ -77,6 +77,9 @@ from vllm.tool_parsers.utils import partial_json_loads
  from vllm.utils.collection_utils import as_list
  from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser
  
 +from deer.cot_controller import CoTController
++from think_budget_vllm_adapter import BudgetController
 +
  if TYPE_CHECKING:
      from vllm.entrypoints.serve.render.serving import OpenAIServingRender
  
-@@ -171,6 +173,8 @@ class OpenAIServingChat(OpenAIServing):
+@@ -112,7 +115,6 @@ class OpenAIServingChat(OpenAIServing):
+             request_logger=request_logger,
+             return_tokens_as_token_ids=return_tokens_as_token_ids,
+         )
+-
+         self.openai_serving_render = openai_serving_render
+         self.response_role = response_role
+         self.chat_template = chat_template
+@@ -171,6 +173,9 @@ class OpenAIServingChat(OpenAIServing):
          # NOTE(woosuk): While OpenAI's chat completion API supports browsing
          # for some models, currently vLLM doesn't support it. Please use the
          # Responses API instead.
 +        self.cot_controller = CoTController()
++        self.think_budget_controller = BudgetController()
 +
          self.supports_browsing = False
          self.browser_tool = None
          # NOTE(woosuk): Chat completion API does not support code interpreter.
-@@ -266,6 +270,13 @@ class OpenAIServingChat(OpenAIServing):
+@@ -266,6 +271,20 @@ class OpenAIServingChat(OpenAIServing):
  
          model_name = self.models.model_name(lora_request)
  
@@ -63,6 +161,13 @@ index 6a48a1b..ba0be43 100644
 +                self, conversation, engine_inputs,
 +                request, request_id, tokenizer, request_metadata,
 +                model_name)
++        if request.enable_think_budget:
++            logger.info(f"Request {request_id} is using Think Budget Controller.")
++            tokenizer = self.renderer.tokenizer
++            assert tokenizer is not None
++            return await self.think_budget_controller.handle_request(
++                self, conversation, engine_inputs,
++                request, request_id, tokenizer, request_metadata)
 +
          # Extract data_parallel_rank from header (router can inject it)
          data_parallel_rank = self._get_data_parallel_rank(raw_request)

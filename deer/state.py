@@ -31,8 +31,9 @@ def _calculate_average_max_prob_from_logprobs(
     """
     num_tokens = len(logprobs_list)
     result = 0.0
-    if not is_code and list(logprobs_list[-1].values())[-1].decoded_token != '</think>':
-        return result
+    # Note: removed because of vllm verson updates
+    # if not is_code and list(logprobs_list[-1].values())[-1].decoded_token != '</think>':
+    #     return result
     if num_tokens <= 1:
         return result
 
@@ -134,6 +135,7 @@ class _IterativeThinkState(_BaseState):
             return _AnswerState
 
         context.trial_count += 1
+        print(f">>>deer iter: {context.trial_count}", flush=True)
         max_new_tokens_for_thought = context.config.think_stride \
             if context.config.think_stride > 0 \
             else int(context.serving_chat.model_config.max_model_len * context.config.think_ratio) - len(context.engine_prompt['prompt_token_ids'])
@@ -253,6 +255,7 @@ class AsyncReasoningOrchestrator:
         current_state_class: Optional[Type[_BaseState]] = _InitialThinkState
         try:
             while current_state_class is not None:
+                print(f">>>deer state: {str(current_state_class)}", flush=True)
                 current_state_class = await current_state_class.handle(self.context)
         except Exception as e:
             import traceback

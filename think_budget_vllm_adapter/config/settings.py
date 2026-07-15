@@ -16,8 +16,8 @@ CONFIG = {
     "enable_budget":              (True,    "[P0] BudgetForcing总开关"),
 
     # ─── P1 核心budget参数 ───
-    "check_length":               (200,     "[P1] 初始思考token数"),
-    "think_stride":               (100,     "[P1] 每轮思考增量token"),
+    "check_length":               (512,     "[P1] 初始思考token数"),
+    "think_stride":               (512,     "[P1] 每轮思考增量token"),
     "prob_th":                    (0.95,    "[P1] 置信度阈值"),
     "num_thinking":               (10,      "[P1] 最大尝试轮次"),
     "check_answer_len":           (4000,    "[P1] 试探答案长度"),
@@ -63,12 +63,12 @@ CONFIG = {
     "history_warmup_strategy":    ("moderate", "[历史轨迹] warm-start策略"),
 
     # ─── 人工可控超参 ───
-    "fixed_budget_tokens":        (0,       "[人工] 固定budget token消耗"),
-    "fixed_num_thinking":         (0,       "[人工] 固定最大轮次"),
-    "fixed_think_stride":         (0,       "[人工] 固定步长"),
-    "fixed_check_length":         (0,       "[人工] 固定初始思考长度"),
-    "fixed_prob_th":              (0.0,     "[人工] 固定置信度阈值"),
-    "fixed_min_think_tokens":     (0,       "[人工] 固定最低思考token"),
+    "fixed_budget_tokens":        (512,       "[人工] 固定budget token消耗"),
+    "fixed_num_thinking":         (8,      "[人工] 固定最大轮次"),
+    "fixed_think_stride":         (512,       "[人工] 固定步长"),
+    "fixed_check_length":         (512,       "[人工] 固定初始思考长度"),
+    "fixed_prob_th":              (0.95,     "[人工] 固定置信度阈值"),
+    "fixed_min_think_tokens":     (100,    "[人工] 固定最低思考token"),
 
     # ─── 统一预算配置 — 4个核心暴露超参数 ───
     "BUDGET_ENABLED":             (True,    "[统一配置] 是否启用预算控制"),

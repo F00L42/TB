@@ -226,6 +226,7 @@ class _IterativeThinkState(_BaseState):
             return _AnswerState
 
         context.thinking_rounds += 1
+        print(f">>>dtb iter: {context.thinking_rounds}", flush=True)
 
         max_new_tokens_for_thought = context.config.think_stride \
             if context.config.think_stride > 0 \
