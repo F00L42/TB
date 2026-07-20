@@ -208,6 +208,7 @@ class _ConfidenceCheckState(_BaseState):
 
         # 置信度检测
         confidence = _calculate_average_max_prob_from_logprobs(context.config.is_code, logprobs)
+        print(f">>>confidence: {confidence}", flush=True)
         if confidence >= context.config.prob_th:
             return _AnswerState
 
@@ -255,7 +256,7 @@ class AsyncReasoningOrchestrator:
         current_state_class: Optional[Type[_BaseState]] = _InitialThinkState
         try:
             while current_state_class is not None:
-                print(f">>>deer state: {str(current_state_class)}", flush=True)
+                # print(f">>>deer state: {str(current_state_class)}", flush=True)
                 current_state_class = await current_state_class.handle(self.context)
         except Exception as e:
             import traceback
