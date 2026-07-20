@@ -30,45 +30,28 @@ class CoTController:
     """
     @staticmethod
     async def _queue_as_async_gen_stream(
-            queue: asyncio.Queue
+        queue: asyncio.Queue[RequestOutput | None],
     ) -> AsyncIterator[RequestOutput]:
-        """
-        Convert a queue into an async iterator for streaming mode.
-
-        Args:
-            queue: The async queue containing incremental RequestOutput items.
-
-        Yields:
-            RequestOutput objects as they arrive until a sentinel (None) is received.
-        """
-        while True:
-            item = await queue.get()
-            if item:
-                yield item
-            else:
-                break
+        """Yield queued outputs unchanged until the ``None`` sentinel."""
+        while (item := await queue.get()) is not None:
+            yield item
 
     @staticmethod
     async def _queue_as_async_gen(
-            queue: asyncio.Queue
+        queue: asyncio.Queue[RequestOutput | None],
     ) -> AsyncIterator[RequestOutput]:
-        """
-        Convert a queue into an async iterator for non-streaming mode.
+        """Aggregate phase outputs into the final non-streaming response."""
+        aggregated = None
+        async for item in CoTController._queue_as_async_gen_stream(queue):
+            if aggregated is None:
+                aggregated = item
+            else:
+                # Keep vLLM's native aggregation semantics for every choice,
+                # including token logprobs and the terminal stop metadata.
+                aggregated.add(item, aggregate=True)
 
-        It aggregates all partial outputs into one final RequestOutput.
-        """
-        item = await queue.get()
-        if item:
-            while True:
-                item_inc = await queue.get()
-                if item_inc:
-                    item.outputs[0].text += item_inc.outputs[0].text
-                    item.outputs[0].token_ids.extend(item_inc.outputs[0].token_ids)
-                else:
-                    break
-            item.outputs[0].finish_reason = "stop"
-            item.finished = True
-        yield item
+        if aggregated is not None:
+            yield aggregated
 
     @staticmethod
     def _build_deer_config(request: ChatCompletionRequest) -> DeerConfig:
