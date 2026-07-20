@@ -80,7 +80,7 @@
 
 ## 当前环境与验证
 
-本工作区能读取仓库源码和日志，但没有 `/vllm-workspace/vllm`、目标模型或推理设备，不能在本机验证真实 vLLM 性能。运行时结论必须按 `docs/debug/deer_performance_analysis.md` 的 runbook 由服务器执行后回填。
+本工作区能读取仓库源码和日志，但没有目标模型或推理设备，不能在本机验证真实 vLLM 性能。运行时结论必须按 `docs/debug/deer_performance_analysis.md` 的 runbook 由服务器执行后回填。
 
 本地改动优先做静态检查和无模型单元测试。不要把无法运行的服务器测试描述为已通过；不要修改或清理与当前任务无关的工作区改动。
 

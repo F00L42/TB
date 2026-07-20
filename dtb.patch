@@ -1,8 +1,8 @@
 diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index aacac38..e649e6f 100644
+index 184ace5..57364ee 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -357,6 +357,116 @@ class ChatCompletionRequest(OpenAIBaseModel):
+@@ -422,6 +422,116 @@ class ChatCompletionRequest(OpenAIBaseModel):
  
      # --8<-- [end:chat-completion-extra-params]
  
@@ -118,12 +118,12 @@ index aacac38..e649e6f 100644
 +
      @model_validator(mode="before")
      @classmethod
-     def _materialize_tool_calls_before(cls, data: Any) -> Any:
+     def _normalize_messages_before(cls, data: Any) -> Any:
 diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 6a48a1b..4bd10c7 100644
+index 9dd9a34..4c63fbd 100644
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -77,6 +77,9 @@ from vllm.tool_parsers.utils import partial_json_loads
+@@ -74,6 +74,9 @@ from vllm.tokenizers import TokenizerLike
  from vllm.utils.collection_utils import as_list
  from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser
  
@@ -133,25 +133,16 @@ index 6a48a1b..4bd10c7 100644
  if TYPE_CHECKING:
      from vllm.entrypoints.serve.render.serving import OpenAIServingRender
  
-@@ -112,7 +115,6 @@ class OpenAIServingChat(OpenAIServing):
-             request_logger=request_logger,
-             return_tokens_as_token_ids=return_tokens_as_token_ids,
-         )
--
-         self.openai_serving_render = openai_serving_render
-         self.response_role = response_role
-         self.chat_template = chat_template
-@@ -171,6 +173,9 @@ class OpenAIServingChat(OpenAIServing):
-         # NOTE(woosuk): While OpenAI's chat completion API supports browsing
-         # for some models, currently vLLM doesn't support it. Please use the
-         # Responses API instead.
+@@ -167,6 +170,8 @@ class OpenAIServingChat(OpenAIServing):
+         # Please use the Responses API instead.
+         self.supports_code_interpreter = False
+         self.python_tool = None
 +        self.cot_controller = CoTController()
 +        self.think_budget_controller = BudgetController()
-+
-         self.supports_browsing = False
-         self.browser_tool = None
-         # NOTE(woosuk): Chat completion API does not support code interpreter.
-@@ -266,6 +271,20 @@ class OpenAIServingChat(OpenAIServing):
+ 
+     def warmup(self) -> None:
+         self.renderer.warmup(
+@@ -265,6 +270,20 @@ class OpenAIServingChat(OpenAIServing):
  
          model_name = self.models.model_name(lora_request)
  

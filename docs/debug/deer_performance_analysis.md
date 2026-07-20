@@ -13,7 +13,6 @@
 3. **Think Budget 的风险比简化版 DEER 更大。** 任务类型预算把单次 `check_answer_len` 设为 2000–4000，轮次为 3–15；冷启动还可能给出 99 轮。试答 token 没有计入 `max_tokens_temp`，`api_call_count` 也没有实际更新，因此现有“总预算”不能约束控制器真实成本。
 4. **先减少 probe 次数和 probe token，再优化 KV。** `mtp_off.txt` 的一个样本中，10 段思考与 9 个置信度分支的重复 prefill 合计 7.79 秒，只占 202.50 秒 E2E 的 3.85%。这证明重复 prefill 确实存在，但在该样本中不是最大项。
 5. **“新 request_id 导致 KV 必然清零”和“一个外部请求同时占 N 个 scheduler slot”都不成立。** 状态机顺序等待每个 phase；开启 Automatic Prefix Caching 时，新请求可按内容复用完整 prefix block。真正应测的是每个子请求的 `num_cached_tokens` 和 prefill 时间。
-6. **MTP 存在严重退化现象，但根因尚未闭环。** 4 并发日志中 `Running=4, Waiting=0` 时 acceptance 从 15.1% 降至 0%，生成吞吐约 5.6 token/s 并持续数分钟；`mtp_on.txt` 还出现大段 `!` 退化输出。需要 Controller × MTP 的 2×2 实验，不能仅凭时间相关性归因于状态切换。
 
 ## 3. 成本模型
 
@@ -21,42 +20,41 @@
 
 对同一个样本，定义：
 
-```text
-T_vanilla
-= T_http + T_queue + T_prefill(prompt) + T_decode(visible_baseline)
+$$
+T_{vanilla} \\
+= T_{\text{http}} + T_{\text{queue}} + T_{\text{prefill(prompt)}} + T_{\text{decode(visible_baseline)}}
+$$
 
-T_controller
-= T_decision_cpu
-+ Σ T_think_phase
-+ Σ T_confidence_probe
-+ T_final_answer
-+ T_controller_cpu
+$$
+T_{controller} \\
+= T_{\text{decision_cpu}} + Σ T_{\text{think_phase}} + Σ T_{\text{confidence_probe}} + T_{\text{final_answer}} + T_{\text{controller_cpu}}
+$$
 
+$$
 净收益
-= T_vanilla - T_controller
-= visible_tokens_saved × TPOT
-- controller_overhead
-```
+= T_{vanilla} - T_{controller} \\
+= \text{visible_tokens_saved} × TPOT - \text{controller_overhead}
+$$
 
 其中：
 
-```text
-T_confidence_probe
-= queue
-+ prefill(reasoning_prefix + probe_suffix)
-+ decode(hidden_probe_tokens, with logprobs)
-+ confidence_cpu
-```
+$$
+T_{\text{confidence_probe}}
+= {\text{queue}}
++ {\text{prefill(reasoning_prefix + probe_suffix)}}
++ {\text{decode(hidden_probe_tokens, with logprobs)}}
++ {\text{confidence_cpu}}
+$$
 
 `hidden_probe_tokens` 不应与对外可见的 thinking/final token 混在一起。对每次 probe 还应计算边际收益：
 
-```text
-probe_expected_gain
+$$
+{\text{probe_expected_gain}}
 = P(本轮可停止)
 × E(若停止可省的后续思考 token)
 × TPOT
-- probe_cost
-```
+- {\text{probe_cost}}
+$$
 
 只有 `probe_expected_gain > 0` 才值得做本轮校验。
 
@@ -132,19 +130,6 @@ Python 的 `_calculate_average_max_prob_from_logprobs()` 只遍历最多几十�
 
 这份样本没有分解最终答案 prefill，也没有给出各分支生成 token，不能据此断言所有场景都只有 3.85%；但它足以否定“只优化 KV 就能解决 202 秒 E2E”的判断。
 
-### 4.4 并发与 MTP：已知现象、未知因果
-
-[`deer_throughoutput.txt`](../log/deer_throughoutput.txt) 在 4 个外部请求并发时显示：
-
-- 10:07:03–10:08:43：`Running=4, Waiting=0`，MTP acceptance 逐步下降；
-- 10:08:53：平均 draft acceptance 降至 15.1%；
-- 10:09:03 起：acceptance 为 0%，generation throughput 约 5.6–5.9 token/s；
-- 直到 10:13 左右仍是 `Running=4, Waiting=0`。
-
-状态机对同一个外部请求是顺序 `await`：一个 phase 结束后才提交下一个 phase。因此 4 个外部请求通常对应 4 个活跃内部请求，不是 `4 × phase 数` 个同时运行请求。日志没有显示 `max_num_seqs` 排队饱和。
-
-可成立的结论只有：MTP 在该并发、模型、prompt/输出形态下严重退化，且退化发生在部分请求进入迭代阶段附近。候选解释包括 phase prompt 分布变化、特定序列退化污染聚合指标、MTP/Ascend 图形状切换问题或版本缺陷；必须通过第 9 节 2×2 实验区分。
-
 ## 5. 优化优先级
 
 ### P0：先改变模型调用账本
@@ -219,15 +204,6 @@ vLLM v0.20.2 的 streaming input 能把同一 request 置于 `WAITING_FOR_STREAM
 - 或改用不需要生成分支的 readiness/confidence 信号。
 
 不要把 streaming input 当作可直接替换现有 `generate()` 的低风险修复。
-
-#### 5.8 单独处理 MTP 交互
-
-完成 2×2 实验后再选择：
-
-- 若 vanilla 和 controller 都退化：优先解决模型/后端 MTP 问题；
-- 若只有 controller+MTP 退化：缩短/约束 probe，检查图形状与 sampling/logprobs 组合；
-- 若只有特定 probe 退化：将 probe 路由到无 MTP 的服务池，或在后端确有请求级开关时只关闭 probe 的 speculative decoding；
-- 在原因不明前，不把“全局关闭 MTP”作为默认优化，因为它可能损失正常答案 decode 的收益。
 
 ### P2：Python 与对象管理微优化
 
@@ -449,36 +425,7 @@ py-spy record --pid <APISERVER_PID> --format speedscope \
 
 重点检查 tokenizer decode/encode、`deepcopy`、logprob 对象构造、history 统计、JSON/logging 和 asyncio queue。若 CPU 占比低，就停止做 Python 微优化。
 
-## 10. 最小实验矩阵
-
-### 10.1 先闭环 MTP 因果
-
-在同一服务构建、同一请求集上执行：
-
-| 组 | Controller | MTP | 并发 |
-|---|---|---|---:|
-| A | Vanilla | Off | 1、4 |
-| B | DEER | Off | 1、4 |
-| C | Vanilla | On | 1、4 |
-| D | DEER | On | 1、4 |
-
-每组独立预热，固定 seed 和到达节奏；每个 case 至少 3 次重复，正式结论扩展到足够覆盖分位数的样本。报告 E2E/TTFT/TPOT、可见 token、隐藏 token、phase prefill/decode、MTP acceptance 和质量。
-
-### 10.2 再做 P0 消融
-
-在 MTP 原因可控后比较：
-
-1. Vanilla。
-2. 固定思考预算、无 probe（一次生成 fast path）。
-3. 当前 DEER/Think Budget。
-4. probe 前置 min-think gate。
-5. gate + probe 长度 64/128/256。
-6. gate + 递增 probe 间隔。
-7. 可复用 candidate 时省略 final generation。
-
-Think Budget 的 history 文件和缓存必须冻结或每组使用相同快照，否则动态预算会污染配对实验。`budget_disabled` 在修复前不能作为 vanilla 对照。
-
-## 11. 验收标准
+## 10. 验收标准
 
 主指标：
 
@@ -493,7 +440,6 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 - `hidden_probe_tokens`、`probe_rounds`、`generate_calls` 有硬上限且日志可审计；
 - 在当前约 300-token 节省量下，额外成本低于 4.50 秒/请求（这是偏宽松上界）；
 - 流式取消、非流式聚合、异常、超时和 DP/priority 透传测试通过；
-- Controller × MTP 的结果能排除或确认交互退化，不再依赖聚合日志猜因果。
 
 ## 12. 外部版本依据
 
