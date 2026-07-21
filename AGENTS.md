@@ -73,10 +73,10 @@
 ## 上游源码策略
 
 - 后续会反复分析 vLLM serving、scheduler、metrics 和 vLLM-Ascend backend，推荐在本地保留两个**只读、固定版本的 Git checkout**，而不是每次只查看 GitHub 网页，也不要把完整上游源码复制进本仓库提交。
-- checkout 必须对应实际验证环境：vLLM 固定到 `v0.23.0` 的 tag/commit；vLLM-Ascend 固定到服务器实际安装包或镜像所用的 commit。若公开 release 尚无同名版本，不要猜测兼容 tag。
-- checkout放在使用git submodule add添加的`third_party/`；在性能实验 `manifest.json` 中保存路径、remote URL、commit SHA、dirty 状态和安装包版本。
+- checkout 必须对应实际验证环境：vLLM 固定到 `v0.23.0` 的 tag；vLLM-Ascend 固定到 `v0.23.0rc1` 的 tag。
+- checkout放在使用git submodule add添加的`third_party/`，下载源码只需执行`git submodule update --init --recursive`；在性能实验 `manifest.json` 中保存路径、remote URL、commit SHA、dirty 状态和安装包版本。
 - 日常源码追踪优先使用本地 `rg`、`git grep`、`git blame` 和 tag 间 diff；GitHub 主要用于查看 PR 讨论、release note、issue 和本地 checkout 中不存在的后续提交。
-- 上游 checkout 视为只读依赖。控制器修改继续保存在本仓库的 adapter/patch 中，避免本地上游改动使分析结果不可复现。
+- 上游 checkout 视为只读依赖。控制器修改继续保存在本仓库的 adapter 中，避免本地上游改动使分析结果不可复现。
 
 ## 当前环境与验证
 
