@@ -1,112 +1,94 @@
-diff --git a/vllm/entrypoints/openai/chat_completion/protocol.py b/vllm/entrypoints/openai/chat_completion/protocol.py
-index 184ace5..9a458c7 100644
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -422,6 +422,63 @@ class ChatCompletionRequest(OpenAIBaseModel):
- 
-     # --8<-- [end:chat-completion-extra-params]
- 
+@@ -423,1 +423,17 @@
 +    # --8<-- [start:deer-extra-params]
-+    enable_deer: bool | None = Field(
-+        default=False,
-+        description="DEER功能的总开关，决定算法是否开启。",
-+    )
-+
-+    deer_initial_thought_limit: int | None = Field(
-+        default=None,
-+        description="首次思考长度，模型将在这个token长度内按原生逻辑自由思考，规避早期思考长度过短时，不必要的置信度检验。",
-+    )
-+
-+    deer_think_stride: int | None = Field(
-+        default=None,
-+        description="首次思考后，模型每次再思考长度。",
-+    )
-+
-+    deer_task_is_code: bool | None = Field(
-+        default=None,
-+        description="prompt任务是否为code类型。",
-+    )
++    enable_deer: bool | None = Field(default=False)
++    deer_initial_thought_limit: int | None = Field(default=None, ge=0)
++    deer_think_stride: int | None = Field(default=None, ge=0)
++    deer_task_is_code: bool | None = Field(default=None)
 +    # --8<-- [end:deer-extra-params]
 +
 +    # --8<-- [start:think-budget-extra-params]
-+    # Think Budget 与 DEER 是两条独立路由。两者同时为 true 时，服务层
-+    # 固定选择 Think Budget，避免同一父请求被两个状态机重复拆分。
-+    # 对外只公开总开关与六个 fixed_* 人工固定输入；动态策略、会话控制
-+    # 和历史 tb_* 别名均保留在服务端，不接受 HTTP 请求覆盖。
-+    enable_think_budget: bool | None = Field(
-+        default=False,
-+        description="Think Budget 总开关。",
-+    )
-+    fixed_budget_tokens: int = Field(
-+        default=0, ge=0,
-+        description="固定总思考预算；0 表示继续使用服务端动态计算。",
-+    )
-+    fixed_num_thinking: int = Field(
-+        default=0, ge=0,
-+        description="固定思考轮数；0 表示继续使用服务端动态计算。",
-+    )
-+    fixed_think_stride: int = Field(
-+        default=0, ge=0,
-+        description="固定每轮思考步长；0 表示继续使用服务端动态计算。",
-+    )
-+    fixed_check_length: int = Field(
-+        default=0, ge=0,
-+        description="固定首次思考长度；0 表示继续使用服务端动态计算。",
-+    )
-+    fixed_prob_th: float = Field(
-+        default=0.0, ge=0.0, le=1.0,
-+        description="固定置信度阈值；0 表示继续使用服务端动态计算。",
-+    )
-+    fixed_min_think_tokens: int = Field(
-+        default=0, ge=0,
-+        description="固定最低思考 token 数；0 表示继续使用服务端动态计算。",
-+    )
++    enable_think_budget: bool | None = Field(default=False)
++    fixed_budget_tokens: int = Field(default=0, ge=0)
++    fixed_num_thinking: int = Field(default=0, ge=0)
++    fixed_think_stride: int = Field(default=0, ge=0)
++    fixed_check_length: int = Field(default=0, ge=0)
++    fixed_prob_th: float = Field(default=0.0, ge=0.0, le=1.0)
++    fixed_min_think_tokens: int = Field(default=0, ge=0)
 +    # --8<-- [end:think-budget-extra-params]
-+
-     @model_validator(mode="before")
-     @classmethod
-     def _normalize_messages_before(cls, data: Any) -> Any:
-diff --git a/vllm/entrypoints/openai/chat_completion/serving.py b/vllm/entrypoints/openai/chat_completion/serving.py
-index 9dd9a34..4c63fbd 100644
+     # --8<-- [end:chat-completion-extra-params]
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -74,6 +74,9 @@ from vllm.tokenizers import TokenizerLike
- from vllm.utils.collection_utils import as_list
- from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser
- 
+@@ -77,1 +77,4 @@
 +from deer.cot_controller import CoTController
 +from think_budget_vllm_adapter import BudgetController
 +
  if TYPE_CHECKING:
-     from vllm.entrypoints.serve.render.serving import OpenAIServingRender
- 
-@@ -167,6 +170,8 @@ class OpenAIServingChat(OpenAIServing):
-         # Please use the Responses API instead.
-         self.supports_code_interpreter = False
-         self.python_tool = None
+@@ -169,1 +172,3 @@
 +        self.cot_controller = CoTController()
 +        self.think_budget_controller = BudgetController()
- 
-     def warmup(self) -> None:
-         self.renderer.warmup(
-@@ -265,6 +270,20 @@ class OpenAIServingChat(OpenAIServing):
- 
-         model_name = self.models.model_name(lora_request)
- 
-+        if request.enable_deer:
-+            logger.info(f">>>>>Request {request_id} is using CoT Controller.")
-+            return await self.cot_controller.handle_request(
-+                self, conversation, engine_inputs,
-+                request, request_id, tokenizer, request_metadata,
-+                model_name)
-+        if request.enable_think_budget:
-+            logger.info(f"Request {request_id} is using Think Budget Controller.")
-+            tokenizer = self.renderer.tokenizer
-+            assert tokenizer is not None
+         self.python_tool = None
+@@ -271,1 +276,62 @@
++        # Server-side master switch: when disabled, continue through native
++        # vLLM as a single generation without constructing controller state.
++        if (request.enable_think_budget
++                and self.think_budget_controller.is_enabled()):
++            print(
++                f"TB_ROUTE event=selected request_id={request_id} "
++                "controller=think_budget",
++                flush=True,
++            )
++            assert len(engine_inputs) == 1
++            prompt_components = self._extract_prompt_components(engine_inputs[0])
++            trace_headers = (
++                None if raw_request is None
++                else await self._get_trace_headers(raw_request.headers)
++            )
++            if (not request.include_reasoning
++                    or request._grammar_from_tool_parser):
++                reasoning_ended = True
++            elif reasoning_parser:
++                reasoning_ended = reasoning_parser.is_reasoning_end(
++                    prompt_components.token_ids or [])
++            else:
++                reasoning_ended = None
++
++            response_parser = None
++            if self.parser_cls is not None:
++                response_parser = self.parser_cls(
++                    tokenizer,
++                    request.tools,
++                    chat_template_kwargs=chat_template_kwargs,
++                )
++
++            # Keep the controller's stable 7-argument ABI. This private
++            # server-process object never enters the public request model.
++            object.__setattr__(request, "_think_budget_route_identity", {
++                "model_name": model_name,
++                "lora_request": lora_request,
++                "data_parallel_rank": data_parallel_rank,
++                "trace_headers": trace_headers,
++                "prompt_text": prompt_components.text,
++                "reasoning_ended": reasoning_ended,
++                "reasoning_parser_kwargs": (
++                    {"chat_template_kwargs": chat_template_kwargs}
++                    if reasoning_parser else None
++                ),
++                "reasoning_parser": reasoning_parser,
++                "response_parser": response_parser,
++                "chat_template_kwargs": chat_template_kwargs,
++            })
 +            return await self.think_budget_controller.handle_request(
 +                self, conversation, engine_inputs,
 +                request, request_id, tokenizer, request_metadata)
 +
-         # Extract data_parallel_rank from header (router can inject it)
-         data_parallel_rank = self._get_data_parallel_rank(raw_request)
- 
++        # Think Budget wins when both flags are true. If its server switch is
++        # disabled, fall through to native vLLM rather than another controller.
++        if request.enable_deer and not request.enable_think_budget:
++            logger.info("Request %s is using DEER CoT Controller.", request_id)
++            return await self.cot_controller.handle_request(
++                self, conversation, engine_inputs,
++                request, request_id, tokenizer, request_metadata,
++                model_name, lora_request, data_parallel_rank)
+         # Schedule the request and get the result generator.

@@ -16,9 +16,8 @@
 
 - `deer/`：简化版 DEER，侵入 vLLM Server，通过 `CoTController` 驱动“思考—试答—置信度—回答”状态机。先读 `deer/AGENTS.md`。
 - `think_budget_vllm_adapter/`：基于 DEER 控制接口的服务内 Think Budget 实现，加入任务分类、难度、历史预算、Value Min Confidence 等逻辑。
-- `think_budget_refactored_final/`：通过 API 转发运行的离线参考实现。算法入口和配置关系见 `think_budget_refactored_final/CLAUDE.md`。
-- `think_budget/`：另一份算法实现/迁移来源；除非正在核对迁移差异，优先读 `think_budget_refactored_final/`。
-- `dtb.patch`：对 vLLM Chat Completion 协议和 serving 入口的侵入式修改。
+- `think_budget/`：通过 API 转发运行的离线参考实现。算法入口和配置关系见 `think_budget_refactored_final/CLAUDE.md`。
+- `dtb.patch`：对 vLLM Chat Completion 协议和 serving 入口的侵入式修改。生产环境应用方式为`cd vllm-workspace/vllm/ && git apply --reject --whitespace=fix /path/to/dtb.patch`
 - `docs/log/`：端到端汇总、vLLM/vLLM-Ascend 服务日志和人工 profiling 结果。
 - `docs/debug/deer_performance_analysis.md`：当前性能诊断、优化优先级和服务器 profiling runbook。
 - `docs/design/`：迁移与模块设计文档。
@@ -30,7 +29,7 @@
 3. `deer/cot_controller.py`、`deer/state.py`、`deer/context.py`。
 4. `dtb.patch`。
 5. `think_budget_vllm_adapter/budget_controller.py`、`think_budget_vllm_adapter/deer_think_budget/state.py`、两个 `context.py`。
-6. `think_budget_refactored_final/CLAUDE.md` 及其算法模块，用于核对服务内迁移是否保留语义。
+6. `think_budget/CLAUDE.md` 及其算法模块，用于核对服务内迁移是否保留语义。
 
 ## 性能分析口径
 

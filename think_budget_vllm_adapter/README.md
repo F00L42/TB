@@ -2,7 +2,7 @@
 
 当请求设置 `enable_think_budget=true` 时，vLLM 会进入 Think Budget 控制器。它把一次推理拆成“思考、试探答案、继续思考、最终回答”等阶段，并在每个阶段检查预算和置信度。
 
-这套机制会增加推理质量控制能力，但每增加一次迭代，都会新增 vLLM 子请求。因此服务端需要控制同时运行的父请求数；算法本身仍按原有动态预算、轮数和试探答案长度运行。详细原因见[性能诊断报告](../docs/vllm_0_20_2_reasoning_budget_performance_report.md)。
+这套机制会增加推理质量控制能力，但每增加一次迭代，都会新增 vLLM 子请求。因此服务端需要控制同时运行的父请求数；算法本身仍按原有动态预算、轮数和试探答案长度运行。目标集成版本为 vLLM `v0.23.0`，详细成本模型见[性能诊断报告](../docs/debug/deer_performance_analysis.md)。
 
 ## 使用方式
 
@@ -59,7 +59,14 @@
 
 ## 运行日志
 
-Think Budget 不依赖 vLLM/Python 的日志等级；所有运行期诊断均以 `print(..., flush=True)` 直接写入 API Server 标准输出，但不会记录模型生成的完整文本。标识包括 `TB_ROUTE`、`TB_REQUEST`、`TB_DECISION`、`TB_STAGE`、`TB_CONFIDENCE`、`TB_SAFETY_GATE` 与 `TB_PROFILE`。每条阶段输出包含请求 ID、阶段名称、重思考/试探轮次、关键 token 参数、生成 token 数、停止原因与本阶段耗时（毫秒）。`TB_PROFILE` 还会输出整条链路和各决策/引擎模块的累计耗时。
+Think Budget 不依赖 vLLM/Python 的日志等级；运行期诊断直接写入 API Server 标准输出，但不会记录模型生成的完整文本。默认每个模型 phase 只 flush 一条 `TB_PHASE` JSON，包含 parent/child request ID、phase、轮次、queue/prefill/decode/wall、prompt/cache/generated token、可见性、停止原因和 probe 判定。缺失的 vLLM stats 写为 `null`，不会伪装成 0 ms。`TB_PROFILE` 还会输出整条链路、各决策/引擎模块耗时以及 visible/hidden/final token 账本。
+
+`RUNTIME.verbose_stage_logging: true` 可临时恢复 `TB_STAGE`/`TB_CONFIDENCE` 的详细 enter/complete 日志；生产性能实验保持默认 `false`。用以下命令把服务日志转成标准产物：
+
+```bash
+python tools/extract_tb_phase_metrics.py \
+  docs/log/perf/<run_id>/server.log docs/log/perf/<run_id>/
+```
 
 可据此检索 `request_id`，定位请求是否停在初始思考、某次 rethink、trial 置信度检查或最终回答阶段；日志不包含 prompt、trial answer 或最终答案正文。
 
@@ -69,7 +76,7 @@ Think Budget 与 DEER 一样使用请求绑定的无界输出队列：不设置�
 
 ## 观测与排障
 
-每个请求会记录总耗时、预算决策模块耗时以及 `initial_think`、`iterative_think`、`trial_answer`、`final_answer` 的阶段耗时。服务端还应采集 vLLM `/metrics`：
+每个请求会记录总耗时、预算决策模块耗时以及 `initial_think`、`iterative_think`、`confidence_probe`、`final_answer` 的阶段耗时。服务端还应采集 vLLM `/metrics`：
 
 - `vllm:num_preemptions`：持续增长通常表示 KV cache 抖动；
 - `vllm:kv_cache_usage_perc`：接近 1 时不要继续提高预算请求并发；

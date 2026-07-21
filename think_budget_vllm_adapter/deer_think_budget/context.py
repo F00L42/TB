@@ -1,7 +1,7 @@
 """ThinkBudget 配置和请求上下文。
 
 基于 DEER context.py 扩展，保留 DEER 原有参数，新增 Think Budget 全部超参。
-适配 vLLM v0.20.2 接口 (TokenizerLike, EngineInput)。
+适配目标 vLLM v0.23.0 接口 (TokenizerLike, EngineInput)。
 
 Inlined from vllm/vllm/deer_think_budget/ into think_budget_vllm_adapter.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Mapping, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
@@ -94,6 +94,12 @@ class RequestStateContext:
     # 一起传给 vLLM，确保 LoRA 与数据并行路由不在中途丢失。
     lora_request: Any = None
     data_parallel_rank: Optional[int] = None
+    trace_headers: Optional[Mapping[str, str]] = None
+    prompt_text: Optional[str] = None
+    reasoning_ended: Optional[bool] = None
+    reasoning_parser_kwargs: Optional[dict[str, Any]] = None
+    reasoning_parser: Any = None
+    chat_template_kwargs: Optional[dict[str, Any]] = None
     trial_count: int = 0
     result_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     last_chunk: Optional[RequestOutput] = None
@@ -119,6 +125,7 @@ class RequestStateContext:
     # 双通道: 跟踪最近一轮推理的 logprobs/tokens
     reasoning_logprobs: list | None = None    # list[float | None]
     reasoning_tokens: list | None = None      # list[str | None]
+    prompt_suffix_token_cache: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
     @property
     def engine_client(self):
@@ -128,21 +135,66 @@ class RequestStateContext:
     def default_sampling_params(self):
         return self.serving_chat.default_sampling_params
 
-    def engine_request_kwargs(self) -> dict[str, Any]:
+    def engine_request_kwargs(
+        self,
+        *,
+        prompt_text: Optional[str] = None,
+        reasoning_ended: Optional[bool] = None,
+    ) -> dict[str, Any]:
         """返回每个 child request 必须保持一致的 vLLM 调度参数。"""
         return {
             "lora_request": self.lora_request,
             "priority": getattr(self.request, "priority", None) or 0,
             "data_parallel_rank": self.data_parallel_rank,
+            "trace_headers": self.trace_headers,
+            "prompt_text": self.prompt_text if prompt_text is None else prompt_text,
+            "reasoning_ended": (
+                self.reasoning_ended if reasoning_ended is None else reasoning_ended
+            ),
+            "reasoning_parser_kwargs": self.reasoning_parser_kwargs,
         }
 
     async def stream_output(self, result):
         """透传推理结果到 result_queue。"""
         await self.result_queue.put(result)
 
-    def update_prompts(self, token_ids: list[int], res: RequestOutput):
+    def encode_prompt_suffix(self, text: str) -> tuple[int, ...]:
+        """Tokenize immutable controller suffixes once per parent request."""
+        cached = self.prompt_suffix_token_cache.get(text)
+        if cached is None:
+            cached = tuple(self.tokenizer.encode(text, add_special_tokens=False))
+            self.prompt_suffix_token_cache[text] = cached
+        return cached
+
+    def child_prompt(self, suffix_text: str) -> dict[str, Any]:
+        """Create a branch prompt without recursively copying EngineInput."""
+        child = self.engine_prompt.copy()
+        child["prompt_token_ids"] = [
+            *self.engine_prompt.get("prompt_token_ids", ()),
+            *self.encode_prompt_suffix(suffix_text),
+        ]
+        if self.prompt_text is not None:
+            child["prompt"] = self.prompt_text + suffix_text
+        return child
+
+    def append_prompt_suffix(self, suffix_text: str) -> None:
+        self.engine_prompt["prompt_token_ids"].extend(
+            self.encode_prompt_suffix(suffix_text))
+        if self.prompt_text is not None:
+            self.prompt_text += suffix_text
+            self.engine_prompt["prompt"] = self.prompt_text
+
+    def update_prompts(
+        self,
+        token_ids: list[int],
+        res: RequestOutput,
+        continuation_text: str = "",
+    ):
         """更新 token_id 和 last_chunk 历史。"""
         self.engine_prompt['prompt_token_ids'].extend(token_ids)
+        if self.prompt_text is not None and continuation_text:
+            self.prompt_text += continuation_text
+            self.engine_prompt["prompt"] = self.prompt_text
         self.last_chunk = res
 
     def elapsed(self) -> float:

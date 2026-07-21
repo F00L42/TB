@@ -78,6 +78,8 @@ class BudgetConfig(ThinkBudgetConfig):
     # trial_answers/token_budget remain the algorithm's dynamic controls.
     max_api_calls: int = 0
     final_answer_max_tokens: int = 2048
+    emit_phase_metrics: bool = True
+    verbose_stage_logging: bool = False
 
     # ─── 历史/难度模块的外置配置 ───
     history_budget_multiplier: float = 1.2

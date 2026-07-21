@@ -4,13 +4,13 @@
 
 本文分析 DEER 与 Think Budget 服务内控制器的端到端时延成本，目标是在质量约束下尽量降低“预算估算 + 置信度校验 + 多阶段调度”的额外耗时。
 
-分析基线：2026-07-20，仓库 revision `43bf906e533d99ebb91b6d12509888175ddf496c`。当前环境没有 `/vllm-workspace/vllm`、目标模型和推理设备，因此结论分为“实测”“源码确定”“待验证假设”。服务器端验证步骤见第 9 节。
+数据基线更新到 2026-07-21 的 v0.23.0 汇总；上游源码基线为本地只读 checkout：vLLM `v0.23.0`（`0fc695f`）与 vLLM-Ascend `v0.23.0rc1`（`f4a08bd`）。当前环境没有目标模型和推理设备，因此结论分为“实测”“源码确定”“待验证假设”。服务器端验证步骤见第 9 节。
 
 ## 2. 结论摘要
 
-1. **当前 DEER 没有达到时延盈亏平衡。** 16 个样本平均只减少 300.06 个可见 token（6.44%），平均时延却增加 24.48 秒（35.02%）。以 `baseline 总时延 / baseline 可见 token` 得到的 15.01 ms/token 作为偏乐观的 TPOT 上界，300 token 最多只值约 4.50 秒；当前控制器额外成本估计在 24.48–28.99 秒/请求之间。
+1. **最新 Think Budget 仍未达到时延盈亏平衡。** 16 个样本平均只减少 278.31 个可见 token（6.35%），平均时延却增加 30.25 秒（42.63%）。以 `baseline 总时延 / baseline 可见 token` 得到的 16.19 ms/token 作为偏乐观的 TPOT 上界，278 token 最多只值约 4.51 秒；当前控制器额外成本估计在 30.25–34.75 秒/请求之间。
 2. **最贵的“置信度计算”不是 Python 中求几何平均，而是为求置信度额外生成一条 trial answer。** 若执行 `k` 次校验，常见路径有 `2k+2` 次独立 `generate()`。这些隐藏 token 不进入客户端 completion-token 统计。
-3. **Think Budget 的风险比简化版 DEER 更大。** 任务类型预算把单次 `check_answer_len` 设为 2000–4000，轮次为 3–15；冷启动还可能给出 99 轮。试答 token 没有计入 `max_tokens_temp`，`api_call_count` 也没有实际更新，因此现有“总预算”不能约束控制器真实成本。
+3. **Think Budget 的风险比简化版 DEER 更大。** 任务类型预算把单次 `check_answer_len` 设为 2000–4000，轮次为 3–15。试答 token 不进入 OpenAI usage，也没有从 `max_tokens_temp` 扣除；仅看客户端 CSV 无法知道隐藏模型工作量。当前实现已经有 `max_api_calls`，但默认值为 0（无限制），不能代替隐藏 token 账本。
 4. **先减少 probe 次数和 probe token，再优化 KV。** `mtp_off.txt` 的一个样本中，10 段思考与 9 个置信度分支的重复 prefill 合计 7.79 秒，只占 202.50 秒 E2E 的 3.85%。这证明重复 prefill 确实存在，但在该样本中不是最大项。
 5. **“新 request_id 导致 KV 必然清零”和“一个外部请求同时占 N 个 scheduler slot”都不成立。** 状态机顺序等待每个 phase；开启 Automatic Prefix Caching 时，新请求可按内容复用完整 prefix block。真正应测的是每个子请求的 `num_cached_tokens` 和 prefill 时间。
 
@@ -60,23 +60,25 @@ $$
 
 ### 3.2 当前汇总的盈亏平衡
 
-数据来自 [`docs/log/test_results/_SUMMARY.csv`](../log/test_results/_SUMMARY.csv)：
+最新同日汇总来自 [`docs/log/test_results/_SUMMARY.csv`](../log/test_results/_SUMMARY.csv)：
 
-| 指标 | Vanilla | DEER | 差值 |
+| 指标 | Vanilla (2026-07-21) | Think Budget (2026-07-21) | 差值 |
 |---|---:|---:|---:|
 | 样本数 | 16 | 16 | — |
-| 平均时延 | 69.9077 s | 94.3911 s | **+24.4834 s / +35.02%** |
-| 时延中位数 | 69.9773 s | 93.1414 s | **+23.1641 s / +33.10%** |
-| 时延 P95 | 84.0568 s | 110.2560 s | **+26.1992 s / +31.17%** |
-| 平均可见 token | 4658.38 | 4358.31 | **-300.06 / -6.44%** |
-| 总可见 token | 74534 | 69733 | **-4801** |
+| 平均时延 | 70.9483 s | 101.1941 s | **+30.2458 s / +42.63%** |
+| 时延中位数 | 65.7790 s | 105.8646 s | **+40.0856 s / +60.94%** |
+| 时延 P95 | 96.8884 s | 125.5645 s | **+28.6761 s / +29.60%** |
+| 平均可见 token | 4381.00 | 4102.69 | **-278.31 / -6.35%** |
+| 总可见 token | 70096 | 65643 | **-4453** |
 
-`1118.5239 s / 74534 token = 15.0069 ms/token` 包含 TTFT/prefill/固定开销，因此只能作为 TPOT 的偏乐观上界，而不是精确 TPOT。即便使用这个上界：
+`1135.1728 s / 70096 token = 16.1946 ms/token` 包含 TTFT/prefill/固定开销，因此只能作为 TPOT 的偏乐观上界，而不是精确 TPOT。即便使用这个上界：
 
-- 每请求 300.06 token 的最大收益约 `4.503 s`；
-- 控制器额外成本约为 `24.483 + [0, 4.503] = 24.48–28.99 s/请求`；
-- 若额外成本不变，至少要节省约 1932 token/请求才可能盈亏平衡，是当前节省量的 6.44 倍；
-- 若保持当前 300-token 节省量，则额外成本必须压到 4.50 秒以下，真实目标还应更低。
+- 每请求 278.31 token 的最大收益约 `4.507 s`；
+- 控制器额外成本约为 `30.246 + [0, 4.507] = 30.25–34.75 s/请求`；
+- 若额外成本不变，至少要节省约 1868–2146 token/请求才可能盈亏平衡，是当前节省量的 6.7–7.7 倍；
+- 若保持当前 278-token 节省量，则额外成本必须压到 4.51 秒以下，真实目标还应更低。
+
+**证据边界：** `_SUMMARY.csv` 只有聚合行，未保留每个样本的 ID/时延/token，因此上述是同日同样本数的聚合对照，尚不能计算严格的逐请求 paired delta。下一次实验必须同时保存 client 结果明细与稳定 sample ID。
 
 ## 4. 当前执行路径与成本放大器
 
@@ -104,14 +106,14 @@ Python 的 `_calculate_average_max_prob_from_logprobs()` 只遍历最多几十�
 | reasoning / knowledge / planning / general | 6–8 | 3000 token |
 | tool_call / fault_diagnosis | 8 | 4000 token |
 
-同时存在以下实现缺口：
+同时存在以下实现/观测缺口：
 
-- `max_tokens_temp` 只扣减思考 token，不扣减 trial-answer token；最后一轮思考也没有 `min(remaining_budget, stride)`。
-- `api_call_count` 只定义、不递增，因此不能形成 API/generate 次数安全门。
-- `budget_disabled=True` 只让决策链返回几个关闭标志，仍然创建状态机并执行 probe，不是真正的 vanilla bypass。
+- `max_tokens_temp` 只扣减思考 token，不扣减 trial-answer token；控制器总预算与真实生成总量仍不是同一口径。
+- `max_api_calls` 已在 child request ID 分配时递增并为 final 预留调用，但生产默认 0 表示无限制；它只限制调用次数，不限制单次 probe token。
+- v0.23.0 serving 补丁现已在入口检查 `BUDGET_ENABLED`，关闭时走原生单次生成；需要在服务器同时验证流式和非流式 bypass。
 - `enable_safety_gate` 默认关闭；即使触发，当前状态机也进入 `_AnswerState` 再做一次最终生成，并没有调用已导入的 `build_safety_fallback()`。
-- `enable_soft_truncation` 对应的截断函数已定义但未调用，初始思考的分支只是 `pass`。
 - `min_think_tokens` 在 trial answer 已生成之后才进入 `make_accept_decision()`；若思考长度不足，本次昂贵 probe 注定不能被接受。
+- trial answer 的 logprob/token 会完整聚合，但 `answer_list`/连续相同答案检测仍只取最后一个输出 chunk 的文本；在复用 candidate 前必须先修复该语义。
 
 这些问题说明“算法预算”与“真实服务成本预算”目前不是同一个量。
 
@@ -149,7 +151,7 @@ Python 的 `_calculate_average_max_prob_from_logprobs()` 只遍历最多几十�
 
 建议先做 `64 / 128 / 256 / 当前值` 的质量—时延消融，而不是直接拍定单一值。工具调用和分类任务可使用受约束的短 JSON/标签；规划与代码任务可先生成摘要式 candidate，只有决定接受时再生成完整答案。
 
-为避免 [`mtp_on.txt`](../log/API_simulations/mtp_on.txt) 中的大段重复 `!`，probe 还应有明确 stop 条件和重复输出保护。vLLM v0.20.2 已有 `repetition_detection` sampling 参数，可在目标模型上单独验证其质量影响。
+为避免 [`mtp_on.txt`](../log/API_simulations/mtp_on.txt) 中的大段重复 `!`，probe 还应有明确 stop 条件和重复输出保护。目标 vLLM v0.23.0 提供 `repetition_detection` sampling 参数，可在目标模型上单独验证其质量影响。
 
 #### 5.3 降低校验频率
 
@@ -184,20 +186,20 @@ Think Budget 已经为 trial answer 计算完整评分，却在接受后进入 `
 
 #### 5.6 透传完整原生调用上下文并固定 DP 亲和性
 
-当前 patch 在提取 `data_parallel_rank` 之前劫持请求；thought/final 还没有统一传递 `priority`。控制器应接收并在每个 phase 透传：
+v0.23.0 patch 现已在提取 `data_parallel_rank` 后劫持请求，并把以下上下文写入仅存在于服务进程的 route identity；各 child `generate()` 再统一透传：
 
 ```text
 priority, lora_request, trace_headers, data_parallel_rank,
 prompt_text, reasoning_ended, reasoning_parser_kwargs
 ```
 
-同一个 parent 的所有 phase 固定在同一 DP rank，才能稳定利用该 rank 的 prefix cache，也避免不同 phase 的优先级被改变。
+同一个 parent 的所有 phase 固定在同一 DP rank，才能稳定利用该 rank 的 prefix cache，也避免不同 phase 的优先级被改变。源码补丁已通过本地 vLLM `v0.23.0` 的 `git apply --check`；LoRA/DP/trace/structured-output 的运行时一致性仍须服务器测试。
 
 #### 5.7 先测 APC，再决定是否做 resumable/streaming input
 
 应记录每个子请求的 `RequestOutput.num_cached_tokens` 与 `request_prefill_kv_computed_tokens`。如果 probe/continue phase 的缓存命中已经很高，重构为 resumable 的收益可能小于复杂度。
 
-vLLM v0.20.2 的 streaming input 能把同一 request 置于 `WAITING_FOR_STREAMING_REQ` 后续写并保留 session，但当前实现明确不支持 `FINAL_ONLY` 和 stop string。更重要的是，confidence probe 是从主思考链分叉、失败后需丢弃的分支；单一 resumable session 不能直接替代 KV fork。因此可行的研究方向是：
+vLLM v0.23.0 的 streaming input 能把同一 request 置于 `WAITING_FOR_STREAMING_REQ` 后续写并保留 session，但当前实现明确不支持 `FINAL_ONLY` 和 stop string。更重要的是，confidence probe 是从主思考链分叉、失败后需丢弃的分支；单一 resumable session 不能直接替代 KV fork。因此可行的研究方向是：
 
 - 主思考链用 resumable session；
 - probe 仍是独立分支并依赖 APC；
@@ -207,14 +209,14 @@ vLLM v0.20.2 的 streaming input 能把同一 request 置于 `WAITING_FOR_STREAM
 
 ### P2：Python 与对象管理微优化
 
-这些改动低风险，但要在 P0 后评估：
+这些改动低风险，但要在 P0 后评估。标为“已实现”的项目尚不能据此宣称 NPU 端 E2E 已改善：
 
 - DEER 只需要 sampled-token logprob；vLLM 在 `logprobs=0` 时仍返回 sampled token，可替代 `logprobs=1`。长 probe 可评估 `flat_logprobs=True` 以降低 GC。
 - 用 `math.exp(logprob)` 替代逐 token `torch.exp(torch.tensor(...)).item()`，并用 `next(iter(values))` 避免临时 list。
-- trial prompt 使用浅拷贝 + 新 token list，避免 `copy.deepcopy(engine_prompt)`。
-- 缓存 prompt 文本/think-tag 状态，不在每次校验时解码完整增长中的 prompt。
-- 避免深拷贝完整 `RequestOutput` 只为插入 `</think>`；构造最小输出或让 stop string 按协议输出。
-- 用结构化 logger 代替每轮 `print(..., flush=True)`；热路径日志不要逐 token flush。
+- **已实现：** trial prompt 使用浅拷贝 + 新 token list，避免 `copy.deepcopy(engine_prompt)`；多模态等其他 EngineInput 对象保持共享只读引用。
+- **已实现：** 缓存静态 prompt suffix 的 token，并维护增长中的 prompt text，不再为每次置信度判定解码完整 prompt。
+- **已实现：** 只浅拷贝 `RequestOutput → CompletionOutput` 两层对象来补发 `</think>`，不复制 prompt ids/logprobs/metrics。
+- **已实现：** 默认关闭每个 state 的 enter/complete flush；每个模型 phase 只输出一条结构化 `TB_PHASE` JSON。
 - 将 producer/queue/orchestrator 合并为单一 async generator 可减少上下文切换和无界队列风险，但预期收益应由 CPU profile 证明。
 - 初始对齐公式当前在 prompt 已是 128 倍数时仍额外加 128 token；若对齐确有必要，应验证是否改为 `(-prompt_len) % 128`，否则会无意增加 1–128 个思考 token。
 
@@ -333,6 +335,8 @@ docs/log/perf/<run_id>/
 
 `manifest.json` 至少记录：commit、dirty diff hash、vLLM/vLLM-Ascend/torch/torch-npu/CANN 版本、模型与 tokenizer revision、完整启动命令、设备、TP/DP、`max_num_seqs`、prefix cache、MTP 参数、数据集 hash、并发和随机种子。
 
+从 [`manifest.template.json`](../log/perf/manifest.template.json) 复制后填写。模板中的上游 tag/SHA 来自本地固定 checkout；`installed_version`、dirty 状态、模型、设备和启动参数必须按目标服务器实填，不能只相信模板值。
+
 `controller_phases.jsonl` 每行一个 phase，推荐格式：
 
 ```json
@@ -355,13 +359,22 @@ curl -s http://127.0.0.1:8000/version > version.json
 curl -s http://127.0.0.1:8000/metrics > metrics.before.prom
 ```
 
-2. 在 `generate_phase()` 统一打 phase JSONL。优先从最终 `RequestOutput` 读取：
+2. 控制器默认对每个 phase 输出一条 `TB_PHASE` JSON。优先从最终 `RequestOutput` 读取：
 
 - `num_cached_tokens`；
 - `metrics.queued_ts / scheduled_ts / first_token_ts / last_token_ts`；
 - `len(output.token_ids)`、stop/finish reason。
 
-这些字段可按 child request 分解 engine 侧 queue、首次调度至首 token、decode 的墙钟区间，而不是从 10 秒全局日志猜测。这里的“首次调度至首 token”不是纯 NPU kernel 时间；若要继续拆算子、图编译或同步开销，使用下一节 profiler。
+这些字段可按 child request 分解 engine 侧 queue、首次调度至首 token、decode 的墙钟区间，而不是从 10 秒全局日志猜测。这里的“首次调度至首 token”不是纯 NPU kernel 时间；若要继续拆算子、图编译或同步开销，使用下一节 profiler。若 vLLM 关闭 stats 或字段缺失，JSON 写 `null`，不能伪装为 0 ms。
+
+请求完成后从服务日志提取标准产物：
+
+```bash
+python tools/extract_tb_phase_metrics.py \
+  docs/log/perf/<run_id>/server.log docs/log/perf/<run_id>/
+```
+
+脚本生成 `controller_phases.jsonl`、`requests.jsonl` 和 `phase_summary.csv`；其中 `requests.jsonl.accounted_phase_wall_ms` 是顺序 phase 的计量和，不等于客户端 HTTP E2E，必须按 `parent_request_id` 与客户端结果配对。
 
 3. 请求结束后保存 `/metrics`。重点指标：
 
@@ -438,21 +451,63 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 - 平均和 P95 `paired_net_gain_ms > 0`；
 - 任务质量达到预先定义的非劣界；
 - `hidden_probe_tokens`、`probe_rounds`、`generate_calls` 有硬上限且日志可审计；
-- 在当前约 300-token 节省量下，额外成本低于 4.50 秒/请求（这是偏宽松上界）；
+- 在当前约 278-token 节省量下，额外成本低于 4.51 秒/请求（这是偏宽松上界）；
 - 流式取消、非流式聚合、异常、超时和 DP/priority 透传测试通过；
+
+## 11. 本轮实现与下一轮实验
+
+### 11.1 已落地但尚待服务器量化
+
+- `TimingCollector` 增加真实模型工作账本：`visible_think_tokens`、`hidden_probe_tokens`、`final_answer_tokens`、`generate_calls`。
+- 每个 `decision / initial_think / iterative_think / confidence_probe / final_answer` 输出 schema 1 的 `TB_PHASE`；若 vLLM stats 可用，则从 child `RequestOutput` 计算 queue/prefill/decode，并记录 `num_cached_tokens`。
+- trial prompt 与合成 `</think>` 从递归深拷贝改成受控浅拷贝；静态 suffix token 以 parent request 为单位缓存。
+- state enter/complete 与重复 `TB_CONFIDENCE` flush 默认关闭，保留 `verbose_stage_logging=true` 作为故障调试开关。
+- v0.23.0 route 在 DP rank 解析后执行，子请求透传 priority、LoRA、trace headers、DP rank、prompt/reasoning parser context；外层响应分别继续使用原生流式 reasoning parser、非流式统一 parser 与 chat template kwargs。
+- `dtb.patch` 已在固定的 vLLM `v0.23.0` checkout 上通过 `git apply --check`；本地 10 个无模型单元测试覆盖 phase 字段/账本、日志提取、浅拷贝、停止原因和流式/非流式路由响应 kwargs。
+
+这些属于**源码确定/本地测试**，不是目标 NPU 的性能实测。尤其结构化 phase 日志本身仍有一次 JSON 序列化与 flush 成本；它替代了更多旧日志，但必须在服务器用 A/B 量化。
+
+### 11.2 第一轮服务器测试（不改算法参数）
+
+使用完全相同的 16 个 sample ID，按交错顺序运行 `vanilla → 当前生产 DTB → 本轮 DTB`，至少 3 个随机化重复；每组都重新执行同样的 warmup/cache policy。比较：
+
+1. paired HTTP E2E、TTFT、可见 token 与质量分；
+2. `hidden_probe_tokens`、probe rounds、generate calls；
+3. phase wall/queue/prefill/decode 与 `cached_prompt_tokens / prompt_tokens`；
+4. `sum(phase.wall_ms)` 与客户端 E2E 的未解释差值；
+5. 新旧 DTB 的输出、accept round 与 quality 必须一致，才能把差值归因于工程微优化。
+
+可证伪假设：
+
+- **H1：隐藏 probe decode 是 30.25 秒回归的主项。** 若 `confidence_probe.decode_ms + 其 wall 中未解释部分` 占 DTB–vanilla paired gap 不足 20%，则否定，转查 final/think decode、排队和客户端格式化。
+- **H2：APC 已复用大部分增长前缀。** 若 iterative/probe 的 `cached_prompt_tokens / prompt_tokens` 中位数低于 80%，则否定，先查 DP 亲和、cache salt、block 边界和抢占；不要直接设计 resumable session。
+- **H3：Python 深拷贝/日志是次要但可测开销。** 若本轮 DTB 与生产 DTB 的 accept round/token/质量一致而 paired E2E 无可重复改善，则停止继续做 Python 微优化。
+
+### 11.3 第二轮 probe 长度消融（允许改变算法，必须做质量非劣检验）
+
+在 11.2 数据证明 probe 成本显著后，再运行 `current / 256 / 128 / 64` 四个长度。由于 task type 会覆盖 `RUNTIME.check_answer_len`，每个变体必须只修改所命中 `TASK_TYPES.*.check_answer_len`（或对全部 task type 做同一机械替换），并保存 `budget_config.yaml` hash；不要通过关闭 task classifier 顺带改变其他预算字段。
+
+每个变体报告：
+
+- paired E2E 平均/P50/P95；
+- hidden probe token、probe 命中轮次和最终可见 token；
+- 任务正确率、JSON/工具调用完整率、规划完整性及预先声明的非劣界；
+- 截断/length stop 比例与 value-min 分数分布。
+
+只有质量达到非劣界且 paired 净收益为正的长度才能进入默认配置。若 64–256 token 导致结构化答案截断，可以测试“短决策摘要 probe + 一次完整 final”，不能把残缺 candidate 直接复用为最终输出。
 
 ## 12. 外部版本依据
 
-- [vLLM v0.20.2 `AsyncLLM`：streaming input、resumable 与 profiler](https://github.com/vllm-project/vllm/blob/v0.20.2/vllm/v1/engine/async_llm.py)
-- [vLLM v0.20.2 scheduler：prefix block 查询与 streaming session](https://github.com/vllm-project/vllm/blob/v0.20.2/vllm/v1/core/sched/scheduler.py)
-- [vLLM v0.20.2 `RequestOutput`：metrics 与 `num_cached_tokens`](https://github.com/vllm-project/vllm/blob/v0.20.2/vllm/outputs.py)
-- [vLLM v0.20.2 `RequestStateStats`：请求级时间戳字段](https://github.com/vllm-project/vllm/blob/v0.20.2/vllm/v1/metrics/stats.py)
-- [vLLM v0.20.2 SamplingParams：logprobs=0、flat_logprobs、repetition_detection](https://github.com/vllm-project/vllm/blob/v0.20.2/vllm/sampling_params.py)
-- [vLLM v0.20.2 Prometheus logger 指标](https://docs.vllm.ai/en/v0.20.2/api/vllm/v1/metrics/loggers/)
+- [vLLM v0.23.0 `AsyncLLM.generate()`](https://github.com/vllm-project/vllm/blob/v0.23.0/vllm/v1/engine/async_llm.py)
+- [vLLM v0.23.0 chat completion serving](https://github.com/vllm-project/vllm/blob/v0.23.0/vllm/entrypoints/openai/chat_completion/serving.py)
+- [vLLM v0.23.0 `RequestOutput`：metrics 与 `num_cached_tokens`](https://github.com/vllm-project/vllm/blob/v0.23.0/vllm/outputs.py)
+- [vLLM v0.23.0 `RequestStateStats`：请求级时间戳字段](https://github.com/vllm-project/vllm/blob/v0.23.0/vllm/v1/metrics/stats.py)
+- [vLLM v0.23.0 SamplingParams](https://github.com/vllm-project/vllm/blob/v0.23.0/vllm/sampling_params.py)
 - [vLLM-Ascend Service Profiling Guide](https://docs.vllm.ai/projects/ascend/en/main/developer_guide/performance_and_debug/service_profiling_guide.html)
 
 ## 13. 变更记录
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-07-21 | 纳入 v0.23.0 最新 DTB 汇总；落地 phase ledger、浅拷贝/日志优化、v0.23.0 调用上下文透传、manifest 模板与日志提取工具 | 先获得隐藏 probe 与 child phase 的请求级证据，再对 2000–4000 token probe 做质量约束消融 |
 | 2026-07-20 | 重写性能分析；建立完整成本模型、优化优先级和服务器 runbook | 校正早期文档对 scheduler slot、KV cache 和 MTP 因果的过度推断，并纳入新日志证据 |

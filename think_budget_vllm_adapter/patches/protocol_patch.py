@@ -1,4 +1,4 @@
-"""添加到 vLLM 0.20.2 ``ChatCompletionRequest`` 的 Think Budget 字段。
+"""添加到 vLLM 0.23.0 ``ChatCompletionRequest`` 的 Think Budget 字段。
 
 对外只开放总开关与六个 ``fixed_*`` 人工固定输入。动态预算、历史/难度
 策略、会话控制及旧版 ``tb_*`` 别名均为服务端配置，不能出现在 HTTP 请求。

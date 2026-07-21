@@ -92,7 +92,8 @@ class BudgetController:
 
     # ``serving.py`` 与适配器曾分别演进，直接扩展 handle_request 的位置
     # 参数会让部分服务器加载到的旧控制器在路由后立即 TypeError。公共调用
-    # ABI 固定为 7 个业务参数；新版所需路由身份由 serving.py 写入私有属性。
+    # ABI 固定为 7 个业务参数；新版所需路由与解析上下文由 serving.py 写入
+    # 私有属性，避免把 HTTP 请求面扩展成内部对象传输协议。
     ROUTING_CONTEXT_ATTR = "_think_budget_route_identity"
 
     @staticmethod
@@ -135,6 +136,8 @@ class BudgetController:
             history_warmup_strategy=str(defaults["history_warmup_strategy"]),
             default_task_type=str(defaults["default_task_type"]),
             final_answer_max_tokens=int(defaults["final_answer_max_tokens"]),
+            emit_phase_metrics=bool(defaults["emit_phase_metrics"]),
+            verbose_stage_logging=bool(defaults["verbose_stage_logging"]),
         )
 
     @staticmethod
@@ -438,7 +441,28 @@ class BudgetController:
         # HTTP JSON，因此不会扩张严格的公网参数面。直接调用控制器时再以
         # vLLM 服务对象回退解析，便于本地测试和旧补丁升级。
         route_identity = getattr(request, self.ROUTING_CONTEXT_ATTR, None)
-        if (isinstance(route_identity, tuple) and len(route_identity) == 3):
+        trace_headers = None
+        engine_prompt_text = None
+        reasoning_ended = None
+        reasoning_parser_kwargs = None
+        reasoning_parser = None
+        response_parser = None
+        chat_template_kwargs = None
+        if isinstance(route_identity, dict):
+            model_name = route_identity.get("model_name", model_name)
+            lora_request = route_identity.get("lora_request", lora_request)
+            data_parallel_rank = route_identity.get(
+                "data_parallel_rank", data_parallel_rank)
+            trace_headers = route_identity.get("trace_headers")
+            engine_prompt_text = route_identity.get("prompt_text")
+            reasoning_ended = route_identity.get("reasoning_ended")
+            reasoning_parser_kwargs = route_identity.get("reasoning_parser_kwargs")
+            reasoning_parser = route_identity.get("reasoning_parser")
+            response_parser = route_identity.get("response_parser")
+            chat_template_kwargs = route_identity.get("chat_template_kwargs")
+        elif (isinstance(route_identity, tuple) and len(route_identity) == 3):
+            # Compatibility with the previous serving patch during rolling
+            # upgrades. New deployments always use the dict above.
             routed_model_name, routed_lora_request, routed_data_parallel_rank = route_identity
             if model_name is None:
                 model_name = routed_model_name
@@ -452,7 +476,7 @@ class BudgetController:
         if model_name is None:
             model_name = serving_chat.models.model_name(lora_request)
 
-        timing = TimingCollector()
+        timing = TimingCollector(emit_phase_metrics=config.emit_phase_metrics)
         try:
             with timing.measure("decision.decode_prompt"):
                 prompt_text = tokenizer.decode(
@@ -464,6 +488,18 @@ class BudgetController:
         with timing.measure("decision.total"):
             decision_params = self._run_budget_decision_chain(
                 prompt_text, config, external_overrides, timing)
+        decision_wall_ms = (time.perf_counter() - timing.started_at) * 1000
+        timing.record_phase(
+            parent_request_id=request_id,
+            child_request_id="",
+            phase="decision",
+            round_id=0,
+            wall_ms=decision_wall_ms,
+            controller_cpu_ms=decision_wall_ms,
+            prompt_tokens=len(engine_inputs[0].get("prompt_token_ids", [])),
+            generated_tokens=0,
+            visible=False,
+        )
         print(
             f"TB_DECISION request_id={request_id} params={decision_params} "
             f"timings={timing.snapshot()}",
@@ -479,6 +515,12 @@ class BudgetController:
             request_id=request_id,
             lora_request=lora_request,
             data_parallel_rank=data_parallel_rank,
+            trace_headers=trace_headers,
+            prompt_text=(engine_prompt_text or engine_inputs[0].get("prompt") or prompt_text),
+            reasoning_ended=reasoning_ended,
+            reasoning_parser_kwargs=reasoning_parser_kwargs,
+            reasoning_parser=reasoning_parser,
+            chat_template_kwargs=chat_template_kwargs,
             max_tokens_temp=0,
             result_queue=asyncio.Queue(),
             budget_start_time=time.time(),
@@ -512,7 +554,8 @@ class BudgetController:
             orchestrator, context, request)
         return await self._format_response(
             serving_chat, request, response_generator, request_id, model_name,
-            conversation, tokenizer, request_metadata)
+            conversation, tokenizer, request_metadata, reasoning_parser,
+            response_parser, chat_template_kwargs)
 
     @staticmethod
     async def _format_response(
@@ -524,17 +567,20 @@ class BudgetController:
         conversation: list,
         tokenizer: TokenizerLike,
         request_metadata: RequestResponseMetadata,
+        reasoning_parser: Any = None,
+        response_parser: Any = None,
+        chat_template_kwargs: dict[str, Any] | None = None,
     ) -> Any:
         if request.stream:
             return serving_chat.chat_completion_stream_generator(
                 request, response_generator, request_id, model_name, conversation,
-                tokenizer, request_metadata, reasoning_parser=None,
-                chat_template_kwargs=None,
+                tokenizer, request_metadata, reasoning_parser=reasoning_parser,
+                chat_template_kwargs=chat_template_kwargs,
             )
         try:
             return await serving_chat.chat_completion_full_generator(
                 request, response_generator, request_id, model_name, conversation,
-                tokenizer, request_metadata, reasoning_parser=None,
+                tokenizer, request_metadata, parser=response_parser,
             )
         except (ValueError, RuntimeError) as exc:
             return serving_chat.create_error_response(str(exc))

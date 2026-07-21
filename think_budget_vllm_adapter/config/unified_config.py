@@ -63,6 +63,11 @@ _RUNTIME_DEFAULTS: Dict[str, Any] = {
     'custom_task_types_path': None,
     'default_task_type': 'general',
     'final_answer_max_tokens': 2048,
+    # One JSON line per model phase is cheap enough for production profiling.
+    # Per-state enter/complete logging is intentionally opt-in because every
+    # flush sits on the request's critical path.
+    'emit_phase_metrics': True,
+    'verbose_stage_logging': False,
 }
 
 
