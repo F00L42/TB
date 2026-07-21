@@ -1,88 +1,61 @@
+"""vLLM 0.20.2 serving.py routing notes for the Think Budget controller.
+
+The authoritative combined patch is ``../../dtb.patch``.  Apply its route as
+one unit: DEER and Think Budget are separate controllers, and Think Budget
+takes precedence only when both flags are accidentally set on one request.
+Adapters, data-parallel rank and the resolved model name must be obtained
+before routing, otherwise child requests lose their engine identity.
 """
-vLLM v0.20.2 — serving.py 补丁说明 (Budget Controller 版)
 
-文件: vllm/entrypoints/openai/chat_completion/serving.py
-
-=== 修改0: 顶部导入 (约第80行附近，在 from deer.cot_controller import CoTController 之后) ===
-添加:
-    from think_budget_vllm_adapter import BudgetController  # noqa: F401
-
-注意: 必须使用 "from think_budget_vllm_adapter import BudgetController" 而非
-      "from think_budget_vllm_adapter.budget_controller import BudgetController"。
-      原因: __init__.py 中预导入了内嵌的 deer_think_budget 子模块，
-      必须先执行 __init__.py 才能保证后续子模块导入正常。
-
-=== 旧版修改1 (已弃用) ===
-    from think_budget_vllm_adapter.budget_controller import BudgetController
+# 1. Imports (near other serving imports)
+from deer.cot_controller import CoTController  # noqa: F401
+from think_budget_vllm_adapter import BudgetController  # noqa: F401
 
 
-=== 修改2: __init__ 方法中初始化 (约第178行附近，在 self.supports_code_interpreter = False 之后) ===
-添加:
-    self.budget_controller = BudgetController()
-
-  如果已有 deer_think_budget 的 CoTController 初始化:
-    self.think_budget_controller = ThinkBudgetController()
-  则保留两者共存，Budget 分流优先于 CoT 分流。
+# 2. OpenAIServingChat.__init__
+# self.cot_controller = CoTController()
+# self.budget_controller = BudgetController()
 
 
-=== 修改3: create_chat_completion 方法中添加 Budget 分流逻辑 ===
-位置: 在 request_metadata 构建之后、lora_request 获取之前
-      (约第264行 "if raw_request:" 块之后)
-
-原始代码:
-    request_metadata = RequestResponseMetadata(request_id=request_id)
-    if raw_request:
-        raw_request.state.request_metadata = request_metadata
-
-    lora_request = self._maybe_get_adapters(request, supports_default_mm_loras=True)
+# 3. OpenAIServingChat.create_chat_completion, directly after request_metadata
+# is assigned.  Replace the original lora/model block with the following and
+# keep the remainder of the original method unchanged.
+SERVING_ROUTING_PATCH = '''
+    lora_request = self._maybe_get_adapters(
+        request, supports_default_mm_loras=True)
     model_name = self.models.model_name(lora_request)
 
-修改为:
-    request_metadata = RequestResponseMetadata(request_id=request_id)
-    if raw_request:
-        raw_request.state.request_metadata = request_metadata
+    data_parallel_rank = self._get_data_parallel_rank(raw_request)
 
-    # ====== Budget 决策链分流 (最高优先级) ======
-    if getattr(request, 'budget_disabled', False) is not True and getattr(request, 'budget_token_limit', 0) > 0:
-        logger.info(f"Request {request_id} is using Budget Controller (fixed budget mode).")
+    # BUDGET_ENABLED 是服务端总开关。关闭时，即使请求带有
+    # enable_think_budget=true 也必须直接回到原生 vLLM 路径，不能创建
+    # Think Budget 会话、子请求或占用其并发槽位。
+    if request.enable_think_budget and self.budget_controller.is_enabled():
+        print(
+            f"TB_ROUTE event=selected request_id={request_id} controller=think_budget",
+            flush=True)
         tokenizer = self.renderer.tokenizer
         assert tokenizer is not None
+        # 固定为旧版 7 参数 ABI，避免 serving.py 与已部署适配器不同步时
+        # 在请求路由后发生 TypeError。该属性只在服务端进程内写入。
+        object.__setattr__(request, "_think_budget_route_identity", (
+            model_name, lora_request, data_parallel_rank))
         return await self.budget_controller.handle_request(
-            self, conversation, engine_inputs,
-            request, request_id, tokenizer, request_metadata)
-    # ====== END Budget 决策链分流 ======
+            self, conversation, engine_inputs, request, request_id, tokenizer,
+            request_metadata)
 
-    # ====== Think Budget 分流 (次优先级) ======
-    if request.enable_think_budget:
-        logger.info(f"Request {request_id} is using Think Budget Controller.")
-        tokenizer = self.renderer.tokenizer
-        assert tokenizer is not None
-        return await self.think_budget_controller.handle_request(
-            self, conversation, engine_inputs,
-            request, request_id, tokenizer, request_metadata)
-    # ====== END Think Budget 分流 ======
+    if request.enable_deer and not request.enable_think_budget:
+        logger.info("Request %s is using DEER CoT Controller.", request_id)
+        return await self.cot_controller.handle_request(
+            self, conversation, engine_inputs, request, request_id, tokenizer,
+            request_metadata, model_name, lora_request, data_parallel_rank)
 
-    lora_request = self._maybe_get_adapters(request, supports_default_mm_loras=True)
-    model_name = self.models.model_name(lora_request)
+    # Do not repeat _maybe_get_adapters/model_name below this block.
+'''
 
 
-=== 注意事项 ===
-1. Budget Controller 分流优先于 Think Budget (CoT) 分流
-2. Budget Controller 默认不启用 — 需要 budget_token_limit > 0 或 BUDGET_ENABLED=True
-3. Budget Controller 包含完整决策链 (任务类型→难度→历史→参数映射)
-4. Think Budget (CoT) Controller 只使用请求参数中的固定值
-5. 两者可以共存: Budget 用于高级场景，CoT 用于简单场景
-6. tokenizer 在分流分支中单独获取 (self.renderer.tokenizer)
-7. engine_inputs 是 list[EngineInput] 类型 (新版 vLLM)
-
-
-=== Budget Controller vs CoT Controller 对比 ===
-
-| 特性                | Budget Controller                | CoT Controller           |
-|---------------------|----------------------------------|--------------------------|
-| 决策链              | 有 (任务类型→难度→历史→参数)    | 无 (直接使用请求参数)   |
-| config 类           | BudgetConfig (扩展 ThinkBudgetConfig) | ThinkBudgetConfig    |
-| context 类          | BudgetRequestContext (扩展 RequestStateContext) | RequestStateContext |
-| 状态机              | 复用 deer_think_budget AsyncReasoningOrchestrator | 同左 |
-| 启用条件            | budget_token_limit>0 或 BUDGET_ENABLED | enable_think_budget |
-| 动态参数            | 根据prompt内容自动调整          | 全部由请求参数指定     |
+NOTES = """
+控制器接收已解析的模型名（包括 LoRA 选择），并仅在
+enable_think_budget=true 时进入 Think Budget 路由。动态策略与会话管理
+均为服务端内部实现，不提供请求级覆盖或续接字段。
+"""

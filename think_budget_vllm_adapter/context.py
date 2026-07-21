@@ -16,6 +16,7 @@ from typing import Any, Optional, Dict, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 from think_budget_vllm_adapter.deer_think_budget.context import ThinkBudgetConfig, RequestStateContext
+from think_budget_vllm_adapter.telemetry import TimingCollector
 
 if TYPE_CHECKING:
     from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
@@ -40,15 +41,13 @@ class BudgetConfig(ThinkBudgetConfig):
     """
 
     # ─── Budget 决策参数（由决策链计算后填入）───
-    check_length: int = 512         # 初始思考token数（覆盖 initial_thought_limit）
-    num_thinking: int = 10          # 最大思考轮次（覆盖 trial_answers）
-    think_stride_budget: int = 128  # budget决定的步长（覆盖 think_stride）
+    # 初始长度、轮数、步长、试探答案长度和置信度直接写入父类的
+    # initial_thought_limit、trial_answers、think_stride、
+    # trial_answer_length、prob_th。不要保留同义镜像字段，否则会出现
+    # “观测值已更新、DEER 实际读取值未更新”的双数据源问题。
     min_think_tokens: int = 100     # 最低思考token门限
-    check_answer_len: int = 50      # 试探答案长度（覆盖 trial_answer_length）
-    prob_th_budget: float = 0.95    # budget决定的置信度阈值（覆盖 prob_th）
 
     # ─── Budget 开关 ───
-    enable_confidence: bool = True       # 是否启用增强置信度评估
     enable_consecutive_same_stop: bool = False  # 连续相同答案早停
     enable_difficulty_estimator: bool = False  # 难度估计器
     enable_task_type_budget: bool = True  # 任务类型预算
@@ -57,8 +56,6 @@ class BudgetConfig(ThinkBudgetConfig):
 
     # ─── DEER trial 参数 ───
     deer_trial_stable_rounds: int = 2
-    deer_trial_answer_len: int = 30
-    deer_confidence_boost: float = 0.05
 
     # ─── 任务类型信息（由决策链填入）───
     task_type: str = 'general'
@@ -69,7 +66,27 @@ class BudgetConfig(ThinkBudgetConfig):
 
     # ─── 人工可控超参 ───
     fixed_budget_tokens: int = 0
+    fixed_num_thinking: int = 0
+    fixed_think_stride: int = 0
+    fixed_check_length: int = 0
+    fixed_prob_th: float = 0.0
+    fixed_min_think_tokens: int = 0
     BUDGET_ENABLED: bool = True
+
+    # ─── 服务端执行边界（不允许请求覆盖） ───
+    # 0 means no separate API-call cap; this is server configuration only.
+    # trial_answers/token_budget remain the algorithm's dynamic controls.
+    max_api_calls: int = 0
+    final_answer_max_tokens: int = 2048
+
+    # ─── 历史/难度模块的外置配置 ───
+    history_budget_multiplier: float = 1.2
+    history_low_success_boost: float = 1.3
+    history_stride_percentile: float = 0.75
+    history_warmup_count: int = 3
+    history_warmup_strategy: str = 'moderate'
+    custom_task_types_path: Optional[str] = None
+    default_task_type: str = 'general'
 
 
 @dataclass
@@ -85,11 +102,15 @@ class BudgetRequestContext(RequestStateContext):
     从 think_budget/context.py 迁移，调整导入路径。
     """
     # ─── Budget 运行时状态 ───
-    reasoning_logprobs_flat: list = field(default_factory=list)   # 最近一轮推理的扁平logprobs
-    reasoning_tokens_text: list = field(default_factory=list)     # 最近一轮推理的token文本
-
     # ─── Trial Evaluator ───
     trial_evaluator: Any = None   # TrialAnswerEvaluator 实例（延迟初始化）
+
+    # ─── 运行时可观测性 / 会话元数据 ───
+    model_name: Optional[str] = None
+    session_id: Optional[str] = None
+    external_overrides: set[str] = field(default_factory=set)
+    timing: TimingCollector = field(default_factory=TimingCollector)
+    orchestration_error: Optional[str] = None
 
     # 注意: budget_start_time, answer_list, prev_answer_text, consecutive_same_count
     # 已在 RequestStateContext 中定义，无需重复声明
@@ -102,47 +123,49 @@ class BudgetRequestContext(RequestStateContext):
         """
         cfg = self.config
 
+        def set_if_computed(field_name: str, value: Any) -> None:
+            """Decision-chain output may never replace a request-supplied field."""
+            if field_name not in self.external_overrides:
+                setattr(cfg, field_name, value)
+
         # 映射 budget 参数到 DeerConfig 兼容字段
         if 'check_length' in budget_params:
-            cfg.initial_thought_limit = budget_params['check_length']
-            cfg.check_length = budget_params['check_length']
+            set_if_computed('initial_thought_limit', budget_params['check_length'])
 
         if 'think_stride' in budget_params:
-            cfg.think_stride = budget_params['think_stride']
-            cfg.think_stride_budget = budget_params['think_stride']
+            set_if_computed('think_stride', budget_params['think_stride'])
 
         if 'num_thinking' in budget_params:
-            cfg.trial_answers = budget_params['num_thinking']
-            cfg.num_thinking = budget_params['num_thinking']
+            set_if_computed('trial_answers', budget_params['num_thinking'])
 
         if 'min_think_tokens' in budget_params:
-            cfg.min_think_tokens = budget_params['min_think_tokens']
+            set_if_computed('min_think_tokens', budget_params['min_think_tokens'])
 
         if 'check_answer_len' in budget_params:
-            cfg.trial_answer_length = budget_params['check_answer_len']
-            cfg.check_answer_len = budget_params['check_answer_len']
+            set_if_computed('trial_answer_length', budget_params['check_answer_len'])
 
         if 'prob_th' in budget_params:
-            cfg.prob_th = budget_params['prob_th']
-            cfg.prob_th_budget = budget_params['prob_th']
+            set_if_computed('prob_th', budget_params['prob_th'])
+
+        if 'token_budget' in budget_params:
+            set_if_computed('token_budget', budget_params['token_budget'])
 
         # 任务类型信息
         if 'task_type' in budget_params:
-            cfg.task_type = budget_params['task_type']
+            set_if_computed('task_type', budget_params['task_type'])
         if 'scene_type' in budget_params:
-            cfg.scene_type = budget_params['scene_type']
+            set_if_computed('scene_type', budget_params['scene_type'])
 
         # 开关参数
-        for key in ['enable_confidence', 'enable_value_min_confidence',
-                     'enable_dual_channel', 'enable_full_chain_confidence',
-                     'enable_consecutive_same_stop', 'enable_clean_context',
-                     'enable_safety_gate', 'enable_difficulty_estimator',
-                     'enable_task_type_budget', 'enable_history_budget',
-                     'enable_deer_trial', 'enable_soft_truncation',
-                     'consecutive_same_stop', 'value_min_bottom_k',
-                     'reasoning_min_percentile', 'full_chain_min_percentile',
-                     'baseline_time_limit', 'deer_trial_stable_rounds',
-                     'deer_trial_answer_len', 'deer_confidence_boost',
+        for key in ['enable_value_min_confidence',
+                      'enable_dual_channel', 'enable_full_chain_confidence',
+                      'enable_consecutive_same_stop',
+                      'enable_safety_gate', 'enable_difficulty_estimator',
+                      'enable_task_type_budget', 'enable_history_budget',
+                      'enable_deer_trial',
+                      'consecutive_same_stop', 'value_min_bottom_k',
+                      'reasoning_min_percentile', 'full_chain_min_percentile',
+                      'baseline_time_limit', 'deer_trial_stable_rounds',
                      'difficulty_info', 'history_info', 'complexity_info',
                      'fixed_budget_tokens', 'BUDGET_ENABLED']:
             if key in budget_params:
@@ -155,7 +178,5 @@ class BudgetRequestContext(RequestStateContext):
             self.trial_evaluator = TrialAnswerEvaluator({
                 'enable_deer_trial': True,
                 'deer_trial_stable_rounds': self.config.deer_trial_stable_rounds,
-                'deer_trial_answer_len': self.config.deer_trial_answer_len,
-                'deer_confidence_boost': self.config.deer_confidence_boost,
             })
             self.trial_evaluator.reset()

@@ -7,10 +7,8 @@ import os
 import time
 import asyncio
 import threading
-import logging
 from typing import Dict, List, Optional, Any, Tuple
 
-logger = logging.getLogger(__name__)
 
 _HISTORY_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'think_budget', 'inference_history.jsonl')
 _HISTORY_LOCK = threading.Lock()
@@ -398,7 +396,10 @@ def _evict_old_entries_locked():
 
     evicted_count = len(_history_cache) - len(survived)
     if evicted_count > 0:
-        logger.info(f"历史淘汰: {evicted_count}条, 保留{len(survived)}条")
+        print(
+            f"TB_HISTORY event=evict evicted={evicted_count} retained={len(survived)}",
+            flush=True,
+        )
         _history_cache = survived
 
         try:
@@ -407,7 +408,10 @@ def _evict_old_entries_locked():
                 for entry in _history_cache:
                     f.write(json.dumps(entry, ensure_ascii=False, default=str) + '\n')
         except Exception as e:
-            logger.warning(f"历史淘汰后重写文件失败: {e}")
+            print(
+                f"TB_WARNING event=history_rewrite_failed error={e}",
+                flush=True,
+            )
 
         _rebuild_index()
         _stats_cache = {}

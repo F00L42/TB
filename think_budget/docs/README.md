@@ -1,4 +1,6 @@
-# Think Budget Refactored — 项目完整说明
+# Think Budget 重构版：项目完整说明
+
+> 发布说明（2026-07-14）：本目录是独立 BudgetForcing 研究实现的历史/参考文档，**不是**本仓库 vLLM 0.20.2 的生产部署文档。请使用仓库根目录的 [README](../../README.md)、[部署说明](../../docs/deployment_vllm_0_20_2.md) 与 [适配器说明](../../think_budget_vllm_adapter/README.md)。文中涉及固定模型端点、数据集路径和历史性能数字，发布前均需脱敏并以可复现实验重新验证。
 
 ## 一、项目简介
 
@@ -722,7 +724,7 @@ HTTP POST /v1/chat/completions
 
 ## 十、关键约束
 
-- **模型强制为 mg2hg**：任何 `model_name` 参数被静默覆盖，唯一端点 `http://141.73.2.25:87/v1/completions`（Completions API，Chat Completions 返回 404）
+- **模型端点外置**：默认请求仍映射为 `mg2hg`，但端点与密钥必须通过 `MG2HG_URL`、`MG2HG_KEY` 注入（Completions API；Chat Completions 是否可用取决于部署端点）。
 - **NO_PROXY 已内置**：所有脚本内部自动设置 `os.environ["NO_PROXY"]` 绕过企业代理
 - **sys.path.insert 必须**：所有脚本手动添加项目根到 `sys.path`，无 `setup.py` 或 `pyproject.toml`
 - **思考标签**：`confidence.py` 和 `budget_forcing.py` 使用标准 XML 标签 `iesa`/`eiraot` 进行标签配对检测

@@ -2,11 +2,46 @@
 # 放置于 think_budget_vllm_adapter/config/ 目录下
 # 如果此文件不存在，程序使用 _get_default_config() 中的内置默认值
 
-HUMAN_CONTROLLABLE:
+RUNTIME:
   BUDGET_ENABLED: true
-  FIXED_BUDGET_TOKEN: 0
-  CONFIDENCE_THRESHOLD: 0.95
-  PERCENTILE_STEP: 0.75
+  check_length: 200
+  think_stride: 100
+  prob_th: 0.95
+  num_thinking: 10
+  # 与 DEER 一致：trial answer 仅用于置信度评估，默认最多 50 token。
+  check_answer_len: 50
+  max_tokens: 65536
+  max_api_calls: 0
+  min_think_tokens: 100
+  enable_consecutive_same_stop: true
+  consecutive_same_stop: 2
+  enable_value_min_confidence: true
+  value_min_bottom_k: 5
+  enable_full_chain_confidence: false
+  full_chain_min_percentile: 0.1
+  enable_dual_channel: false
+  reasoning_min_percentile: 0.1
+  enable_safety_gate: false
+  baseline_time_limit: 90.0
+  enable_task_type_budget: true
+  enable_history_budget: true
+  enable_difficulty_estimator: false
+  enable_deer_trial: false
+  deer_trial_stable_rounds: 2
+  fixed_budget_tokens: 0
+  fixed_num_thinking: 0
+  fixed_think_stride: 0
+  fixed_check_length: 0
+  fixed_prob_th: 0.0
+  fixed_min_think_tokens: 0
+  history_budget_multiplier: 1.2
+  history_low_success_boost: 1.3
+  history_stride_percentile: 0.75
+  history_warmup_count: 3
+  history_warmup_strategy: moderate
+  custom_task_types_path: null
+  default_task_type: general
+  final_answer_max_tokens: 2048
 
 TASK_TYPES:
   retrieval:
@@ -17,6 +52,15 @@ TASK_TYPES:
     num_thinking: 3
     min_think_tokens: 50
     check_answer_len: 2000
+    prob_th: 0.90
+  statistics_aggregation:
+    description: 统计聚合任务
+    typical_tokens: 4000
+    check_length: 800
+    think_stride: 300
+    num_thinking: 6
+    min_think_tokens: 600
+    check_answer_len: 4000
     prob_th: 0.90
   classification:
     description: 分类任务
@@ -137,15 +181,15 @@ TASK_TYPE_PRIORITY:
   - planning
   - fault_diagnosis
   - tool_call
+  - statistics_aggregation
   - classification
   - retrieval
   - knowledge_qa
   - general
 
 HISTORY_NEW_TASK:
-  unlimited: true
+  unlimited: false
   unlimited_budget_placeholder: 99999
-  new_task_similarity_threshold: 0.3
 
 HISTORY_WARM_START:
   warmup_count: 3
@@ -160,9 +204,6 @@ HISTORY_HOT_START:
   stride_percentile: 0.75
   low_success_boost: 1.3
   high_failure_stride_factor: 0.8
-
-AUTO_REGISTRATION:
-  auto_cluster_threshold: 5
 
 SCENE_TYPES:
   tool_call:
@@ -192,3 +233,15 @@ SCENE_TYPES:
   general:
     typical_tokens: 3000
     token_range: [500, 15000]
+
+# 任务类型规则指示词。修改此处即可调整检索、分类和推理路由，毋须修改代码。
+TASK_TYPE_INDICATORS:
+  retrieval:
+    strong: ["查询", "检索", "查找", "获取", "搜索", "query", "retrieve", "search", "find", "lookup", "fetch", "查出", "列出", "帮我查", "查一下"]
+    weak: ["什么", "哪个", "哪些", "where", "which", "what", "有没有", "是否存在", "is there"]
+  classification:
+    strong: ["分类", "归类", "属于哪类", "classify", "categorize", "判断对错", "true or false", "选择题", "A.", "B.", "C.", "D.", "which of the following", "选项"]
+    weak: ["判断", "选择", "区分", "辨别", "identify"]
+  reasoning:
+    strong: ["推理", "推导", "前提", "结论", "推断", "infer", "deduce", "therefore", "hence", "conclude", "必然", "逻辑判断", "逻辑推理", "logically"]
+    weak: ["分析", "因为", "所以", "由于", "because", "since", "so", "thus", "首先", "然后", "最后", "因果关系"]

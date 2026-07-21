@@ -10,7 +10,7 @@ from typing import Dict, Optional, Any, List
 
 from think_budget_vllm_adapter.config.unified_config import (
     TaskType, get_task_type_budgets, get_task_type_budget as _get_unified_budget,
-    get_task_type_priority,
+    get_task_type_priority, get_task_type_indicators,
 )
 
 
@@ -25,6 +25,10 @@ def _load_defaults_from_unified_config():
         'retrieval': {
             'description': '检索任务', 'typical_tokens': 500, 'check_length': 200, 'think_stride': 100,
             'num_thinking': 3, 'min_think_tokens': 50, 'check_answer_len': 2000, 'prob_th': 0.90,
+        },
+        'statistics_aggregation': {
+            'description': '统计聚合任务', 'typical_tokens': 4000, 'check_length': 800, 'think_stride': 300,
+            'num_thinking': 6, 'min_think_tokens': 600, 'check_answer_len': 4000, 'prob_th': 0.90,
         },
         'classification': {
             'description': '分类任务', 'typical_tokens': 800, 'check_length': 300, 'think_stride': 100,
@@ -67,42 +71,37 @@ def _load_defaults_from_unified_config():
 
 TASK_TYPE_BUDGET_DEFAULTS = _load_defaults_from_unified_config()
 
-VALID_TASK_TYPES: List[str] = TaskType.values()
+def _load_task_type_indicators() -> Dict[str, Dict[str, List[str]]]:
+    """从统一 YAML 加载规则词；YAML 不可用时使用最小回退。"""
+    try:
+        indicators = get_task_type_indicators()
+        if indicators:
+            return indicators
+    except Exception:
+        pass
+    return {
+        'retrieval': {
+            'strong': ['查询', '检索', '查找', '获取', '搜索', 'query', 'retrieve', 'search', 'find', 'lookup', 'fetch'],
+            'weak': ['什么', '哪个', '哪些', 'where', 'which', 'what'],
+        },
+        'classification': {
+            'strong': ['分类', '归类', 'classify', 'categorize', '判断对错', '选择题', 'A.', 'B.', 'C.', 'D.'],
+            'weak': ['判断', '选择', '区分', '辨别'],
+        },
+        'reasoning': {
+            'strong': ['推理', '推导', '前提', '结论', '推断', 'infer', 'deduce'],
+            'weak': ['分析', '因为', '所以', '由于', 'because', 'since'],
+        },
+    }
 
-# ─── 关键词集合 ───
-_RETRIEVAL_STRONG = {
-    '查询', '检索', '查找', '获取', '搜索', 'query', 'retrieve', 'search',
-    'find', 'lookup', 'fetch', 'get info', '查找出', '查出', '查出所有',
-    '列出', 'list all', '列出所有', '显示', 'show me', '帮我查', '查一下',
-}
-_RETRIEVAL_WEAK = {
-    '什么', '哪个', '哪些', 'where', 'which', 'what',
-    '有没有', '是否存在', 'is there',
-}
 
-_CLASSIFICATION_STRONG = {
-    '分类', '归类', '属于哪类', '属于哪种', 'classify', 'categorize',
-    '哪个类别', '哪种类型', 'which category', 'which type',
-    '判断对错', '正误判断', 'true or false', '对还是错',
-    '选择题', '单选题', '多选题', 'A.', 'B.', 'C.', 'D.',
-    'which of the following', '选项', '以下哪项',
-}
-_CLASSIFICATION_WEAK = {
-    '判断', '选择', '区分', '辨别', 'identify',
-    '是A', '是B', '是C', '是D',
-}
-
-_REASONING_STRONG = {
-    '推理', '推导', '如果...那么', '前提', '结论', '推断',
-    'infer', 'deduce', 'therefore', 'hence', 'conclude',
-    '必然', '一定', '可以推出', '根据...可以',
-    '逻辑判断', '逻辑推理', 'logically',
-}
-_REASONING_WEAK = {
-    '分析', '判断', '因为', '所以', '由于',
-    'because', 'since', 'so', 'thus',
-    '首先', '然后', '最后', '因果关系',
-}
+_INDICATORS_CFG = _load_task_type_indicators()
+_RETRIEVAL_STRONG = set(_INDICATORS_CFG.get('retrieval', {}).get('strong', []))
+_RETRIEVAL_WEAK = set(_INDICATORS_CFG.get('retrieval', {}).get('weak', []))
+_CLASSIFICATION_STRONG = set(_INDICATORS_CFG.get('classification', {}).get('strong', []))
+_CLASSIFICATION_WEAK = set(_INDICATORS_CFG.get('classification', {}).get('weak', []))
+_REASONING_STRONG = set(_INDICATORS_CFG.get('reasoning', {}).get('strong', []))
+_REASONING_WEAK = set(_INDICATORS_CFG.get('reasoning', {}).get('weak', []))
 
 _SCENE_TO_TASK_TYPE = {
     'code_generation': 'coding',
@@ -118,6 +117,25 @@ _TASK_TYPE_PRIORITY = get_task_type_priority()
 
 _IF_THEN_RE = re.compile(r'如果[^。？]{3,30}(?:那么|则|就)', re.IGNORECASE)
 _CHOICE_RE = re.compile(r'[A-D][\.、\)）]', re.IGNORECASE)
+_COUNT_FIELD_RE = re.compile(r'\b[a-zA-Z_]*count\s*:', re.IGNORECASE)
+
+
+def _is_statistics_aggregation_task(question: str, q_lower: str) -> bool:
+    """识别统计表中的计数/求和问题，避免被误判为普通检索。"""
+    count_fields = _COUNT_FIELD_RE.findall(question)
+    has_many_statistics_rows = (
+        q_lower.count('ne_count') >= 5
+        or q_lower.count('_count:') >= 5
+        or len(count_fields) >= 5
+    )
+    asks_aggregation = any(marker in q_lower for marker in (
+        'how many', 'how much', 'count', 'total', 'sum', 'number of',
+        '多少', '几个', '总数', '数量', '统计', '求和',
+    ))
+    has_statistics_context = any(marker in q_lower for marker in (
+        '### statistics', 'statistics', 'aggregated record', 'ne_count',
+    ))
+    return has_many_statistics_rows and asks_aggregation and has_statistics_context
 
 
 def classify_task_type(question: str, scene_info: Optional[Dict] = None) -> Dict[str, Any]:
@@ -128,6 +146,16 @@ def classify_task_type(question: str, scene_info: Optional[Dict] = None) -> Dict
         from think_budget_vllm_adapter.optimizations.scene_classifier import classify_scene
         scene_info = classify_scene(question)
     scene_type = scene_info.get('scene_type', 'general')
+
+    if _is_statistics_aggregation_task(question, q_lower):
+        task_type = TaskType.STATISTICS_AGGREGATION.value
+        return {
+            'task_type': task_type,
+            'task_confidence': 1.0,
+            'scene_type': scene_type,
+            'scores': {task_type: 1.0},
+            'budget': get_task_type_budget(task_type),
+        }
 
     scores = {}
 

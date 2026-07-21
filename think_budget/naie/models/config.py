@@ -1,21 +1,47 @@
+"""External model-endpoint configuration for the standalone research client.
+
+No endpoint or credential is embedded in source code.  Set the matching
+``*_URL`` and ``*_KEY`` process environment variables before starting a client.
+"""
 import os
 
+
+def _external_model(key_env: str, url_env: str) -> dict[str, str]:
+    return {
+        "token": os.getenv(key_env, ""),
+        "url": os.getenv(url_env, ""),
+        "key_env": key_env,
+        "url_env": url_env,
+    }
+
+
 MODEL_CONFIGS = {
-    "DeepSeek-R1-108": {"token": os.getenv("DEEPSEEK_R1_108_KEY", "sk-xxx"), "url": os.getenv("DEEPSEEK_R1_108_URL", "http://oneapi.rnd.huawei.com/v1")},
-    "DeepSeek-R1": {"token": os.getenv("DEEPSEEK_R1_KEY", "sk-xxx"), "url": os.getenv("DEEPSEEK_R1_URL", "http://oneapi.rnd.huawei.com/v1")},
-    "DeepSeek-R1-Distill-Llama-70B": {"token": os.getenv("DEEPSEEK_R1_LLAMA_KEY", "sk-xxx"), "url": os.getenv("DEEPSEEK_R1_LLAMA_URL", "http://oneapi.rnd.huawei.com/v1")},
-    "Qwen3-32B": {"token": os.getenv("QWEN3_32B_KEY", "sk-gDdTT07VGCb6keLFBeD8C24145F343B3AeC515Db920d6c0b"), "url": os.getenv("QWEN3_32B_URL", "http://oneapi.rnd.huawei.com/v1")},
-    "Qwen3-30B-A3B": {"token": os.getenv("QWEN3_30B_KEY", ""), "url": os.getenv("QWEN3_30B_URL", "http://oneapi.rnd.huawei.com/v1")},
-    "minimax-m2.7": {"token": os.getenv("MINIMAX_M27_KEY", "sk-gDdTT07VGCb6keLFBeD8C24145F343B3AeC515Db920d6c0b"), "url": os.getenv("MINIMAX_M27_URL", "http://oneapi.rnd.huawei.com/v1")},
-    "MiniMax-M2.7": {"token": os.getenv("MINIMAX_M27_ALT_KEY", "ah-625bc34bdb0169905cfcbc27479cc4db8bb572f15ec656d80f4414109c272384"), "url": os.getenv("MINIMAX_M27_ALT_URL", "http://70.248.198.1:8080/v1")},
-    "mg2hg": {"token": os.getenv("MG2HG_KEY", "sk-gDdTT07VGCb6keLFBeD8C24145F343B3AeC515Db920d6c0b"), "url": os.getenv("MG2HG_URL", "http://141.73.2.25:73/v1")},
-    "netmo-qwen3p6-27b": {"token": os.getenv("netmo-qwen3p6-27b_KEY", "sk-gDdTT07VGCb6keLFBeD8C24145F343B3AeC515Db920d6c0b"), "url": os.getenv("netmo-qwen3p6-27b_URL", "https://71.77.65.6:32880/rest/netrsn/v1")},
-    "minimax27": {"token": os.getenv("MINIMAX27_KEY", "sk-gDdTT07VGCb6keLFBeD8C24145F343B3AeC515Db920d6c0b"), "url": os.getenv("MINIMAX27_URL", "http://oneapi.rnd.huawei.com/v1")},
-    "codemate/MiniMax-M2.7": {"token": os.getenv("CODEMATE_KEY", "xxx"), "url": os.getenv("CODEMATE_URL", "http://127.0.0.1:31943/v1/")},
+    "DeepSeek-R1-108": _external_model("DEEPSEEK_R1_108_KEY", "DEEPSEEK_R1_108_URL"),
+    "DeepSeek-R1": _external_model("DEEPSEEK_R1_KEY", "DEEPSEEK_R1_URL"),
+    "DeepSeek-R1-Distill-Llama-70B": _external_model(
+        "DEEPSEEK_R1_LLAMA_KEY", "DEEPSEEK_R1_LLAMA_URL"),
+    "Qwen3-32B": _external_model("QWEN3_32B_KEY", "QWEN3_32B_URL"),
+    "Qwen3-30B-A3B": _external_model("QWEN3_30B_KEY", "QWEN3_30B_URL"),
+    "minimax-m2.7": _external_model("MINIMAX_M27_KEY", "MINIMAX_M27_URL"),
+    "MiniMax-M2.7": _external_model("MINIMAX_M27_ALT_KEY", "MINIMAX_M27_ALT_URL"),
+    "mg2hg": _external_model("MG2HG_KEY", "MG2HG_URL"),
+    "netmo-qwen3p6-27b": _external_model(
+        "NETMO_QWEN3P6_27B_KEY", "NETMO_QWEN3P6_27B_URL"),
+    "minimax27": _external_model("MINIMAX27_KEY", "MINIMAX27_URL"),
+    "codemate/MiniMax-M2.7": _external_model("CODEMATE_KEY", "CODEMATE_URL"),
 }
 
 
-def get_model_config(model_name: str) -> dict:
-    if model_name in MODEL_CONFIGS:
-        return MODEL_CONFIGS[model_name]
-    return {"token": os.getenv("FALLBACK_KEY", "sk-xxx"), "url": os.getenv("FALLBACK_URL", "http://oneapi.rnd.huawei.com/v1")}
+def get_model_config(model_name: str) -> dict[str, str]:
+    """Return a configured model endpoint or fail before an HTTP request.
+
+    An unknown model deliberately uses the explicit fallback variables rather
+    than silently routing production data to a source-code default endpoint.
+    """
+    config = dict(MODEL_CONFIGS.get(
+        model_name, _external_model("FALLBACK_KEY", "FALLBACK_URL")))
+    if not config["token"] or not config["url"]:
+        raise ValueError(
+            f"Model {model_name!r} is not configured. Set {config['key_env']} "
+            f"and {config['url_env']} in the service environment.")
+    return config

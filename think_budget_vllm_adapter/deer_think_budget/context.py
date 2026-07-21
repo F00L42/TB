@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import time
 
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
@@ -61,12 +61,6 @@ class ThinkBudgetConfig:
     enable_dual_channel: bool = False          # 双通道混合评估
     reasoning_min_percentile: float = 0.1      # 推理区 Min-%
 
-    # ─── P3.3 Clean Context ───
-    enable_clean_context: bool = True          # 继续思考时丢弃 induced 部分
-
-    # ─── 软截断 ───
-    enable_soft_truncation: bool = True        # 自然断点截断
-
     # ─── 安全门 ───
     enable_safety_gate: bool = False           # 超时自动回退
     baseline_time_limit: float = 90.0          # 基线时间限制 (秒)
@@ -96,9 +90,15 @@ class RequestStateContext:
     # 动态状态 — DEER 原有
     request_id: str
     engine_prompt: dict  # EngineInput (TokensInput TypedDict)
+    # Budget 决策只发生一次；以下身份必须随每个 DEER child request
+    # 一起传给 vLLM，确保 LoRA 与数据并行路由不在中途丢失。
+    lora_request: Any = None
+    data_parallel_rank: Optional[int] = None
     trial_count: int = 0
     result_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     last_chunk: Optional[RequestOutput] = None
+    # 回答态与异常收口共用，保证可见的 </think> 至多补发一次。
+    think_end_emitted: bool = False
     rep_count: int = 0
     last_stride_text: Optional[str] = None
 
@@ -127,6 +127,14 @@ class RequestStateContext:
     @property
     def default_sampling_params(self):
         return self.serving_chat.default_sampling_params
+
+    def engine_request_kwargs(self) -> dict[str, Any]:
+        """返回每个 child request 必须保持一致的 vLLM 调度参数。"""
+        return {
+            "lora_request": self.lora_request,
+            "priority": getattr(self.request, "priority", None) or 0,
+            "data_parallel_rank": self.data_parallel_rank,
+        }
 
     async def stream_output(self, result):
         """透传推理结果到 result_queue。"""

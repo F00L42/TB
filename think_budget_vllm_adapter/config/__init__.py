@@ -4,7 +4,7 @@ from think_budget_vllm_adapter.config.unified_config import (
     load_budget_config,
     get_task_type_budgets, get_task_type_budget,
     get_difficulty_tier, get_difficulty_multiplier,
-    get_human_controllable_params, get_history_config,
+    get_runtime_config, get_history_config,
     get_task_type_priority, get_scene_type_tokens,
     compute_difficulty_adjusted_budget,
 )
@@ -14,7 +14,7 @@ __all__ = [
     'load_budget_config',
     'get_task_type_budgets', 'get_task_type_budget',
     'get_difficulty_tier', 'get_difficulty_multiplier',
-    'get_human_controllable_params', 'get_history_config',
+    'get_runtime_config', 'get_history_config',
     'get_task_type_priority', 'get_scene_type_tokens',
     'compute_difficulty_adjusted_budget',
 ]

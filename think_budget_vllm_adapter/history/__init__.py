@@ -5,14 +5,12 @@ from think_budget_vllm_adapter.history.history_module import (
     clear_history,
 )
 from think_budget_vllm_adapter.history.history_budget import (
-    compute_history_budget, detect_new_task_type,
-    register_task_type_from_history,
+    compute_history_budget, register_task_type_from_history,
 )
 
 __all__ = [
     'record_inference', 'load_history', 'get_category_stats',
     'get_scene_stats', 'get_task_type_stats', 'get_cv_for_task_type',
     'clear_history',
-    'compute_history_budget', 'detect_new_task_type',
-    'register_task_type_from_history',
+    'compute_history_budget', 'register_task_type_from_history',
 ]

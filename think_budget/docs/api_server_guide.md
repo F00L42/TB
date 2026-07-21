@@ -1,10 +1,10 @@
-# API 服务指南 — API Server Guide
+# API 服务指南
 
 ## 概述
 
 `naie/api_server.py` 是生产版 API 服务器，提供兼容 OpenAI 格式的 BudgetForcing 代理接口。
 
-**唯一模型端点**：`http://141.73.2.25:87/v1/completions` (mg2hg)
+**模型端点**：默认模型为 `mg2hg`；部署时通过 `MG2HG_URL` 和 `MG2HG_KEY` 环境变量注入 Completions API 端点与凭据。
 **model 字段强制映射为 mg2hg**，不接受外部覆盖。
 
 ### v3 改进
@@ -511,7 +511,7 @@ response = requests.post(
 
 ## 注意事项
 
-- **model 强制为 mg2hg**：无论请求中指定什么 model，实际调用端点为 `http://141.73.2.25:87/v1/completions`
+- **model 默认映射为 mg2hg**：端点由 `MG2HG_URL` 提供，不再在源码或文档中固定内部地址。
 - **NO_PROXY 已内置**：服务器自动设置 `NO_PROXY` 环境变量
 - **思考标签格式**：标准格式 `iesa` / `eiraot`，API 返回中 `reasoning_content` 字段包含纯思考内容
 - **错误处理**：内部异常返回 HTTP 500 + 异常类型和消息

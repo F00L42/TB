@@ -18,7 +18,7 @@ _extra_struct_tokens: set[str] = set()
 DEFAULT_STRUCT_TOKENS = frozenset({
     '{', '}', '[', ']', ':', ',', '"', '```', '```json', '```python',
     '\\n', '\\t', 'true', 'false', 'null', 'True', 'False', 'None',
-    '->', '=>', '::',
+    '->', '=>', '::', '<think>', '</think>',
 })
 
 # 默认 JSON 键名 — 空集合，由 set_task_key_names() 注入

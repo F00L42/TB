@@ -3,24 +3,17 @@
 从 think_budget/history/history_budget.py 迁移，
 import 路径调整为 think_budget_vllm_adapter 内部模块。
 """
-import os
-import json
 import math
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, Any
 
 from think_budget_vllm_adapter.history.history_module import (
-    load_history, get_scene_stats, get_category_stats,
     get_task_type_stats, get_cv_for_task_type,
-    record_inference,
 )
 from think_budget_vllm_adapter.optimizations.task_type_budget import (
     get_task_type_budget, register_custom_task_type, register_new_task_type,
     is_known_task_type, compute_num_thinking_from_budget, compute_stride_from_budget,
-    TASK_TYPE_BUDGET_DEFAULTS,
 )
-from think_budget_vllm_adapter.config.unified_config import (
-    get_history_config, TaskType,
-)
+from think_budget_vllm_adapter.config.unified_config import get_history_config
 
 
 def compute_history_budget(
@@ -34,9 +27,8 @@ def compute_history_budget(
     hist_cfg = get_history_config()
 
     new_task_cfg = hist_cfg.get('new_task', {})
-    new_task_unlimited = cfg.get('new_task_unlimited', new_task_cfg.get('unlimited', True))
+    new_task_unlimited = cfg.get('new_task_unlimited', new_task_cfg.get('unlimited', False))
     unlimited_placeholder = new_task_cfg.get('unlimited_budget_placeholder', 99999)
-    similarity_threshold = new_task_cfg.get('new_task_similarity_threshold', 0.3)
 
     warm_cfg = hist_cfg.get('warm_start', {})
     multiplier = cfg.get('history_budget_multiplier', warm_cfg.get('multiplier', 1.2))
@@ -64,11 +56,11 @@ def compute_history_budget(
     success_rate = cat_stats.get('success_rate', 0.0)
     failure_rate = cat_stats.get('failure_rate', 0.0)
 
-    is_new = detect_new_task_type(question, task_type, scene_type, threshold=similarity_threshold)
-
-    # ═══ 阶段A: 新任务出现(零历史) ═══
-    if history_count == 0 or is_new:
-        if new_task_unlimited and is_new:
+    # ═══ 阶段A: 当前任务类型没有历史 ═══
+    # 题面措辞不同不代表任务类型是新的。以语义相似度判断会让同一
+    # task_type 的新表述反复回到无限预算，破坏已积累的历史收敛性。
+    if history_count == 0:
+        if new_task_unlimited:
             return {
                 'think_budget': unlimited_placeholder,
                 'check_length': task_budget.get('check_length', 500),
@@ -98,7 +90,7 @@ def compute_history_budget(
                 'history_avg_tokens': 0.0,
                 'history_p75_tokens': 0.0,
                 'success_rate': 0.0,
-                'is_new_task': is_new,
+                'is_new_task': True,
             }
 
     # ═══ 阶段B: 冷启动(1~warmup_count条历史) ═══
@@ -175,38 +167,6 @@ def compute_history_budget(
         'success_rate': round(success_rate, 3),
         'is_new_task': False,
     }
-
-
-def detect_new_task_type(question: str, task_type: str = 'general',
-                          scene_type: str = '', threshold: float = 0.3) -> bool:
-    """检测是否为新任务类型。"""
-    history = load_history()
-    if not history:
-        return True
-
-    candidates = [e for e in history if e.get('task_type') == task_type]
-    if not candidates:
-        if scene_type:
-            candidates = [e for e in history if e.get('scene_type') == scene_type]
-        if not candidates:
-            return True
-
-    max_sim = 0.0
-    q_chars = set(question[:200])
-    for e in candidates:
-        ep = e.get('question_preview', '')
-        if not ep:
-            continue
-        ep_chars = set(ep[:200])
-        intersection = len(q_chars & ep_chars)
-        union = len(q_chars | ep_chars)
-        if union > 0:
-            sim = intersection / union
-            max_sim = max(max_sim, sim)
-
-    return max_sim < threshold
-
-
 def register_task_type_from_history(
     task_type: str,
     scene_type: str = '',

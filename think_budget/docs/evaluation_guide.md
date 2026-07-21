@@ -14,7 +14,7 @@ Think Budget Refactored 提供多种评估模式，对比基线（自由生成�
 source ../.venv/bin/activate
 
 # 确认 NO_PROXY 已设置（脚本内部自动设置）
-# 确认模型端点可达: curl http://141.73.2.25:87/v1/completions
+# 确认模型端点可达: curl "$env:MG2HG_URL/completions"
 ```
 
 ---
@@ -500,7 +500,7 @@ python -c "import sys;sys.path.insert(0,'.');from naie.optimizations import *;fr
 **A**: 检查模型端点是否可达：
 
 ```bash
-curl http://141.73.2.25:87/v1/completions
+curl "$env:MG2HG_URL/completions"
 ```
 
 确保脚本内部设置了 `NO_PROXY`（已自动设置，无需手动操作）。

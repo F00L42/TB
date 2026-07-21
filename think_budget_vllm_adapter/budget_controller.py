@@ -1,395 +1,390 @@
-"""Budget Controller — 带完整预算决策链的推理控制器。
+"""Production controller for Think Budget on top of vLLM's async engine.
 
-基于 deer_think_budget 的 CoTController 扩展:
-  - 在创建 context 之前执行 budget 决策链 (Step 0-5)
-  - 使用 BudgetConfig/BudgetRequestContext 替代 ThinkBudgetConfig/RequestStateContext
-  - 复用 deer_think_budget 的 AsyncReasoningOrchestrator 状态机
-  - budget 决策链通过 config 参数传递给状态机
-
-Budget 决策链:
-  Step 0: BUDGET_ENABLED 总开关
-  Step 0.5: FIXED_BUDGET_TOKEN 覆盖
-  Step 1: 人工固定值覆盖
-  Step 2: 任务类型判断 (scene_classifier -> task_type_budget)
-  Step 3: 难度估计器 (difficulty_estimator -> budget映射)
-  Step 4: 历史轨迹预算 (history_budget -> 三段式泛化)
-  Step 5: 人工固定子参数覆盖
-  Final: CONFIDENCE_THRESHOLD & PERCENTILE_STEP 覆盖
-
-从 think_budget/budget_controller.py 迁移，调整导入路径:
-  - deer/deer_think_budget → deer_think_budget
-  - think_budget.* → think_budget_vllm_adapter.*
-  - 适配 vLLM v0.20.2 接口
+The controller deliberately separates three concerns:
+* request configuration is validated once and always wins field-by-field;
+* budget modules calculate only fields not supplied by the caller;
+* the state machine follows DEER's request-bound stream lifecycle, leaving
+  parent-request concurrency and cancellation to vLLM/OpenAI serving.
 """
 from __future__ import annotations
 
 import asyncio
-import copy
 import time
-
 from collections.abc import AsyncGenerator, AsyncIterator
-from typing import Optional, Union, Dict, Any, TYPE_CHECKING
+from typing import Any, Dict, Optional, TYPE_CHECKING
 
-import logging
-logger = logging.getLogger(__name__)
-
-# ─── 从内嵌的 deer_think_budget 子模块导入基础状态机 ───
-from think_budget_vllm_adapter.deer_think_budget.state import (
-    _BaseState,
-    _InitialThinkState,
-    _IterativeThinkState,
-    _ConfidenceCheckState,
-    _AnswerState,
-    AsyncReasoningOrchestrator,
-)
-
-# ─── 从 adapter 导入增强版 context ───
+from think_budget_vllm_adapter.config.unified_config import get_runtime_config
 from think_budget_vllm_adapter.context import BudgetConfig, BudgetRequestContext
-
-# ─── 从 adapter 导入兼容桥接层 ───
-from think_budget_vllm_adapter.confidence_compat import (
-    vllm_logprobs_to_flat,
-    cal_confidence,
-    is_think_tag_paired,
-    get_think_closing_tag,
-    reopen_think_tag,
-)
-from think_budget_vllm_adapter.optimizations.confidence_gates_compat import compute_dual_channel_score
-from think_budget_vllm_adapter.optimizations.early_stopping_compat import (
-    extract_answer_for_sc,
-    check_consecutive_same,
-    check_min_think_gate,
-    make_accept_decision,
-)
-from think_budget_vllm_adapter.optimizations.context_control_compat import make_induced_prompt
-from think_budget_vllm_adapter.optimizations.safety_gate_compat import safety_gate_check
-
-# ─── 从 adapter 导入高级优化模块 ───
+from think_budget_vllm_adapter.deer_think_budget.state import AsyncReasoningOrchestrator
 from think_budget_vllm_adapter.optimizations.complexity_analyzer import estimate_complexity
 from think_budget_vllm_adapter.optimizations.difficulty_estimator import (
-    estimate_difficulty,
     compute_budget_from_difficulty,
+    estimate_difficulty,
 )
 from think_budget_vllm_adapter.optimizations.scene_classifier import classify_scene
 from think_budget_vllm_adapter.optimizations.task_type_budget import (
     classify_task_type,
     get_task_type_budget,
-    register_new_task_type,
-    is_known_task_type,
 )
-from think_budget_vllm_adapter.optimizations.token_filter_compat import set_task_key_names
-from think_budget_vllm_adapter.history.history_budget import compute_history_budget
+from think_budget_vllm_adapter.telemetry import TimingCollector
 
 if TYPE_CHECKING:
-    from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
     from vllm.entrypoints.openai.chat_completion.protocol import (
-        ChatCompletionRequest, ChatCompletionResponse,
-        ChatMessage, ErrorResponse, RequestResponseMetadata)
-    from vllm.inputs import EngineInput
+        ChatCompletionRequest,
+        RequestResponseMetadata,
+    )
+    from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
     from vllm.outputs import RequestOutput
     from vllm.tokenizers import TokenizerLike
 
 
-# ─── 注入 token_filter 的 key names ───
-_KEY_NAMES = {
-    'tool', 'faultNumber', 'faultIMSI', 'faultPort', 'faultType',
-    'fault', 'Number', 'IMSI', 'Url', 'Ip', 'APN', 'Time', 'Range',
-    'Caller', 'result', 'answer', 'name', 'type', 'value',
-    'faultUrl', 'faultIp', 'faultAPN', 'faultTimeRange',
-    'isCaller', 'status', 'code', 'message', 'id', 'data',
-    'error', 'success', 'query', 'response',
+class ThinkBudgetConfigError(ValueError):
+    """A client supplied an unknown or invalid Think Budget configuration."""
+
+
+# Think Budget 的公网请求面严格收敛为总开关和这六个固定输入。动态
+# 策略、会话控制与兼容别名均只允许出现在服务端配置中，不能由 HTTP 请求
+# 改写。下面的拒绝列表用于防御「服务端协议补丁未完全更新」的混合部署。
+_FIXED_REQUEST_FIELDS = frozenset({
+    "fixed_budget_tokens",
+    "fixed_num_thinking",
+    "fixed_think_stride",
+    "fixed_check_length",
+    "fixed_prob_th",
+    "fixed_min_think_tokens",
+})
+_RETIRED_REQUEST_FIELDS = frozenset({
+    "tb_check_length",
+    "tb_think_stride",
+    "tb_num_thinking",
+    "tb_check_answer_len",
+    "tb_prob_th",
+    "tb_min_think_tokens",
+    "tb_is_code",
+    "tb_enable_value_min_confidence",
+    "tb_value_min_bottom_k",
+    "tb_enable_clean_context",
+    "tb_enable_soft_truncation",
+    "tb_consecutive_same_stop",
+    "budget_token_limit",
+    "budget_disabled",
+    "budget_confidence_threshold",
+    "budget_task_type_override",
+    "think_budget_config",
+    "think_budget_session_id",
+    "think_budget_resume",
+    "think_budget_session_ttl_s",
+})
+
+_DECISION_TO_CONFIG = {
+    "check_length": "initial_thought_limit",
+    "think_stride": "think_stride",
+    "num_thinking": "trial_answers",
+    "check_answer_len": "trial_answer_length",
+    "prob_th": "prob_th",
+    "min_think_tokens": "min_think_tokens",
+    "think_budget": "token_budget",
+    "token_budget": "token_budget",
 }
-set_task_key_names(_KEY_NAMES)
-
-# Think tags (must match deer_think_budget/state.py)
-_THINK_CLOSE_TAG = get_think_closing_tag('')
-
-
-# ═══════════════════════════════════════════════════════════════
-# Budget Controller — 带决策链的推理控制器
-# ═══════════════════════════════════════════════════════════════
-
+_CORE_DECISION_FIELDS = frozenset(_DECISION_TO_CONFIG.values())
 class BudgetController:
-    """Budget 推理控制器 — 替代 CoTController，新增预算决策链。
+    """Request entrypoint used by the vLLM chat-completion serving patch."""
 
-    与 CoTController 完全相同的 handle_request 接口，
-    但在内部使用 budget 决策链动态计算推理参数。
+    # ``serving.py`` 与适配器曾分别演进，直接扩展 handle_request 的位置
+    # 参数会让部分服务器加载到的旧控制器在路由后立即 TypeError。公共调用
+    # ABI 固定为 7 个业务参数；新版所需路由身份由 serving.py 写入私有属性。
+    ROUTING_CONTEXT_ATTR = "_think_budget_route_identity"
 
-    设计策略:
-      1. 复用 deer_think_budget 的 AsyncReasoningOrchestrator 状态机
-         (状态转移逻辑不变，通过 config 参数控制行为)
-      2. 在创建 context 之前执行 budget 决策链
-      3. 用决策结果更新 BudgetConfig，状态机自动读取正确参数
+    @staticmethod
+    def _default_config() -> BudgetConfig:
+        """Build runtime config from the single YAML-backed configuration."""
+        defaults = get_runtime_config()
+        return BudgetConfig(
+            BUDGET_ENABLED=bool(defaults["BUDGET_ENABLED"]),
+            initial_thought_limit=int(defaults["check_length"]),
+            think_stride=int(defaults["think_stride"]),
+            trial_answers=int(defaults["num_thinking"]),
+            trial_answer_length=int(defaults["check_answer_len"]),
+            token_budget=int(defaults["max_tokens"]),
+            max_api_calls=int(defaults["max_api_calls"]),
+            prob_th=float(defaults["prob_th"]),
+            min_think_tokens=int(defaults["min_think_tokens"]),
+            enable_value_min_confidence=bool(defaults["enable_value_min_confidence"]),
+            value_min_bottom_k=int(defaults["value_min_bottom_k"]),
+            enable_full_chain_confidence=bool(defaults["enable_full_chain_confidence"]),
+            full_chain_min_percentile=float(defaults["full_chain_min_percentile"]),
+            enable_safety_gate=bool(defaults["enable_safety_gate"]),
+            baseline_time_limit=float(defaults["baseline_time_limit"]),
+            enable_task_type_budget=bool(defaults["enable_task_type_budget"]),
+            enable_history_budget=bool(defaults["enable_history_budget"]),
+            enable_difficulty_estimator=bool(defaults["enable_difficulty_estimator"]),
+            enable_deer_trial=bool(defaults["enable_deer_trial"]),
+            enable_dual_channel=bool(defaults["enable_dual_channel"]),
+            consecutive_same_stop=int(defaults["consecutive_same_stop"]),
+            enable_consecutive_same_stop=bool(defaults["enable_consecutive_same_stop"]),
+            fixed_budget_tokens=int(defaults["fixed_budget_tokens"]),
+            fixed_num_thinking=int(defaults["fixed_num_thinking"]),
+            fixed_think_stride=int(defaults["fixed_think_stride"]),
+            fixed_check_length=int(defaults["fixed_check_length"]),
+            fixed_prob_th=float(defaults["fixed_prob_th"]),
+            fixed_min_think_tokens=int(defaults["fixed_min_think_tokens"]),
+            history_budget_multiplier=float(defaults["history_budget_multiplier"]),
+            history_low_success_boost=float(defaults["history_low_success_boost"]),
+            history_stride_percentile=float(defaults["history_stride_percentile"]),
+            history_warmup_count=int(defaults["history_warmup_count"]),
+            history_warmup_strategy=str(defaults["history_warmup_strategy"]),
+            default_task_type=str(defaults["default_task_type"]),
+            final_answer_max_tokens=int(defaults["final_answer_max_tokens"]),
+        )
 
-    与源码 think_budget/budget_controller.py 的区别:
-      - 不定义 _BudgetConfidenceCheckState / _BudgetReasoningOrchestrator
-        (复用 deer_think_budget 中已完善的 _ConfidenceCheckState + AsyncReasoningOrchestrator)
-      - 决策链通过 config 参数传递给状态机，而非替换状态类
-    """
+    @staticmethod
+    def is_enabled() -> bool:
+        """Whether the server allows a request to enter the Think Budget route."""
+        return bool(get_runtime_config()["BUDGET_ENABLED"])
+
+    @staticmethod
+    def _validate_value(name: str, value: Any) -> None:
+        if name not in _FIXED_REQUEST_FIELDS:
+            raise ThinkBudgetConfigError(f"unknown Think Budget config key: {name}")
+        if value is None:
+            raise ThinkBudgetConfigError(f"Think Budget config {name} cannot be null")
+        if name != "fixed_prob_th" and (
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+        ):
+            raise ThinkBudgetConfigError(f"Think Budget config {name} must be a non-negative integer")
+        if name == "fixed_prob_th" and (
+            not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 1
+        ):
+            raise ThinkBudgetConfigError(f"Think Budget config {name} must be in [0, 1]")
+
+    @classmethod
+    def _build_budget_config(cls, request: ChatCompletionRequest) -> tuple[BudgetConfig, set[str]]:
+        """Build config from the six supported fixed request inputs only.
+
+        A positive fixed value takes unconditional precedence over the matching
+        dynamic calculation.  A value of zero means "do not fix this field" and
+        keeps the original server-side calculation chain intact.
+        """
+        cfg = cls._default_config()
+        external: dict[str, Any] = {}
+        for name in _RETIRED_REQUEST_FIELDS:
+            value = getattr(request, name, None)
+            # Some old protocol versions materialize False/0 defaults.  They
+            # are indistinguishable from an omitted field and have no effect;
+            # every meaningful old input is rejected explicitly.
+            if value not in (None, False, 0, ""):
+                raise ThinkBudgetConfigError(
+                    f"Think Budget request field is not supported: {name}")
+            if name == "think_budget_config" and value is not None:
+                raise ThinkBudgetConfigError(
+                    "Think Budget request field is not supported: think_budget_config")
+
+        for name in _FIXED_REQUEST_FIELDS:
+            value = getattr(request, name, None)
+            if value is not None:
+                cls._validate_value(name, value)
+                # 与参考 API server 一致，0/0.0 是统一的“未固定”值：
+                # 不覆盖服务端静态配置，也不阻断动态决策。
+                if value > 0:
+                    external[name] = value
+
+        # Fixed sub-parameters are external inputs as well. Project them onto
+        # their canonical runtime fields before validation/merge.  Fixed inputs
+        # are the only caller-controlled values, therefore there is no second
+        # request representation with which they can conflict.
+        fixed_aliases = {
+            "fixed_check_length": "initial_thought_limit",
+            "fixed_think_stride": "think_stride",
+            "fixed_num_thinking": "trial_answers",
+            "fixed_prob_th": "prob_th",
+            "fixed_min_think_tokens": "min_think_tokens",
+        }
+        for fixed_name, runtime_name in fixed_aliases.items():
+            fixed_value = external.get(fixed_name, getattr(cfg, fixed_name))
+            if fixed_value:
+                external.setdefault(runtime_name, fixed_value)
+        fixed_budget = external.get("fixed_budget_tokens", cfg.fixed_budget_tokens)
+        if fixed_budget:
+            external.setdefault("token_budget", fixed_budget)
+
+        for name, value in external.items():
+            setattr(cfg, name, value)
+        if 0 < cfg.max_api_calls < 2:
+            raise ThinkBudgetConfigError(
+                "max_api_calls must be 0 (unlimited) or at least 2 so a final answer can be generated")
+        return cfg, set(external)
+
+    @staticmethod
+    def _set_dynamic(
+        params: dict[str, Any], external_overrides: set[str], key: str, value: Any
+    ) -> None:
+        config_key = _DECISION_TO_CONFIG.get(key, key)
+        if config_key not in external_overrides:
+            params[key] = value
+
+    @classmethod
+    def _run_budget_decision_chain(
+        cls,
+        prompt_text: str,
+        config: BudgetConfig,
+        external_overrides: set[str],
+        timing: TimingCollector,
+        reference: str = "",
+    ) -> Dict[str, Any]:
+        """Run the original priority chain, but only fill non-external fields."""
+        params: dict[str, Any] = {}
+        if not config.BUDGET_ENABLED:
+            return params
+
+        def needs_core() -> bool:
+            return bool(_CORE_DECISION_FIELDS - external_overrides)
+
+        # Step 0.5/1: fixed budget remains the highest *computed* source. A
+        # caller-provided individual field is never overwritten by this result.
+        if config.fixed_budget_tokens > 0 and needs_core():
+            with timing.measure("decision.fixed_budget"):
+                fixed = config.fixed_budget_tokens
+                check_length = min(fixed, config.initial_thought_limit)
+                num_thinking = max(3, fixed // max(check_length, 1))
+                values = {
+                    "check_length": check_length,
+                    "num_thinking": num_thinking,
+                    "think_stride": max(50, fixed // num_thinking),
+                    "prob_th": config.prob_th,
+                    "token_budget": fixed,
+                }
+            for key, value in values.items():
+                cls._set_dynamic(params, external_overrides, key, value)
+            return params
+
+        scene_info: dict[str, Any] = {
+            "scene_type": config.scene_type,
+            "typical_tokens": 0,
+            "scene_confidence": 0.0,
+        }
+        task_type = config.default_task_type
+        task_matched = False
+        if needs_core() and config.enable_task_type_budget:
+            with timing.measure("decision.scene_classifier"):
+                scene_info = classify_scene(prompt_text)
+            with timing.measure("decision.task_type"):
+                task_match = classify_task_type(prompt_text, scene_info)
+                task_type = task_match.get("task_type", config.default_task_type)
+                task_matched = (
+                    task_type != "general"
+                    and float(task_match.get("task_confidence", 0.0)) > 0.0
+                )
+                task_budget = get_task_type_budget(task_type)
+            for key in ("check_length", "think_stride", "num_thinking", "min_think_tokens", "check_answer_len", "prob_th"):
+                cls._set_dynamic(params, external_overrides, key, task_budget.get(key))
+            cls._set_dynamic(params, external_overrides, "token_budget", task_budget.get("typical_tokens", config.token_budget))
+
+        # A matched task has a meaningful feature space for difficulty
+        # estimation.  An unmatched task instead uses historical behaviour.
+        # The two modules are deliberately exclusive for one request: history
+        # must not overwrite a matched task's difficulty budget, and a generic
+        # fallback must not be treated as a confident task match.
+        if needs_core() and config.enable_difficulty_estimator and task_matched:
+            with timing.measure("decision.difficulty"):
+                diff_info = estimate_difficulty(
+                    prompt_text,
+                    reference,
+                    scene_type=scene_info.get("scene_type", "general"),
+                    scene_typical_tokens=scene_info.get("typical_tokens", 0),
+                    scene_confidence=scene_info.get("scene_confidence", 0.0),
+                )
+                diff_budget = compute_budget_from_difficulty(diff_info.get("difficulty", 0.5))
+            for key, value in diff_budget.items():
+                cls._set_dynamic(params, external_overrides, key, value)
+            params["difficulty_info"] = diff_info
+
+        if needs_core() and config.enable_history_budget and not task_matched:
+            from think_budget_vllm_adapter.history.history_budget import compute_history_budget
+
+            with timing.measure("decision.history"):
+                history = compute_history_budget(
+                    prompt_text,
+                    task_type=task_type,
+                    scene_type=scene_info.get("scene_type", "general"),
+                    config={
+                        "history_budget_multiplier": config.history_budget_multiplier,
+                        "history_low_success_boost": config.history_low_success_boost,
+                        "history_stride_percentile": config.history_stride_percentile,
+                        "history_warmup_count": config.history_warmup_count,
+                        "history_warmup_strategy": config.history_warmup_strategy,
+                        "custom_task_types_path": config.custom_task_types_path,
+                    },
+                )
+            for key, value in history.items():
+                if key in _DECISION_TO_CONFIG:
+                    # History modules call the aggregate amount think_budget;
+                    # DEER consumes token_budget.  Normalize at the adapter
+                    # boundary so the value reaches the retained state machine.
+                    output_key = "token_budget" if key == "think_budget" else key
+                    cls._set_dynamic(params, external_overrides, output_key, value)
+            params["history_info"] = history
+
+        if needs_core():
+            with timing.measure("decision.complexity"):
+                params["complexity_info"] = estimate_complexity(prompt_text, reference)
+        cls._set_dynamic(params, external_overrides, "task_type", task_type)
+        cls._set_dynamic(params, external_overrides, "scene_type", scene_info.get("scene_type", "general"))
+        return params
 
     @staticmethod
     async def _queue_as_async_gen_stream(
-            queue: asyncio.Queue
+        queue: asyncio.Queue, context: BudgetRequestContext
     ) -> AsyncIterator[RequestOutput]:
-        """流式模式: 从队列迭代输出。"""
         while True:
             item = await queue.get()
-            if item:
-                yield item
-            else:
+            if item is None:
+                if context.orchestration_error:
+                    raise RuntimeError("Think Budget orchestration failed; see server logs")
                 break
+            yield item
 
     @staticmethod
     async def _queue_as_async_gen(
-            queue: asyncio.Queue
+        queue: asyncio.Queue, context: BudgetRequestContext
     ) -> AsyncIterator[RequestOutput]:
-        """非流式模式: 聚合所有输出。"""
         item = await queue.get()
-        if item:
+        if item is None:
+            if context.orchestration_error:
+                raise RuntimeError("Think Budget orchestration failed; see server logs")
+            yield None
+            return
+        if item is not None:
             while True:
                 item_inc = await queue.get()
-                if item_inc:
-                    item.outputs[0].text += item_inc.outputs[0].text
-                    item.outputs[0].token_ids.extend(item_inc.outputs[0].token_ids)
-                else:
+                if item_inc is None:
+                    if context.orchestration_error:
+                        raise RuntimeError("Think Budget orchestration failed; see server logs")
                     break
+                item.outputs[0].text += item_inc.outputs[0].text
+                item.outputs[0].token_ids.extend(item_inc.outputs[0].token_ids)
             item.outputs[0].finish_reason = "stop"
-            item.finished = "True"
+            item.finished = True
         yield item
-
-    @staticmethod
-    def _build_budget_config(request: ChatCompletionRequest) -> BudgetConfig:
-        """构建 BudgetConfig — 从请求参数读取用户指定的值。
-
-        与 deer_think_budget CoTController._build_think_budget_config 类似，
-        但额外读取 budget 专属字段 (budget_token_limit, budget_disabled 等)。
-        """
-        cfg = BudgetConfig(
-            # DEER 原有参数 (与 CoTController 一致)
-            initial_thought_limit=(
-                getattr(request, 'tb_check_length', None)
-                if getattr(request, 'tb_check_length', None) is not None
-                else BudgetConfig.initial_thought_limit
-            ),
-            think_stride=(
-                getattr(request, 'tb_think_stride', None)
-                if getattr(request, 'tb_think_stride', None) is not None
-                else BudgetConfig.think_stride
-            ),
-            trial_answers=(
-                getattr(request, 'tb_num_thinking', None)
-                if getattr(request, 'tb_num_thinking', None) is not None
-                else BudgetConfig.trial_answers
-            ),
-            trial_answer_length=(
-                getattr(request, 'tb_check_answer_len', None)
-                if getattr(request, 'tb_check_answer_len', None) is not None
-                else BudgetConfig.trial_answer_length
-            ),
-            prob_th=(
-                getattr(request, 'tb_prob_th', None)
-                if getattr(request, 'tb_prob_th', None) is not None
-                else BudgetConfig.prob_th
-            ),
-            is_code=(
-                getattr(request, 'tb_is_code', None)
-                if getattr(request, 'tb_is_code', None) is not None
-                else BudgetConfig.is_code
-            ),
-            min_think_tokens=(
-                getattr(request, 'tb_min_think_tokens', None)
-                if getattr(request, 'tb_min_think_tokens', None) is not None
-                else BudgetConfig.min_think_tokens
-            ),
-            # Think Budget 基础参数 (与 CoTController 一致)
-            enable_value_min_confidence=(
-                getattr(request, 'tb_enable_value_min_confidence', None)
-                if getattr(request, 'tb_enable_value_min_confidence', None) is not None
-                else BudgetConfig.enable_value_min_confidence
-            ),
-            value_min_bottom_k=(
-                getattr(request, 'tb_value_min_bottom_k', None)
-                if getattr(request, 'tb_value_min_bottom_k', None) is not None
-                else BudgetConfig.value_min_bottom_k
-            ),
-            enable_clean_context=(
-                getattr(request, 'tb_enable_clean_context', None)
-                if getattr(request, 'tb_enable_clean_context', None) is not None
-                else BudgetConfig.enable_clean_context
-            ),
-            enable_soft_truncation=(
-                getattr(request, 'tb_enable_soft_truncation', None)
-                if getattr(request, 'tb_enable_soft_truncation', None) is not None
-                else BudgetConfig.enable_soft_truncation
-            ),
-            consecutive_same_stop=(
-                getattr(request, 'tb_consecutive_same_stop', None)
-                if getattr(request, 'tb_consecutive_same_stop', None) is not None
-                else BudgetConfig.consecutive_same_stop
-            ),
-            # Budget 决策链参数 (新增)
-            fixed_budget_tokens=getattr(request, 'budget_token_limit', 0) or 0,
-            BUDGET_ENABLED=not (getattr(request, 'budget_disabled', False) or False),
-        )
-
-        # budget_confidence_threshold 覆盖
-        budget_conf_th = getattr(request, 'budget_confidence_threshold', None)
-        if budget_conf_th is not None:
-            cfg.prob_th = budget_conf_th
-            cfg.prob_th_budget = budget_conf_th
-
-        # budget_task_type_override 手动指定任务类型
-        budget_task_override = getattr(request, 'budget_task_type_override', None)
-        if budget_task_override:
-            cfg.task_type = budget_task_override
-
-        return cfg
-
-    @staticmethod
-    def _run_budget_decision_chain(
-        prompt_text: str,
-        config: BudgetConfig,
-        reference: str = '',
-    ) -> Dict[str, Any]:
-        """执行 Budget 决策链 — 计算所有 budget 参数。
-
-        与参考项目 budget_forcing.py 的 Step 0-5 对齐，
-        但不执行模型调用，只计算参数。
-
-        Args:
-            prompt_text: 用户 prompt 文本 (用于任务类型/难度/场景判断)
-            config: 初始 BudgetConfig (含用户指定参数)
-            reference: 参考答案 (可选)
-
-        Returns:
-            dict: budget_params 字典，用于更新 BudgetRequestContext
-        """
-        params = {}
-
-        # ─── Step 0: BUDGET_ENABLED 总开关 ───
-        if not config.BUDGET_ENABLED:
-            params['enable_confidence'] = False
-            params['enable_task_type_budget'] = False
-            params['enable_history_budget'] = False
-            params['enable_difficulty_estimator'] = False
-            return params
-
-        # ─── Step 0.5: FIXED_BUDGET_TOKEN 覆盖 ───
-        fixed_budget_tokens = config.fixed_budget_tokens
-
-        # ─── Step 1: 人工固定值覆盖 (最高优先级) ───
-        if fixed_budget_tokens > 0:
-            params['check_length'] = min(fixed_budget_tokens, config.check_length)
-            params['min_think_tokens'] = fixed_budget_tokens
-            params['num_thinking'] = max(3, fixed_budget_tokens // config.check_length)
-            params['think_stride'] = max(50, fixed_budget_tokens // params['num_thinking'])
-            params['prob_th'] = config.prob_th
-            return params
-
-        # ─── Step 2: 任务类型判断 ───
-        scene_info = classify_scene(prompt_text)
-        scene_type = scene_info.get('scene_type', 'general')
-
-        # 检查人工任务类型覆盖 (budget_task_type_override)
-        task_type = config.task_type if config.task_type != 'general' else 'general'
-        if config.enable_task_type_budget:
-            if task_type == 'general':
-                # 自动判断任务类型
-                task_info = classify_task_type(prompt_text, scene_info)
-                task_type = task_info.get('task_type', 'general')
-
-            # 应用任务类型基础预算
-            task_budget = get_task_type_budget(task_type)
-            params['check_length'] = task_budget.get('check_length', config.check_length)
-            params['think_stride'] = task_budget.get('think_stride', config.think_stride)
-            params['num_thinking'] = task_budget.get('num_thinking', config.num_thinking)
-            params['min_think_tokens'] = task_budget.get('min_think_tokens', config.min_think_tokens)
-            params['check_answer_len'] = task_budget.get('check_answer_len', config.check_answer_len)
-            params['prob_th'] = task_budget.get('prob_th', config.prob_th)
-
-        params['task_type'] = task_type
-        params['scene_type'] = scene_type
-
-        # ─── Step 3: 难度估计器 ───
-        if config.enable_difficulty_estimator:
-            diff_info = estimate_difficulty(
-                prompt_text, reference,
-                scene_type=scene_type,
-                scene_typical_tokens=scene_info.get('typical_tokens', 0),
-                scene_confidence=scene_info.get('scene_confidence', 0.0),
-            )
-            diff_budget = compute_budget_from_difficulty(
-                diff_info.get('difficulty', 0.5),
-            )
-            params['check_length'] = diff_budget['check_length']
-            params['min_think_tokens'] = diff_budget['min_think_tokens']
-            params['think_stride'] = diff_budget['think_stride']
-            params['num_thinking'] = diff_budget['num_thinking']
-            params['check_answer_len'] = diff_budget.get('check_answer_len', config.check_answer_len)
-            params['difficulty_info'] = diff_info
-
-        # ─── Step 4: 历史轨迹预算 ───
-        if config.enable_history_budget:
-            h_budget = compute_history_budget(
-                prompt_text,
-                task_type=task_type,
-                scene_type=scene_type,
-            )
-            budget_mode = h_budget.get('budget_mode', 'cold_start')
-
-            if budget_mode == 'unlimited':
-                params['num_thinking'] = h_budget.get('num_thinking', 99)
-                params['min_think_tokens'] = h_budget.get('min_think_tokens', 0)
-            elif budget_mode in ('warm_start', 'hot_start'):
-                if not config.enable_difficulty_estimator:
-                    params['check_length'] = h_budget.get('check_length', params.get('check_length', config.check_length))
-                    params['min_think_tokens'] = h_budget.get('min_think_tokens', params.get('min_think_tokens', config.min_think_tokens))
-                    params['num_thinking'] = h_budget.get('num_thinking', params.get('num_thinking', config.num_thinking))
-                h_stride = h_budget.get('think_stride', 0)
-                if h_stride > 0:
-                    if budget_mode == 'hot_start':
-                        params['think_stride'] = h_stride
-                    else:
-                        params['think_stride'] = max(params.get('think_stride', config.think_stride), h_stride)
-
-            params['history_info'] = h_budget
-
-        # ─── Step 5: 人工固定子参数覆盖 ───
-        # (目前仅通过 request 参数传入，暂无额外逻辑)
-
-        # ─── 复杂度分析 ───
-        params['complexity_info'] = estimate_complexity(prompt_text, reference)
-
-        # ─── 开关参数 ───
-        params['enable_confidence'] = True
-        params['enable_value_min_confidence'] = config.enable_value_min_confidence
-        params['enable_dual_channel'] = config.enable_dual_channel
-        params['enable_full_chain_confidence'] = config.enable_full_chain_confidence
-        params['enable_consecutive_same_stop'] = config.enable_consecutive_same_stop
-        params['enable_clean_context'] = config.enable_clean_context
-        params['enable_safety_gate'] = config.enable_safety_gate
-        params['enable_deer_trial'] = config.enable_deer_trial
-
-        return params
 
     @staticmethod
     def _build_managed_generator(
         orchestrator: AsyncReasoningOrchestrator,
-        request_context: BudgetRequestContext,
-        request: ChatCompletionRequest
+        context: BudgetRequestContext,
+        request: ChatCompletionRequest,
     ) -> AsyncGenerator[RequestOutput, None]:
-        """构建受管生成器 — 确保客户端断开时取消后台任务。"""
+        """与 DEER 保持相同的请求绑定式 producer/consumer 生命周期。"""
         async def generator() -> AsyncGenerator[RequestOutput, None]:
             producer_task = asyncio.create_task(orchestrator.run())
-            consumer_gen = (
-                BudgetController._queue_as_async_gen_stream(request_context.result_queue)
-                if request.stream
-                else BudgetController._queue_as_async_gen(request_context.result_queue)
+            consumer = (
+                BudgetController._queue_as_async_gen_stream(context.result_queue, context)
+                if request.stream else BudgetController._queue_as_async_gen(
+                    context.result_queue, context)
             )
             try:
-                async for item in consumer_gen:
+                async for item in consumer:
                     yield item
             finally:
+                # 与 DEER 一致：客户端断开后立即取消当前父请求的子请求链。
                 if not producer_task.done():
                     producer_task.cancel()
                     try:
@@ -408,81 +403,138 @@ class BudgetController:
         request_id: str,
         tokenizer: TokenizerLike,
         request_metadata: RequestResponseMetadata,
-    ) -> Union[AsyncGenerator, object]:
-        """处理 Budget 请求的入口点 — 与 CoTController.handle_request 相同接口。
-
-        核心区别: 在创建 context 之前先执行 budget 决策链，
-        然后通过 BudgetRequestContext 将决策结果传递给状态机。
-
-        签名与 deer_think_budget CoTController.handle_request 一致，
-        适配 vLLM v0.20.2。
-        """
-        # 1. 构建 BudgetConfig
-        budget_config = self._build_budget_config(request)
-
-        # 2. 从 prompt 文本提取预算决策
-        # 尝试从 engine_inputs 的 token_ids 反推 prompt 文本
-        prompt_text = ''
+        model_name: str | None = None,
+        lora_request: Any = None,
+        data_parallel_rank: int | None = None,
+    ) -> Any:
         try:
-            if hasattr(tokenizer, 'decode'):
-                prompt_text = tokenizer.decode(
-                    engine_inputs[0].get('prompt_token_ids', []),
-                    skip_special_tokens=True
-                )
-        except Exception:
-            pass
+            config, external_overrides = self._build_budget_config(request)
+        except ThinkBudgetConfigError as exc:
+            return serving_chat.create_error_response(str(exc))
+        if not config.BUDGET_ENABLED:
+            # The serving patch normally bypasses this method entirely.  Keep
+            # this guard for mixed/stale deployments so the state machine can
+            # never be created after the server master switch was disabled.
+            return serving_chat.create_error_response(
+                "Think Budget is disabled by server configuration")
 
-        # 3. 执行 Budget 决策链
-        budget_params = self._run_budget_decision_chain(
-            prompt_text, budget_config
+        base_config = {
+            "initial_thought_limit": config.initial_thought_limit,
+            "think_stride": config.think_stride,
+            "trial_answers": config.trial_answers,
+            "trial_answer_length": config.trial_answer_length,
+            "token_budget": config.token_budget,
+            "prob_th": config.prob_th,
+            "min_think_tokens": config.min_think_tokens,
+        }
+        print(
+            "TB_REQUEST event=accepted "
+            f"request_id={request_id} stream={bool(request.stream)} "
+            f"external_overrides={sorted(external_overrides)} base_config={base_config}",
+            flush=True,
         )
 
-        # 4. 计算初始 max_tokens_temp (总思考 token 预算)
-        max_model_len = serving_chat.model_config.max_model_len
-        prompt_token_len = len(engine_inputs[0].get('prompt_token_ids', []))
-        initial_budget = budget_config.token_budget
-        if initial_budget <= 0:
-            initial_budget = int(max_model_len * budget_config.think_ratio) - prompt_token_len
+        # 优先使用 serving.py 在同一进程内计算的真实路由身份；它不会来自
+        # HTTP JSON，因此不会扩张严格的公网参数面。直接调用控制器时再以
+        # vLLM 服务对象回退解析，便于本地测试和旧补丁升级。
+        route_identity = getattr(request, self.ROUTING_CONTEXT_ATTR, None)
+        if (isinstance(route_identity, tuple) and len(route_identity) == 3):
+            routed_model_name, routed_lora_request, routed_data_parallel_rank = route_identity
+            if model_name is None:
+                model_name = routed_model_name
+            if lora_request is None:
+                lora_request = routed_lora_request
+            if data_parallel_rank is None:
+                data_parallel_rank = routed_data_parallel_rank
+        if lora_request is None:
+            lora_request = serving_chat._maybe_get_adapters(
+                request, supports_default_mm_loras=True)
+        if model_name is None:
+            model_name = serving_chat.models.model_name(lora_request)
 
-        # 5. 创建增强版请求上下文
-        request_context = BudgetRequestContext(
+        timing = TimingCollector()
+        try:
+            with timing.measure("decision.decode_prompt"):
+                prompt_text = tokenizer.decode(
+                    engine_inputs[0].get("prompt_token_ids", []), skip_special_tokens=True)
+        except Exception:
+            prompt_text = ""
+            timing.durations_s["decision.decode_prompt"] += 0.0
+
+        with timing.measure("decision.total"):
+            decision_params = self._run_budget_decision_chain(
+                prompt_text, config, external_overrides, timing)
+        print(
+            f"TB_DECISION request_id={request_id} params={decision_params} "
+            f"timings={timing.snapshot()}",
+            flush=True,
+        )
+
+        context = BudgetRequestContext(
             request=request,
             tokenizer=tokenizer,
             engine_prompt=engine_inputs[0],
-            config=budget_config,
+            config=config,
             serving_chat=serving_chat,
             request_id=request_id,
-            max_tokens_temp=initial_budget,
+            lora_request=lora_request,
+            data_parallel_rank=data_parallel_rank,
+            max_tokens_temp=0,
+            result_queue=asyncio.Queue(),
             budget_start_time=time.time(),
+            model_name=model_name,
+            session_id=request_id,
+            external_overrides=external_overrides,
+            timing=timing,
+        )
+        context.update_budget_params(decision_params)
+        context.max_tokens_temp = config.token_budget
+        context.init_trial_evaluator()
+        effective_config = {
+            "initial_thought_limit": config.initial_thought_limit,
+            "think_stride": config.think_stride,
+            "trial_answers": config.trial_answers,
+            "trial_answer_length": config.trial_answer_length,
+            "token_budget": config.token_budget,
+            "prob_th": config.prob_th,
+            "min_think_tokens": config.min_think_tokens,
+            "max_api_calls": config.max_api_calls,
+        }
+        print(
+            "TB_REQUEST event=orchestrator_created "
+            f"request_id={request_id} model={model_name} "
+            f"effective_config={effective_config}",
+            flush=True,
         )
 
-        # 6. 用决策结果更新 context
-        request_context.update_budget_params(budget_params)
-
-        # 7. 初始化 trial evaluator (如果启用)
-        request_context.init_trial_evaluator()
-
-        # 8. 创建流程编排器 (复用 deer_think_budget 的状态机)
-        orchestrator = AsyncReasoningOrchestrator(request_context)
+        orchestrator = AsyncReasoningOrchestrator(context)
         response_generator = self._build_managed_generator(
-            orchestrator, request_context, request
-        )
+            orchestrator, context, request)
+        return await self._format_response(
+            serving_chat, request, response_generator, request_id, model_name,
+            conversation, tokenizer, request_metadata)
 
-        # 9. 返回编排器处理后的结果
-        model_name = serving_chat.models.model_name(None)
-
+    @staticmethod
+    async def _format_response(
+        serving_chat: OpenAIServingChat,
+        request: ChatCompletionRequest,
+        response_generator: AsyncGenerator[RequestOutput, None],
+        request_id: str,
+        model_name: str,
+        conversation: list,
+        tokenizer: TokenizerLike,
+        request_metadata: RequestResponseMetadata,
+    ) -> Any:
         if request.stream:
             return serving_chat.chat_completion_stream_generator(
-                request, response_generator, request_id, model_name,
-                conversation, tokenizer, request_metadata,
-                reasoning_parser=None,
+                request, response_generator, request_id, model_name, conversation,
+                tokenizer, request_metadata, reasoning_parser=None,
                 chat_template_kwargs=None,
             )
         try:
             return await serving_chat.chat_completion_full_generator(
-                request, response_generator, request_id, model_name,
-                conversation, tokenizer, request_metadata,
-                reasoning_parser=None,
+                request, response_generator, request_id, model_name, conversation,
+                tokenizer, request_metadata, reasoning_parser=None,
             )
-        except ValueError as e:
-            return serving_chat.create_error_response(str(e))
+        except (ValueError, RuntimeError) as exc:
+            return serving_chat.create_error_response(str(exc))

@@ -19,11 +19,16 @@ _THINK_CLOSE_TAG = '</think>'
 
 
 def cal_confidence(logprobs: list[float | None]) -> float:
-    """平均 exp 概率 — 所有 token logprob 的 exp 均值。"""
-    if not logprobs:
+    """有效 token 的平均 exp 概率。
+
+    ``None`` 表示 vLLM 没有返回该位置的 sampled-token logprob，不能既从
+    分子跳过又留在分母中；否则缺失值会系统性压低分数，并与 perplexity 的
+    有效样本口径不一致。
+    """
+    valid = [lp for lp in logprobs if lp is not None]
+    if not valid:
         return 0.0
-    total = sum(math.exp(lp) for lp in logprobs if lp is not None)
-    return total / len(logprobs)
+    return sum(math.exp(lp) for lp in valid) / len(valid)
 
 
 def cal_perplexity(logprobs: list[float | None]) -> float:
@@ -50,21 +55,6 @@ def get_think_closing_tag(text: str = '') -> str:
     return _THINK_CLOSE_TAG
 
 
-def reopen_think_tag(text: str) -> str:
-    """从文本中移除 </think> 闭标签及其之后的内容，使思考标签重新打开。
-
-    例: "...<think>思考内容</think>\\n答案<|im_end|>" → "...<think>思考内容"
-    """
-    text = text.rstrip()
-    if text.endswith('<|im_end|>'):
-        text = text[:-len('<|im_end|>')]
-    # 找到最后一个 </think> 并截断
-    idx = text.rfind(_THINK_CLOSE_TAG)
-    if idx >= 0:
-        text = text[:idx]
-    return text.rstrip()
-
-
 # ─── vLLM logprobs 格式转换 ───
 # vLLM CompletionOutput.logprobs 是 SampleLogprobs 类型:
 #   list[LogprobsOnePosition] 其中 LogprobsOnePosition = dict[str, Logprob]
@@ -74,11 +64,50 @@ def reopen_think_tag(text: str) -> str:
 #   logprobs: list[float | None] — 每个 token 的 top-1 logprob
 #   tokens:   list[str | None]   — 每个 token 的文本
 
-def extract_token_logprobs_and_texts(logprobs_list) -> tuple[list[float | None], list[str | None]]:
-    """将 vLLM SampleLogprobs 转换为 (logprobs_float_list, tokens_text_list)。
+def _matches_sampled_token_id(candidate_id, sampled_token_id: int) -> bool:
+    """兼容 vLLM 不同版本中 int 或字符串形式的 token-id 字典键。"""
+    if candidate_id == sampled_token_id:
+        return True
+    try:
+        return int(candidate_id) == sampled_token_id
+    except (TypeError, ValueError):
+        return False
+
+
+def _sampled_logprob_entry(position, sampled_token_id: int):
+    """从一个 vLLM 位置的候选字典中精确找回实际采样 token。"""
+    if not hasattr(position, "items"):
+        return None
+
+    # vLLM 的 SampleLogprobs 按 token id 映射；先走 O(1) 查找，再兼容
+    # JSON/封装层把键转为字符串的情况。绝不能以字典第一个元素作为猜测。
+    for key in (sampled_token_id, str(sampled_token_id)):
+        try:
+            entry = position.get(key)
+        except AttributeError:
+            entry = None
+        if entry is not None:
+            return entry
+    for key, entry in position.items():
+        if _matches_sampled_token_id(key, sampled_token_id):
+            return entry
+        if getattr(entry, "token_id", None) == sampled_token_id:
+            return entry
+    return None
+
+
+def extract_token_logprobs_and_texts(
+    logprobs_list,
+    sampled_token_ids: list[int] | tuple[int, ...] | None,
+) -> tuple[list[float | None], list[str | None]]:
+    """将 vLLM SampleLogprobs 转换为实际采样 token 的 logprob 与文本。
 
     Args:
-        logprobs_list: vLLM CompletionOutput.logprobs — list[dict[str, Logprob] | None] 或 FlatLogprobs
+        logprobs_list: vLLM CompletionOutput.logprobs，每个位置是 token-id
+            到 Logprob 的映射。
+        sampled_token_ids: 同一输出片段的 ``CompletionOutput.token_ids``。
+            vLLM 的候选字典还含 top-k 备选 token，必须用该序列精确匹配实际
+            采样 token；缺失或不匹配时返回 ``None``，而不猜测字典顺序。
 
     Returns:
         (logprobs, tokens): 两个等长列表，用于 token_filter / confidence 计算
@@ -89,39 +118,20 @@ def extract_token_logprobs_and_texts(logprobs_list) -> tuple[list[float | None],
     if logprobs_list is None:
         return token_logprobs, token_texts
 
-    for pos in logprobs_list:
-        if pos is None:
+    sampled_token_ids = sampled_token_ids or ()
+    for index, pos in enumerate(logprobs_list):
+        if pos is None or index >= len(sampled_token_ids):
             token_logprobs.append(None)
             token_texts.append(None)
             continue
 
-        # pos 可能是 dict[str, Logprob] 或 FlatLogprobs
-        # dict 格式: {token_text: Logprob(logprob=..., decoded_token=...)}
-        if hasattr(pos, 'values') and not isinstance(pos, (list, tuple)):
-            # dict-like
-            try:
-                items = list(pos.values())
-                if items:
-                    top1 = items[0]
-                    if hasattr(top1, 'logprob'):
-                        token_logprobs.append(top1.logprob)
-                        token_texts.append(
-                            getattr(top1, 'decoded_token', None) or list(pos.keys())[0]
-                        )
-                    else:
-                        # 可能是 FlatLogprobs 的其他格式
-                        token_logprobs.append(None)
-                        token_texts.append(None)
-                else:
-                    token_logprobs.append(None)
-                    token_texts.append(None)
-            except (IndexError, AttributeError):
-                token_logprobs.append(None)
-                token_texts.append(None)
-        else:
-            # 其他格式（FlatLogprobs 或 list）
+        sampled_entry = _sampled_logprob_entry(pos, sampled_token_ids[index])
+        if sampled_entry is None or not hasattr(sampled_entry, "logprob"):
             token_logprobs.append(None)
             token_texts.append(None)
+            continue
+        token_logprobs.append(sampled_entry.logprob)
+        token_texts.append(getattr(sampled_entry, "decoded_token", None))
 
     return token_logprobs, token_texts
 

@@ -1,7 +1,7 @@
 """Think Budget API Server — 兼容 OpenAI 格式的代理接口。
 
-唯一模型端点: http://141.73.2.25:87/v1/completions (mg2hg)
-model字段强制映射为mg2hg, 不接受外部覆盖。
+默认模型为 mg2hg；端点与凭据由 MG2HG_URL / MG2HG_KEY 环境变量提供。
+模型字段仍映射为 mg2hg，除非调用方在外层服务修改该策略。
 
 v3 改进:
   - 集成 scene_classifier 自动推断商用场景
@@ -37,7 +37,7 @@ import traceback
 import logging
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-os.environ['NO_PROXY'] = 'localhost,127.0.0.1,141.73.2.25,71.26.76.45'
+os.environ.setdefault('NO_PROXY', 'localhost,127.0.0.1')
 
 from naie.inference.think_budget import call_model as budget_call_model
 from naie.config.settings import THINK_BUDGET_CONFIG_47
