@@ -33,6 +33,7 @@ from collections.abc import AsyncGenerator
 from typing import Optional, Tuple, Type, TYPE_CHECKING
 
 from think_budget_vllm_adapter.deer_think_budget.context import RequestStateContext
+from think_budget_vllm_adapter.context import TRIAL_ANSWER_LENGTH
 from think_budget_vllm_adapter.deer_think_budget.confidence import (
     cal_confidence, cal_perplexity,
     is_think_tag_paired,
@@ -53,6 +54,46 @@ if TYPE_CHECKING:
 # deer 源码中 stop word = "</think>", stop_reason 检测也是 "</think>"
 # think_budget 源码中 _THINK_CLOSE_TAG = '</think>'
 THINK_END_TAG = "</think>"
+
+_NATURAL_BREAK_CHARS = frozenset("。！？\n，.!?,}]}」』")
+_NATURAL_BREAK_SEARCH_RANGE = 500
+
+
+def _truncate_thinking_at_natural_breakpoint(content: str) -> str:
+    """Close an overlong thinking segment at its last natural breakpoint.
+
+    This is only applied when a thinking request stopped because it exhausted
+    its token limit.  A completed ``</think>`` segment is left untouched;
+    otherwise punctuation, a newline, or a JSON/container closing character
+    in the recent tail is preferred over cutting through a sentence/value.
+    """
+    if not content or THINK_END_TAG in content:
+        return content
+    lower_bound = max(0, len(content) - _NATURAL_BREAK_SEARCH_RANGE)
+    for index in range(len(content) - 1, lower_bound - 1, -1):
+        if content[index] in _NATURAL_BREAK_CHARS:
+            truncated = content[:index + 1]
+            if THINK_END_TAG not in truncated:
+                truncated = f"{truncated.rstrip()}\n{THINK_END_TAG}\n"
+            return truncated
+    return content
+
+
+def _natural_breakpoint_tokens(
+    context: RequestStateContext,
+    token_ids: list[int],
+    text: str,
+    stop_reason: object,
+) -> tuple[list[int], str]:
+    """Normalize a length-stopped think stride for the next engine prompt."""
+    if stop_reason != "length" or THINK_END_TAG in text:
+        return token_ids, text
+    truncated = _truncate_thinking_at_natural_breakpoint(text)
+    if truncated == text:
+        return token_ids, text
+    # Re-tokenize the retained suffix so prompt text and prompt_token_ids stay
+    # aligned after removing an incomplete tail and adding ``</think>``.
+    return list(context.encode_prompt_suffix(truncated)), truncated
 
 
 def _last_chunk_ends_with_think_tag(last_chunk: object) -> bool:
@@ -305,6 +346,8 @@ class _InitialThinkState(_BaseState):
         if last_chunk is None:
             raise RuntimeError("initial_think completed without a vLLM output")
         controller_segment_started_at = perf_counter()
+        stride_token_ids, stride_text = _natural_breakpoint_tokens(
+            context, stride_token_ids, stride_text, phase_stop_reason)
         context.update_prompts(stride_token_ids, last_chunk, stride_text)
 
         # 更新 token 计数
@@ -335,7 +378,9 @@ class _InitialThinkState(_BaseState):
         )
 
         # 检查是否因为 </think> 停止 (与 deer 源码一致)
-        if last_chunk and last_chunk.outputs[0].stop_reason == THINK_END_TAG:
+        if (last_chunk and last_chunk.outputs[0].stop_reason == THINK_END_TAG) or (
+            THINK_END_TAG in stride_text
+        ):
             return _AnswerState  # 思考已结束，直接回答
         else:
             return _IterativeThinkState  # 进入迭代思考
@@ -416,11 +461,13 @@ class _IterativeThinkState(_BaseState):
             raise RuntimeError("iterative_think completed without a vLLM output")
 
         controller_segment_started_at = perf_counter()
-        generated_tokens = len(stride_token_ids)
         continuation_text = stride_text
+        stride_token_ids, continuation_text = _natural_breakpoint_tokens(
+            context, stride_token_ids, continuation_text, phase_stop_reason)
+        generated_tokens = len(stride_token_ids)
         # deer 源码: stop_word 可能是 str 或 int，需要处理
         stop_word = last_chunk.outputs[0].stop_reason
-        if stop_word is not None:  # 在下一轮续写中添加本次的截断词
+        if stop_word is not None and THINK_END_TAG not in continuation_text:  # 在下一轮续写中添加本次的截断词
             if isinstance(stop_word, str):
                 stride_token_ids.extend(
                     context.encode_prompt_suffix(stop_word)
@@ -460,7 +507,9 @@ class _IterativeThinkState(_BaseState):
             stop_reason=phase_stop_reason,
         )
 
-        if last_chunk and last_chunk.outputs[0].stop_reason == THINK_END_TAG:
+        if (last_chunk and last_chunk.outputs[0].stop_reason == THINK_END_TAG) or (
+            THINK_END_TAG in continuation_text
+        ):
             return _AnswerState  # 思考已结束，直接回答
         else:
             return _ConfidenceCheckState  # 思考未结束，检查置信度
@@ -503,7 +552,7 @@ class _ConfidenceCheckState(_BaseState):
         # ─── 构建 trial answer 请求 ───
         # 新版 vLLM: to_sampling_params 只接受 (max_tokens, default_sampling_params)
         ans_params = context.request.to_sampling_params(
-            context.config.trial_answer_length,
+            TRIAL_ANSWER_LENGTH,
             context.default_sampling_params,
         )
         ans_params.logprobs = 1  # 为置信度检查准备 logprobs
@@ -531,7 +580,7 @@ class _ConfidenceCheckState(_BaseState):
 
         _BaseState.log_stage(
             context, "enter", "confidence_check",
-            trial_answer_max_tokens=context.config.trial_answer_length,
+            trial_answer_max_tokens=TRIAL_ANSWER_LENGTH,
             prob_th=context.config.prob_th,
             value_min=context.config.enable_value_min_confidence,
             dual_channel=context.config.enable_dual_channel,
@@ -701,7 +750,12 @@ class _AnswerState(_BaseState):
         # 异常收口与正常回答共用，绝不重复输出闭合标签。
         await _emit_think_end_once(context)
 
-        if context.last_chunk and context.last_chunk.outputs[0].stop_reason is None:
+        prompt_already_closed = _decode_prompt_text(context).rstrip().endswith(THINK_END_TAG)
+        if prompt_already_closed:
+            # Natural-break truncation or an explicit stop token already put
+            # the close tag in the continuation prompt.
+            ans_prompt = ""
+        elif context.last_chunk and context.last_chunk.outputs[0].stop_reason is None:
             # 上一轮思考因为超长退出，强制生成答案 (与 deer 源码一致)
             ans_prompt = (
                 "Considering the limited time by the user, "
@@ -717,14 +771,10 @@ class _AnswerState(_BaseState):
             context.serving_chat.model_config.max_model_len
             - len(context.engine_prompt['prompt_token_ids'])
         )
-        requested_max_tokens = (
-            getattr(context.request, "max_completion_tokens", None)
-            or getattr(context.request, "max_tokens", None)
-        )
-        answer_limit = context.config.final_answer_max_tokens
-        if requested_max_tokens is not None:
-            answer_limit = min(answer_limit, requested_max_tokens)
-        answer_limit = min(answer_limit, remaining_context)
+        # The final answer is a separate, complete request.  Only the model
+        # context window limits it; trial/probe and legacy server caps must not
+        # truncate the user-visible answer.
+        answer_limit = remaining_context
         if answer_limit <= 0:
             raise RuntimeError("no context space remains for the final answer")
 

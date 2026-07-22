@@ -14,7 +14,9 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from think_budget_vllm_adapter.config.unified_config import get_runtime_config
-from think_budget_vllm_adapter.context import BudgetConfig, BudgetRequestContext
+from think_budget_vllm_adapter.context import (
+    BudgetConfig, BudgetRequestContext, TRIAL_ANSWER_LENGTH,
+)
 from think_budget_vllm_adapter.deer_think_budget.state import AsyncReasoningOrchestrator
 from think_budget_vllm_adapter.optimizations.complexity_analyzer import estimate_complexity
 from think_budget_vllm_adapter.optimizations.difficulty_estimator import (
@@ -258,6 +260,7 @@ class BudgetController:
                 }
             for key, value in values.items():
                 cls._set_dynamic(params, external_overrides, key, value)
+            params["check_answer_len"] = TRIAL_ANSWER_LENGTH
             return params
 
         scene_info: dict[str, Any] = {
@@ -283,10 +286,8 @@ class BudgetController:
             cls._set_dynamic(params, external_overrides, "token_budget", task_budget.get("typical_tokens", config.token_budget))
 
         # A matched task has a meaningful feature space for difficulty
-        # estimation.  An unmatched task instead uses historical behaviour.
-        # The two modules are deliberately exclusive for one request: history
-        # must not overwrite a matched task's difficulty budget, and a generic
-        # fallback must not be treated as a confident task match.
+        # estimation.  Established history must not overwrite that budget;
+        # zero-history tasks are handled below as unlimited cold starts.
         if needs_core() and config.enable_difficulty_estimator and task_matched:
             with timing.measure("decision.difficulty"):
                 diff_info = estimate_difficulty(
@@ -301,7 +302,7 @@ class BudgetController:
                 cls._set_dynamic(params, external_overrides, key, value)
             params["difficulty_info"] = diff_info
 
-        if needs_core() and config.enable_history_budget and not task_matched:
+        if needs_core() and config.enable_history_budget:
             from think_budget_vllm_adapter.history.history_budget import compute_history_budget
 
             with timing.measure("decision.history"):
@@ -318,13 +319,23 @@ class BudgetController:
                         "custom_task_types_path": config.custom_task_types_path,
                     },
                 )
-            for key, value in history.items():
-                if key in _DECISION_TO_CONFIG:
-                    # History modules call the aggregate amount think_budget;
-                    # DEER consumes token_budget.  Normalize at the adapter
-                    # boundary so the value reaches the retained state machine.
-                    output_key = "token_budget" if key == "think_budget" else key
-                    cls._set_dynamic(params, external_overrides, output_key, value)
+            # Keep the decision record consistent with the hidden probe
+            # invariant; task/history modules may still return legacy values.
+            history["check_answer_len"] = TRIAL_ANSWER_LENGTH
+            # A matched task with established history keeps its difficulty
+            # budget.  A zero-history task still needs the unlimited cold start
+            # even when the classifier gave it a known coarse label.
+            apply_history_budget = (
+                not task_matched or int(history.get("history_count", 0)) == 0
+            )
+            if apply_history_budget:
+                for key, value in history.items():
+                    if key in _DECISION_TO_CONFIG:
+                        # History modules call the aggregate amount think_budget;
+                        # DEER consumes token_budget.  Normalize at the adapter
+                        # boundary so the value reaches the retained state machine.
+                        output_key = "token_budget" if key == "think_budget" else key
+                        cls._set_dynamic(params, external_overrides, output_key, value)
             params["history_info"] = history
 
         if needs_core():
@@ -332,6 +343,10 @@ class BudgetController:
                 params["complexity_info"] = estimate_complexity(prompt_text, reference)
         cls._set_dynamic(params, external_overrides, "task_type", task_type)
         cls._set_dynamic(params, external_overrides, "scene_type", scene_info.get("scene_type", "general"))
+        # ``check_answer_len`` is a probe length, not the requested answer
+        # length.  Dynamic task/history policies may report a legacy value,
+        # but the state machine must always issue a 50-token hidden trial.
+        params["check_answer_len"] = TRIAL_ANSWER_LENGTH
         return params
 
     @staticmethod

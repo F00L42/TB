@@ -334,7 +334,8 @@ def _evaluate_one(question, reference, model_name, response_fn, max_retries=_API
         difficulty_score=extras.get('complexity', {}).get('difficulty', 0) if isinstance(extras.get('complexity'), dict) else 0,
         budget_params=budget_params_record,
         result={'thinking_tokens': thinking_tokens, 'total_tokens': total_tokens,
-                'score': score, 'elapsed_time': elapsed_time},
+                'score': score, 'is_correct': is_correct,
+                'elapsed_time': elapsed_time},
         scene_type=scene_type,
     )
 

@@ -18,6 +18,12 @@ from dataclasses import dataclass, field
 from think_budget_vllm_adapter.deer_think_budget.context import ThinkBudgetConfig, RequestStateContext
 from think_budget_vllm_adapter.telemetry import TimingCollector
 
+
+# Trial answers are hidden probes used only for confidence estimation.  Keep
+# their work bounded independently of task/history budgets; the final answer
+# has its own unrestricted request in ``_AnswerState``.
+TRIAL_ANSWER_LENGTH = 50
+
 if TYPE_CHECKING:
     from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
     from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
@@ -144,7 +150,10 @@ class BudgetRequestContext(RequestStateContext):
             set_if_computed('min_think_tokens', budget_params['min_think_tokens'])
 
         if 'check_answer_len' in budget_params:
-            set_if_computed('trial_answer_length', budget_params['check_answer_len'])
+            # Task and history modules still expose ``check_answer_len`` for
+            # compatibility/telemetry, but a trial must never become a hidden
+            # long generation.  The production invariant is exactly 50.
+            set_if_computed('trial_answer_length', TRIAL_ANSWER_LENGTH)
 
         if 'prob_th' in budget_params:
             set_if_computed('prob_th', budget_params['prob_th'])

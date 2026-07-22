@@ -10,7 +10,7 @@ from think_budget_vllm_adapter.history.history_module import (
     get_task_type_stats, get_cv_for_task_type,
 )
 from think_budget_vllm_adapter.optimizations.task_type_budget import (
-    get_task_type_budget, register_custom_task_type, register_new_task_type,
+    get_task_type_budget, register_custom_task_type,
     is_known_task_type, compute_num_thinking_from_budget, compute_stride_from_budget,
 )
 from think_budget_vllm_adapter.config.unified_config import get_history_config
@@ -27,7 +27,7 @@ def compute_history_budget(
     hist_cfg = get_history_config()
 
     new_task_cfg = hist_cfg.get('new_task', {})
-    new_task_unlimited = cfg.get('new_task_unlimited', new_task_cfg.get('unlimited', False))
+    new_task_unlimited = cfg.get('new_task_unlimited', new_task_cfg.get('unlimited', True))
     unlimited_placeholder = new_task_cfg.get('unlimited_budget_placeholder', 99999)
 
     warm_cfg = hist_cfg.get('warm_start', {})
@@ -43,10 +43,7 @@ def compute_history_budget(
     low_success_boost = cfg.get('history_low_success_boost', hot_cfg.get('low_success_boost', 1.3))
     high_failure_stride_factor = hot_cfg.get('high_failure_stride_factor', 0.8)
 
-    if not is_known_task_type(task_type):
-        register_new_task_type(task_type, typical_tokens=3000,
-                               description=f'动态注册 — {task_type}',
-                               json_path=cfg.get('custom_task_types_path'))
+    task_was_known = is_known_task_type(task_type)
     task_budget = get_task_type_budget(task_type, cfg.get('custom_task_types_path'))
 
     cat_stats = get_task_type_stats(task_type, scene_type)
@@ -55,6 +52,19 @@ def compute_history_budget(
     history_p75_tokens = cat_stats.get('p75_tokens', 0.0)
     success_rate = cat_stats.get('success_rate', 0.0)
     failure_rate = cat_stats.get('failure_rate', 0.0)
+
+    # Once an unknown task has enough completed examples, replace its generic
+    # cold-start entry with a history-derived task profile.  Registration is
+    # deliberately deferred until five records so one noisy request cannot
+    # permanently define the type.
+    if not task_was_known and history_count >= 5:
+        register_task_type_from_history(
+            task_type,
+            scene_type=scene_type,
+            json_path=cfg.get('custom_task_types_path'),
+            min_count=5,
+        )
+        task_budget = get_task_type_budget(task_type, cfg.get('custom_task_types_path'))
 
     # ═══ 阶段A: 当前任务类型没有历史 ═══
     # 题面措辞不同不代表任务类型是新的。以语义相似度判断会让同一

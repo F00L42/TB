@@ -290,7 +290,7 @@ def _get_default_config() -> Dict[str, Any]:
             'classification': {'strong': ['分类', '归类', '属于哪类', 'classify', 'categorize', '判断对错', 'true or false', '选择题', 'A.', 'B.', 'C.', 'D.', 'which of the following', '选项'], 'weak': ['判断', '选择', '区分', '辨别', 'identify']},
             'reasoning': {'strong': ['推理', '推导', '前提', '结论', '推断', 'infer', 'deduce', 'therefore', 'hence', 'conclude', '必然', '逻辑判断', '逻辑推理', 'logically'], 'weak': ['分析', '因为', '所以', '由于', 'because', 'since', 'so', 'thus', '首先', '然后', '最后', '因果关系']},
         },
-        'HISTORY_NEW_TASK': {'unlimited': False, 'unlimited_budget_placeholder': 99999},
+        'HISTORY_NEW_TASK': {'unlimited': True, 'unlimited_budget_placeholder': 99999},
         'HISTORY_WARM_START': {'warmup_count': 3, 'multiplier': 1.2, 'strategy': 'moderate', 'high_variance_boost': {'conservative': 1.3, 'moderate': 1.1, 'aggressive': 1.0}},
         'HISTORY_HOT_START': {'stride_percentile': 0.75, 'low_success_boost': 1.3, 'high_failure_stride_factor': 0.8},
         'SCENE_TYPES': {
