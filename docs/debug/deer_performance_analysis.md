@@ -4,7 +4,7 @@
 
 本文分析 DEER 与 Think Budget 服务内控制器的端到端时延成本，目标是在质量约束下尽量降低“预算估算 + 置信度校验 + 多阶段调度”的额外耗时。
 
-数据基线更新到 2026-07-21 的 v0.23.0 汇总；上游源码基线为本地只读 checkout：vLLM `v0.23.0`（`0fc695f`）与 vLLM-Ascend `v0.23.0rc1`（`f4a08bd`）。当前环境没有目标模型和推理设备，因此结论分为“实测”“源码确定”“待验证假设”。服务器端验证步骤见第 9 节。
+数据基线更新到 2026-07-21 的 v0.23.0 汇总和 [`run_00`](../log/perf/run_00/RESULT.md) 请求级 phase 数据；上游源码基线为本地只读 checkout：vLLM `v0.23.0`（`0fc695f`）与 vLLM-Ascend `v0.23.0rc1`（`f4a08bd`）。当前环境没有目标模型和推理设备，因此结论分为“实测”“源码确定”“待验证假设”。服务器端验证步骤见第 9 节。
 
 ## 2. 结论摘要
 
@@ -13,6 +13,8 @@
 3. **Think Budget 的风险比简化版 DEER 更大。** 任务类型预算把单次 `check_answer_len` 设为 2000–4000，轮次为 3–15。试答 token 不进入 OpenAI usage，也没有从 `max_tokens_temp` 扣除；仅看客户端 CSV 无法知道隐藏模型工作量。当前实现已经有 `max_api_calls`，但默认值为 0（无限制），不能代替隐藏 token 账本。
 4. **先减少 probe 次数和 probe token，再优化 KV。** `mtp_off.txt` 的一个样本中，10 段思考与 9 个置信度分支的重复 prefill 合计 7.79 秒，只占 202.50 秒 E2E 的 3.85%。这证明重复 prefill 确实存在，但在该样本中不是最大项。
 5. **“新 request_id 导致 KV 必然清零”和“一个外部请求同时占 N 个 scheduler slot”都不成立。** 状态机顺序等待每个 phase；开启 Automatic Prefix Caching 时，新请求可按内容复用完整 prefix block。真正应测的是每个子请求的 `num_cached_tokens` 和 prefill 时间。
+6. **run_00 已直接确认隐藏 probe 是主项。** 63 次 probe 生成 74871 个隐藏 token，wall/decode 分别占客户端 E2E 的 64.85%/62.90%；客户端 E2E 与 hidden token 的请求级相关系数为 0.933。已记录 controller CPU 只有 22.2 ms/请求。
+7. **存在一个可先消除的死 probe 和一个路由异常。** 第四轮 15 次 probe 无论接受与否都进入最终回答，却消耗 433.54 秒；同时 16/16 个长故障诊断/规划 prompt 被选项正则误判为 classification。修分类器前必须先约束所有 task type 的隐藏预算，否则会路由到更长 probe。
 
 ## 3. 成本模型
 
@@ -79,6 +81,21 @@ $$
 - 若保持当前 278-token 节省量，则额外成本必须压到 4.51 秒以下，真实目标还应更低。
 
 **证据边界：** `_SUMMARY.csv` 只有聚合行，未保留每个样本的 ID/时延/token，因此上述是同日同样本数的聚合对照，尚不能计算严格的逐请求 paired delta。下一次实验必须同时保存 client 结果明细与稳定 sample ID。
+
+### 3.3 run_00 请求级归因
+
+[`run_00/RESULT.md`](../log/perf/run_00/RESULT.md) 保存完整分析。关键账本如下：
+
+| Phase | 调用数 | wall | 客户端 E2E 占比 | decode | 生成 token |
+|---|---:|---:|---:|---:|---:|
+| initial_think | 16 | 164.44 s | 5.55% | 128.17 s | 6066 |
+| iterative_think | 63 | 211.35 s | 7.13% | 150.26 s | 6212 |
+| confidence_probe | 63 | **1922.17 s** | **64.85%** | **1864.57 s** | **74871** |
+| final_answer | 16 | 664.05 s | 22.40% | 649.99 s | 27188 |
+
+**实测：** phase wall 合计 2962.16 秒，客户端 E2E 合计 2964.20 秒，只差 2.04 秒。总模型生成量 114337 token，其中隐藏 probe 占 65.48%；同日 vanilla 可见生成量为 70096，因此 run_00 虽减少可见输出，真实生成量仍多 44241 token。
+
+**采集边界：** before/after Prometheus 快照的进程启动时间不同，不能直接相减；after 的 158 call、591201 prompt、181248 cache hit、114337 generated 与 phase JSONL 完全一致，只作为绝对计数交叉校验。质量分和服务器源码 SHA 未采集。
 
 ## 4. 当前执行路径与成本放大器
 
@@ -335,7 +352,7 @@ docs/log/perf/<run_id>/
 
 `manifest.json` 至少记录：commit、dirty diff hash、vLLM/vLLM-Ascend/torch/torch-npu/CANN 版本、模型与 tokenizer revision、完整启动命令、设备、TP/DP、`max_num_seqs`、prefix cache、MTP 参数、数据集 hash、并发和随机种子。
 
-从 [`manifest.template.json`](../log/perf/manifest.template.json) 复制后填写。模板中的上游 tag/SHA 来自本地固定 checkout；`installed_version`、dirty 状态、模型、设备和启动参数必须按目标服务器实填，不能只相信模板值。
+从 [`run_00/manifest.template.json`](../log/perf/run_00/manifest.template.json) 复制后填写。模板保留了 run_00 的版本基线和缺口状态；`installed_version`、实际 checkout SHA、dirty 状态、模型、设备和启动参数仍必须按目标服务器实填，不能只相信模板值。
 
 `controller_phases.jsonl` 每行一个 phase，推荐格式：
 
@@ -358,6 +375,28 @@ npu-smi info > npu_smi.txt
 curl -s http://127.0.0.1:8000/version > version.json
 curl -s http://127.0.0.1:8000/metrics > metrics.before.prom
 ```
+
+版本字符串不足以证明服务器源码身份；每轮还必须采集实际 editable checkout、TB 源码和配置 hash：
+
+```bash
+TB_REPO=/opt/p00906181/260707/TB
+for repo in "$TB_REPO" /vllm-workspace/vllm /vllm-workspace/vllm-ascend; do
+  echo "repo=$repo"
+  git -C "$repo" remote get-url origin
+  git -C "$repo" rev-parse HEAD
+  git -C "$repo" status --porcelain
+done > source_versions.txt
+
+sha256sum \
+  "$TB_REPO/think_budget_vllm_adapter/config/budget_config.yaml" \
+  run_server_qwen36.sh > config_hashes.txt
+
+find /usr/local/Ascend/ascend-toolkit/latest -maxdepth 3 -type f \
+  \( -name 'version.cfg' -o -name '*install.info' -o -name 'version.info' \) \
+  -print -exec sed -n '1,80p' {} \; > cann_version.txt
+```
+
+模型不是固定 revision checkout 时，至少记录 `readlink -f` 后的真实路径及 `config.json`、tokenizer 配置文件 hash。测试后先核对两份 metrics 的 `process_start_time_seconds`；不同则 counter delta 整体无效，不能选择性使用其中某些差值。
 
 2. 控制器默认对每个 phase 输出一条 `TB_PHASE` JSON。优先从最终 `RequestOutput` 读取：
 
@@ -467,7 +506,14 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 
 这些属于**源码确定/本地测试**，不是目标 NPU 的性能实测。尤其结构化 phase 日志本身仍有一次 JSON 序列化与 flush 成本；它替代了更多旧日志，但必须在服务器用 A/B 量化。
 
-### 11.2 第一轮服务器测试（不改算法参数）
+### 11.2 run_00 已确认的假设
+
+- **H1 已支持：** probe decode 占客户端 E2E 62.90%，不是原先设定的最低 20% 边界问题，而是绝对主项。
+- **H2 已否定：** 整体 APC 命中率只有 30.66%；iterative/probe 分别 32.78%/33.03%，缓存 token 只出现 0 或 1536，没有随 parent 轮次增长。
+- **H3 得到数量级支持：** 已记录 controller CPU 平均 22.2 ms/请求，phase 与客户端未解释差值平均 127.6 ms/请求，普通 Python 微优化远小于平均 120.1 秒的 probe wall。
+- **新增发现：** 63 次 confidence score 全部低于 0.90；第四轮 15 次 probe 不改变后续控制流，却占总 E2E 14.63%。
+
+### 11.3 下一轮服务器测试
 
 使用完全相同的 16 个 sample ID，按交错顺序运行 `vanilla → 当前生产 DTB → 本轮 DTB`，至少 3 个随机化重复；每组都重新执行同样的 warmup/cache policy。比较：
 
@@ -477,13 +523,13 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 4. `sum(phase.wall_ms)` 与客户端 E2E 的未解释差值；
 5. 新旧 DTB 的输出、accept round 与 quality 必须一致，才能把差值归因于工程微优化。
 
-可证伪假设：
+继续验证：
 
-- **H1：隐藏 probe decode 是 30.25 秒回归的主项。** 若 `confidence_probe.decode_ms + 其 wall 中未解释部分` 占 DTB–vanilla paired gap 不足 20%，则否定，转查 final/think decode、排队和客户端格式化。
-- **H2：APC 已复用大部分增长前缀。** 若 iterative/probe 的 `cached_prompt_tokens / prompt_tokens` 中位数低于 80%，则否定，先查 DP 亲和、cache salt、block 边界和抢占；不要直接设计 resumable session。
-- **H3：Python 深拷贝/日志是次要但可测开销。** 若本轮 DTB 与生产 DTB 的 accept round/token/质量一致而 paired E2E 无可重复改善，则停止继续做 Python 微优化。
+- 跳过不能改变控制流的最后一轮 probe 后，可见 prompt、答案和质量是否保持一致，paired E2E 是否接近静态上界的 27.10 秒/请求改善。
+- 并发 1、单样本时 cached token 是否仍固定为 1536；若仍固定，查 child token/block hash/cache salt/生成 block 保留，若随轮次增长则查并发容量淘汰。
+- 记录 `accept_reason`、Value-Min raw、平均 confidence 和 candidate 完整性，解释低 score 下的 3 次 accepted。
 
-### 11.3 第二轮 probe 长度消融（允许改变算法，必须做质量非劣检验）
+### 11.4 probe 长度消融（允许改变算法，必须做质量非劣检验）
 
 在 11.2 数据证明 probe 成本显著后，再运行 `current / 256 / 128 / 64` 四个长度。由于 task type 会覆盖 `RUNTIME.check_answer_len`，每个变体必须只修改所命中 `TASK_TYPES.*.check_answer_len`（或对全部 task type 做同一机械替换），并保存 `budget_config.yaml` hash；不要通过关闭 task classifier 顺带改变其他预算字段。
 
@@ -509,5 +555,6 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-07-21 | 纳入 run_00 请求级 phase、环境和客户端明细；确认 probe decode 主导、APC 增长前缀未命中、最后一轮死 probe 与 classification 误路由；补齐 manifest/RESULT | 用 158 个 engine call 的实测账本替代历史聚合假设，并明确下一轮的首改与采集缺口 |
 | 2026-07-21 | 纳入 v0.23.0 最新 DTB 汇总；落地 phase ledger、浅拷贝/日志优化、v0.23.0 调用上下文透传、manifest 模板与日志提取工具 | 先获得隐藏 probe 与 child phase 的请求级证据，再对 2000–4000 token probe 做质量约束消融 |
 | 2026-07-20 | 重写性能分析；建立完整成本模型、优化优先级和服务器 runbook | 校正早期文档对 scheduler slot、KV cache 和 MTP 因果的过度推断，并纳入新日志证据 |

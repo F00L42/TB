@@ -1,38 +1,102 @@
 {
   "schema": 1,
+  "template": {
+    "copy_as": "docs/log/perf/<run_id>/manifest.json",
+    "version_baseline_run": "run_00",
+    "version_baseline_status": "PACKAGE_VERSIONS_CAPTURED_SOURCE_COMMITS_UNVERIFIED",
+    "comparison_rule": "后续轮次必须同时比较安装包版本和实际 server checkout commit；只匹配版本字符串不能标记为完全一致"
+  },
+  "version_baseline": {
+    "vllm": {
+      "required_tag": "v0.23.0",
+      "reference_commit_sha": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
+      "run_00_package_version": "0.23.0+empty",
+      "run_00_api_version": "0.23.0",
+      "run_00_install_mode": "editable",
+      "run_00_editable_path": "/vllm-workspace/vllm",
+      "run_00_source_commit_sha": null,
+      "status": "VERSION_MATCH_SOURCE_COMMIT_NOT_COLLECTED"
+    },
+    "vllm_ascend": {
+      "required_tag": "v0.23.0rc1",
+      "reference_commit_sha": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db",
+      "run_00_package_version": "0.23.0rc1",
+      "run_00_install_mode": "editable",
+      "run_00_editable_path": "/vllm-workspace/vllm-ascend",
+      "run_00_source_commit_sha": null,
+      "status": "VERSION_MATCH_SOURCE_COMMIT_NOT_COLLECTED"
+    },
+    "runtime": {
+      "python": "3.12.13",
+      "pytorch": "2.10.0+cpu",
+      "torch_npu": "2.10.0.post2",
+      "transformers": "5.5.4",
+      "triton": "3.5.0",
+      "triton_ascend": "3.2.1",
+      "os": "openEuler 24.03 (LTS-SP3) aarch64",
+      "npu_smi": "25.0.rc1",
+      "cann": null,
+      "status": "CANN_VERSION_NOT_COLLECTED"
+    },
+    "hardware": {
+      "device_model": "Ascend 910B4",
+      "run_00_selected_devices": [0, 1, 2, 3],
+      "host_visible_device_count": 8
+    },
+    "model": {
+      "name_or_path": "/opt/foundation_model/Qwen3.6-27B",
+      "served_model_name": "Qwen3.6-27B",
+      "model_revision": null,
+      "tokenizer_revision": null,
+      "status": "MODEL_AND_TOKENIZER_REVISIONS_NOT_COLLECTED"
+    }
+  },
   "run_id": null,
   "created_at": null,
+  "created_at_timezone": null,
   "variant": null,
   "code": {
     "repository": "TB",
-    "path": null,
+    "server_path": null,
     "commit_sha": null,
     "dirty": null,
-    "dirty_diff_sha256": null
+    "dirty_diff_sha256": null,
+    "status": "REQUIRED"
   },
   "upstream": {
     "vllm": {
-      "path": "third_party/vllm",
+      "reference_path": "third_party/vllm",
       "remote_url": "git@github.com:vllm-project/vllm.git",
-      "tag": "v0.23.0",
-      "commit_sha": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
+      "required_tag": "v0.23.0",
+      "reference_commit_sha": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
+      "server_checkout_path": null,
+      "source_commit_sha": null,
       "dirty": null,
-      "installed_version": null
+      "installed_version": null,
+      "api_version": null,
+      "comparison_status": null
     },
     "vllm_ascend": {
-      "path": "third_party/vllm-ascend",
+      "reference_path": "third_party/vllm-ascend",
       "remote_url": "git@github.com:vllm-project/vllm-ascend.git",
-      "tag": "v0.23.0rc1",
-      "commit_sha": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db",
+      "required_tag": "v0.23.0rc1",
+      "reference_commit_sha": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db",
+      "server_checkout_path": null,
+      "source_commit_sha": null,
       "dirty": null,
-      "installed_version": null
+      "installed_version": null,
+      "comparison_status": null
     }
   },
   "runtime": {
     "python": null,
     "pytorch": null,
     "torch_npu": null,
+    "transformers": null,
+    "triton": null,
+    "triton_ascend": null,
     "cann": null,
+    "npu_smi": null,
     "os": null,
     "container_image": null
   },
@@ -44,17 +108,26 @@
     "served_model_name": null
   },
   "server": {
+    "script": null,
+    "script_sha256": null,
     "command": null,
+    "argv": null,
     "environment": null,
     "devices": null,
+    "device_model": null,
     "tensor_parallel_size": null,
     "data_parallel_size": null,
     "pipeline_parallel_size": null,
     "max_model_len": null,
     "max_num_seqs": null,
     "max_num_batched_tokens": null,
+    "block_size": null,
     "enable_prefix_caching": null,
+    "enable_chunked_prefill": null,
     "gpu_memory_utilization": null,
+    "async_scheduling": null,
+    "compilation_config": null,
+    "torch_compile_cache_cleared_before_start": null,
     "mtp_config": null,
     "budget_config_sha256": null,
     "phase_metrics_enabled": true,
@@ -65,6 +138,7 @@
     "dataset_sha256": null,
     "sample_count": null,
     "sample_ids_sha256": null,
+    "sample_ids_hash_method": "SHA256(sorted sample IDs joined by LF with trailing LF)",
     "concurrency": null,
     "arrival_pattern": null,
     "random_seed": null,
@@ -77,10 +151,25 @@
     "evaluator_version": null,
     "non_inferiority_margin": null
   },
+  "integrity": {
+    "metrics_before_process_start_time_seconds": null,
+    "metrics_after_process_start_time_seconds": null,
+    "metrics_same_process": null,
+    "metrics_counter_delta_valid": null,
+    "phase_parent_request_count": null,
+    "phase_engine_call_count": null,
+    "client_request_count": null,
+    "phase_wall_vs_client_e2e_gap_ms": null
+  },
   "artifacts": {
     "collect_env": "collect_env.txt",
     "packages": "packages.txt",
+    "source_versions": "source_versions.txt",
+    "cann_version": "cann_version.txt",
+    "config_hashes": "config_hashes.txt",
     "npu_smi": "npu_smi.txt",
+    "version": "version.json",
+    "server_script": "run_server_qwen36.sh",
     "metrics_before": "metrics.before.prom",
     "metrics_after": "metrics.after.prom",
     "server_log": "server.log",
@@ -88,6 +177,7 @@
     "controller_phases": "controller_phases.jsonl",
     "request_summary": "requests.jsonl",
     "phase_summary": "phase_summary.csv",
-    "quality_summary": "quality_summary.csv"
+    "quality_summary": "quality_summary.csv",
+    "result": "RESULT.md"
   }
 }
