@@ -227,8 +227,7 @@ class _AnswerState(_BaseState):
 
         if context.last_chunk.outputs[0].stop_reason is None:  # 上一轮思考因为超长退出，强制生成答案
             ans_prompt = (
-                "Considering the limited time by the user, "
-                "I have to give the solution based on the thinking directly now.\n</think>.\n\n"
+                "... \n OK, I have completed my thinking and can now provide the final answer.</think>\n"
             )
         else:  # 置信度足够高，可以直接结束思考
             ans_prompt = "</think>"
