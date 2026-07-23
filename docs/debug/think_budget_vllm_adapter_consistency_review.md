@@ -1,5 +1,11 @@
 # think_budget_vllm_adapter 算法一致性检视与重构方案
 
+> 状态说明（2026-07-23）：本文保留首次检视时的差异证据。用户随后以端到端
+> 时延优先原则裁决了这些差异；实施范围和最终修改顺序以
+> `docs/debug/think_budget_vllm_adapter_refactor_plan.md` 为准。本文中要求
+> 恢复 `answer_list`、soft truncation、safety amplification/fallback、
+> trial evaluator early-stop 或严格协议校验的旧建议均已被新计划替代。
+
 ## 1. 文档目的
 
 本文检视 `think_budget_vllm_adapter` 是否符合以下迁移原则：
@@ -703,3 +709,5 @@ C 可能减少重复 prefill/decode，但实现复杂度和格式风险更高。
 
 - 2026-07-23：首次检视；确认接口复用基本可保留，算法层需要整体重写；
   将五项模糊语义单列为待裁决事项。
+- 2026-07-23：收到性能优先裁决；保留本文作为差异证据，实施处置迁移到
+  `think_budget_vllm_adapter_refactor_plan.md`。
