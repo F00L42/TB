@@ -758,8 +758,7 @@ class _AnswerState(_BaseState):
         elif context.last_chunk and context.last_chunk.outputs[0].stop_reason is None:
             # 上一轮思考因为超长退出，强制生成答案 (与 deer 源码一致)
             ans_prompt = (
-                "Considering the limited time by the user, "
-                f"I have to give the solution based on the thinking directly now.\n{THINK_END_TAG}.\n\n"
+                f"Considering the limited time by the user, I have to give the solution based on the thinking directly now.\n{THINK_END_TAG}\n\n"
             )
         else:
             # 置信度足够高，可以直接结束思考 (与 deer 源码一致)
