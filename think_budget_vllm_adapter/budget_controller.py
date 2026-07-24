@@ -1,32 +1,46 @@
-"""Production controller for Think Budget on top of vLLM's async engine.
-
-The controller deliberately separates three concerns:
-* request configuration is validated once and always wins field-by-field;
-* budget modules calculate only fields not supplied by the caller;
-* the state machine follows DEER's request-bound stream lifecycle, leaving
-  parent-request concurrency and cancellation to vLLM/OpenAI serving.
-"""
+"""Think Budget decision, vLLM routing, and parent-request lifecycle."""
 from __future__ import annotations
 
 import asyncio
 import time
 from collections.abc import AsyncGenerator, AsyncIterator
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from dataclasses import replace
+from typing import Any, Optional, TYPE_CHECKING
 
-from think_budget_vllm_adapter.config.unified_config import get_runtime_config
-from think_budget_vllm_adapter.context import (
-    BudgetConfig, BudgetRequestContext, TRIAL_ANSWER_LENGTH,
+from think_budget_vllm_adapter.config.unified_config import (
+    get_performance_policy_config,
+    get_runtime_config,
 )
-from think_budget_vllm_adapter.deer_think_budget.state import AsyncReasoningOrchestrator
-from think_budget_vllm_adapter.optimizations.complexity_analyzer import estimate_complexity
+from think_budget_vllm_adapter.context import (
+    AlgorithmConfig,
+    BudgetPlan,
+    BudgetVector,
+    DecisionBranch,
+    PerformancePolicy,
+    log_performance_policy_once,
+)
+from think_budget_vllm_adapter.deer_think_budget.context import (
+    RequestAlgorithmState,
+    RequestStateContext,
+)
+from think_budget_vllm_adapter.deer_think_budget.state import (
+    AsyncReasoningOrchestrator,
+)
+from think_budget_vllm_adapter.history.history_module import (
+    AsyncHistoryRecorder,
+    HistoryOutcome,
+)
 from think_budget_vllm_adapter.optimizations.difficulty_estimator import (
     compute_budget_from_difficulty,
     estimate_difficulty,
 )
-from think_budget_vllm_adapter.optimizations.scene_classifier import classify_scene
+from think_budget_vllm_adapter.optimizations.scene_classifier import (
+    classify_scene,
+)
 from think_budget_vllm_adapter.optimizations.task_type_budget import (
     classify_task_type,
     get_task_type_budget,
+    is_known_task_type,
 )
 from think_budget_vllm_adapter.telemetry import TimingCollector
 
@@ -41,12 +55,9 @@ if TYPE_CHECKING:
 
 
 class ThinkBudgetConfigError(ValueError):
-    """A client supplied an unknown or invalid Think Budget configuration."""
+    pass
 
 
-# Think Budget 的公网请求面严格收敛为总开关和这六个固定输入。动态
-# 策略、会话控制与兼容别名均只允许出现在服务端配置中，不能由 HTTP 请求
-# 改写。下面的拒绝列表用于防御「服务端协议补丁未完全更新」的混合部署。
 _FIXED_REQUEST_FIELDS = frozenset({
     "fixed_budget_tokens",
     "fixed_num_thinking",
@@ -77,340 +88,610 @@ _RETIRED_REQUEST_FIELDS = frozenset({
     "think_budget_resume",
     "think_budget_session_ttl_s",
 })
+_VECTOR_FIELDS = (
+    "check_length",
+    "min_think_budget",
+    "num_thinking",
+    "think_stride",
+)
+_DEFAULT_CONFIDENCE_THRESHOLD = 0.95
+_DEFAULT_PERCENTILE_STEP = 0.75
 
-_DECISION_TO_CONFIG = {
-    "check_length": "initial_thought_limit",
-    "think_stride": "think_stride",
-    "num_thinking": "trial_answers",
-    "check_answer_len": "trial_answer_length",
-    "prob_th": "prob_th",
-    "min_think_tokens": "min_think_tokens",
-    "think_budget": "token_budget",
-    "token_budget": "token_budget",
-}
-_CORE_DECISION_FIELDS = frozenset(_DECISION_TO_CONFIG.values())
+
+def _round_half_up_average(left: int, right: int) -> int:
+    return (int(left) + int(right) + 1) // 2
+
+
+def _optional_vector_value(
+    values: dict[str, Any],
+    field_name: str,
+) -> int | None:
+    value = values.get(field_name)
+    if value is None and field_name == "min_think_budget":
+        value = values.get("min_think_tokens")
+    if value is None:
+        return None
+    return max(1, int(value))
+
+
 class BudgetController:
-    """Request entrypoint used by the vLLM chat-completion serving patch."""
+    """Entry point used by the vLLM chat-completion serving patch."""
 
-    # ``serving.py`` 与适配器曾分别演进，直接扩展 handle_request 的位置
-    # 参数会让部分服务器加载到的旧控制器在路由后立即 TypeError。公共调用
-    # ABI 固定为 7 个业务参数；新版所需路由与解析上下文由 serving.py 写入
-    # 私有属性，避免把 HTTP 请求面扩展成内部对象传输协议。
     ROUTING_CONTEXT_ATTR = "_think_budget_route_identity"
 
+    def __init__(
+        self,
+        history_recorder: AsyncHistoryRecorder | None = None,
+    ) -> None:
+        self.history_recorder = history_recorder or AsyncHistoryRecorder()
+
     @staticmethod
-    def _default_config() -> BudgetConfig:
-        """Build runtime config from the single YAML-backed configuration."""
+    def _default_config() -> AlgorithmConfig:
         defaults = get_runtime_config()
-        return BudgetConfig(
-            BUDGET_ENABLED=bool(defaults["BUDGET_ENABLED"]),
-            initial_thought_limit=int(defaults["check_length"]),
+        get_performance_policy_config()
+        return AlgorithmConfig(
+            budget_enabled=bool(defaults["BUDGET_ENABLED"]),
+            check_length=int(defaults["check_length"]),
+            min_think_budget=int(defaults["min_think_budget"]),
+            num_thinking=int(defaults["num_thinking"]),
             think_stride=int(defaults["think_stride"]),
-            trial_answers=int(defaults["num_thinking"]),
-            trial_answer_length=int(defaults["check_answer_len"]),
-            token_budget=int(defaults["max_tokens"]),
-            max_api_calls=int(defaults["max_api_calls"]),
-            prob_th=float(defaults["prob_th"]),
-            min_think_tokens=int(defaults["min_think_tokens"]),
-            enable_value_min_confidence=bool(defaults["enable_value_min_confidence"]),
+            confidence_threshold=float(defaults["confidence_threshold"]),
+            percentile_step=float(defaults["percentile_step"]),
+            enable_value_min_confidence=bool(
+                defaults["enable_value_min_confidence"]),
             value_min_bottom_k=int(defaults["value_min_bottom_k"]),
-            enable_full_chain_confidence=bool(defaults["enable_full_chain_confidence"]),
-            full_chain_min_percentile=float(defaults["full_chain_min_percentile"]),
             enable_safety_gate=bool(defaults["enable_safety_gate"]),
             baseline_time_limit=float(defaults["baseline_time_limit"]),
-            enable_task_type_budget=bool(defaults["enable_task_type_budget"]),
+            enable_task_type_budget=bool(
+                defaults["enable_task_type_budget"]),
             enable_history_budget=bool(defaults["enable_history_budget"]),
-            enable_difficulty_estimator=bool(defaults["enable_difficulty_estimator"]),
-            enable_deer_trial=bool(defaults["enable_deer_trial"]),
-            enable_dual_channel=bool(defaults["enable_dual_channel"]),
-            consecutive_same_stop=int(defaults["consecutive_same_stop"]),
-            enable_consecutive_same_stop=bool(defaults["enable_consecutive_same_stop"]),
+            enable_difficulty_estimator=bool(
+                defaults["enable_difficulty_estimator"]),
+            difficulty_check_length_base=int(
+                defaults["difficulty_check_length_base"]),
+            difficulty_check_length_max=int(
+                defaults["difficulty_check_length_max"]),
+            difficulty_min_think_base=int(
+                defaults["difficulty_min_think_base"]),
+            difficulty_min_think_max=int(
+                defaults["difficulty_min_think_max"]),
+            difficulty_stride_base=int(
+                defaults["difficulty_stride_base"]),
+            difficulty_stride_max=int(
+                defaults["difficulty_stride_max"]),
+            difficulty_num_thinking_base=int(
+                defaults["difficulty_num_thinking_base"]),
+            difficulty_num_thinking_max=int(
+                defaults["difficulty_num_thinking_max"]),
             fixed_budget_tokens=int(defaults["fixed_budget_tokens"]),
             fixed_num_thinking=int(defaults["fixed_num_thinking"]),
             fixed_think_stride=int(defaults["fixed_think_stride"]),
             fixed_check_length=int(defaults["fixed_check_length"]),
             fixed_prob_th=float(defaults["fixed_prob_th"]),
-            fixed_min_think_tokens=int(defaults["fixed_min_think_tokens"]),
-            history_budget_multiplier=float(defaults["history_budget_multiplier"]),
-            history_low_success_boost=float(defaults["history_low_success_boost"]),
-            history_stride_percentile=float(defaults["history_stride_percentile"]),
+            fixed_min_think_tokens=int(
+                defaults["fixed_min_think_tokens"]),
+            history_budget_multiplier=float(
+                defaults["history_budget_multiplier"]),
+            history_low_success_boost=float(
+                defaults["history_low_success_boost"]),
+            history_stride_percentile=float(
+                defaults["history_stride_percentile"]),
             history_warmup_count=int(defaults["history_warmup_count"]),
-            history_warmup_strategy=str(defaults["history_warmup_strategy"]),
+            history_warmup_strategy=str(
+                defaults["history_warmup_strategy"]),
+            new_task_unlimited=bool(defaults["new_task_unlimited"]),
+            auto_cluster_threshold=int(
+                defaults["auto_cluster_threshold"]),
+            custom_task_types_path=defaults["custom_task_types_path"],
             default_task_type=str(defaults["default_task_type"]),
-            final_answer_max_tokens=int(defaults["final_answer_max_tokens"]),
+            task_type_override=str(defaults["task_type_override"]),
+            max_internal_calls=int(defaults["max_internal_calls"]),
+            max_thinking_tokens=int(defaults["max_thinking_tokens"]),
+            final_answer_max_tokens=int(
+                defaults["final_answer_max_tokens"]),
             emit_phase_metrics=bool(defaults["emit_phase_metrics"]),
             verbose_stage_logging=bool(defaults["verbose_stage_logging"]),
         )
 
     @staticmethod
     def is_enabled() -> bool:
-        """Whether the server allows a request to enter the Think Budget route."""
         return bool(get_runtime_config()["BUDGET_ENABLED"])
 
     @staticmethod
     def _validate_value(name: str, value: Any) -> None:
         if name not in _FIXED_REQUEST_FIELDS:
-            raise ThinkBudgetConfigError(f"unknown Think Budget config key: {name}")
+            raise ThinkBudgetConfigError(
+                f"unknown Think Budget config key: {name}")
         if value is None:
-            raise ThinkBudgetConfigError(f"Think Budget config {name} cannot be null")
-        if name != "fixed_prob_th" and (
-            not isinstance(value, int) or isinstance(value, bool) or value < 0
+            raise ThinkBudgetConfigError(
+                f"Think Budget config {name} cannot be null")
+        if name == "fixed_prob_th":
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not 0 <= value <= 1
+            ):
+                raise ThinkBudgetConfigError(
+                    f"Think Budget config {name} must be in [0, 1]")
+            return
+        if (
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 0
         ):
-            raise ThinkBudgetConfigError(f"Think Budget config {name} must be a non-negative integer")
-        if name == "fixed_prob_th" and (
-            not isinstance(value, (int, float)) or isinstance(value, bool) or not 0 <= value <= 1
-        ):
-            raise ThinkBudgetConfigError(f"Think Budget config {name} must be in [0, 1]")
+            raise ThinkBudgetConfigError(
+                f"Think Budget config {name} must be a non-negative integer")
 
     @classmethod
-    def _build_budget_config(cls, request: ChatCompletionRequest) -> tuple[BudgetConfig, set[str]]:
-        """Build config from the six supported fixed request inputs only.
-
-        A positive fixed value takes unconditional precedence over the matching
-        dynamic calculation.  A value of zero means "do not fix this field" and
-        keeps the original server-side calculation chain intact.
-        """
-        cfg = cls._default_config()
-        external: dict[str, Any] = {}
+    def _build_algorithm_config(
+        cls,
+        request: ChatCompletionRequest,
+    ) -> AlgorithmConfig:
+        config = cls._default_config()
         for name in _RETIRED_REQUEST_FIELDS:
             value = getattr(request, name, None)
-            # Some old protocol versions materialize False/0 defaults.  They
-            # are indistinguishable from an omitted field and have no effect;
-            # every meaningful old input is rejected explicitly.
             if value not in (None, False, 0, ""):
                 raise ThinkBudgetConfigError(
                     f"Think Budget request field is not supported: {name}")
             if name == "think_budget_config" and value is not None:
                 raise ThinkBudgetConfigError(
-                    "Think Budget request field is not supported: think_budget_config")
-
+                    "Think Budget request field is not supported: "
+                    "think_budget_config")
+        changes: dict[str, Any] = {}
         for name in _FIXED_REQUEST_FIELDS:
             value = getattr(request, name, None)
-            if value is not None:
-                cls._validate_value(name, value)
-                # 与参考 API server 一致，0/0.0 是统一的“未固定”值：
-                # 不覆盖服务端静态配置，也不阻断动态决策。
-                if value > 0:
-                    external[name] = value
+            if value is None:
+                continue
+            cls._validate_value(name, value)
+            if value > 0:
+                changes[name] = value
+        return replace(config, **changes) if changes else config
 
-        # Fixed sub-parameters are external inputs as well. Project them onto
-        # their canonical runtime fields before validation/merge.  Fixed inputs
-        # are the only caller-controlled values, therefore there is no second
-        # request representation with which they can conflict.
-        fixed_aliases = {
-            "fixed_check_length": "initial_thought_limit",
-            "fixed_think_stride": "think_stride",
-            "fixed_num_thinking": "trial_answers",
-            "fixed_prob_th": "prob_th",
-            "fixed_min_think_tokens": "min_think_tokens",
-        }
-        for fixed_name, runtime_name in fixed_aliases.items():
-            fixed_value = external.get(fixed_name, getattr(cfg, fixed_name))
-            if fixed_value:
-                external.setdefault(runtime_name, fixed_value)
-        fixed_budget = external.get("fixed_budget_tokens", cfg.fixed_budget_tokens)
-        if fixed_budget:
-            external.setdefault("token_budget", fixed_budget)
-
-        for name, value in external.items():
-            setattr(cfg, name, value)
-        if 0 < cfg.max_api_calls < 2:
-            raise ThinkBudgetConfigError(
-                "max_api_calls must be 0 (unlimited) or at least 2 so a final answer can be generated")
-        return cfg, set(external)
+    # Compatibility with callers that used the previous private name.
+    _build_budget_config = _build_algorithm_config
 
     @staticmethod
-    def _set_dynamic(
-        params: dict[str, Any], external_overrides: set[str], key: str, value: Any
-    ) -> None:
-        config_key = _DECISION_TO_CONFIG.get(key, key)
-        if config_key not in external_overrides:
-            params[key] = value
+    def _classify_task(
+        prompt_text: str,
+        config: AlgorithmConfig,
+        timing: TimingCollector,
+    ) -> tuple[dict[str, Any], dict[str, Any], str, bool]:
+        with timing.measure("decision.scene_classifier"):
+            scene_info = classify_scene(prompt_text)
+        with timing.measure("decision.task_type"):
+            task_match = classify_task_type(
+                prompt_text, scene_info, include_budget=False)
+        task_type = (
+            config.task_type_override
+            or task_match.get("task_type")
+            or config.default_task_type
+        )
+        task_matched = bool(
+            config.enable_task_type_budget
+            and task_type != "general"
+            and is_known_task_type(task_type)
+            and (
+                config.task_type_override
+                or float(task_match.get("task_confidence", 0.0)) > 0
+            )
+        )
+        return scene_info, task_match, task_type, task_matched
+
+    @staticmethod
+    def _clamp_vector(
+        vector: BudgetVector,
+        hard_limit: int,
+        source_by_field: dict[str, Any],
+    ) -> BudgetVector:
+        clamped: dict[str, int] = {}
+        for field_name, value in vector.to_dict().items():
+            final_value = max(1, min(int(value), hard_limit))
+            clamped[field_name] = final_value
+            if final_value != value:
+                previous = source_by_field.get(field_name)
+                source_by_field[field_name] = {
+                    "source": previous,
+                    "clamped_from": value,
+                    "hard_limit": hard_limit,
+                    "final": final_value,
+                }
+        return BudgetVector(**clamped)
 
     @classmethod
-    def _run_budget_decision_chain(
+    def _decide(
         cls,
         prompt_text: str,
-        config: BudgetConfig,
-        external_overrides: set[str],
+        config: AlgorithmConfig,
         timing: TimingCollector,
+        *,
+        hard_token_limit: int | None = None,
         reference: str = "",
-    ) -> Dict[str, Any]:
-        """Run the original priority chain, but only fill non-external fields."""
-        params: dict[str, Any] = {}
-        if not config.BUDGET_ENABLED:
-            return params
+    ) -> BudgetPlan:
+        """Apply the reviewed FIXED / TASK_DIFFICULTY / HISTORY tree."""
+        policy = PerformancePolicy()
+        scene_info, task_match, task_type, task_matched = cls._classify_task(
+            prompt_text, config, timing)
+        default_vector = config.default_budget
+        source_by_field: dict[str, Any] = {}
+        difficulty_info: dict[str, Any] | None = None
+        history_info: dict[str, Any] | None = None
+        history_snapshot_id: str | None = None
+        branch_confidence_threshold = _DEFAULT_CONFIDENCE_THRESHOLD
+        branch_confidence_source = "runtime_default"
+        if config.percentile_step != _DEFAULT_PERCENTILE_STEP:
+            effective_percentile_step = config.percentile_step
+            percentile_source = "percentile_step_override"
+        else:
+            effective_percentile_step = config.history_stride_percentile
+            percentile_source = "history_stride_percentile"
 
-        def needs_core() -> bool:
-            return bool(_CORE_DECISION_FIELDS - external_overrides)
-
-        # Step 0.5/1: fixed budget remains the highest *computed* source. A
-        # caller-provided individual field is never overwritten by this result.
-        if config.fixed_budget_tokens > 0 and needs_core():
-            with timing.measure("decision.fixed_budget"):
-                fixed = config.fixed_budget_tokens
-                check_length = min(fixed, config.initial_thought_limit)
-                num_thinking = max(3, fixed // max(check_length, 1))
-                values = {
-                    "check_length": check_length,
-                    "num_thinking": num_thinking,
-                    "think_stride": max(50, fixed // num_thinking),
-                    "prob_th": config.prob_th,
-                    "token_budget": fixed,
-                }
-            for key, value in values.items():
-                cls._set_dynamic(params, external_overrides, key, value)
-            params["check_answer_len"] = TRIAL_ANSWER_LENGTH
-            return params
-
-        scene_info: dict[str, Any] = {
-            "scene_type": config.scene_type,
-            "typical_tokens": 0,
-            "scene_confidence": 0.0,
-        }
-        task_type = config.default_task_type
-        task_matched = False
-        if needs_core() and config.enable_task_type_budget:
-            with timing.measure("decision.scene_classifier"):
-                scene_info = classify_scene(prompt_text)
-            with timing.measure("decision.task_type"):
-                task_match = classify_task_type(prompt_text, scene_info)
-                task_type = task_match.get("task_type", config.default_task_type)
-                task_matched = (
-                    task_type != "general"
-                    and float(task_match.get("task_confidence", 0.0)) > 0.0
-                )
-                task_budget = get_task_type_budget(task_type)
-            for key in ("check_length", "think_stride", "num_thinking", "min_think_tokens", "check_answer_len", "prob_th"):
-                cls._set_dynamic(params, external_overrides, key, task_budget.get(key))
-            cls._set_dynamic(params, external_overrides, "token_budget", task_budget.get("typical_tokens", config.token_budget))
-
-        # A matched task has a meaningful feature space for difficulty
-        # estimation.  Established history must not overwrite that budget;
-        # zero-history tasks are handled below as unlimited cold starts.
-        if needs_core() and config.enable_difficulty_estimator and task_matched:
-            with timing.measure("decision.difficulty"):
-                diff_info = estimate_difficulty(
-                    prompt_text,
-                    reference,
-                    scene_type=scene_info.get("scene_type", "general"),
-                    scene_typical_tokens=scene_info.get("typical_tokens", 0),
-                    scene_confidence=scene_info.get("scene_confidence", 0.0),
-                )
-                diff_budget = compute_budget_from_difficulty(diff_info.get("difficulty", 0.5))
-            for key, value in diff_budget.items():
-                cls._set_dynamic(params, external_overrides, key, value)
-            params["difficulty_info"] = diff_info
-
-        if needs_core() and config.enable_history_budget:
-            from think_budget_vllm_adapter.history.history_budget import compute_history_budget
-
-            with timing.measure("decision.history"):
-                history = compute_history_budget(
-                    prompt_text,
-                    task_type=task_type,
-                    scene_type=scene_info.get("scene_type", "general"),
-                    config={
-                        "history_budget_multiplier": config.history_budget_multiplier,
-                        "history_low_success_boost": config.history_low_success_boost,
-                        "history_stride_percentile": config.history_stride_percentile,
-                        "history_warmup_count": config.history_warmup_count,
-                        "history_warmup_strategy": config.history_warmup_strategy,
-                        "custom_task_types_path": config.custom_task_types_path,
-                    },
-                )
-            # Keep the decision record consistent with the hidden probe
-            # invariant; task/history modules may still return legacy values.
-            history["check_answer_len"] = TRIAL_ANSWER_LENGTH
-            # A matched task with established history keeps its difficulty
-            # budget.  A zero-history task still needs the unlimited cold start
-            # even when the classifier gave it a known coarse label.
-            apply_history_budget = (
-                not task_matched or int(history.get("history_count", 0)) == 0
+        if config.fixed_budget_tokens > 0:
+            branch = DecisionBranch.FIXED
+            fixed_check_length = (
+                config.fixed_check_length
+                if config.fixed_check_length > 0
+                else default_vector.check_length
             )
-            if apply_history_budget:
-                for key, value in history.items():
-                    if key in _DECISION_TO_CONFIG:
-                        # History modules call the aggregate amount think_budget;
-                        # DEER consumes token_budget.  Normalize at the adapter
-                        # boundary so the value reaches the retained state machine.
-                        output_key = "token_budget" if key == "think_budget" else key
-                        cls._set_dynamic(params, external_overrides, output_key, value)
-            params["history_info"] = history
+            fixed_stride = (
+                config.fixed_think_stride
+                if config.fixed_think_stride > 0
+                else default_vector.think_stride
+            )
+            check_length = min(
+                fixed_check_length, config.fixed_budget_tokens)
+            think_stride = min(
+                fixed_stride, config.fixed_budget_tokens)
+            if config.fixed_num_thinking > 0:
+                num_thinking = config.fixed_num_thinking
+            else:
+                remaining = max(
+                    config.fixed_budget_tokens - check_length, 0)
+                num_thinking = max(
+                    1,
+                    (remaining + max(think_stride, 1) - 1)
+                    // max(think_stride, 1),
+                )
+            vector = BudgetVector(
+                check_length=check_length,
+                min_think_budget=(
+                    config.fixed_min_think_tokens
+                    if config.fixed_min_think_tokens > 0
+                    else config.fixed_budget_tokens
+                ),
+                num_thinking=num_thinking,
+                think_stride=think_stride,
+            )
+            source_by_field.update({
+                field_name: {
+                    "source": "fixed_budget",
+                    "fixed_budget_tokens": config.fixed_budget_tokens,
+                    "final": getattr(vector, field_name),
+                }
+                for field_name in _VECTOR_FIELDS
+            })
+        elif task_matched:
+            branch = DecisionBranch.TASK_DIFFICULTY
+            with timing.measure("decision.task_budget"):
+                task_values = get_task_type_budget(
+                    task_type, config.custom_task_types_path)
+            task_vector = BudgetVector.from_mapping(
+                task_values, default_vector)
+            task_confidence = task_values.get(
+                "confidence_threshold", task_values.get("prob_th"))
+            if isinstance(task_confidence, (int, float)):
+                branch_confidence_threshold = max(
+                    0.0, min(1.0, float(task_confidence)))
+                branch_confidence_source = "task"
+            if config.enable_difficulty_estimator:
+                with timing.measure("decision.difficulty"):
+                    difficulty_info = estimate_difficulty(
+                        prompt_text,
+                        reference,
+                        task_type=task_type,
+                        scene_type=scene_info.get(
+                            "scene_type", "general"),
+                        scene_typical_tokens=int(
+                            scene_info.get("typical_tokens", 0)),
+                        scene_confidence=float(
+                            scene_info.get("scene_confidence", 0.0)),
+                    )
+                    difficulty_values = compute_budget_from_difficulty(
+                        float(difficulty_info.get("difficulty", 0.5)),
+                        base_check_length=(
+                            config.difficulty_check_length_base),
+                        max_check_length=(
+                            config.difficulty_check_length_max),
+                        base_min_think=(
+                            config.difficulty_min_think_base),
+                        max_min_think=(
+                            config.difficulty_min_think_max),
+                        base_stride=config.difficulty_stride_base,
+                        max_stride=config.difficulty_stride_max,
+                        base_num_thinking=(
+                            config.difficulty_num_thinking_base),
+                        max_num_thinking=(
+                            config.difficulty_num_thinking_max),
+                    )
+                merged: dict[str, int] = {}
+                raw_sources: dict[str, tuple[int | None, int | None]] = {}
+                for field_name in _VECTOR_FIELDS:
+                    task_value = _optional_vector_value(
+                        task_values, field_name)
+                    difficulty_value = _optional_vector_value(
+                        difficulty_values, field_name)
+                    raw_sources[field_name] = (
+                        task_value, difficulty_value)
+                    if task_value is not None and difficulty_value is not None:
+                        merged[field_name] = _round_half_up_average(
+                            task_value, difficulty_value)
+                    elif task_value is not None:
+                        merged[field_name] = task_value
+                    elif difficulty_value is not None:
+                        merged[field_name] = difficulty_value
+                    else:
+                        merged[field_name] = getattr(
+                            default_vector, field_name)
+                vector = BudgetVector(**merged)
+                for field_name in _VECTOR_FIELDS:
+                    task_value, difficulty_value = raw_sources[field_name]
+                    if task_value is not None and difficulty_value is not None:
+                        source = "task+difficulty"
+                    elif task_value is not None:
+                        source = "task"
+                    elif difficulty_value is not None:
+                        source = "difficulty"
+                    else:
+                        source = "default"
+                    source_by_field[field_name] = {
+                        "source": source,
+                        "task": task_value,
+                        "difficulty": difficulty_value,
+                        "rounding": "half_up",
+                        "final": getattr(vector, field_name),
+                    }
+            else:
+                vector = task_vector
+                source_by_field.update({
+                    field_name: {
+                        "source": "task",
+                        "final": getattr(vector, field_name),
+                    }
+                    for field_name in _VECTOR_FIELDS
+                })
+        else:
+            branch = DecisionBranch.HISTORY
+            if config.enable_history_budget:
+                from think_budget_vllm_adapter.history.history_budget import (
+                    compute_history_budget,
+                )
 
-        if needs_core():
-            with timing.measure("decision.complexity"):
-                params["complexity_info"] = estimate_complexity(prompt_text, reference)
-        cls._set_dynamic(params, external_overrides, "task_type", task_type)
-        cls._set_dynamic(params, external_overrides, "scene_type", scene_info.get("scene_type", "general"))
-        # ``check_answer_len`` is a probe length, not the requested answer
-        # length.  Dynamic task/history policies may report a legacy value,
-        # but the state machine must always issue a 50-token hidden trial.
-        params["check_answer_len"] = TRIAL_ANSWER_LENGTH
-        return params
+                with timing.measure("decision.history"):
+                    history_info = compute_history_budget(
+                        prompt_text,
+                        task_type=task_type,
+                        scene_type=scene_info.get(
+                            "scene_type", "general"),
+                        config={
+                            "history_budget_multiplier":
+                                config.history_budget_multiplier,
+                            "history_low_success_boost":
+                                config.history_low_success_boost,
+                            "history_stride_percentile":
+                                effective_percentile_step,
+                            "history_warmup_count":
+                                config.history_warmup_count,
+                            "history_warmup_strategy":
+                                config.history_warmup_strategy,
+                            "new_task_unlimited":
+                                config.new_task_unlimited,
+                            "auto_cluster_threshold":
+                                config.auto_cluster_threshold,
+                            "custom_task_types_path":
+                                config.custom_task_types_path,
+                        },
+                    )
+                vector = BudgetVector.from_mapping(
+                    history_info, default_vector)
+                history_snapshot_id = history_info.get(
+                    "history_snapshot_id")
+                history_source = history_info.get(
+                    "budget_mode", "history")
+                history_confidence = history_info.get(
+                    "confidence_threshold", history_info.get("prob_th"))
+                if isinstance(history_confidence, (int, float)):
+                    branch_confidence_threshold = max(
+                        0.0, min(1.0, float(history_confidence)))
+                    branch_confidence_source = "history"
+            else:
+                vector = default_vector
+                history_info = {"budget_mode": "history_disabled"}
+                history_source = "default"
+            source_by_field.update({
+                field_name: {
+                    "source": history_source,
+                    "final": getattr(vector, field_name),
+                }
+                for field_name in _VECTOR_FIELDS
+            })
+
+        fixed_overrides = {
+            "check_length": config.fixed_check_length,
+            "min_think_budget": config.fixed_min_think_tokens,
+            "num_thinking": config.fixed_num_thinking,
+            "think_stride": config.fixed_think_stride,
+        }
+        fixed_source_names = {
+            "check_length": "fixed_check_length",
+            "min_think_budget": "fixed_min_think_tokens",
+            "num_thinking": "fixed_num_thinking",
+            "think_stride": "fixed_think_stride",
+        }
+        vector_values = vector.to_dict()
+        for field_name, fixed_value in fixed_overrides.items():
+            if fixed_value > 0:
+                vector_values[field_name] = fixed_value
+                source_by_field[field_name] = {
+                    "source": fixed_source_names[field_name],
+                    "final": fixed_value,
+                }
+        vector = BudgetVector(**vector_values)
+
+        hard_limit = max(1, min(
+            config.max_thinking_tokens,
+            hard_token_limit or config.max_thinking_tokens,
+            (
+                config.fixed_budget_tokens
+                if config.fixed_budget_tokens > 0
+                else config.max_thinking_tokens
+            ),
+        ))
+        vector = cls._clamp_vector(
+            vector, hard_limit, source_by_field)
+        if config.fixed_prob_th > 0:
+            confidence_threshold = config.fixed_prob_th
+            confidence_source = "fixed_prob_th"
+        elif (
+            config.confidence_threshold
+            != _DEFAULT_CONFIDENCE_THRESHOLD
+        ):
+            confidence_threshold = config.confidence_threshold
+            confidence_source = "confidence_threshold_override"
+        else:
+            confidence_threshold = branch_confidence_threshold
+            confidence_source = branch_confidence_source
+        source_by_field["confidence_threshold"] = {
+            "source": confidence_source,
+            "final": confidence_threshold,
+        }
+        source_by_field["percentile_step"] = {
+            "source": percentile_source,
+            "final": effective_percentile_step,
+        }
+        source_by_field["hard_think_token_limit"] = {
+            "source": "context/request/config",
+            "final": hard_limit,
+        }
+
+        return BudgetPlan(
+            task_type=task_type,
+            task_matched=task_matched,
+            decision_branch=branch,
+            budget=vector,
+            confidence_threshold=confidence_threshold,
+            percentile_step=effective_percentile_step,
+            source_by_field=source_by_field,
+            history_snapshot_id=history_snapshot_id,
+            policy_version=policy.version,
+            hard_think_token_limit=hard_limit,
+            scene_type=scene_info.get("scene_type", "general"),
+            difficulty_info=difficulty_info,
+            history_info=history_info,
+        )
 
     @staticmethod
     async def _queue_as_async_gen_stream(
-        queue: asyncio.Queue, context: BudgetRequestContext
+        queue: asyncio.Queue,
+        context: RequestStateContext,
     ) -> AsyncIterator[RequestOutput]:
         while True:
             item = await queue.get()
             if item is None:
                 if context.orchestration_error:
-                    raise RuntimeError("Think Budget orchestration failed; see server logs")
+                    raise RuntimeError(
+                        "Think Budget orchestration failed; see server logs")
                 break
             yield item
 
     @staticmethod
     async def _queue_as_async_gen(
-        queue: asyncio.Queue, context: BudgetRequestContext
+        queue: asyncio.Queue,
+        context: RequestStateContext,
     ) -> AsyncIterator[RequestOutput]:
         item = await queue.get()
         if item is None:
             if context.orchestration_error:
-                raise RuntimeError("Think Budget orchestration failed; see server logs")
+                raise RuntimeError(
+                    "Think Budget orchestration failed; see server logs")
             yield None
             return
-        if item is not None:
-            while True:
-                item_inc = await queue.get()
-                if item_inc is None:
-                    if context.orchestration_error:
-                        raise RuntimeError("Think Budget orchestration failed; see server logs")
-                    break
-                item.outputs[0].text += item_inc.outputs[0].text
-                item.outputs[0].token_ids.extend(item_inc.outputs[0].token_ids)
+        while True:
+            following = await queue.get()
+            if following is None:
+                if context.orchestration_error:
+                    raise RuntimeError(
+                        "Think Budget orchestration failed; see server logs")
+                break
+            item.outputs[0].text += following.outputs[0].text
+            item.outputs[0].token_ids.extend(
+                following.outputs[0].token_ids)
+            if following.outputs[0].finish_reason is not None:
+                item.outputs[0].finish_reason = (
+                    following.outputs[0].finish_reason)
+                item.outputs[0].stop_reason = (
+                    following.outputs[0].stop_reason)
+        if item.outputs[0].finish_reason is None:
             item.outputs[0].finish_reason = "stop"
-            item.finished = True
+        item.finished = True
         yield item
 
-    @staticmethod
+    def _record_history(self, context: RequestStateContext) -> None:
+        plan = context.budget_plan
+        difficulty = None
+        if plan.difficulty_info is not None:
+            difficulty = float(
+                plan.difficulty_info.get("difficulty", 0.0))
+        ledger = context.timing.ledger.snapshot()
+        outcome = HistoryOutcome.from_request(
+            parent_request_id=context.request_id,
+            question=context.question_text,
+            task_type=plan.task_type,
+            scene_type=plan.scene_type,
+            decision_branch=plan.decision_branch.value,
+            difficulty=difficulty,
+            budget_plan=plan.telemetry(),
+            thinking_tokens=int(ledger["visible_think_tokens"]),
+            hidden_probe_tokens=int(ledger["hidden_probe_tokens"]),
+            final_answer_tokens=int(ledger["final_answer_tokens"]),
+            elapsed_ms=context.elapsed() * 1000,
+            completion_status=context.algorithm_state.completion_status,
+        )
+        self.history_recorder.record_outcome(outcome)
+
     def _build_managed_generator(
+        self,
         orchestrator: AsyncReasoningOrchestrator,
-        context: BudgetRequestContext,
+        context: RequestStateContext,
         request: ChatCompletionRequest,
     ) -> AsyncGenerator[RequestOutput, None]:
-        """与 DEER 保持相同的请求绑定式 producer/consumer 生命周期。"""
         async def generator() -> AsyncGenerator[RequestOutput, None]:
             producer_task = asyncio.create_task(orchestrator.run())
             consumer = (
-                BudgetController._queue_as_async_gen_stream(context.result_queue, context)
-                if request.stream else BudgetController._queue_as_async_gen(
+                self._queue_as_async_gen_stream(
+                    context.result_queue, context)
+                if request.stream
+                else self._queue_as_async_gen(
                     context.result_queue, context)
             )
             try:
                 async for item in consumer:
                     yield item
+            except asyncio.CancelledError:
+                context.algorithm_state.completion_status = "cancelled"
+                raise
             finally:
-                # 与 DEER 一致：客户端断开后立即取消当前父请求的子请求链。
                 if not producer_task.done():
+                    context.algorithm_state.completion_status = "cancelled"
                     producer_task.cancel()
                     try:
                         await producer_task
                     except asyncio.CancelledError:
                         pass
+                self._record_history(context)
 
         return generator()
+
+    async def flush_history(self, timeout_s: float = 2.0) -> bool:
+        return await self.history_recorder.flush(timeout_s)
 
     async def handle_request(
         self,
@@ -425,37 +706,22 @@ class BudgetController:
         lora_request: Any = None,
         data_parallel_rank: int | None = None,
     ) -> Any:
+        if getattr(request, "n", None) not in (None, 1):
+            return serving_chat.create_error_response(
+                "Think Budget currently supports only n=1")
         try:
-            config, external_overrides = self._build_budget_config(request)
-        except ThinkBudgetConfigError as exc:
+            config = self._build_algorithm_config(request)
+        except (ThinkBudgetConfigError, ValueError) as exc:
             return serving_chat.create_error_response(str(exc))
-        if not config.BUDGET_ENABLED:
-            # The serving patch normally bypasses this method entirely.  Keep
-            # this guard for mixed/stale deployments so the state machine can
-            # never be created after the server master switch was disabled.
+        if not config.budget_enabled:
             return serving_chat.create_error_response(
                 "Think Budget is disabled by server configuration")
 
-        base_config = {
-            "initial_thought_limit": config.initial_thought_limit,
-            "think_stride": config.think_stride,
-            "trial_answers": config.trial_answers,
-            "trial_answer_length": config.trial_answer_length,
-            "token_budget": config.token_budget,
-            "prob_th": config.prob_th,
-            "min_think_tokens": config.min_think_tokens,
-        }
-        print(
-            "TB_REQUEST event=accepted "
-            f"request_id={request_id} stream={bool(request.stream)} "
-            f"external_overrides={sorted(external_overrides)} base_config={base_config}",
-            flush=True,
-        )
+        policy = PerformancePolicy()
+        log_performance_policy_once(policy)
 
-        # 优先使用 serving.py 在同一进程内计算的真实路由身份；它不会来自
-        # HTTP JSON，因此不会扩张严格的公网参数面。直接调用控制器时再以
-        # vLLM 服务对象回退解析，便于本地测试和旧补丁升级。
-        route_identity = getattr(request, self.ROUTING_CONTEXT_ATTR, None)
+        route_identity = getattr(
+            request, self.ROUTING_CONTEXT_ATTR, None)
         trace_headers = None
         engine_prompt_text = None
         reasoning_ended = None
@@ -465,45 +731,67 @@ class BudgetController:
         chat_template_kwargs = None
         if isinstance(route_identity, dict):
             model_name = route_identity.get("model_name", model_name)
-            lora_request = route_identity.get("lora_request", lora_request)
+            lora_request = route_identity.get(
+                "lora_request", lora_request)
             data_parallel_rank = route_identity.get(
                 "data_parallel_rank", data_parallel_rank)
             trace_headers = route_identity.get("trace_headers")
             engine_prompt_text = route_identity.get("prompt_text")
             reasoning_ended = route_identity.get("reasoning_ended")
-            reasoning_parser_kwargs = route_identity.get("reasoning_parser_kwargs")
+            reasoning_parser_kwargs = route_identity.get(
+                "reasoning_parser_kwargs")
             reasoning_parser = route_identity.get("reasoning_parser")
             response_parser = route_identity.get("response_parser")
-            chat_template_kwargs = route_identity.get("chat_template_kwargs")
-        elif (isinstance(route_identity, tuple) and len(route_identity) == 3):
-            # Compatibility with the previous serving patch during rolling
-            # upgrades. New deployments always use the dict above.
-            routed_model_name, routed_lora_request, routed_data_parallel_rank = route_identity
-            if model_name is None:
-                model_name = routed_model_name
-            if lora_request is None:
-                lora_request = routed_lora_request
+            chat_template_kwargs = route_identity.get(
+                "chat_template_kwargs")
+        elif isinstance(route_identity, tuple) and len(route_identity) == 3:
+            routed_model, routed_lora, routed_rank = route_identity
+            model_name = model_name or routed_model
+            lora_request = lora_request or routed_lora
             if data_parallel_rank is None:
-                data_parallel_rank = routed_data_parallel_rank
+                data_parallel_rank = routed_rank
         if lora_request is None:
             lora_request = serving_chat._maybe_get_adapters(
                 request, supports_default_mm_loras=True)
         if model_name is None:
             model_name = serving_chat.models.model_name(lora_request)
 
-        timing = TimingCollector(emit_phase_metrics=config.emit_phase_metrics)
+        timing = TimingCollector(
+            emit_phase_metrics=config.emit_phase_metrics,
+            policy_version=policy.version,
+        )
+        prompt_token_ids = engine_inputs[0].get(
+            "prompt_token_ids", [])
         try:
             with timing.measure("decision.decode_prompt"):
                 prompt_text = tokenizer.decode(
-                    engine_inputs[0].get("prompt_token_ids", []), skip_special_tokens=True)
+                    prompt_token_ids, skip_special_tokens=True)
         except Exception:
             prompt_text = ""
-            timing.durations_s["decision.decode_prompt"] += 0.0
 
+        remaining_context = max(
+            1,
+            int(serving_chat.model_config.max_model_len)
+            - len(prompt_token_ids),
+        )
+        requested_limit = (
+            getattr(request, "max_completion_tokens", None)
+            or getattr(request, "max_tokens", None)
+        )
+        hard_token_limit = remaining_context
+        if isinstance(requested_limit, int) and requested_limit > 0:
+            hard_token_limit = min(hard_token_limit, requested_limit)
+
+        decision_started_at = time.perf_counter()
         with timing.measure("decision.total"):
-            decision_params = self._run_budget_decision_chain(
-                prompt_text, config, external_overrides, timing)
-        decision_wall_ms = (time.perf_counter() - timing.started_at) * 1000
+            plan = self._decide(
+                prompt_text,
+                config,
+                timing,
+                hard_token_limit=hard_token_limit,
+            )
+        decision_wall_ms = (
+            time.perf_counter() - decision_started_at) * 1000
         timing.record_phase(
             parent_request_id=request_id,
             child_request_id="",
@@ -511,66 +799,62 @@ class BudgetController:
             round_id=0,
             wall_ms=decision_wall_ms,
             controller_cpu_ms=decision_wall_ms,
-            prompt_tokens=len(engine_inputs[0].get("prompt_token_ids", [])),
+            prompt_tokens=len(prompt_token_ids),
             generated_tokens=0,
             visible=False,
         )
         print(
-            f"TB_DECISION request_id={request_id} params={decision_params} "
+            "TB_DECISION "
+            f"request_id={request_id} plan={plan.telemetry()} "
             f"timings={timing.snapshot()}",
             flush=True,
         )
 
-        context = BudgetRequestContext(
+        state = RequestAlgorithmState(budget_plan=plan)
+        context = RequestStateContext(
             request=request,
             tokenizer=tokenizer,
-            engine_prompt=engine_inputs[0],
             config=config,
+            policy=policy,
             serving_chat=serving_chat,
             request_id=request_id,
+            engine_prompt=engine_inputs[0],
+            algorithm_state=state,
             lora_request=lora_request,
             data_parallel_rank=data_parallel_rank,
             trace_headers=trace_headers,
-            prompt_text=(engine_prompt_text or engine_inputs[0].get("prompt") or prompt_text),
+            prompt_text=(
+                engine_prompt_text
+                or engine_inputs[0].get("prompt")
+                or prompt_text
+            ),
             reasoning_ended=reasoning_ended,
             reasoning_parser_kwargs=reasoning_parser_kwargs,
             reasoning_parser=reasoning_parser,
             chat_template_kwargs=chat_template_kwargs,
-            max_tokens_temp=0,
             result_queue=asyncio.Queue(),
             budget_start_time=time.time(),
             model_name=model_name,
             session_id=request_id,
-            external_overrides=external_overrides,
             timing=timing,
+            question_text=prompt_text,
         )
-        context.update_budget_params(decision_params)
-        context.max_tokens_temp = config.token_budget
-        context.init_trial_evaluator()
-        effective_config = {
-            "initial_thought_limit": config.initial_thought_limit,
-            "think_stride": config.think_stride,
-            "trial_answers": config.trial_answers,
-            "trial_answer_length": config.trial_answer_length,
-            "token_budget": config.token_budget,
-            "prob_th": config.prob_th,
-            "min_think_tokens": config.min_think_tokens,
-            "max_api_calls": config.max_api_calls,
-        }
-        print(
-            "TB_REQUEST event=orchestrator_created "
-            f"request_id={request_id} model={model_name} "
-            f"effective_config={effective_config}",
-            flush=True,
-        )
-
         orchestrator = AsyncReasoningOrchestrator(context)
         response_generator = self._build_managed_generator(
             orchestrator, context, request)
         return await self._format_response(
-            serving_chat, request, response_generator, request_id, model_name,
-            conversation, tokenizer, request_metadata, reasoning_parser,
-            response_parser, chat_template_kwargs)
+            serving_chat,
+            request,
+            response_generator,
+            request_id,
+            model_name,
+            conversation,
+            tokenizer,
+            request_metadata,
+            reasoning_parser,
+            response_parser,
+            chat_template_kwargs,
+        )
 
     @staticmethod
     async def _format_response(
@@ -588,14 +872,26 @@ class BudgetController:
     ) -> Any:
         if request.stream:
             return serving_chat.chat_completion_stream_generator(
-                request, response_generator, request_id, model_name, conversation,
-                tokenizer, request_metadata, reasoning_parser=reasoning_parser,
+                request,
+                response_generator,
+                request_id,
+                model_name,
+                conversation,
+                tokenizer,
+                request_metadata,
+                reasoning_parser=reasoning_parser,
                 chat_template_kwargs=chat_template_kwargs,
             )
         try:
             return await serving_chat.chat_completion_full_generator(
-                request, response_generator, request_id, model_name, conversation,
-                tokenizer, request_metadata, parser=response_parser,
+                request,
+                response_generator,
+                request_id,
+                model_name,
+                conversation,
+                tokenizer,
+                request_metadata,
+                parser=response_parser,
             )
         except (ValueError, RuntimeError) as exc:
             return serving_chat.create_error_response(str(exc))

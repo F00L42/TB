@@ -1,10 +1,9 @@
 """添加到 vLLM 0.23.0 ``ChatCompletionRequest`` 的 Think Budget 字段。
 
 对外只开放总开关与六个 ``fixed_*`` 人工固定输入。动态预算、历史/难度
-策略、会话控制及旧版 ``tb_*`` 别名均为服务端配置，不能出现在 HTTP 请求。
-vLLM 的 ``OpenAIBaseModel`` 默认允许未知字段，因此必须同时在
-``ChatCompletionRequest`` 类中加入 ``model_config = ConfigDict(extra="forbid")``，
-并把 ``ConfigDict`` 加入 pydantic 导入；否则被删除的字段仍可能静默进入。
+策略、会话控制及旧版 ``tb_*`` 别名均为服务端配置。按本轮裁决保留 vLLM
+原生 ``extra="allow"``，不在协议基类上收紧未知字段；控制器仍会显式拒绝
+已知的旧 Think Budget 字段，避免混合版本部署悄悄恢复旧算法语义。
 """
 
 enable_think_budget: bool | None = Field(

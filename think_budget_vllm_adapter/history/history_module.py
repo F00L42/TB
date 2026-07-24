@@ -1,417 +1,554 @@
-"""推理历史模块 — 记录与查询推理历史, 支持商用场景分类过滤。
+"""Online history feedback with non-blocking, idempotent JSONL persistence."""
+from __future__ import annotations
 
-从 think_budget/history/history_module.py 迁移，调整路径。
-"""
+import asyncio
+import hashlib
 import json
 import os
-import time
-import asyncio
 import threading
-from typing import Dict, List, Optional, Any, Tuple
+import time
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 
-_HISTORY_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'think_budget', 'inference_history.jsonl')
-_HISTORY_LOCK = threading.Lock()
-_history_cache: Optional[List[Dict]] = None
+_HISTORY_FILE = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "data",
+    "think_budget",
+    "inference_history.jsonl",
+)
+_HISTORY_LOCK = threading.RLock()
+_history_cache: Optional[List[Dict[str, Any]]] = None
+_task_type_index: Dict[str, List[int]] = {}
+_scene_type_index: Dict[str, List[int]] = {}
+_parent_request_ids: set[str] = set()
+_stats_cache: Dict[str, Tuple[Dict[str, Any], float]] = {}
 
 _MAX_HISTORY_ENTRIES = 5000
 _MAX_HISTORY_AGE_DAYS = 7
 _EVICT_EVERY_N_WRITES = 50
-_eviction_counter = 0
-
-_stats_cache: Dict[str, Tuple[Dict, float]] = {}
 _STATS_CACHE_TTL = 60.0
-
-_task_type_index: Dict[str, List[int]] = {}
-_scene_type_index: Dict[str, List[int]] = {}
+_persisted_write_count = 0
 
 
-def _ensure_dir():
-    d = os.path.dirname(_HISTORY_FILE)
-    if not os.path.exists(d):
-        os.makedirs(d, exist_ok=True)
+def _stable_question_hash(text: str) -> str:
+    return hashlib.sha256(text[:200].encode("utf-8")).hexdigest()[:16]
 
 
-def _record_inference_sync(entry: dict):
-    """同步写入推理历史到文件。"""
-    global _history_cache, _eviction_counter
+@dataclass(frozen=True)
+class HistoryOutcome:
+    parent_request_id: str
+    timestamp: float
+    question_hash: str
+    question_preview: str
+    task_type: str
+    scene_type: str
+    decision_branch: str
+    difficulty: float | None
+    budget_plan: Dict[str, Any]
+    thinking_tokens: int
+    hidden_probe_tokens: int
+    final_answer_tokens: int
+    total_generated_tokens: int
+    elapsed_ms: float
+    completion_status: str
+    quality_score: float | None = None
+    quality_observed: bool = False
+    token_data_complete: bool = True
+
+    @classmethod
+    def from_request(
+        cls,
+        *,
+        parent_request_id: str,
+        question: str,
+        task_type: str,
+        scene_type: str,
+        decision_branch: str,
+        difficulty: float | None,
+        budget_plan: Dict[str, Any],
+        thinking_tokens: int,
+        hidden_probe_tokens: int,
+        final_answer_tokens: int,
+        elapsed_ms: float,
+        completion_status: str,
+    ) -> "HistoryOutcome":
+        return cls(
+            parent_request_id=parent_request_id,
+            timestamp=time.time(),
+            question_hash=_stable_question_hash(question),
+            question_preview=question[:100],
+            task_type=task_type,
+            scene_type=scene_type or "general",
+            decision_branch=decision_branch,
+            difficulty=difficulty,
+            budget_plan=budget_plan,
+            thinking_tokens=max(0, thinking_tokens),
+            hidden_probe_tokens=max(0, hidden_probe_tokens),
+            final_answer_tokens=max(0, final_answer_tokens),
+            total_generated_tokens=max(
+                0,
+                thinking_tokens + hidden_probe_tokens + final_answer_tokens,
+            ),
+            elapsed_ms=max(0.0, elapsed_ms),
+            completion_status=completion_status,
+            quality_score=None,
+            quality_observed=False,
+            token_data_complete=(completion_status == "success"),
+        )
+
+    def to_entry(self) -> Dict[str, Any]:
+        values = asdict(self)
+        values["difficulty_score"] = values.pop("difficulty")
+        values["result"] = {
+            "thinking_tokens": values.pop("thinking_tokens"),
+            "hidden_probe_tokens": values.pop("hidden_probe_tokens"),
+            "final_answer_tokens": values.pop("final_answer_tokens"),
+            "total_generated_tokens": values.pop("total_generated_tokens"),
+            "elapsed_ms": values.pop("elapsed_ms"),
+            "completion_status": values.pop("completion_status"),
+            "quality_score": values.pop("quality_score"),
+            "quality_observed": values.pop("quality_observed"),
+            "token_data_complete": values.pop("token_data_complete"),
+        }
+        values["_persisted"] = False
+        return values
+
+
+def _ensure_dir() -> None:
+    os.makedirs(os.path.dirname(_HISTORY_FILE), exist_ok=True)
+
+
+def _serializable_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in entry.items() if key != "_persisted"}
+
+
+def _update_index_entry(entry: Dict[str, Any], index: int) -> None:
+    task_type = entry.get("task_type", "")
+    scene_type = entry.get("scene_type", "")
+    if task_type:
+        _task_type_index.setdefault(task_type, []).append(index)
+    if scene_type:
+        _scene_type_index.setdefault(scene_type, []).append(index)
+
+
+def _rebuild_index_locked() -> None:
+    _task_type_index.clear()
+    _scene_type_index.clear()
+    _parent_request_ids.clear()
+    for index, entry in enumerate(_history_cache or []):
+        _update_index_entry(entry, index)
+        parent_request_id = entry.get("parent_request_id")
+        if parent_request_id:
+            _parent_request_ids.add(parent_request_id)
+
+
+def _invalidate_stats_cache(entry: Dict[str, Any]) -> None:
+    task_type = entry.get("task_type", "")
+    scene_type = entry.get("scene_type", "")
+    for key in list(_stats_cache):
+        if key.startswith(f"{task_type}|") or key.endswith(f"|{scene_type}"):
+            _stats_cache.pop(key, None)
+
+
+def load_history() -> List[Dict[str, Any]]:
+    global _history_cache
+    if _history_cache is not None:
+        return _history_cache
+    entries: List[Dict[str, Any]] = []
+    with _HISTORY_LOCK:
+        if _history_cache is not None:
+            return _history_cache
+        if os.path.exists(_HISTORY_FILE):
+            try:
+                with open(
+                    _HISTORY_FILE, "r", encoding="utf-8"
+                ) as stream:
+                    for line in stream:
+                        try:
+                            entry = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        entry["_persisted"] = True
+                        entries.append(entry)
+            except OSError as exc:
+                print(
+                    "TB_WARNING event=history_load_failed "
+                    f"path={_HISTORY_FILE} error={exc}",
+                    flush=True,
+                )
+        _history_cache = entries
+        _rebuild_index_locked()
+        return _history_cache
+
+
+def _cache_entry(entry: Dict[str, Any]) -> bool:
+    load_history()
+    with _HISTORY_LOCK:
+        parent_request_id = entry.get("parent_request_id")
+        if parent_request_id and parent_request_id in _parent_request_ids:
+            return False
+        index = len(_history_cache or [])
+        assert _history_cache is not None
+        _history_cache.append(entry)
+        _update_index_entry(entry, index)
+        if parent_request_id:
+            _parent_request_ids.add(parent_request_id)
+        _invalidate_stats_cache(entry)
+        return True
+
+
+def _append_entry_sync(entry: Dict[str, Any]) -> None:
+    global _persisted_write_count
     with _HISTORY_LOCK:
         _ensure_dir()
-        with open(_HISTORY_FILE, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(entry, ensure_ascii=False, default=str) + '\n')
-        if _history_cache is not None:
-            idx = len(_history_cache)
-            _history_cache.append(entry)
-            _update_index_entry(entry, idx)
-            _invalidate_stats_cache(entry)
-        _eviction_counter += 1
-        if _eviction_counter >= _EVICT_EVERY_N_WRITES:
-            _eviction_counter = 0
+        with open(_HISTORY_FILE, "a", encoding="utf-8") as stream:
+            stream.write(json.dumps(
+                _serializable_entry(entry),
+                ensure_ascii=False,
+                default=str,
+            ) + "\n")
+        entry["_persisted"] = True
+        _persisted_write_count += 1
+        if _persisted_write_count % _EVICT_EVERY_N_WRITES == 0:
             _evict_old_entries_locked()
 
 
-def record_inference(question: str, reference: str = '',
-                     task_type: str = 'naie',
-                     difficulty_score: float = 0.0,
-                     budget_params: Optional[Dict] = None,
-                     result: Optional[Dict] = None,
-                     scene_type: str = ''):
-    """记录推理历史。"""
-    entry = {
-        'timestamp': time.time(),
-        'question_hash': hash(question[:200]) % (10**9),
-        'question_preview': question[:100],
-        'reference_preview': reference[:50] if reference else '',
-        'task_type': task_type,
-        'scene_type': scene_type or 'general',
-        'difficulty_score': difficulty_score,
-        'budget_params': budget_params or {},
-        'result': result or {},
-    }
+def _evict_old_entries_locked() -> None:
+    global _history_cache
+    if not _history_cache:
+        return
+    cutoff = time.time() - (_MAX_HISTORY_AGE_DAYS * 86400)
+    persisted = [
+        entry for entry in _history_cache
+        if entry.get("_persisted")
+        and float(entry.get("timestamp", time.time())) >= cutoff
+    ]
+    unpersisted = [
+        entry for entry in _history_cache if not entry.get("_persisted")
+    ]
+    if len(persisted) > _MAX_HISTORY_ENTRIES:
+        persisted = persisted[-_MAX_HISTORY_ENTRIES:]
+    survivors = [*persisted, *unpersisted]
+    if len(survivors) == len(_history_cache):
+        return
+    _history_cache = survivors
+    _ensure_dir()
+    with open(_HISTORY_FILE, "w", encoding="utf-8") as stream:
+        for entry in persisted:
+            stream.write(json.dumps(
+                _serializable_entry(entry),
+                ensure_ascii=False,
+                default=str,
+            ) + "\n")
+    _rebuild_index_locked()
+    _stats_cache.clear()
 
+
+class AsyncHistoryRecorder:
+    """Small per-serving-instance queue; record submission never awaits I/O."""
+
+    def __init__(self, max_queue_size: int = 1024) -> None:
+        # Load once while the serving controller is constructed so the first
+        # request never pays JSONL scan cost on its completion path.
+        load_history()
+        self._queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue(
+            maxsize=max_queue_size)
+        self._worker_task: asyncio.Task | None = None
+        self.last_error: str | None = None
+
+    def record_outcome(self, outcome: HistoryOutcome) -> bool:
+        entry = outcome.to_entry()
+        if not _cache_entry(entry):
+            return False
+        try:
+            loop = asyncio.get_running_loop()
+            self._queue.put_nowait(entry)
+            if self._worker_task is None or self._worker_task.done():
+                self._worker_task = loop.create_task(self._drain())
+            return True
+        except (RuntimeError, asyncio.QueueFull) as exc:
+            self.last_error = str(exc)
+            print(
+                "TB_WARNING event=history_enqueue_failed "
+                f"request_id={outcome.parent_request_id} error={exc}",
+                flush=True,
+            )
+            return False
+
+    async def _drain(self) -> None:
+        try:
+            while True:
+                try:
+                    entry = self._queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                try:
+                    await asyncio.to_thread(_append_entry_sync, entry)
+                except Exception as exc:
+                    self.last_error = str(exc)
+                    print(
+                        "TB_WARNING event=history_write_failed "
+                        f"request_id={entry.get('parent_request_id')} error={exc}",
+                        flush=True,
+                    )
+                finally:
+                    self._queue.task_done()
+        finally:
+            self._worker_task = None
+            if not self._queue.empty():
+                self._worker_task = asyncio.create_task(self._drain())
+
+    async def flush(self, timeout_s: float = 2.0) -> bool:
+        try:
+            await asyncio.wait_for(self._queue.join(), timeout=timeout_s)
+            task = self._worker_task
+            if task is not None:
+                await asyncio.wait_for(asyncio.shield(task), timeout=timeout_s)
+            return True
+        except asyncio.TimeoutError:
+            return False
+
+
+def record_inference(
+    question: str,
+    reference: str = "",
+    task_type: str = "naie",
+    difficulty_score: float = 0.0,
+    budget_params: Optional[Dict[str, Any]] = None,
+    result: Optional[Dict[str, Any]] = None,
+    scene_type: str = "",
+) -> None:
+    """Compatibility entrypoint for offline evaluation writers."""
+    result = dict(result or {})
+    quality_observed = (
+        "score" in result or "is_correct" in result
+    )
+    entry = {
+        "timestamp": time.time(),
+        "question_hash": _stable_question_hash(question),
+        "question_preview": question[:100],
+        "reference_preview": reference[:50] if reference else "",
+        "task_type": task_type,
+        "scene_type": scene_type or "general",
+        "difficulty_score": difficulty_score,
+        "budget_plan": budget_params or {},
+        "result": {
+            **result,
+            "completion_status": result.get("completion_status", "success"),
+            "quality_observed": quality_observed,
+            "quality_score": result.get("score"),
+            "token_data_complete": result.get("token_data_complete", True),
+        },
+        "_persisted": False,
+    }
+    if not _cache_entry(entry):
+        return
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = None
-
     if loop is not None and loop.is_running():
-        loop.run_in_executor(None, _record_inference_sync, entry)
+        loop.run_in_executor(None, _append_entry_sync, entry)
     else:
-        _record_inference_sync(entry)
+        _append_entry_sync(entry)
 
 
-def load_history() -> List[Dict]:
-    """加载历史记录(带缓存和索引构建)。"""
-    global _history_cache
-    if _history_cache is not None:
-        return _history_cache
-    entries = []
-    if not os.path.exists(_HISTORY_FILE):
-        _history_cache = entries
-        _rebuild_index()
-        return entries
-    with _HISTORY_LOCK:
-        with open(_HISTORY_FILE, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    try:
-                        entries.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        continue
-    _history_cache = entries
-    _rebuild_index()
-    return entries
-
-
-def get_category_stats(question_preview: str, task_type: str = 'naie',
-                       scene_type: str = '', top_k: int = 10) -> Dict[str, float]:
-    """获取同类题目的统计信息。"""
+def _candidate_entries(
+    task_type: str,
+    scene_type: str = "",
+) -> List[Dict[str, Any]]:
     history = load_history()
-    if not history:
-        return {'avg_tokens': 0.0, 'failure_rate': 0.0, 'count': 0,
-                'scene_type': scene_type, 'scene_match_count': 0}
-
     if task_type in _task_type_index:
-        candidates = [history[i] for i in _task_type_index[task_type]
-                      if i < len(history)]
+        candidates = [
+            history[index]
+            for index in _task_type_index[task_type]
+            if index < len(history)
+        ]
     else:
-        candidates = history
-
-    if not candidates:
-        candidates = history
-
-    q_hash = hash(question_preview[:200]) % (10**9)
-    scored = []
-    for e in candidates:
-        sim = 0.0
-        eh = e.get('question_hash', 0)
-        if eh == q_hash:
-            sim = 1.0
-        ep = e.get('question_preview', '')
-        if ep and question_preview:
-            overlap = len(set(ep) & set(question_preview[:100]))
-            total = len(set(ep) | set(question_preview[:100]))
-            sim = max(sim, overlap / max(total, 1))
-        e_scene = e.get('scene_type', '')
-        if scene_type and e_scene:
-            if e_scene == scene_type:
-                sim += 0.3
-            else:
-                sim -= 0.1
-        scored.append((sim, e))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    if scene_type:
-        same_scene = [(s, e) for s, e in scored if e.get('scene_type', '') == scene_type]
-        if len(same_scene) >= min(3, top_k):
-            top = same_scene[:top_k]
-        else:
-            top = scored[:top_k]
-    else:
-        top = scored[:top_k]
-
-    if not top:
-        return {'avg_tokens': 0.0, 'failure_rate': 0.0, 'count': 0,
-                'scene_type': scene_type, 'scene_match_count': 0}
-
-    tokens_list = []
-    failures = 0
-    scene_match_count = 0
-    for sim, e in top:
-        res = e.get('result', {})
-        tok = res.get('thinking_tokens') or res.get('total_tokens', 0)
-        if tok:
-            tokens_list.append(tok)
-        if res.get('score', 0) == 0:
-            failures += 1
-        if e.get('scene_type', '') == scene_type:
-            scene_match_count += 1
-
-    avg_tok = sum(tokens_list) / len(tokens_list) if tokens_list else 0.0
-    fail_rate = failures / len(top) if top else 0.0
-    return {
-        'avg_tokens': avg_tok,
-        'failure_rate': fail_rate,
-        'count': len(top),
-        'scene_type': scene_type,
-        'scene_match_count': scene_match_count,
-    }
+        candidates = [
+            entry for entry in history
+            if entry.get("task_type") == task_type
+        ]
+    if not candidates and scene_type:
+        candidates = [
+            history[index]
+            for index in _scene_type_index.get(scene_type, [])
+            if index < len(history)
+        ]
+    return candidates
 
 
-def get_scene_stats(scene_type: str, task_type: str = 'naie') -> Dict[str, float]:
-    """获取指定商用场景的聚合统计。"""
-    history = load_history()
-    if not history:
-        return {'avg_tokens': 0.0, 'failure_rate': 0.0, 'count': 0}
-
-    if task_type in _task_type_index:
-        candidates = [history[i] for i in _task_type_index[task_type]
-                      if i < len(history)]
-        candidates = [e for e in candidates if e.get('scene_type', '') == scene_type]
-    else:
-        candidates = [e for e in history
-                      if e.get('task_type', '') == task_type and e.get('scene_type', '') == scene_type]
-
-    if not candidates:
-        return {'avg_tokens': 0.0, 'failure_rate': 0.0, 'count': 0}
-
-    tokens_list = []
-    failures = 0
-    for e in candidates:
-        res = e.get('result', {})
-        tok = res.get('thinking_tokens') or res.get('total_tokens', 0)
-        if tok:
-            tokens_list.append(tok)
-        if res.get('score', 0) == 0:
-            failures += 1
-
-    avg_tok = sum(tokens_list) / len(tokens_list) if tokens_list else 0.0
-    fail_rate = failures / len(candidates) if candidates else 0.0
-    return {
-        'avg_tokens': avg_tok,
-        'failure_rate': fail_rate,
-        'count': len(candidates),
-    }
+def _thinking_tokens(entry: Dict[str, Any]) -> int:
+    result = entry.get("result", {})
+    value = (
+        result.get("thinking_tokens")
+        or result.get("total_tokens")
+        or 0
+    )
+    return int(value) if isinstance(value, (int, float)) and value > 0 else 0
 
 
-def get_task_type_stats(task_type: str, scene_type: str = '') -> Dict[str, float]:
-    """获取指定任务类型的聚合统计(含百分位)。"""
+def _token_record_is_valid(entry: Dict[str, Any]) -> bool:
+    result = entry.get("result", {})
+    status = result.get("completion_status")
+    if status is not None and status != "success":
+        return False
+    if result.get("token_data_complete", True) is not True:
+        return False
+    return _thinking_tokens(entry) > 0
+
+
+def _quality_label(entry: Dict[str, Any]) -> bool | None:
+    result = entry.get("result", {})
+    observed = result.get("quality_observed")
+    if observed is None:
+        observed = "score" in result or "is_correct" in result
+    if not observed:
+        return None
+    if result.get("is_correct") is not None:
+        return bool(result["is_correct"])
+    score = result.get("quality_score", result.get("score"))
+    if score is None:
+        return None
+    return float(score) >= 10
+
+
+def get_task_type_stats(
+    task_type: str,
+    scene_type: str = "",
+) -> Dict[str, Any]:
     cache_key = f"{task_type}|{scene_type}"
     now = time.time()
-    if cache_key in _stats_cache:
-        cached_stats, cached_time = _stats_cache[cache_key]
-        if now - cached_time < _STATS_CACHE_TTL:
-            return cached_stats
+    cached = _stats_cache.get(cache_key)
+    if cached and now - cached[1] < _STATS_CACHE_TTL:
+        return dict(cached[0])
 
-    history = load_history()
-    if not history:
-        empty = {'count': 0, 'avg_tokens': 0.0, 'p75_tokens': 0.0,
-                 'p50_tokens': 0.0, 'max_tokens': 0.0, 'success_rate': 0.0, 'failure_rate': 0.0}
-        _stats_cache[cache_key] = (empty, now)
-        return empty
-
-    if task_type in _task_type_index:
-        candidates = [history[i] for i in _task_type_index[task_type]
-                      if i < len(history)]
+    candidates = _candidate_entries(task_type, scene_type)
+    token_values = sorted(
+        _thinking_tokens(entry)
+        for entry in candidates
+        if _token_record_is_valid(entry)
+    )
+    labels = [
+        label for label in (_quality_label(entry) for entry in candidates)
+        if label is not None
+    ]
+    successes = sum(1 for label in labels if label)
+    failures = len(labels) - successes
+    if token_values:
+        count = len(token_values)
+        result: Dict[str, Any] = {
+            "count": count,
+            "avg_tokens": round(sum(token_values) / count, 1),
+            "p50_tokens": token_values[min(count - 1, int(count * 0.50))],
+            "p75_tokens": token_values[
+                min(count - 1, int(count * 0.75))
+            ],
+            "max_tokens": token_values[-1],
+        }
     else:
-        candidates = [e for e in history if e.get('task_type', '') == task_type]
-
-    if not candidates and scene_type:
-        if scene_type in _scene_type_index:
-            candidates = [history[i] for i in _scene_type_index[scene_type]
-                          if i < len(history)]
-        else:
-            candidates = [e for e in history if e.get('scene_type', '') == scene_type]
-
-    if not candidates:
-        empty = {'count': 0, 'avg_tokens': 0.0, 'p75_tokens': 0.0,
-                 'p50_tokens': 0.0, 'max_tokens': 0.0, 'success_rate': 0.0, 'failure_rate': 0.0}
-        _stats_cache[cache_key] = (empty, now)
-        return empty
-
-    tokens_list = []
-    successes = 0
-    failures = 0
-    for e in candidates:
-        res = e.get('result', {})
-        tok = res.get('thinking_tokens') or res.get('total_tokens', 0)
-        if tok and tok > 0:
-            tokens_list.append(tok)
-        score = res.get('score', 0)
-        if score >= 10 or res.get('is_correct', False):
-            successes += 1
-        elif score == 0 or res.get('is_correct') is False:
-            failures += 1
-
-    if not tokens_list:
-        result = {'count': len(candidates), 'avg_tokens': 0.0, 'p75_tokens': 0.0,
-                  'p50_tokens': 0.0, 'max_tokens': 0.0, 'success_rate': 0.0, 'failure_rate': 0.0}
-        _stats_cache[cache_key] = (result, now)
-        return result
-
-    tokens_sorted = sorted(tokens_list)
-    n = len(tokens_sorted)
-    avg_tok = sum(tokens_sorted) / n
-    p50_tok = tokens_sorted[int(n * 0.50)]
-    p75_tok = tokens_sorted[int(n * 0.75)] if n > 3 else tokens_sorted[-1]
-    max_tok = tokens_sorted[-1]
-
-    total_judged = successes + failures
-    success_rate = successes / total_judged if total_judged > 0 else 0.0
-    failure_rate = failures / total_judged if total_judged > 0 else 0.0
-
-    result = {
-        'count': len(candidates),
-        'avg_tokens': round(avg_tok, 1),
-        'p75_tokens': round(p75_tok, 1),
-        'p50_tokens': round(p50_tok, 1),
-        'max_tokens': max_tok,
-        'success_rate': round(success_rate, 3),
-        'failure_rate': round(failure_rate, 3),
-    }
-    _stats_cache[cache_key] = (result, now)
+        result = {
+            "count": 0,
+            "avg_tokens": 0.0,
+            "p50_tokens": 0.0,
+            "p75_tokens": 0.0,
+            "max_tokens": 0.0,
+        }
+    quality_count = len(labels)
+    result.update({
+        "quality_count": quality_count,
+        "success_rate": round(
+            successes / quality_count, 3) if quality_count else 0.0,
+        "failure_rate": round(
+            failures / quality_count, 3) if quality_count else 0.0,
+        "reliability_count": len(candidates),
+    })
+    _stats_cache[cache_key] = (dict(result), now)
     return result
 
 
-def get_cv_for_task_type(task_type: str, scene_type: str = '') -> float:
-    """计算指定任务类型历史 token 消耗的变异系数。"""
-    history = load_history()
-    if not history:
+def get_cv_for_task_type(task_type: str, scene_type: str = "") -> float:
+    values = [
+        _thinking_tokens(entry)
+        for entry in _candidate_entries(task_type, scene_type)
+        if _token_record_is_valid(entry)
+    ]
+    if len(values) < 2:
         return 0.0
-
-    if task_type in _task_type_index:
-        candidates = [history[i] for i in _task_type_index[task_type]
-                      if i < len(history)]
-    else:
-        candidates = [e for e in history if e.get('task_type', '') == task_type]
-
-    if not candidates and scene_type:
-        if scene_type in _scene_type_index:
-            candidates = [history[i] for i in _scene_type_index[scene_type]
-                          if i < len(history)]
-        else:
-            candidates = [e for e in history if e.get('scene_type', '') == scene_type]
-
-    tokens_list = []
-    for e in candidates:
-        res = e.get('result', {})
-        tok = res.get('thinking_tokens') or res.get('total_tokens', 0)
-        if tok and tok > 0:
-            tokens_list.append(tok)
-
-    if len(tokens_list) < 2:
+    average = sum(values) / len(values)
+    if average == 0:
         return 0.0
-
-    avg = sum(tokens_list) / len(tokens_list)
-    if avg == 0:
-        return 0.0
-
-    variance = sum((t - avg) ** 2 for t in tokens_list) / len(tokens_list)
-    std = variance ** 0.5
-    return std / avg
+    variance = sum((value - average) ** 2 for value in values) / len(values)
+    return variance ** 0.5 / average
 
 
-def clear_history():
-    """清空历史记录。"""
-    global _history_cache, _stats_cache, _task_type_index, _scene_type_index
+def get_category_stats(
+    question_preview: str,
+    task_type: str = "naie",
+    scene_type: str = "",
+    top_k: int = 10,
+) -> Dict[str, Any]:
+    candidates = _candidate_entries(task_type, scene_type)
+    query_chars = set(question_preview[:100])
+    scored = []
+    for entry in candidates:
+        preview = entry.get("question_preview", "")
+        chars = set(preview)
+        similarity = (
+            len(chars & query_chars) / max(1, len(chars | query_chars))
+        )
+        if scene_type and entry.get("scene_type") == scene_type:
+            similarity += 0.3
+        scored.append((similarity, entry))
+    selected = [
+        entry for _, entry in sorted(
+            scored, key=lambda item: item[0], reverse=True
+        )[:top_k]
+    ]
+    valid_tokens = [
+        _thinking_tokens(entry)
+        for entry in selected
+        if _token_record_is_valid(entry)
+    ]
+    labels = [
+        label for label in (_quality_label(entry) for entry in selected)
+        if label is not None
+    ]
+    return {
+        "avg_tokens": (
+            sum(valid_tokens) / len(valid_tokens) if valid_tokens else 0.0
+        ),
+        "failure_rate": (
+            sum(1 for label in labels if not label) / len(labels)
+            if labels else 0.0
+        ),
+        "count": len(valid_tokens),
+        "quality_count": len(labels),
+        "scene_type": scene_type,
+        "scene_match_count": sum(
+            1 for entry in selected
+            if entry.get("scene_type") == scene_type
+        ),
+    }
+
+
+def get_scene_stats(
+    scene_type: str,
+    task_type: str = "naie",
+) -> Dict[str, Any]:
+    return get_task_type_stats(task_type, scene_type)
+
+
+def clear_history() -> None:
+    global _history_cache, _persisted_write_count
     with _HISTORY_LOCK:
         if os.path.exists(_HISTORY_FILE):
             os.remove(_HISTORY_FILE)
         _history_cache = []
-        _stats_cache = {}
-        _task_type_index = {}
-        _scene_type_index = {}
-
-
-# ═══════════════════════════════════════════════════════════════
-# 内部函数
-# ═══════════════════════════════════════════════════════════════
-
-def _rebuild_index():
-    global _task_type_index, _scene_type_index
-    _task_type_index = {}
-    _scene_type_index = {}
-    if _history_cache is None:
-        return
-    for idx, entry in enumerate(_history_cache):
-        _update_index_entry(entry, idx)
-
-
-def _update_index_entry(entry: dict, idx: int):
-    tt = entry.get('task_type', '')
-    st = entry.get('scene_type', '')
-    if tt:
-        _task_type_index.setdefault(tt, []).append(idx)
-    if st:
-        _scene_type_index.setdefault(st, []).append(idx)
-
-
-def _invalidate_stats_cache(entry: dict):
-    tt = entry.get('task_type', '')
-    st = entry.get('scene_type', '')
-    keys_to_remove = [k for k in _stats_cache if k.startswith(f"{tt}|")]
-    for k in keys_to_remove:
-        del _stats_cache[k]
-    keys_to_remove2 = [k for k in _stats_cache if k.endswith(f"|{st}")]
-    for k in keys_to_remove2:
-        del _stats_cache[k]
-
-
-def _evict_old_entries_locked():
-    """淘汰过期/过量历史记录。"""
-    global _history_cache, _stats_cache, _task_type_index, _scene_type_index
-
-    if _history_cache is None or len(_history_cache) == 0:
-        return
-
-    now = time.time()
-    cutoff_time = now - _MAX_HISTORY_AGE_DAYS * 86400
-
-    survived = [e for e in _history_cache if e.get('timestamp', now) >= cutoff_time]
-
-    if len(survived) > _MAX_HISTORY_ENTRIES:
-        survived = survived[-_MAX_HISTORY_ENTRIES:]
-
-    evicted_count = len(_history_cache) - len(survived)
-    if evicted_count > 0:
-        print(
-            f"TB_HISTORY event=evict evicted={evicted_count} retained={len(survived)}",
-            flush=True,
-        )
-        _history_cache = survived
-
-        try:
-            _ensure_dir()
-            with open(_HISTORY_FILE, 'w', encoding='utf-8') as f:
-                for entry in _history_cache:
-                    f.write(json.dumps(entry, ensure_ascii=False, default=str) + '\n')
-        except Exception as e:
-            print(
-                f"TB_WARNING event=history_rewrite_failed error={e}",
-                flush=True,
-            )
-
-        _rebuild_index()
-        _stats_cache = {}
+        _task_type_index.clear()
+        _scene_type_index.clear()
+        _parent_request_ids.clear()
+        _stats_cache.clear()
+        _persisted_write_count = 0

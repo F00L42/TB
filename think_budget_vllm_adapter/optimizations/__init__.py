@@ -9,4 +9,3 @@ from think_budget_vllm_adapter.optimizations.task_type_budget import (
     is_known_task_type, compute_num_thinking_from_budget,
     compute_stride_from_budget,
 )
-from think_budget_vllm_adapter.optimizations.trial_evaluator import TrialAnswerEvaluator

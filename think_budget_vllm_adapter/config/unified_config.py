@@ -26,29 +26,26 @@ _config_mtime: Optional[float] = None
 _RUNTIME_DEFAULTS: Dict[str, Any] = {
     'BUDGET_ENABLED': True,
     'check_length': 200,
+    'min_think_budget': 100,
     'think_stride': 100,
-    'prob_th': 0.95,
     'num_thinking': 10,
-    # 与 DEER 保持一致：trial 只用于置信度检查，不应生成数千隐藏 token。
-    'check_answer_len': 50,
-    'max_tokens': 65536,
-    'max_api_calls': 0,
-    'min_think_tokens': 100,
-    'enable_consecutive_same_stop': True,
-    'consecutive_same_stop': 2,
+    'confidence_threshold': 0.95,
+    'percentile_step': 0.75,
     'enable_value_min_confidence': True,
     'value_min_bottom_k': 5,
-    'enable_full_chain_confidence': False,
-    'full_chain_min_percentile': 0.1,
-    'enable_dual_channel': False,
-    'reasoning_min_percentile': 0.1,
     'enable_safety_gate': False,
     'baseline_time_limit': 90.0,
     'enable_task_type_budget': True,
     'enable_history_budget': True,
-    'enable_difficulty_estimator': False,
-    'enable_deer_trial': False,
-    'deer_trial_stable_rounds': 2,
+    'enable_difficulty_estimator': True,
+    'difficulty_check_length_base': 400,
+    'difficulty_check_length_max': 6000,
+    'difficulty_min_think_base': 100,
+    'difficulty_min_think_max': 6000,
+    'difficulty_stride_base': 400,
+    'difficulty_stride_max': 6000,
+    'difficulty_num_thinking_base': 10,
+    'difficulty_num_thinking_max': 20,
     'fixed_budget_tokens': 0,
     'fixed_num_thinking': 0,
     'fixed_think_stride': 0,
@@ -60,8 +57,13 @@ _RUNTIME_DEFAULTS: Dict[str, Any] = {
     'history_stride_percentile': 0.75,
     'history_warmup_count': 3,
     'history_warmup_strategy': 'moderate',
+    'new_task_unlimited': True,
+    'auto_cluster_threshold': 5,
     'custom_task_types_path': None,
     'default_task_type': 'general',
+    'task_type_override': '',
+    'max_internal_calls': 20,
+    'max_thinking_tokens': 65536,
     'final_answer_max_tokens': 2048,
     # One JSON line per model phase is cheap enough for production profiling.
     # Per-state enter/complete logging is intentionally opt-in because every
@@ -184,7 +186,7 @@ def get_runtime_config(config: Optional[Dict] = None) -> Dict[str, Any]:
     """Return the complete server-side runtime configuration.
 
     Request JSON never reaches this section.  A partial YAML section inherits
-    only documented fallback values, so every ``BudgetConfig`` field has one
+    only documented fallback values, so every ``AlgorithmConfig`` field has one
     authoritative server-side value.
     """
     cfg = config or load_budget_config()
@@ -197,6 +199,31 @@ def get_runtime_config(config: Optional[Dict] = None) -> Dict[str, Any]:
             'unknown RUNTIME keys in budget_config.yaml: '
             + ', '.join(sorted(unknown)))
     return {**_RUNTIME_DEFAULTS, **runtime}
+
+
+def get_performance_policy_config(
+    config: Optional[Dict] = None,
+) -> Dict[str, Any]:
+    """Return the deployment manifest for fixed performance policy values."""
+    from think_budget_vllm_adapter.context import PerformancePolicy
+
+    cfg = config or load_budget_config()
+    declared = cfg.get('PERFORMANCE_POLICY', {})
+    if declared is None:
+        declared = {}
+    if not isinstance(declared, dict):
+        raise ValueError('PERFORMANCE_POLICY must be a mapping')
+    expected = PerformancePolicy().telemetry()
+    merged = {**expected, **declared}
+    if merged != expected:
+        changed = sorted(
+            key for key, value in merged.items()
+            if expected.get(key) != value
+        )
+        raise ValueError(
+            'PERFORMANCE_POLICY is fixed; invalid overrides: '
+            + ', '.join(changed))
+    return expected
 
 
 def get_history_config(config: Optional[Dict] = None) -> Dict[str, Any]:
@@ -265,6 +292,18 @@ def _get_default_config() -> Dict[str, Any]:
     """YAML 加载失败时的默认配置。"""
     return {
         'RUNTIME': dict(_RUNTIME_DEFAULTS),
+        'PERFORMANCE_POLICY': {
+            'version': 'think-budget-performance-v1',
+            'trial_answer_length': 50,
+            'clean_context_only': True,
+            'fresh_final_answer': True,
+            'retain_answer_list': False,
+            'enable_soft_truncation': False,
+            'confidence_missing_input': 'fail_open',
+            'confidence_scope': 'current_trial',
+            'enable_safety_amplification': False,
+            'enable_safety_candidate_fallback': False,
+        },
         'TASK_TYPES': {
             'retrieval': {'description': '检索任务', 'typical_tokens': 500, 'check_length': 200, 'think_stride': 100, 'num_thinking': 3, 'min_think_tokens': 50, 'check_answer_len': 2000, 'prob_th': 0.90},
             'statistics_aggregation': {'description': '统计聚合任务', 'typical_tokens': 4000, 'check_length': 800, 'think_stride': 300, 'num_thinking': 6, 'min_think_tokens': 600, 'check_answer_len': 4000, 'prob_th': 0.90},

@@ -10,11 +10,11 @@
 
 1. **最新 Think Budget 仍未达到时延盈亏平衡。** 16 个样本平均只减少 278.31 个可见 token（6.35%），平均时延却增加 30.25 秒（42.63%）。以 `baseline 总时延 / baseline 可见 token` 得到的 16.19 ms/token 作为偏乐观的 TPOT 上界，278 token 最多只值约 4.51 秒；当前控制器额外成本估计在 30.25–34.75 秒/请求之间。
 2. **最贵的“置信度计算”不是 Python 中求几何平均，而是为求置信度额外生成一条 trial answer。** 若执行 `k` 次校验，常见路径有 `2k+2` 次独立 `generate()`。这些隐藏 token 不进入客户端 completion-token 统计。
-3. **Think Budget 的风险比简化版 DEER 更大。** 任务类型预算把单次 `check_answer_len` 设为 2000–4000，轮次为 3–15。试答 token 不进入 OpenAI usage，也没有从 `max_tokens_temp` 扣除；仅看客户端 CSV 无法知道隐藏模型工作量。当前实现已经有 `max_api_calls`，但默认值为 0（无限制），不能代替隐藏 token 账本。
+3. **历史 Think Budget 的风险比简化版 DEER 更大，但裁决后已增加硬边界。** run_00 对应实现会让任务预算把单次 probe 放大到 2000–4000 token；当前 adapter 已固定为最多 50 token，并把 `max_internal_calls` 默认设为 20。试答 token 仍不进入 OpenAI usage，因此必须继续使用隐藏 phase 账本验证总工作量。
 4. **先减少 probe 次数和 probe token，再优化 KV。** `mtp_off.txt` 的一个样本中，10 段思考与 9 个置信度分支的重复 prefill 合计 7.79 秒，只占 202.50 秒 E2E 的 3.85%。这证明重复 prefill 确实存在，但在该样本中不是最大项。
 5. **“新 request_id 导致 KV 必然清零”和“一个外部请求同时占 N 个 scheduler slot”都不成立。** 状态机顺序等待每个 phase；开启 Automatic Prefix Caching 时，新请求可按内容复用完整 prefix block。真正应测的是每个子请求的 `num_cached_tokens` 和 prefill 时间。
 6. **run_00 已直接确认隐藏 probe 是主项。** 63 次 probe 生成 74871 个隐藏 token，wall/decode 分别占客户端 E2E 的 64.85%/62.90%；客户端 E2E 与 hidden token 的请求级相关系数为 0.933。已记录 controller CPU 只有 22.2 ms/请求。
-7. **存在一个可先消除的死 probe 和一个路由异常。** 第四轮 15 次 probe 无论接受与否都进入最终回答，却消耗 433.54 秒；同时 16/16 个长故障诊断/规划 prompt 被选项正则误判为 classification。修分类器前必须先约束所有 task type 的隐藏预算，否则会路由到更长 probe。
+7. **run_00 的死 probe 已由新状态顺序消除，路由异常仍需独立处理。** 历史第四轮 15 次 probe 无论接受与否都进入最终回答，却消耗 433.54 秒；当前状态机在最后一次失败 probe 后只完成 stride 再 final。16/16 个长故障诊断/规划 prompt 被选项正则误判为 classification 的问题仍需单独回归，不能与本轮状态重构混为同一变量。
 
 ## 3. 成本模型
 
@@ -112,27 +112,31 @@ hidden_probe_tokens <= k × trial_answer_length
 
 Python 的 `_calculate_average_max_prob_from_logprobs()` 只遍历最多几十个 token。它存在 `torch.tensor()` 逐 token 分配等微优化空间，但与额外模型 decode 相比不是主矛盾。
 
-### 4.2 Think Budget 的无界隐藏成本
+### 4.2 Think Budget 的隐藏成本边界
 
-[`think_budget_vllm_adapter/optimizations/task_type_budget.py`](../../think_budget_vllm_adapter/optimizations/task_type_budget.py) 的任务类型默认值为：
+裁决后实现不再使用任务预算中的 legacy `check_answer_len`。所有
+confidence probe 由 `PerformancePolicy` 固定为最多 50 token，并通过
+`hidden_probe_tokens` 单独记账。任务预算只决定 `BudgetVector` 的首段、
+最小思考、轮数和 stride。
 
-| 任务类型 | 最大校验轮次 | 单次试答上限 |
-|---|---:|---:|
-| retrieval / classification | 3–4 | 2000 token |
-| coding / math | 12–15 | 4000 token |
-| reasoning / knowledge / planning / general | 6–8 | 3000 token |
-| tool_call / fault_diagnosis | 8 | 4000 token |
+当前实现边界：
 
-同时存在以下实现/观测缺口：
+- `hard_think_token_limit` 只约束可见思考；隐藏 probe 仍需按
+  `probe_round × 实际 trial token` 单列，不能并入外部 completion usage。
+- `max_internal_calls` 默认 20，并在可选 think/probe 前为 final 保留调用
+  槽位；它与 50-token policy 共同限制隐藏调用，但不等于总 token 预算。
+- v0.23.0 serving 补丁在入口检查 `BUDGET_ENABLED`；关闭时应走原生单次
+  生成，仍需服务器验证 stream/non-stream bypass。
+- safety 默认关闭；触发时只提前进入新鲜 FinalAnswer，不做时间放大或候选
+  fallback。
+- `min_think_budget` 仍在 probe 决策时门控；若模型没有提前输出
+  `</think>`，首段小于 minimum 时可能先产生一次不能按分数接受的 probe。
+  该额外成本要用服务器 phase 账本量化。
+- DELTA/FINAL_ONLY/CUMULATIVE trial 已按明确 output kind 聚合完整文本、
+  token ids 和 logprob 位置；不存在 candidate/answer-list 复用路径。
 
-- `max_tokens_temp` 只扣减思考 token，不扣减 trial-answer token；控制器总预算与真实生成总量仍不是同一口径。
-- `max_api_calls` 已在 child request ID 分配时递增并为 final 预留调用，但生产默认 0 表示无限制；它只限制调用次数，不限制单次 probe token。
-- v0.23.0 serving 补丁现已在入口检查 `BUDGET_ENABLED`，关闭时走原生单次生成；需要在服务器同时验证流式和非流式 bypass。
-- `enable_safety_gate` 默认关闭；即使触发，当前状态机也进入 `_AnswerState` 再做一次最终生成，并没有调用已导入的 `build_safety_fallback()`。
-- `min_think_tokens` 在 trial answer 已生成之后才进入 `make_accept_decision()`；若思考长度不足，本次昂贵 probe 注定不能被接受。
-- trial answer 的 logprob/token 会完整聚合，但 `answer_list`/连续相同答案检测仍只取最后一个输出 chunk 的文本；在复用 candidate 前必须先修复该语义。
-
-这些问题说明“算法预算”与“真实服务成本预算”目前不是同一个量。
+因此“思考硬预算”和“真实总模型工作量”仍是两个口径，但所有隐藏工作现在
+都有固定单次上限和独立 phase 账本。
 
 ### 4.3 重复 prefill：存在，但不应夸大
 
@@ -153,20 +157,25 @@ Python 的 `_calculate_average_max_prob_from_logprobs()` 只遍历最多几十�
 
 ### P0：先改变模型调用账本
 
-#### 5.1 在 probe 前执行便宜门控
+#### 5.1 probe 前的便宜门控
 
 把以下检查放在创建 trial-answer 请求之前：
 
-- `actual_len < min_think_tokens`：直接继续思考；
-- 剩余可节省 token 的价值小于最近 probe 成本：跳过 probe 或直接结束；
-- 达到 `max_probe_rounds`、`max_hidden_probe_tokens`、`max_controller_ms`、`max_generate_calls`：停止新增 probe；
-- safety gate 触发且已有 candidate：直接使用最佳 candidate，不再生成 final。
+- 达到思考硬预算、context 上限或 `max_internal_calls`：保留 final，不再新增
+  probe；
+- 达到 `num_thinking` 后：最后失败 probe 只追加 stride，再进入 final；
+- safety gate 触发：进入新鲜 final，不选择 trial candidate；
+- `min_think_budget` 前若模型尝试输出 `</think>`：继续思考，不发起 probe。
 
-这项改动不改变置信度公式，只消除“结果必然不能接受”的校验。
+当前实现仍可能在模型没有尝试早停时，于首段小于 `min_think_budget` 的情况
+先做一次 probe。是否应无条件把 minimum 检查前移属于后续算法改动，需要用
+接受轮次、质量和时延做配对实验。
 
-#### 5.2 把 trial answer 从 2000–4000 token 降为任务所需的最小 probe
+#### 5.2 固定 50-token trial
 
-建议先做 `64 / 128 / 256 / 当前值` 的质量—时延消融，而不是直接拍定单一值。工具调用和分类任务可使用受约束的短 JSON/标签；规划与代码任务可先生成摘要式 candidate，只有决定接受时再生成完整答案。
+裁决后 `PerformancePolicy.trial_answer_length=50`，任务类型和历史预算不能覆盖。
+collector 不要求 trial 形成完整 JSON/答案；它只为当前轮置信度提供证据，接受
+后仍重新生成完整 final。
 
 为避免 [`mtp_on.txt`](../log/API_simulations/mtp_on.txt) 中的大段重复 `!`，probe 还应有明确 stop 条件和重复输出保护。目标 vLLM v0.23.0 提供 `repetition_detection` sampling 参数，可在目标模型上单独验证其质量影响。
 
@@ -181,11 +190,15 @@ Python 的 `_calculate_average_max_prob_from_logprobs()` 只遍历最多几十�
 
 `deer_confidence.txt` 的前三次置信度都未过阈值，是“推迟首个 probe”可能获益的直接样本，但需要更多请求验证。
 
-#### 5.4 复用已经验过的 candidate
+#### 5.4 不复用短 trial candidate
 
-Think Budget 已经为 trial answer 计算完整评分，却在接受后进入 `_AnswerState` 再生成一次答案。对于短答案/工具调用，可直接把被接受 candidate 作为最终输出，消除一次 final prefill + decode，并保证“交付的答案就是被校验的答案”。
+当前 policy 明确丢弃最多 50-token 的 trial，并从单调主思考 prompt 新鲜生成
+final。这避免把截断或结构不完整的隐藏分支直接交付给用户，但保留一次 final
+prefill + decode 成本。
 
-实现前要修复流式聚合：当前 `trial_chunk` 只保留最后一个 delta，不能代表完整 candidate。长规划/代码答案可保留重新生成路径，或采用“短 probe 决策 + 单次完整 final”的两级策略。
+trial 的流式聚合已经修复。若未来实验候选续写或复用，必须新建 policy
+version，并验证 child sequence 续写、LoRA/DP/parser 上下文、usage 和格式
+完整性；本轮不实现。
 
 #### 5.5 建立真实成本预算与真 bypass
 
@@ -197,7 +210,9 @@ Think Budget 已经为 trial answer 计算完整评分，却在接受后进入 `
 - generate 调用次数；
 - controller wall time。
 
-`enable=false` / `budget_disabled=true` 必须在 serving 入口直接进入原生单次生成路径。否则既无法保证安全回退，也无法做可信 A/B。
+请求未设置 `enable_think_budget=true`，或服务端 `BUDGET_ENABLED=false` 时，
+必须在 serving 入口直接进入原生单次生成路径。旧 `budget_disabled` 字段已
+退出请求契约，不能只关闭部分算法后继续状态机。
 
 ### P1：降低调度与 KV 成本
 
@@ -308,18 +323,17 @@ def should_probe(
 
 ```mermaid
 flowchart TD
-    A["Chat request"] --> B["CPU budget decision"]
-    B --> C{"High-confidence one-shot budget?"}
-    C -- Yes --> D["One native generation with thinking budget"]
-    C -- No --> E["Initial / continued thinking"]
-    E --> F{"Cheap gates and expected gain allow probe?"}
-    F -- No, continue --> E
-    F -- No, stop --> I["Best candidate or one final answer"]
-    F -- Yes --> G["Bounded confidence probe"]
-    G --> H{"Accept?"}
-    H -- No --> E
-    H -- Yes, reusable --> J["Return verified candidate"]
-    H -- Yes, not reusable --> I
+    A["Chat request"] --> B{"Budget enabled?"}
+    B -- No --> C["Native single generation"]
+    B -- Yes --> D["Classify, then build BudgetPlan"]
+    D --> E["Thinking: initial check_length"]
+    E --> F["ConfidenceProbe: current 50-token trial"]
+    F --> G{"Accepted and minimum met?"}
+    G -- Yes --> H["FinalAnswer: close think once, generate fresh answer"]
+    G -- No --> I["Thinking: append one stride"]
+    I --> J{"Probe rounds remain?"}
+    J -- Yes --> F
+    J -- No --> H
 ```
 
 ## 7. 一致性与风险检查
@@ -328,7 +342,7 @@ flowchart TD
 - **取消**：客户端断开要中止当前 child request，并保证 parent 不再提交后续 phase。
 - **错误**：orchestrator 不能只记日志后返回一个看似成功的空 200；错误应转换为 OpenAI error response。
 - **预算**：所有隐藏 token 和 final 之外的模型调用都进入 ledger；任何路径都不能绕过上限。
-- **质量**：减少 probe 或复用 candidate 必须同时报告任务正确率/完整性，不能只比较时延。
+- **质量**：减少 probe 或调整预算必须同时报告任务正确率/完整性，不能只比较时延。
 - **公平性**：同一 parent 的 priority、DP rank、LoRA、采样参数和 tracing 上下文保持一致。
 - **指标**：Prometheus 低基数标签只用 `phase`/`variant`，不要把 request_id 放进 metric label；request_id 只进入 JSONL/trace。
 
@@ -462,7 +476,10 @@ analyse("./ascend_profile/<generated>_ascend_pt/")
 - `api_statistic.csv`
 - `trace_view.json`（需要时间线时）
 
-要看 Python/service 状态机而非算子时，使用 MS Service Profiler，将 `BudgetController.handle_request`、`generate_phase`、四个 state handle、`AsyncLLM.add_request`、scheduler add/schedule、model runner execute 标为 symbol，导出 Chrome Trace + CSV。
+要看 Python/service 状态机而非算子时，使用 MS Service Profiler，将
+`BudgetController.handle_request`、三个 state handle、
+`AsyncLLM.add_request`、scheduler add/schedule、model runner execute 标为
+symbol，导出 Chrome Trace + CSV。
 
 Profiler 只对少量请求开启，且不与正式延迟数字混用；profile 本身会改变时延。
 
@@ -502,7 +519,10 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 - trial prompt 与合成 `</think>` 从递归深拷贝改成受控浅拷贝；静态 suffix token 以 parent request 为单位缓存。
 - state enter/complete 与重复 `TB_CONFIDENCE` flush 默认关闭，保留 `verbose_stage_logging=true` 作为故障调试开关。
 - v0.23.0 route 在 DP rank 解析后执行，子请求透传 priority、LoRA、trace headers、DP rank、prompt/reasoning parser context；外层响应分别继续使用原生流式 reasoning parser、非流式统一 parser 与 chat template kwargs。
-- `dtb.patch` 已在固定的 vLLM `v0.23.0` checkout 上通过 `git apply --check`；本地 10 个无模型单元测试覆盖 phase 字段/账本、日志提取、浅拷贝、停止原因和流式/非流式路由响应 kwargs。
+- adapter 算法层已取消 DEER 字段投影，状态机改为 Thinking / ConfidenceProbe / FinalAnswer；首段后立即 probe，最后失败 probe 后仍完成 stride，主 prompt 只追加。
+- trial 上限由 `PerformancePolicy` 固定为 50，DELTA/FINAL_ONLY/CUMULATIVE 使用完整 collector；Value Min 缺少完整 bottom-k 时降级平均置信度，无可用 logprob 时 fail-open。
+- 在线历史增加 parent request 幂等、非阻塞 JSONL writer 和未评分语义；error/cancel 不进入 token 分位数。
+- `dtb.patch` 已在固定的 vLLM `v0.23.0` checkout 上通过 `git apply --check`；本地 39 个无模型单元测试覆盖预算分支与覆盖优先级、三状态轨迹、trial collector、置信度、历史闭环、写入失败隔离、phase 账本、浅拷贝、`n=1` 契约与原生路由上下文。
 
 这些属于**源码确定/本地测试**，不是目标 NPU 的性能实测。尤其结构化 phase 日志本身仍有一次 JSON 序列化与 flush 成本；它替代了更多旧日志，但必须在服务器用 A/B 量化。
 
@@ -521,17 +541,24 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 2. `hidden_probe_tokens`、probe rounds、generate calls；
 3. phase wall/queue/prefill/decode 与 `cached_prompt_tokens / prompt_tokens`；
 4. `sum(phase.wall_ms)` 与客户端 E2E 的未解释差值；
-5. 新旧 DTB 的输出、accept round 与 quality 必须一致，才能把差值归因于工程微优化。
+5. 当前生产 DTB 与裁决后重构版的输出、accept round 与 quality；算法差异
+   必须按 fixed / task+difficulty / history 分支分层解释，不能再把全部差值
+   归因为工程微优化。
 
 继续验证：
 
-- 跳过不能改变控制流的最后一轮 probe 后，可见 prompt、答案和质量是否保持一致，paired E2E 是否接近静态上界的 27.10 秒/请求改善。
+- 首段后立即 probe、失败后追加 stride、最后失败 probe 后不再发起额外
+  probe 的新轨迹，是否减少无效调用且保持质量。
 - 并发 1、单样本时 cached token 是否仍固定为 1536；若仍固定，查 child token/block hash/cache salt/生成 block 保留，若随轮次增长则查并发容量淘汰。
-- 记录 `accept_reason`、Value-Min raw、平均 confidence 和 candidate 完整性，解释低 score 下的 3 次 accepted。
+- 记录 `confidence_method`、Value-Min raw、平均 confidence、pair 完整性和
+  fail-open 次数，解释接受轮次变化。
 
-### 11.4 probe 长度消融（允许改变算法，必须做质量非劣检验）
+### 11.4 固定 50-token probe 验证
 
-在 11.2 数据证明 probe 成本显著后，再运行 `current / 256 / 128 / 64` 四个长度。由于 task type 会覆盖 `RUNTIME.check_answer_len`，每个变体必须只修改所命中 `TASK_TYPES.*.check_answer_len`（或对全部 task type 做同一机械替换），并保存 `budget_config.yaml` hash；不要通过关闭 task classifier 顺带改变其他预算字段。
+裁决后 `trial_answer_length=50` 是 `PerformancePolicy` 不变量，不再由
+`RUNTIME` 或 `TASK_TYPES.*.check_answer_len` 覆盖。本轮只比较当前生产
+probe 与固定 50-token probe；若未来重新做长度消融，必须先形成新的算法
+裁决和 policy version，不能临时修改 YAML。
 
 每个变体报告：
 
@@ -540,7 +567,9 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 - 任务正确率、JSON/工具调用完整率、规划完整性及预先声明的非劣界；
 - 截断/length stop 比例与 value-min 分数分布。
 
-只有质量达到非劣界且 paired 净收益为正的长度才能进入默认配置。若 64–256 token 导致结构化答案截断，可以测试“短决策摘要 probe + 一次完整 final”，不能把残缺 candidate 直接复用为最终输出。
+50-token trial 无论是否形成完整答案都不会直接复用；接受后必须从主思考
+prompt 新鲜生成 final。只有质量达到非劣界且 paired 净收益为正，当前 policy
+才能进入生产。
 
 ## 12. 外部版本依据
 
@@ -555,6 +584,7 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-07-23 | 同步裁决后 adapter 重构：独立 AlgorithmConfig、三状态、固定 50-token 完整 trial collector、fail-open 和在线历史闭环；更新服务器实验口径 | 实现、默认参数和 probe 策略已变化，旧四状态/可配置 probe 消融描述不再适用 |
 | 2026-07-21 | 纳入 run_00 请求级 phase、环境和客户端明细；确认 probe decode 主导、APC 增长前缀未命中、最后一轮死 probe 与 classification 误路由；补齐 manifest/RESULT | 用 158 个 engine call 的实测账本替代历史聚合假设，并明确下一轮的首改与采集缺口 |
 | 2026-07-21 | 纳入 v0.23.0 最新 DTB 汇总；落地 phase ledger、浅拷贝/日志优化、v0.23.0 调用上下文透传、manifest 模板与日志提取工具 | 先获得隐藏 probe 与 child phase 的请求级证据，再对 2000–4000 token probe 做质量约束消融 |
 | 2026-07-20 | 重写性能分析；建立完整成本模型、优化优先级和服务器 runbook | 校正早期文档对 scheduler slot、KV cache 和 MTP 因果的过度推断，并纳入新日志证据 |

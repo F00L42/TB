@@ -138,7 +138,12 @@ def _is_statistics_aggregation_task(question: str, q_lower: str) -> bool:
     return has_many_statistics_rows and asks_aggregation and has_statistics_context
 
 
-def classify_task_type(question: str, scene_info: Optional[Dict] = None) -> Dict[str, Any]:
+def classify_task_type(
+    question: str,
+    scene_info: Optional[Dict] = None,
+    *,
+    include_budget: bool = True,
+) -> Dict[str, Any]:
     """根据问题内容判断任务类型。"""
     q_lower = question.lower()
 
@@ -149,13 +154,15 @@ def classify_task_type(question: str, scene_info: Optional[Dict] = None) -> Dict
 
     if _is_statistics_aggregation_task(question, q_lower):
         task_type = TaskType.STATISTICS_AGGREGATION.value
-        return {
+        result = {
             'task_type': task_type,
             'task_confidence': 1.0,
             'scene_type': scene_type,
             'scores': {task_type: 1.0},
-            'budget': get_task_type_budget(task_type),
         }
+        if include_budget:
+            result['budget'] = get_task_type_budget(task_type)
+        return result
 
     scores = {}
 
@@ -223,15 +230,15 @@ def classify_task_type(question: str, scene_info: Optional[Dict] = None) -> Dict
         confidence = 0.0
         best_type = 'general'
 
-    budget = get_task_type_budget(best_type)
-
-    return {
+    result = {
         'task_type': best_type,
         'task_confidence': round(confidence, 3),
         'scene_type': scene_type,
         'scores': {k: round(v, 2) for k, v in scores.items()},
-        'budget': budget,
     }
+    if include_budget:
+        result['budget'] = get_task_type_budget(best_type)
+    return result
 
 
 def get_task_type_budget(task_type: str, json_path: Optional[str] = None) -> Dict[str, Any]:

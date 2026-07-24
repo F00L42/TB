@@ -1,11 +1,7 @@
-"""安全门 — 超时回退逻辑。
+"""Simple elapsed-time gate.
 
-从 naie/optimizations/safety_gate.py 移植，自包含。
-
-超时后不再调API, 直接从已有answer_list取最佳答案返回。
-无answer时关闭think标签返回已有prompt内容(不调API)。
-
-Inlined from vllm/vllm/deer_think_budget/ into think_budget_vllm_adapter.
+The gate only asks the three-state machine to enter a fresh FinalAnswerState.
+It never amplifies the limit and never selects a hidden trial candidate.
 """
 
 def safety_gate_check(

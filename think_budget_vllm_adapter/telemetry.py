@@ -66,6 +66,7 @@ class TimingCollector:
     calls: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     ledger: BudgetLedger = field(default_factory=BudgetLedger)
     emit_phase_metrics: bool = True
+    policy_version: str = ""
 
     @contextmanager
     def measure(self, name: str) -> Iterator[None]:
@@ -156,6 +157,7 @@ class TimingCollector:
             "parent_request_id": parent_request_id,
             "child_request_id": child_request_id,
             "variant": "think_budget",
+            "policy_version": self.policy_version or None,
             "phase": phase,
             "round": round_id,
             "wall_ms": round(max(wall_ms, 0.0), 3),

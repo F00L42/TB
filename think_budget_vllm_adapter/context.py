@@ -1,193 +1,317 @@
-"""增强版请求上下文 — 扩展 deer_think_budget 的 ThinkBudgetConfig/RequestStateContext，
-新增 budget 决策参数和运行时状态。
+"""Think Budget algorithm configuration and immutable decision structures.
 
-核心设计:
-  - BudgetConfig 扩展 ThinkBudgetConfig，增加 budget 决策链所需的全部超参
-  - BudgetRequestContext 扩展 RequestStateContext，增加 budget 运行时状态
-  - 与 deer 状态机完全兼容：状态类通过 context.config 读取参数
-
-从 think_budget/context.py 迁移，调整导入路径。
+The algorithm layer intentionally has no dependency on DEER configuration
+types.  vLLM routing and request-lifecycle objects live in
+``deer_think_budget.context``; this module contains only values that can be
+unit-tested without importing vLLM.
 """
 from __future__ import annotations
 
-import asyncio
-import time
-from typing import Any, Optional, Dict, TYPE_CHECKING
-from dataclasses import dataclass, field
-
-from think_budget_vllm_adapter.deer_think_budget.context import ThinkBudgetConfig, RequestStateContext
-from think_budget_vllm_adapter.telemetry import TimingCollector
+from dataclasses import asdict, dataclass, field
+from enum import Enum
+from threading import Lock
+from typing import Any, Mapping
 
 
-# Trial answers are hidden probes used only for confidence estimation.  Keep
-# their work bounded independently of task/history budgets; the final answer
-# has its own unrestricted request in ``_AnswerState``.
 TRIAL_ANSWER_LENGTH = 50
+POLICY_VERSION = "think-budget-performance-v1"
 
-if TYPE_CHECKING:
-    from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
-    from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
-    from vllm.outputs import RequestOutput
-    from vllm.tokenizers import TokenizerLike
+
+class DecisionBranch(str, Enum):
+    FIXED = "fixed"
+    TASK_DIFFICULTY = "task_difficulty"
+    HISTORY = "history"
+
+
+class MissingConfidencePolicy(str, Enum):
+    FAIL_OPEN = "fail_open"
+
+
+class ConfidenceScope(str, Enum):
+    CURRENT_TRIAL = "current_trial"
+
+
+@dataclass(frozen=True)
+class PerformancePolicy:
+    """Reviewed algorithm deviations that are not runtime tuning knobs."""
+
+    version: str = POLICY_VERSION
+    trial_answer_length: int = TRIAL_ANSWER_LENGTH
+    clean_context_only: bool = True
+    fresh_final_answer: bool = True
+    retain_answer_list: bool = False
+    enable_soft_truncation: bool = False
+    confidence_missing_input: MissingConfidencePolicy = (
+        MissingConfidencePolicy.FAIL_OPEN
+    )
+    confidence_scope: ConfidenceScope = ConfidenceScope.CURRENT_TRIAL
+    enable_safety_amplification: bool = False
+    enable_safety_candidate_fallback: bool = False
+
+    def __post_init__(self) -> None:
+        if self.trial_answer_length != TRIAL_ANSWER_LENGTH:
+            raise ValueError(
+                f"trial_answer_length is fixed at {TRIAL_ANSWER_LENGTH}")
+        invariant_flags = {
+            "clean_context_only": self.clean_context_only,
+            "fresh_final_answer": self.fresh_final_answer,
+        }
+        disabled_flags = {
+            "retain_answer_list": self.retain_answer_list,
+            "enable_soft_truncation": self.enable_soft_truncation,
+            "enable_safety_amplification": self.enable_safety_amplification,
+            "enable_safety_candidate_fallback":
+                self.enable_safety_candidate_fallback,
+        }
+        if not all(invariant_flags.values()) or any(disabled_flags.values()):
+            raise ValueError("PerformancePolicy invariants are not configurable")
+
+    def telemetry(self) -> dict[str, Any]:
+        values = asdict(self)
+        values["confidence_missing_input"] = (
+            self.confidence_missing_input.value)
+        values["confidence_scope"] = self.confidence_scope.value
+        return values
+
+
+_POLICY_LOG_LOCK = Lock()
+_POLICY_LOGGED = False
+
+
+def log_performance_policy_once(policy: PerformancePolicy) -> None:
+    global _POLICY_LOGGED
+    with _POLICY_LOG_LOCK:
+        if _POLICY_LOGGED:
+            return
+        print(
+            "TB_POLICY "
+            f"version={policy.version} values={policy.telemetry()}",
+            flush=True,
+        )
+        _POLICY_LOGGED = True
+
+
+@dataclass(frozen=True)
+class BudgetVector:
+    """The four generation-budget fields that may be merged arithmetically."""
+
+    check_length: int
+    min_think_budget: int
+    num_thinking: int
+    think_stride: int
+
+    def __post_init__(self) -> None:
+        for name, value in asdict(self).items():
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                raise ValueError(f"{name} must be a positive integer")
+
+    @classmethod
+    def from_mapping(
+        cls,
+        values: Mapping[str, Any],
+        fallback: "BudgetVector",
+    ) -> "BudgetVector":
+        def get_int(primary: str, legacy: str | None, default: int) -> int:
+            value = values.get(primary)
+            if value is None and legacy is not None:
+                value = values.get(legacy)
+            return max(1, int(default if value is None else value))
+
+        return cls(
+            check_length=get_int(
+                "check_length", None, fallback.check_length),
+            min_think_budget=get_int(
+                "min_think_budget", "min_think_tokens",
+                fallback.min_think_budget),
+            num_thinking=get_int(
+                "num_thinking", None, fallback.num_thinking),
+            think_stride=get_int(
+                "think_stride", None, fallback.think_stride),
+        )
+
+    def to_dict(self) -> dict[str, int]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BudgetPlan:
+    task_type: str
+    task_matched: bool
+    decision_branch: DecisionBranch
+    budget: BudgetVector
+    confidence_threshold: float
+    percentile_step: float
+    source_by_field: Mapping[str, Any]
+    history_snapshot_id: str | None
+    policy_version: str
+    hard_think_token_limit: int
+    scene_type: str = "general"
+    difficulty_info: Mapping[str, Any] | None = None
+    history_info: Mapping[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.confidence_threshold <= 1:
+            raise ValueError("confidence_threshold must be in [0, 1]")
+        if not 0 < self.percentile_step <= 1:
+            raise ValueError("percentile_step must be in (0, 1]")
+        if self.hard_think_token_limit < 1:
+            raise ValueError("hard_think_token_limit must be positive")
+
+    def telemetry(self) -> dict[str, Any]:
+        return {
+            "task_type": self.task_type,
+            "task_matched": self.task_matched,
+            "decision_branch": self.decision_branch.value,
+            "budget": self.budget.to_dict(),
+            "confidence_threshold": self.confidence_threshold,
+            "percentile_step": self.percentile_step,
+            "source_by_field": dict(self.source_by_field),
+            "history_snapshot_id": self.history_snapshot_id,
+            "policy_version": self.policy_version,
+            "hard_think_token_limit": self.hard_think_token_limit,
+            "scene_type": self.scene_type,
+            "difficulty_info": (
+                dict(self.difficulty_info)
+                if self.difficulty_info is not None else None
+            ),
+            "history_info": (
+                dict(self.history_info)
+                if self.history_info is not None else None
+            ),
+        }
 
 
 @dataclass
-class BudgetConfig(ThinkBudgetConfig):
-    """扩展 ThinkBudgetConfig — 增加 budget 决策链所需的全部超参。
+class AlgorithmConfig:
+    """Server-side Think Budget configuration using algorithm terminology."""
 
-    这些参数由 budget_controller.py 中的决策链计算得出，
-    然后通过 BudgetRequestContext.config 传递给 deer 状态类。
+    check_length: int = 200
+    min_think_budget: int = 100
+    num_thinking: int = 10
+    think_stride: int = 100
 
-    状态类（如 _IterativeThinkState）通过 context.config 读取参数，
-    因此只需确保 BudgetConfig 包含正确的参数值即可。
+    confidence_threshold: float = 0.95
+    percentile_step: float = 0.75
+    enable_value_min_confidence: bool = True
+    value_min_bottom_k: int = 5
 
-    继承关系:
-      ThinkBudgetConfig (DEER 参数 + Think Budget 基础参数)
-        → BudgetConfig (+ budget 决策链参数 + 开关)
-    """
+    enable_task_type_budget: bool = True
+    enable_difficulty_estimator: bool = True
+    enable_history_budget: bool = True
+    default_task_type: str = "general"
+    task_type_override: str = ""
+    custom_task_types_path: str | None = None
 
-    # ─── Budget 决策参数（由决策链计算后填入）───
-    # 初始长度、轮数、步长、试探答案长度和置信度直接写入父类的
-    # initial_thought_limit、trial_answers、think_stride、
-    # trial_answer_length、prob_th。不要保留同义镜像字段，否则会出现
-    # “观测值已更新、DEER 实际读取值未更新”的双数据源问题。
-    min_think_tokens: int = 100     # 最低思考token门限
+    difficulty_check_length_base: int = 400
+    difficulty_check_length_max: int = 6000
+    difficulty_min_think_base: int = 100
+    difficulty_min_think_max: int = 6000
+    difficulty_stride_base: int = 400
+    difficulty_stride_max: int = 6000
+    difficulty_num_thinking_base: int = 10
+    difficulty_num_thinking_max: int = 20
 
-    # ─── Budget 开关 ───
-    enable_consecutive_same_stop: bool = False  # 连续相同答案早停
-    enable_difficulty_estimator: bool = False  # 难度估计器
-    enable_task_type_budget: bool = True  # 任务类型预算
-    enable_history_budget: bool = True    # 历史轨迹预算
-    enable_deer_trial: bool = False       # DEER trial评估
+    history_budget_multiplier: float = 1.2
+    history_low_success_boost: float = 1.3
+    history_stride_percentile: float = 0.75
+    history_warmup_count: int = 3
+    history_warmup_strategy: str = "moderate"
+    new_task_unlimited: bool = True
+    auto_cluster_threshold: int = 5
 
-    # ─── DEER trial 参数 ───
-    deer_trial_stable_rounds: int = 2
-
-    # ─── 任务类型信息（由决策链填入）───
-    task_type: str = 'general'
-    scene_type: str = 'general'
-    difficulty_info: Optional[Dict] = None
-    history_info: Optional[Dict] = None
-    complexity_info: Optional[Dict] = None
-
-    # ─── 人工可控超参 ───
     fixed_budget_tokens: int = 0
     fixed_num_thinking: int = 0
     fixed_think_stride: int = 0
     fixed_check_length: int = 0
     fixed_prob_th: float = 0.0
     fixed_min_think_tokens: int = 0
-    BUDGET_ENABLED: bool = True
 
-    # ─── 服务端执行边界（不允许请求覆盖） ───
-    # 0 means no separate API-call cap; this is server configuration only.
-    # trial_answers/token_budget remain the algorithm's dynamic controls.
-    max_api_calls: int = 0
+    enable_safety_gate: bool = False
+    baseline_time_limit: float = 90.0
+    max_internal_calls: int = 20
+    max_thinking_tokens: int = 65536
     final_answer_max_tokens: int = 2048
+    budget_enabled: bool = True
     emit_phase_metrics: bool = True
     verbose_stage_logging: bool = False
 
-    # ─── 历史/难度模块的外置配置 ───
-    history_budget_multiplier: float = 1.2
-    history_low_success_boost: float = 1.3
-    history_stride_percentile: float = 0.75
-    history_warmup_count: int = 3
-    history_warmup_strategy: str = 'moderate'
-    custom_task_types_path: Optional[str] = None
-    default_task_type: str = 'general'
+    def __post_init__(self) -> None:
+        positive_fields = (
+            "check_length",
+            "min_think_budget",
+            "num_thinking",
+            "think_stride",
+            "value_min_bottom_k",
+            "difficulty_check_length_base",
+            "difficulty_check_length_max",
+            "difficulty_min_think_base",
+            "difficulty_min_think_max",
+            "difficulty_stride_base",
+            "difficulty_stride_max",
+            "difficulty_num_thinking_base",
+            "difficulty_num_thinking_max",
+            "history_warmup_count",
+            "auto_cluster_threshold",
+            "max_thinking_tokens",
+            "final_answer_max_tokens",
+        )
+        for name in positive_fields:
+            value = getattr(self, name)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                raise ValueError(f"{name} must be a positive integer")
+        if self.max_internal_calls < 0:
+            raise ValueError("max_internal_calls must be non-negative")
+        if 0 < self.max_internal_calls < 2:
+            raise ValueError(
+                "max_internal_calls must be 0 or at least 2")
+        if not 0 <= self.confidence_threshold <= 1:
+            raise ValueError("confidence_threshold must be in [0, 1]")
+        if not 0 < self.percentile_step <= 1:
+            raise ValueError("percentile_step must be in (0, 1]")
+        if not 0 < self.history_stride_percentile <= 1:
+            raise ValueError(
+                "history_stride_percentile must be in (0, 1]")
+        if self.history_budget_multiplier <= 0:
+            raise ValueError("history_budget_multiplier must be positive")
+        if self.history_low_success_boost <= 0:
+            raise ValueError("history_low_success_boost must be positive")
+        if self.baseline_time_limit < 0:
+            raise ValueError("baseline_time_limit must be non-negative")
+        for base_name, maximum_name in (
+            ("difficulty_check_length_base",
+             "difficulty_check_length_max"),
+            ("difficulty_min_think_base",
+             "difficulty_min_think_max"),
+            ("difficulty_stride_base", "difficulty_stride_max"),
+            ("difficulty_num_thinking_base",
+             "difficulty_num_thinking_max"),
+        ):
+            if getattr(self, base_name) > getattr(self, maximum_name):
+                raise ValueError(
+                    f"{base_name} must not exceed {maximum_name}")
+        for name in (
+            "fixed_budget_tokens",
+            "fixed_num_thinking",
+            "fixed_think_stride",
+            "fixed_check_length",
+            "fixed_min_think_tokens",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if not 0 <= self.fixed_prob_th <= 1:
+            raise ValueError("fixed_prob_th must be in [0, 1]")
+
+    @property
+    def default_budget(self) -> BudgetVector:
+        return BudgetVector(
+            check_length=self.check_length,
+            min_think_budget=self.min_think_budget,
+            num_thinking=self.num_thinking,
+            think_stride=self.think_stride,
+        )
 
 
-@dataclass
-class BudgetRequestContext(RequestStateContext):
-    """增强版请求上下文 — 扩展 RequestStateContext，新增 budget 运行时状态。
-
-    核心设计原则:
-      - 与 RequestStateContext 接口兼容（所有字段 + 方法均保留）
-      - 通过 config: BudgetConfig 将 budget 决策参数传递给 deer 状态类
-      - 新增的 budget 运行时状态用于增强版置信度检查状态
-      - 使用继承扩展（dataclass 字段有默认值，可安全继承）
-
-    从 think_budget/context.py 迁移，调整导入路径。
-    """
-    # ─── Budget 运行时状态 ───
-    # ─── Trial Evaluator ───
-    trial_evaluator: Any = None   # TrialAnswerEvaluator 实例（延迟初始化）
-
-    # ─── 运行时可观测性 / 会话元数据 ───
-    model_name: Optional[str] = None
-    session_id: Optional[str] = None
-    external_overrides: set[str] = field(default_factory=set)
-    timing: TimingCollector = field(default_factory=TimingCollector)
-    orchestration_error: Optional[str] = None
-
-    # 注意: budget_start_time, answer_list, prev_answer_text, consecutive_same_count
-    # 已在 RequestStateContext 中定义，无需重复声明
-
-    def update_budget_params(self, budget_params: Dict[str, Any]):
-        """用 budget 决策链的结果更新 config 参数。
-
-        将决策链计算的参数映射到 BudgetConfig / ThinkBudgetConfig 的字段，
-        使 deer 状态类通过 context.config 读取到正确的参数。
-        """
-        cfg = self.config
-
-        def set_if_computed(field_name: str, value: Any) -> None:
-            """Decision-chain output may never replace a request-supplied field."""
-            if field_name not in self.external_overrides:
-                setattr(cfg, field_name, value)
-
-        # 映射 budget 参数到 DeerConfig 兼容字段
-        if 'check_length' in budget_params:
-            set_if_computed('initial_thought_limit', budget_params['check_length'])
-
-        if 'think_stride' in budget_params:
-            set_if_computed('think_stride', budget_params['think_stride'])
-
-        if 'num_thinking' in budget_params:
-            set_if_computed('trial_answers', budget_params['num_thinking'])
-
-        if 'min_think_tokens' in budget_params:
-            set_if_computed('min_think_tokens', budget_params['min_think_tokens'])
-
-        if 'check_answer_len' in budget_params:
-            # Task and history modules still expose ``check_answer_len`` for
-            # compatibility/telemetry, but a trial must never become a hidden
-            # long generation.  The production invariant is exactly 50.
-            set_if_computed('trial_answer_length', TRIAL_ANSWER_LENGTH)
-
-        if 'prob_th' in budget_params:
-            set_if_computed('prob_th', budget_params['prob_th'])
-
-        if 'token_budget' in budget_params:
-            set_if_computed('token_budget', budget_params['token_budget'])
-
-        # 任务类型信息
-        if 'task_type' in budget_params:
-            set_if_computed('task_type', budget_params['task_type'])
-        if 'scene_type' in budget_params:
-            set_if_computed('scene_type', budget_params['scene_type'])
-
-        # 开关参数
-        for key in ['enable_value_min_confidence',
-                      'enable_dual_channel', 'enable_full_chain_confidence',
-                      'enable_consecutive_same_stop',
-                      'enable_safety_gate', 'enable_difficulty_estimator',
-                      'enable_task_type_budget', 'enable_history_budget',
-                      'enable_deer_trial',
-                      'consecutive_same_stop', 'value_min_bottom_k',
-                      'reasoning_min_percentile', 'full_chain_min_percentile',
-                      'baseline_time_limit', 'deer_trial_stable_rounds',
-                     'difficulty_info', 'history_info', 'complexity_info',
-                     'fixed_budget_tokens', 'BUDGET_ENABLED']:
-            if key in budget_params:
-                setattr(cfg, key, budget_params[key])
-
-    def init_trial_evaluator(self):
-        """延迟初始化 TrialAnswerEvaluator。"""
-        if self.config.enable_deer_trial and self.trial_evaluator is None:
-            from think_budget_vllm_adapter.optimizations.trial_evaluator import TrialAnswerEvaluator
-            self.trial_evaluator = TrialAnswerEvaluator({
-                'enable_deer_trial': True,
-                'deer_trial_stable_rounds': self.config.deer_trial_stable_rounds,
-            })
-            self.trial_evaluator.reset()
+# Compatibility for integrations that imported the old public name.  This is
+# an alias, not an inherited DEER configuration type.
+BudgetConfig = AlgorithmConfig

@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from types import SimpleNamespace
 
 from think_budget_vllm_adapter.budget_controller import BudgetController
+from think_budget_vllm_adapter.context import (
+    BudgetPlan,
+    BudgetVector,
+    DecisionBranch,
+    PerformancePolicy,
+)
 from think_budget_vllm_adapter.deer_think_budget.context import (
+    RequestAlgorithmState,
     RequestStateContext,
     ThinkBudgetConfig,
 )
@@ -30,10 +38,23 @@ def make_context() -> RequestStateContext:
     tokenizer = FakeTokenizer()
     request = SimpleNamespace(priority=7)
     serving = SimpleNamespace(engine_client=object(), default_sampling_params={})
+    plan = BudgetPlan(
+        task_type="general",
+        task_matched=False,
+        decision_branch=DecisionBranch.HISTORY,
+        budget=BudgetVector(10, 1, 2, 4),
+        confidence_threshold=0.9,
+        percentile_step=0.75,
+        source_by_field={},
+        history_snapshot_id=None,
+        policy_version="think-budget-performance-v1",
+        hard_think_token_limit=20,
+    )
     return RequestStateContext(
         request=request,
         tokenizer=tokenizer,
         config=ThinkBudgetConfig(),
+        policy=PerformancePolicy(),
         serving_chat=serving,
         request_id="parent",
         engine_prompt={
@@ -41,6 +62,7 @@ def make_context() -> RequestStateContext:
             "prompt_token_ids": [1, 2],
             "multi_modal_data": object(),
         },
+        algorithm_state=RequestAlgorithmState(budget_plan=plan),
         lora_request="lora",
         data_parallel_rank=3,
         trace_headers={"traceparent": "x"},
@@ -105,7 +127,7 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(queued.outputs[0].text, "</think>")
         self.assertEqual(original_output.text, "reasoning")
 
-    async def test_consumer_preserves_terminal_reason_for_phase_metrics(self) -> None:
+    async def test_consumer_preserves_terminal_reason_without_mutating_source(self) -> None:
         context = make_context()
         completion = SimpleNamespace(
             text="delta",
@@ -126,10 +148,69 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(last_chunk, chunk)
         self.assertEqual(text, "delta")
         self.assertEqual(stop_reason, "length")
-        self.assertIsNone(completion.finish_reason)
+        self.assertEqual(completion.finish_reason, "length")
+        visible = await context.result_queue.get()
+        self.assertIsNone(visible.outputs[0].finish_reason)
 
 
 class ResponseContextTests(unittest.IsolatedAsyncioTestCase):
+    async def test_nonstream_aggregation_preserves_final_stop_reason(
+        self,
+    ) -> None:
+        queue = asyncio.Queue()
+        context = SimpleNamespace(orchestration_error=None)
+
+        def chunk(
+            text: str,
+            token_ids: list[int],
+            finish_reason=None,
+            stop_reason=None,
+        ):
+            return SimpleNamespace(
+                outputs=[SimpleNamespace(
+                    text=text,
+                    token_ids=token_ids,
+                    finish_reason=finish_reason,
+                    stop_reason=stop_reason,
+                )],
+                finished=finish_reason is not None,
+            )
+
+        await queue.put(chunk("thought", [1]))
+        await queue.put(chunk("</think>", [2]))
+        await queue.put(chunk(
+            "answer", [3], finish_reason="length",
+            stop_reason="max_tokens",
+        ))
+        await queue.put(None)
+
+        items = [
+            item async for item in BudgetController._queue_as_async_gen(
+                queue, context)
+        ]
+        output = items[0].outputs[0]
+        self.assertEqual(output.text, "thought</think>answer")
+        self.assertEqual(output.token_ids, [1, 2, 3])
+        self.assertEqual(output.finish_reason, "length")
+        self.assertEqual(output.stop_reason, "max_tokens")
+
+    async def test_controller_rejects_multiple_candidates(self) -> None:
+        class Serving:
+            @staticmethod
+            def create_error_response(message):
+                return message
+
+        response = await BudgetController().handle_request(
+            Serving(),
+            [],
+            [],
+            SimpleNamespace(n=2),
+            "request",
+            FakeTokenizer(),
+            SimpleNamespace(),
+        )
+        self.assertEqual(response, "Think Budget currently supports only n=1")
+
     async def test_stream_formatter_receives_native_reasoning_context(self) -> None:
         captured = {}
 

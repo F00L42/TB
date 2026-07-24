@@ -52,17 +52,23 @@ def compute_history_budget(
     history_p75_tokens = cat_stats.get('p75_tokens', 0.0)
     success_rate = cat_stats.get('success_rate', 0.0)
     failure_rate = cat_stats.get('failure_rate', 0.0)
+    quality_count = cat_stats.get('quality_count', 0)
+    history_snapshot_id = (
+        f"{task_type}:{scene_type or 'general'}:"
+        f"{history_count}:{cat_stats.get('p75_tokens', 0)}"
+    )
 
     # Once an unknown task has enough completed examples, replace its generic
     # cold-start entry with a history-derived task profile.  Registration is
     # deliberately deferred until five records so one noisy request cannot
     # permanently define the type.
-    if not task_was_known and history_count >= 5:
+    auto_cluster_threshold = int(cfg.get('auto_cluster_threshold', 5))
+    if not task_was_known and history_count >= auto_cluster_threshold:
         register_task_type_from_history(
             task_type,
             scene_type=scene_type,
             json_path=cfg.get('custom_task_types_path'),
-            min_count=5,
+            min_count=auto_cluster_threshold,
         )
         task_budget = get_task_type_budget(task_type, cfg.get('custom_task_types_path'))
 
@@ -84,7 +90,9 @@ def compute_history_budget(
                 'history_avg_tokens': 0.0,
                 'history_p75_tokens': 0.0,
                 'success_rate': 0.0,
+                'quality_count': 0,
                 'is_new_task': True,
+                'history_snapshot_id': history_snapshot_id,
             }
         else:
             return {
@@ -100,7 +108,9 @@ def compute_history_budget(
                 'history_avg_tokens': 0.0,
                 'history_p75_tokens': 0.0,
                 'success_rate': 0.0,
+                'quality_count': 0,
                 'is_new_task': True,
+                'history_snapshot_id': history_snapshot_id,
             }
 
     # ═══ 阶段B: 冷启动(1~warmup_count条历史) ═══
@@ -139,7 +149,9 @@ def compute_history_budget(
             'history_avg_tokens': round(history_avg_tokens, 1),
             'history_p75_tokens': round(history_p75_tokens, 1),
             'success_rate': round(success_rate, 3),
+            'quality_count': quality_count,
             'is_new_task': False,
+            'history_snapshot_id': history_snapshot_id,
             'warmup_cv': round(cv, 3),
             'warmup_multiplier_used': round(effective_multiplier, 3),
         }
@@ -147,11 +159,11 @@ def compute_history_budget(
     # ═══ 阶段C: 稳定期(>warmup_count条历史) ═══
     effective_tokens = history_p75_tokens if history_p75_tokens > 0 else history_avg_tokens
 
-    if success_rate < 0.7:
+    if quality_count > 0 and success_rate < 0.7:
         effective_tokens = int(effective_tokens * low_success_boost)
 
     stride_factor = 1.0
-    if failure_rate > 0.3:
+    if quality_count > 0 and failure_rate > 0.3:
         stride_factor = high_failure_stride_factor
 
     num_thinking = compute_num_thinking_from_budget(effective_tokens, task_budget.get('check_length', 500),
@@ -175,7 +187,9 @@ def compute_history_budget(
         'history_avg_tokens': round(history_avg_tokens, 1),
         'history_p75_tokens': round(history_p75_tokens, 1),
         'success_rate': round(success_rate, 3),
+        'quality_count': quality_count,
         'is_new_task': False,
+        'history_snapshot_id': history_snapshot_id,
     }
 def register_task_type_from_history(
     task_type: str,

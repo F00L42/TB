@@ -5,29 +5,26 @@
 RUNTIME:
   BUDGET_ENABLED: true
   check_length: 200
+  min_think_budget: 100
   think_stride: 100
-  prob_th: 0.95
   num_thinking: 10
-  # 与 DEER 一致：trial answer 仅用于置信度评估，默认最多 50 token。
-  check_answer_len: 50
-  max_tokens: 65536
-  max_api_calls: 0
-  min_think_tokens: 100
-  enable_consecutive_same_stop: true
-  consecutive_same_stop: 2
+  confidence_threshold: 0.95
+  percentile_step: 0.75
   enable_value_min_confidence: true
   value_min_bottom_k: 5
-  enable_full_chain_confidence: false
-  full_chain_min_percentile: 0.1
-  enable_dual_channel: false
-  reasoning_min_percentile: 0.1
   enable_safety_gate: false
   baseline_time_limit: 90.0
   enable_task_type_budget: true
   enable_history_budget: true
-  enable_difficulty_estimator: false
-  enable_deer_trial: false
-  deer_trial_stable_rounds: 2
+  enable_difficulty_estimator: true
+  difficulty_check_length_base: 400
+  difficulty_check_length_max: 6000
+  difficulty_min_think_base: 100
+  difficulty_min_think_max: 6000
+  difficulty_stride_base: 400
+  difficulty_stride_max: 6000
+  difficulty_num_thinking_base: 10
+  difficulty_num_thinking_max: 20
   fixed_budget_tokens: 0
   fixed_num_thinking: 0
   fixed_think_stride: 0
@@ -39,13 +36,31 @@ RUNTIME:
   history_stride_percentile: 0.75
   history_warmup_count: 3
   history_warmup_strategy: moderate
+  new_task_unlimited: true
+  auto_cluster_threshold: 5
   custom_task_types_path: null
   default_task_type: general
+  task_type_override: ""
+  max_internal_calls: 20
+  max_thinking_tokens: 65536
   final_answer_max_tokens: 2048
   # 每个模型 phase 输出一条 TB_PHASE JSON；不记录 prompt/答案正文。
   emit_phase_metrics: true
   # 调试时才开启。默认关闭每个 state 的 enter/complete 同步刷盘。
   verbose_stage_logging: false
+
+# 此节用于部署清单/回放；这些值是裁决后的不变量，不是调参入口。
+PERFORMANCE_POLICY:
+  version: think-budget-performance-v1
+  trial_answer_length: 50
+  clean_context_only: true
+  fresh_final_answer: true
+  retain_answer_list: false
+  enable_soft_truncation: false
+  confidence_missing_input: fail_open
+  confidence_scope: current_trial
+  enable_safety_amplification: false
+  enable_safety_candidate_fallback: false
 
 TASK_TYPES:
   retrieval:

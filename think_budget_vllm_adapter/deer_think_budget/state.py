@@ -1,132 +1,94 @@
-"""Think Budget 状态机 — DEER 状态转移 + Think Budget 算法核心。
-
-状态转移 (保留 deer 原版):
-  _InitialThinkState → _IterativeThinkState ⇄ _ConfidenceCheckState
-                           ↓                       ↓
-                       _AnswerState ←───────────────┘
-
-算法替换 (与 think budget 保持一致):
-  - _ConfidenceCheckState: DEER 简单 logprob 均值 → Think Budget 双通道/Value Min Confidence
-  - _InitialThinkState: 增加 soft truncation
-  - _IterativeThinkState: 增加 soft truncation + safety gate
-  - _AnswerState: 在需要时注入 THINK_END_TAG，并生成最终答案
-
-适配目标 vLLM v0.23.0:
-  - to_sampling_params(max_tokens, default_sampling_params) 2参数签名
-  - model_config.max_model_len 访问
-  - SampleLogprobs 格式 → (logprobs_float, tokens_text) 转换
-  - TokenizerLike.encode(text, add_special_tokens=False)
-
-Think tags: use "<think>" as stop word and stop_reason (same as deer source code)
-token_ids encoded via context.tokenizer.encode("</think>", add_special_tokens=False)
-
-Inlined from vllm/vllm/deer_think_budget/ into think_budget_vllm_adapter.
-"""
-
+"""Three-state Think Budget execution on vLLM child ``generate`` calls."""
 from __future__ import annotations
 
+import asyncio
 import copy
-from time import perf_counter
-
 from abc import ABC
 from collections.abc import AsyncGenerator
-from typing import Optional, Tuple, Type, TYPE_CHECKING
+from time import perf_counter
+from typing import Any, Optional, Type, TYPE_CHECKING
 
-from think_budget_vllm_adapter.deer_think_budget.context import RequestStateContext
-from think_budget_vllm_adapter.context import TRIAL_ANSWER_LENGTH
-from think_budget_vllm_adapter.deer_think_budget.confidence import (
-    cal_confidence, cal_perplexity,
-    is_think_tag_paired,
-    extract_token_logprobs_and_texts,
+from think_budget_vllm_adapter.deer_think_budget.confidence_gates import (
+    assess_trial_confidence,
 )
-from think_budget_vllm_adapter.deer_think_budget.confidence_gates import compute_dual_channel_score
-from think_budget_vllm_adapter.deer_think_budget.early_stopping import (
-    extract_answer_for_sc, check_consecutive_same,
-    make_accept_decision,
+from think_budget_vllm_adapter.deer_think_budget.context import (
+    ReasoningState,
+    RequestStateContext,
+    TrialObservation,
 )
-from think_budget_vllm_adapter.deer_think_budget.safety_gate import safety_gate_check
+from think_budget_vllm_adapter.deer_think_budget.safety_gate import (
+    safety_gate_check,
+)
 
 if TYPE_CHECKING:
     from vllm.outputs import RequestOutput
 
 
-# ─── Think tags (严格按照 deer 源码) ───
-# deer 源码中 stop word = "</think>", stop_reason 检测也是 "</think>"
-# think_budget 源码中 _THINK_CLOSE_TAG = '</think>'
 THINK_END_TAG = "</think>"
-
-_NATURAL_BREAK_CHARS = frozenset("。！？\n，.!?,}]}」』")
-_NATURAL_BREAK_SEARCH_RANGE = 500
-
-
-def _truncate_thinking_at_natural_breakpoint(content: str) -> str:
-    """Close an overlong thinking segment at its last natural breakpoint.
-
-    This is only applied when a thinking request stopped because it exhausted
-    its token limit.  A completed ``</think>`` segment is left untouched;
-    otherwise punctuation, a newline, or a JSON/container closing character
-    in the recent tail is preferred over cutting through a sentence/value.
-    """
-    if not content or THINK_END_TAG in content:
-        return content
-    lower_bound = max(0, len(content) - _NATURAL_BREAK_SEARCH_RANGE)
-    for index in range(len(content) - 1, lower_bound - 1, -1):
-        if content[index] in _NATURAL_BREAK_CHARS:
-            truncated = content[:index + 1]
-            if THINK_END_TAG not in truncated:
-                truncated = f"{truncated.rstrip()}\n{THINK_END_TAG}\n"
-            return truncated
-    return content
+TRIAL_PROMPT = (
+    "I have to give the answer based on the thinking directly "
+    "without explanation now.\n**Final Answer**\n"
+)
 
 
-def _natural_breakpoint_tokens(
-    context: RequestStateContext,
-    token_ids: list[int],
-    text: str,
-    stop_reason: object,
-) -> tuple[list[int], str]:
-    """Normalize a length-stopped think stride for the next engine prompt."""
-    if stop_reason != "length" or THINK_END_TAG in text:
-        return token_ids, text
-    truncated = _truncate_thinking_at_natural_breakpoint(text)
-    if truncated == text:
-        return token_ids, text
-    # Re-tokenize the retained suffix so prompt text and prompt_token_ids stay
-    # aligned after removing an incomplete tail and adding ``</think>``.
-    return list(context.encode_prompt_suffix(truncated)), truncated
+def _output_kind_name(value: Any) -> str:
+    kind = getattr(value, "output_kind", value)
+    name = getattr(kind, "name", None)
+    if name:
+        return str(name).upper()
+    text = str(kind or "DELTA").rsplit(".", 1)[-1]
+    return text.upper()
+
+
+def _replace_or_append(
+    output_kind: str,
+    current_text: str,
+    current_token_ids: list[int],
+    chunk_text: str,
+    chunk_token_ids: list[int],
+) -> tuple[str, list[int]]:
+    if output_kind == "DELTA":
+        return (
+            current_text + chunk_text,
+            [*current_token_ids, *chunk_token_ids],
+        )
+    return chunk_text, list(chunk_token_ids)
+
+
+def _aligned_logprobs(
+    raw_logprobs: Any,
+    token_count: int,
+) -> list[Any | None]:
+    values = list(raw_logprobs or [])
+    if len(values) < token_count:
+        values.extend([None] * (token_count - len(values)))
+    return values[:token_count]
+
+
+def _configure_final_answer_stop(params: Any) -> None:
+    current_stop = getattr(params, "stop", None)
+    stops = [current_stop] if isinstance(current_stop, str) else list(
+        current_stop or [])
+    if THINK_END_TAG not in stops:
+        stops.append(THINK_END_TAG)
+    params.stop = stops
+    params.include_stop_str_in_output = False
 
 
 def _last_chunk_ends_with_think_tag(last_chunk: object) -> bool:
-    """判断刚刚已透传的思考输出是否已含闭合标签。
-
-    vLLM 在不同 ``RequestOutputKind`` 下可能返回增量文本或累计文本。
-    无论哪一种，只要最后一段可见文本已经以 ``</think>`` 结尾，就不能
-    再合成并透传一次闭合标签。
-    """
     try:
-        output = last_chunk.outputs[0]
-        return (getattr(output, "text", "") or "").rstrip().endswith(THINK_END_TAG)
+        return (
+            (getattr(last_chunk.outputs[0], "text", "") or "")
+            .rstrip()
+            .endswith(THINK_END_TAG)
+        )
     except (AttributeError, IndexError, TypeError):
         return False
 
 
-def _configure_final_answer_stop(params: object) -> None:
-    """保留用户 stop，同时屏蔽最终答案中的重复 ``</think>``。"""
-    current_stop = getattr(params, "stop", None)
-    if isinstance(current_stop, str):
-        stops = [current_stop]
-    else:
-        stops = list(current_stop or [])
-    if THINK_END_TAG not in stops:
-        stops.append(THINK_END_TAG)
-    params.stop = stops
-    # 即使调用方请求返回 stop 文本，回答区也不能把控制标签暴露给用户。
-    params.include_stop_str_in_output = False
-
-
 async def _emit_think_end_once(context: RequestStateContext) -> bool:
-    """在已输出思考内容时，至多补发一次可见的闭合标签。"""
-    if getattr(context, "think_end_emitted", False):
+    """Emit the one visible close marker without deep-copying request metrics."""
+    if context.think_end_emitted:
         return False
     last_chunk = context.last_chunk
     if last_chunk is None:
@@ -134,738 +96,598 @@ async def _emit_think_end_once(context: RequestStateContext) -> bool:
     if _last_chunk_ends_with_think_tag(last_chunk):
         context.think_end_emitted = True
         return False
-    # RequestOutput may retain prompt ids, logprobs and metrics for thousands of
-    # tokens. Only the outer object and its first CompletionOutput are mutated,
-    # so a two-object shallow copy is equivalent to deepcopy here.
-    end_think_res = copy.copy(last_chunk)
-    end_think_output = copy.copy(last_chunk.outputs[0])
-    end_think_res.outputs = [end_think_output, *last_chunk.outputs[1:]]
-    end_think_output.text = THINK_END_TAG
-    end_think_output.token_ids = list(context.encode_prompt_suffix(THINK_END_TAG))
-    await context.stream_output(end_think_res)
+    result = copy.copy(last_chunk)
+    output = copy.copy(last_chunk.outputs[0])
+    result.outputs = [output, *last_chunk.outputs[1:]]
+    output.text = THINK_END_TAG
+    output.token_ids = list(context.encode_prompt_suffix(THINK_END_TAG))
+    output.finish_reason = None
+    output.stop_reason = None
+    await context.stream_output(result)
     context.think_end_emitted = True
     return True
 
 
-def _decode_prompt_text(context: RequestStateContext) -> str:
-    """从 engine_prompt 的 token_ids 解码出文本，用于 is_think_tag_paired 等检查。"""
-    if context.prompt_text is not None:
-        return context.prompt_text
-    try:
-        return context.tokenizer.decode(
-            context.engine_prompt.get('prompt_token_ids', []),
-            skip_special_tokens=True
-        )
-    except Exception:
-        return ''
-
-
 class _BaseState(ABC):
-    """状态的抽象基类"""
     @staticmethod
-    async def handle(context: RequestStateContext) -> Optional[Type['_BaseState']]:
-        """处理当前状态的逻辑，并返回下一个状态的类。"""
+    async def handle(
+        context: RequestStateContext,
+    ) -> Optional[Type["_BaseState"]]:
         raise NotImplementedError
 
     @staticmethod
-    def log_stage(context: RequestStateContext, event: str, stage: str, **details) -> None:
-        """Emit progress metadata only; generated text is never logged."""
-        if not getattr(context.config, "verbose_stage_logging", False):
+    def log_stage(
+        context: RequestStateContext,
+        event: str,
+        stage: str,
+        **details: Any,
+    ) -> None:
+        if not context.config.verbose_stage_logging:
             return
+        state = context.algorithm_state
         print(
             "TB_STAGE "
             f"event={event} request_id={context.request_id} "
-            f"session_id={getattr(context, 'session_id', None)} "
-            f"model={getattr(context, 'model_name', None)} stage={stage} "
-            f"thinking_round={context.thinking_rounds} trial_round={context.trial_count} "
-            f"api_calls={context.api_call_count} remaining_budget={context.max_tokens_temp} "
-            f"details={details}",
+            f"stage={stage} thinking_segments={state.thinking_segments} "
+            f"probe_round={state.probe_round} "
+            f"api_calls={state.api_call_count} details={details}",
             flush=True,
+        )
+
+    @staticmethod
+    def next_engine_request_id(
+        context: RequestStateContext,
+        stage: str,
+    ) -> str:
+        state = context.algorithm_state
+        maximum = context.config.max_internal_calls
+        if maximum > 0 and state.api_call_count >= maximum:
+            raise RuntimeError(
+                "Think Budget max_internal_calls reached for "
+                f"{context.request_id}: {maximum}")
+        state.api_call_count += 1
+        return f"{context.request_id}_{stage}_{state.api_call_count}"
+
+    @staticmethod
+    def has_call_room(
+        context: RequestStateContext,
+        required_calls: int,
+    ) -> bool:
+        maximum = context.config.max_internal_calls
+        return maximum <= 0 or (
+            context.algorithm_state.api_call_count + required_calls
+            <= maximum
+        )
+
+    @staticmethod
+    def remaining_think_budget(context: RequestStateContext) -> int:
+        return max(
+            0,
+            context.budget_plan.hard_think_token_limit
+            - context.algorithm_state.thinking_tokens,
+        )
+
+    @staticmethod
+    def remaining_context(context: RequestStateContext) -> int:
+        return max(
+            0,
+            int(context.serving_chat.model_config.max_model_len)
+            - len(context.engine_prompt.get("prompt_token_ids", [])),
         )
 
     @staticmethod
     async def consume_output(
         gen: AsyncGenerator,
-        context: Optional[RequestStateContext],
+        context: RequestStateContext,
         *,
+        output_kind: Any = None,
         collect_reasoning_logprobs: bool = False,
-    ) -> Tuple[list[int], Optional[RequestOutput], str, object]:
-        """消费 generator 输出，收集 token_ids 并转发到 result_queue。"""
-        stride_token_ids = []
-        stride_logprobs = []
-        logprob_token_ids = []
-        last_chunk = None
-        stride_text = ""
-        phase_stop_reason = None
-        async for chunk in gen:
-            out = chunk.outputs[0]
-            stride_token_ids.extend(out.token_ids)
-            chunk_text = out.text or ""
-            # DELTA chunks append; cumulative/final-only chunks replace the
-            # text accumulated so far. This cache never changes model tokens.
-            if chunk_text.startswith(stride_text):
-                stride_text = chunk_text
-            else:
-                stride_text += chunk_text
-            if collect_reasoning_logprobs and out.logprobs:
-                # ``out.logprobs`` 与同一 chunk 的 ``out.token_ids`` 一一
-                # 对应；后者用于从 top-k 候选中精确取回实际采样 token。
-                pair_count = min(len(out.logprobs), len(out.token_ids))
-                stride_logprobs.extend(out.logprobs[:pair_count])
-                logprob_token_ids.extend(out.token_ids[:pair_count])
-            if out.finish_reason:  # 本轮推理正常结束，但我们需要过滤停止信号以进一步处理
-                phase_stop_reason = out.stop_reason or out.finish_reason
-                out.finish_reason = None
-            await context.stream_output(chunk)
-            # generate 在下一次迭代抛异常时，仍能收口已经透传的思考文本。
-            context.last_chunk = chunk
-            last_chunk = chunk
-        if collect_reasoning_logprobs and context is not None:
-            reasoning_logprobs, reasoning_tokens = extract_token_logprobs_and_texts(
-                stride_logprobs, logprob_token_ids)
-            if context.reasoning_logprobs is None:
-                context.reasoning_logprobs = []
-                context.reasoning_tokens = []
-            context.reasoning_logprobs.extend(reasoning_logprobs)
-            context.reasoning_tokens.extend(reasoning_tokens)
-        return stride_token_ids, last_chunk, stride_text, phase_stop_reason
-
-    @staticmethod
-    async def consume_output_for_logprobs(
-        gen: AsyncGenerator,
-    ) -> Tuple[list, list[int], Optional[RequestOutput], int]:
-        """消费 generator 输出，收集 logprobs (不转发到 result_queue)。
-
-        用于 _ConfidenceCheckState 的 trial answer 生成 — trial answer 不对外输出，
-        仅用于内部置信度评估。
-        """
-        stride_logprobs = []
-        stride_token_ids = []
-        last_chunk = None
-        generated_token_count = 0
-        async for res in gen:
-            out = res.outputs[0]
-            generated_token_count += len(out.token_ids)
-            # vLLM 格式: out.logprobs 是 SampleLogprobs
-            if out.logprobs:
-                pair_count = min(len(out.logprobs), len(out.token_ids))
-                stride_logprobs.extend(out.logprobs[:pair_count])
-                stride_token_ids.extend(out.token_ids[:pair_count])
-            last_chunk = res
-        return stride_logprobs, stride_token_ids, last_chunk, generated_token_count
-
-    @staticmethod
-    def requires_reasoning_logprobs(context: RequestStateContext) -> bool:
-        """仅在完整链/双通道启用时为思考子请求请求 logprobs。
-
-        默认 Value-Min 只评估 trial answer；不给每段思考开启 logprobs，避免
-        在默认模式为所有流式 chunk 增加无意义的返回与处理开销。
-        """
-        return bool(
-            context.config.enable_full_chain_confidence
-            or context.config.enable_dual_channel)
-
-    @staticmethod
-    def next_engine_request_id(context: RequestStateContext, stage: str) -> str:
-        """Assign traceable child ids and enforce the external API-call limit."""
-        max_api_calls = getattr(context.config, "max_api_calls", 0)
-        if max_api_calls > 0 and context.api_call_count >= max_api_calls:
-            raise RuntimeError(
-                f"Think Budget max_api_calls reached for {context.request_id}: {max_api_calls}")
-        context.api_call_count += 1
-        return f"{context.request_id}_{stage}_{context.api_call_count}"
-
-    @staticmethod
-    def has_call_room(context: RequestStateContext, required_calls: int) -> bool:
-        """Return whether optional work can run while reserving later calls.
-
-        A positive max_api_calls is a complete parent-request budget, including
-        the final answer.  Callers use this helper before optional thinking or
-        trial stages so a cap never turns into a missing final answer.
-        """
-        max_api_calls = getattr(context.config, "max_api_calls", 0)
-        return max_api_calls <= 0 or (
-            context.api_call_count + required_calls <= max_api_calls)
-
-
-class _InitialThinkState(_BaseState):
-    """状态1: 执行首次长程思考
-
-    DEER behavior: generate initial_thought_limit tokens, stop at "<think>"
-    Think Budget 增强: soft truncation (自然断点闭合)
-    """
-    @staticmethod
-    async def handle(context: RequestStateContext) -> Optional[Type[_BaseState]]:
-        if context.config.initial_thought_limit <= 0:
-            return _IterativeThinkState
-        if not _BaseState.has_call_room(context, 2):
-            # 调用上限不足时保留最终回答，不能让可选思考挤掉答案。
-            return _AnswerState
-
-        # 对齐到 128 的倍数 (与 DEER 原版一致)
-        threshold = 128 - len(context.engine_prompt['prompt_token_ids']) % 128
-        threshold += context.config.initial_thought_limit
-        threshold = min(threshold, context.max_tokens_temp)
-        if threshold <= 0:
-            return _AnswerState
-
-        phase_started_at = perf_counter()
-        controller_segment_started_at = perf_counter()
-        prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
-        # 新版 vLLM: to_sampling_params 只接受 (max_tokens, default_sampling_params)
-        params = context.request.to_sampling_params(
-            threshold,
-            context.default_sampling_params,
+    ) -> tuple[list[int], Optional[RequestOutput], str, object]:
+        """Collect and forward a visible thought without post-hoc truncation."""
+        del collect_reasoning_logprobs
+        kind = _output_kind_name(
+            output_kind
+            if output_kind is not None
+            else ("DELTA" if getattr(context.request, "stream", False)
+                  else "FINAL_ONLY")
         )
-        params.stop = [THINK_END_TAG]
-        if _BaseState.requires_reasoning_logprobs(context):
-            params.logprobs = 1
+        full_text = ""
+        all_token_ids: list[int] = []
+        last_output = None
+        terminal_reason = None
+        async for result in gen:
+            source_output = result.outputs[0]
+            chunk_text = source_output.text or ""
+            chunk_token_ids = list(source_output.token_ids or [])
+            if THINK_END_TAG in chunk_text:
+                context.algorithm_state.attempted_early_stop = True
+                chunk_text = chunk_text.split(THINK_END_TAG, 1)[0]
+                chunk_token_ids = list(
+                    context.tokenizer.encode(
+                        chunk_text, add_special_tokens=False))
 
-        _BaseState.log_stage(
-            context, "enter", "initial_think", max_tokens=threshold,
-            stop=THINK_END_TAG, logprobs=bool(getattr(params, "logprobs", None)),
-            prompt_tokens=prompt_tokens,
-        )
-        child_request_id = _BaseState.next_engine_request_id(
-            context, "initial_think")
-        controller_cpu_ms = (
-            perf_counter() - controller_segment_started_at) * 1000
-        with context.timing.measure("engine.initial_think"):
-            gen = context.engine_client.generate(
-                context.engine_prompt, params,
-                child_request_id,
-                **context.engine_request_kwargs(),
+            full_text, all_token_ids = _replace_or_append(
+                kind,
+                full_text,
+                all_token_ids,
+                chunk_text,
+                chunk_token_ids,
             )
-            stride_token_ids, last_chunk, stride_text, phase_stop_reason = (
-                await _BaseState.consume_output(
-                    gen,
-                    context,
-                    collect_reasoning_logprobs=(
-                        _BaseState.requires_reasoning_logprobs(context)),
-                ))
-        if last_chunk is None:
-            raise RuntimeError("initial_think completed without a vLLM output")
-        controller_segment_started_at = perf_counter()
-        stride_token_ids, stride_text = _natural_breakpoint_tokens(
-            context, stride_token_ids, stride_text, phase_stop_reason)
-        context.update_prompts(stride_token_ids, last_chunk, stride_text)
+            if source_output.finish_reason:
+                terminal_reason = (
+                    source_output.stop_reason
+                    or source_output.finish_reason
+                )
 
-        # 更新 token 计数
-        token_count = len(stride_token_ids)
-        context.output_len += token_count
-        context.actual_len += token_count
-        context.max_tokens_temp -= token_count
-        controller_cpu_ms += (
-            perf_counter() - controller_segment_started_at) * 1000
-        phase_wall_ms = (perf_counter() - phase_started_at) * 1000
-        context.timing.record_phase(
-            parent_request_id=context.request_id,
-            child_request_id=child_request_id,
-            phase="initial_think",
-            round_id=0,
-            wall_ms=phase_wall_ms,
-            controller_cpu_ms=controller_cpu_ms,
-            prompt_tokens=prompt_tokens,
-            generated_tokens=token_count,
-            visible=True,
-            output=last_chunk,
-            stop_reason=phase_stop_reason,
-        )
-        _BaseState.log_stage(
-            context, "complete", "initial_think",
-            duration_ms=round(phase_wall_ms, 3),
-            generated_tokens=token_count, stop_reason=phase_stop_reason,
-        )
+            visible_result = copy.copy(result)
+            visible_output = copy.copy(source_output)
+            visible_result.outputs = [
+                visible_output,
+                *result.outputs[1:],
+            ]
+            visible_output.text = chunk_text
+            visible_output.token_ids = chunk_token_ids
+            visible_output.finish_reason = None
+            visible_output.stop_reason = None
+            if chunk_text or chunk_token_ids:
+                await context.stream_output(visible_result)
+                context.last_chunk = visible_result
+            last_output = result
 
-        # 检查是否因为 </think> 停止 (与 deer 源码一致)
-        if (last_chunk and last_chunk.outputs[0].stop_reason == THINK_END_TAG) or (
-            THINK_END_TAG in stride_text
-        ):
-            return _AnswerState  # 思考已结束，直接回答
-        else:
-            return _IterativeThinkState  # 进入迭代思考
+        if terminal_reason == THINK_END_TAG:
+            context.algorithm_state.attempted_early_stop = True
+        return all_token_ids, last_output, full_text, terminal_reason
 
-
-class _IterativeThinkState(_BaseState):
-    """状态2: 执行后续的短程、迭代思考
-
-    DEER behavior: each round generates think_stride tokens, detect "<think>"
-    Think Budget 增强: soft truncation + safety gate
-    """
     @staticmethod
-    async def handle(context: RequestStateContext) -> Optional[Type[_BaseState]]:
-        # ─── 安全门检查 ───
-        if safety_gate_check(context.elapsed, context.config.baseline_time_limit,
-                             context.config.enable_safety_gate):
-            # 安全门触发 — 直接进入 _AnswerState (与 deer 源码行为一致)
-            return _AnswerState
+    async def consume_trial_output(
+        gen: AsyncGenerator,
+        *,
+        output_kind: Any = "DELTA",
+    ) -> TrialObservation:
+        """Collect the complete hidden trial for DELTA/FINAL/CUMULATIVE modes."""
+        kind = _output_kind_name(output_kind)
+        text = ""
+        token_ids: list[int] = []
+        sample_logprobs: list[Any | None] = []
+        sampled_token_ids: list[int] = []
+        finish_reason = None
+        stop_reason = None
+        last_output = None
 
-        if context.trial_count >= context.config.trial_answers:
-            return _AnswerState
+        async for result in gen:
+            output = result.outputs[0]
+            chunk_text = output.text or ""
+            if THINK_END_TAG in chunk_text:
+                chunk_text = chunk_text.split(THINK_END_TAG, 1)[0]
+            chunk_token_ids = list(output.token_ids or [])
+            chunk_logprobs = _aligned_logprobs(
+                output.logprobs, len(chunk_token_ids))
+            if kind == "DELTA":
+                text += chunk_text
+                token_ids.extend(chunk_token_ids)
+                sampled_token_ids.extend(chunk_token_ids)
+                sample_logprobs.extend(chunk_logprobs)
+            else:
+                text = chunk_text
+                token_ids = chunk_token_ids
+                sampled_token_ids = list(chunk_token_ids)
+                sample_logprobs = chunk_logprobs
+            if output.finish_reason is not None:
+                finish_reason = output.finish_reason
+            if output.stop_reason is not None:
+                stop_reason = output.stop_reason
+            last_output = result
 
-        # max_tokens 预算耗尽
-        if context.max_tokens_temp <= 0:
-            return _AnswerState
+        return TrialObservation(
+            full_text=text,
+            all_token_ids=token_ids,
+            sample_logprobs=sample_logprobs,
+            sampled_token_ids=sampled_token_ids,
+            generated_tokens=len(token_ids),
+            finish_reason=finish_reason,
+            stop_reason=stop_reason,
+            last_output=last_output,
+            output_kind=kind,
+        )
 
-        # Reserve a possible trial plus the mandatory final answer. When the
-        # parent request is near its call cap, finish instead of spending the
-        # final slot on another think chunk.
-        if not _BaseState.has_call_room(context, 3):
-            return _AnswerState
 
-        context.thinking_rounds += 1
+class _ThinkingState(_BaseState):
+    """Generate check_length first, then one stride after each failed probe."""
 
-        max_new_tokens_for_thought = context.config.think_stride \
-            if context.config.think_stride > 0 \
-            else int(context.serving_chat.model_config.max_model_len * context.config.think_ratio) - len(context.engine_prompt['prompt_token_ids'])
-        max_new_tokens_for_thought = min(
-            max_new_tokens_for_thought, context.max_tokens_temp)
-        if max_new_tokens_for_thought <= 0:
-            return _AnswerState
+    @staticmethod
+    async def handle(
+        context: RequestStateContext,
+    ) -> Optional[Type[_BaseState]]:
+        state = context.algorithm_state
+        if state.reasoning_state is ReasoningState.CLOSED:
+            raise RuntimeError("ThinkingState cannot run after FinalAnswerState")
+        if safety_gate_check(
+            context.elapsed,
+            context.config.baseline_time_limit,
+            context.config.enable_safety_gate,
+        ):
+            return _FinalAnswerState
+        remaining_budget = _BaseState.remaining_think_budget(context)
+        remaining_context = _BaseState.remaining_context(context)
+        close_reserve = len(
+            context.encode_prompt_suffix(THINK_END_TAG)) + 1
+        available_think_context = remaining_context - close_reserve
+        if remaining_budget <= 0 or available_think_context <= 0:
+            return _FinalAnswerState
+        if not _BaseState.has_call_room(context, 2):
+            return _FinalAnswerState
 
-        phase_started_at = perf_counter()
-        controller_segment_started_at = perf_counter()
+        first_segment = state.thinking_segments == 0
+        requested_tokens = (
+            context.budget_plan.budget.check_length
+            if first_segment
+            else context.budget_plan.budget.think_stride
+        )
+        maximum = min(
+            requested_tokens,
+            remaining_budget,
+            available_think_context,
+        )
+        if maximum <= 0:
+            return _FinalAnswerState
+
+        phase = "initial_think" if first_segment else "iterative_think"
+        phase_started = perf_counter()
+        controller_started = perf_counter()
         prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
-        # 新版 vLLM: to_sampling_params 只接受 (max_tokens, default_sampling_params)
         params = context.request.to_sampling_params(
-            max_new_tokens_for_thought,
-            context.default_sampling_params,
-        )
+            maximum, context.default_sampling_params)
         params.stop = [THINK_END_TAG]
-        if _BaseState.requires_reasoning_logprobs(context):
-            params.logprobs = 1
-
-        _BaseState.log_stage(
-            context, "enter", "iterative_think", max_tokens=max_new_tokens_for_thought,
-            stop=THINK_END_TAG, logprobs=bool(getattr(params, "logprobs", None)),
-            prompt_tokens=prompt_tokens,
-        )
-        child_request_id = _BaseState.next_engine_request_id(context, "rethink")
+        params.include_stop_str_in_output = False
+        output_kind = getattr(params, "output_kind", None)
+        child_request_id = _BaseState.next_engine_request_id(
+            context, phase)
         controller_cpu_ms = (
-            perf_counter() - controller_segment_started_at) * 1000
-        with context.timing.measure("engine.iterative_think"):
-            gen = context.engine_client.generate(
+            perf_counter() - controller_started) * 1000
+
+        with context.timing.measure(f"engine.{phase}"):
+            generator = context.engine_client.generate(
                 context.engine_prompt,
                 params,
                 child_request_id,
                 **context.engine_request_kwargs(),
             )
-            stride_token_ids, last_chunk, stride_text, phase_stop_reason = (
-                await _BaseState.consume_output(
-                    gen,
-                    context,
-                    collect_reasoning_logprobs=(
-                        _BaseState.requires_reasoning_logprobs(context)),
-                ))
-        if last_chunk is None:
-            raise RuntimeError("iterative_think completed without a vLLM output")
+            (
+                generated_token_ids,
+                last_output,
+                generated_text,
+                stop_reason,
+            ) = await _BaseState.consume_output(
+                generator,
+                context,
+                output_kind=output_kind,
+            )
+        if last_output is None:
+            raise RuntimeError(f"{phase} completed without a vLLM output")
 
-        controller_segment_started_at = perf_counter()
-        continuation_text = stride_text
-        stride_token_ids, continuation_text = _natural_breakpoint_tokens(
-            context, stride_token_ids, continuation_text, phase_stop_reason)
-        generated_tokens = len(stride_token_ids)
-        # deer 源码: stop_word 可能是 str 或 int，需要处理
-        stop_word = last_chunk.outputs[0].stop_reason
-        if stop_word is not None and THINK_END_TAG not in continuation_text:  # 在下一轮续写中添加本次的截断词
-            if isinstance(stop_word, str):
-                stride_token_ids.extend(
-                    context.encode_prompt_suffix(stop_word)
-                )
-                continuation_text += stop_word
-            else:
-                stride_token_ids.append(stop_word)
-                continuation_text += context.tokenizer.decode(
-                    [stop_word], skip_special_tokens=False)
-        context.update_prompts(stride_token_ids, last_chunk, continuation_text)
-
-        # 更新 token 计数
-        token_count = len(stride_token_ids)
-        context.output_len += token_count
-        context.actual_len += token_count
-        context.max_tokens_temp -= token_count
+        controller_started = perf_counter()
+        context.append_thinking(
+            generated_token_ids,
+            generated_text,
+            last_output,
+        )
+        generated_tokens = len(generated_token_ids)
         controller_cpu_ms += (
-            perf_counter() - controller_segment_started_at) * 1000
-        phase_wall_ms = (perf_counter() - phase_started_at) * 1000
+            perf_counter() - controller_started) * 1000
+        wall_ms = (perf_counter() - phase_started) * 1000
         context.timing.record_phase(
             parent_request_id=context.request_id,
             child_request_id=child_request_id,
-            phase="iterative_think",
-            round_id=context.thinking_rounds,
-            wall_ms=phase_wall_ms,
+            phase=phase,
+            round_id=0 if first_segment else state.thinking_segments - 1,
+            wall_ms=wall_ms,
             controller_cpu_ms=controller_cpu_ms,
             prompt_tokens=prompt_tokens,
             generated_tokens=generated_tokens,
             visible=True,
-            output=last_chunk,
-            stop_reason=phase_stop_reason,
-        )
-        _BaseState.log_stage(
-            context, "complete", "iterative_think",
-            duration_ms=round(phase_wall_ms, 3),
-            generated_tokens=generated_tokens,
-            stop_reason=phase_stop_reason,
+            output=last_output,
+            stop_reason=stop_reason,
         )
 
-        if (last_chunk and last_chunk.outputs[0].stop_reason == THINK_END_TAG) or (
-            THINK_END_TAG in continuation_text
+        if generated_tokens <= 0:
+            return _FinalAnswerState
+        if stop_reason == THINK_END_TAG:
+            state.attempted_early_stop = True
+        if (
+            state.attempted_early_stop
+            and state.thinking_tokens
+            < context.budget_plan.budget.min_think_budget
         ):
-            return _AnswerState  # 思考已结束，直接回答
-        else:
-            return _ConfidenceCheckState  # 思考未结束，检查置信度
-
-
-class _ConfidenceCheckState(_BaseState):
-    """状态3: 生成 trial answer, 使用 Think Budget 算法检查置信度
-
-    DEER 行为: 简单 logprob 均值 (avg2 几何平均) vs prob_th
-    Think Budget 替换:
-      - cal_confidence + cal_perplexity (基础指标)
-      - compute_dual_channel_score (4种模式: full_chain / dual_channel / value_min / 默认)
-      - check_consecutive_same (连续相同答案早停)
-      - make_accept_decision (综合判断，含 min_think_tokens 门控)
-
-    关键适配: vLLM logprobs 格式转换
-      DEER 使用 vLLM CompletionOutput.logprobs (dict[str, Logprob] 格式)
-      Think Budget 需要 list[float | None] + list[str | None] 格式
-      → 使用 extract_token_logprobs_and_texts() 转换
-    """
-    @staticmethod
-    async def handle(context: RequestStateContext) -> Optional[Type[_BaseState]]:
-        if context.trial_count >= context.config.trial_answers:
-            return _AnswerState
-
-        # A trial is optional; retain one API call for the final answer.
+            return _ThinkingState
+        if (
+            _BaseState.remaining_think_budget(context) <= 0
+            or _BaseState.remaining_context(context) <= close_reserve
+        ):
+            return _FinalAnswerState
+        # After the final failed probe, the required stride is generated and
+        # then the fresh final answer starts without another probe.
+        if (
+            state.probe_round
+            >= context.budget_plan.budget.num_thinking
+        ):
+            return _FinalAnswerState
         if not _BaseState.has_call_room(context, 2):
-            return _AnswerState
+            return _FinalAnswerState
+        return _ConfidenceProbeState
 
-        context.trial_count += 1
-        context.sc_rounds += 1
 
-        # ─── 安全门检查 ───
-        if safety_gate_check(context.elapsed, context.config.baseline_time_limit,
-                             context.config.enable_safety_gate):
-            return _AnswerState
+class _ConfidenceProbeState(_BaseState):
+    """Generate one hidden <=50-token trial from a shallow child prompt."""
 
-        phase_started_at = perf_counter()
-        controller_segment_started_at = perf_counter()
-        # ─── 构建 trial answer 请求 ───
-        # 新版 vLLM: to_sampling_params 只接受 (max_tokens, default_sampling_params)
-        ans_params = context.request.to_sampling_params(
-            TRIAL_ANSWER_LENGTH,
-            context.default_sampling_params,
+    @staticmethod
+    async def handle(
+        context: RequestStateContext,
+    ) -> Optional[Type[_BaseState]]:
+        state = context.algorithm_state
+        if state.reasoning_state is ReasoningState.CLOSED:
+            raise RuntimeError(
+                "ConfidenceProbeState cannot run after FinalAnswerState")
+        if (
+            state.probe_round
+            >= context.budget_plan.budget.num_thinking
+        ):
+            return _FinalAnswerState
+        if not _BaseState.has_call_room(context, 2):
+            return _FinalAnswerState
+        if safety_gate_check(
+            context.elapsed,
+            context.config.baseline_time_limit,
+            context.config.enable_safety_gate,
+        ):
+            return _FinalAnswerState
+
+        phase_started = perf_counter()
+        controller_started = perf_counter()
+        child_prompt = context.child_prompt(TRIAL_PROMPT)
+        child_prompt_text = child_prompt.get("prompt")
+        prompt_tokens = len(child_prompt["prompt_token_ids"])
+        trial_limit = min(
+            context.policy.trial_answer_length,
+            max(
+                0,
+                int(context.serving_chat.model_config.max_model_len)
+                - prompt_tokens,
+            ),
         )
-        ans_params.logprobs = 1  # 为置信度检查准备 logprobs
-
-        # trial answer 提示词 (与 deer 源码一致)
-        if context.config.is_code:
-            ans_prompt = (
-                "I have to give the answer based on the thinking "
-                f"directly without explanation now.{THINK_END_TAG}\n"
-            )
-        else:
-            ans_prompt = (
-                "I have to give the answer based on the thinking "
-                "directly without explanation now.\n**Final Answer**\n"
-            )
-            # deer 源码中非 code 模式的 stop 是字符串而非列表
-            ans_params.stop = [THINK_END_TAG]
-
-        # EngineInput may contain multimodal objects and large token arrays.
-        # Branch only the prompt dict and token list; all other values are
-        # immutable inputs shared with the main reasoning path.
-        ans_engine_prompt = context.child_prompt(ans_prompt)
-        ans_prompt_text = ans_engine_prompt.get("prompt")
-        prompt_tokens = len(ans_engine_prompt["prompt_token_ids"])
-
-        _BaseState.log_stage(
-            context, "enter", "confidence_check",
-            trial_answer_max_tokens=TRIAL_ANSWER_LENGTH,
-            prob_th=context.config.prob_th,
-            value_min=context.config.enable_value_min_confidence,
-            dual_channel=context.config.enable_dual_channel,
-            full_chain=context.config.enable_full_chain_confidence,
-            prompt_tokens=prompt_tokens,
+        requested_limit = (
+            getattr(context.request, "max_completion_tokens", None)
+            or getattr(context.request, "max_tokens", None)
         )
+        if isinstance(requested_limit, int) and requested_limit > 0:
+            trial_limit = min(trial_limit, requested_limit)
+        if trial_limit <= 0:
+            return _FinalAnswerState
+        state.probe_round += 1
+        params = context.request.to_sampling_params(
+            trial_limit, context.default_sampling_params)
+        params.logprobs = 1
+        params.stop = [THINK_END_TAG]
+        params.include_stop_str_in_output = False
+        output_kind = getattr(params, "output_kind", None)
         child_request_id = _BaseState.next_engine_request_id(
-            context, "trial_answer")
+            context, "confidence_probe")
         controller_cpu_ms = (
-            perf_counter() - controller_segment_started_at) * 1000
-        with context.timing.measure("engine.trial_answer"):
-            gen = context.engine_client.generate(
-                ans_engine_prompt,
-                ans_params,
+            perf_counter() - controller_started) * 1000
+
+        with context.timing.measure("engine.confidence_probe"):
+            generator = context.engine_client.generate(
+                child_prompt,
+                params,
                 child_request_id,
                 **context.engine_request_kwargs(
-                    prompt_text=ans_prompt_text,
+                    prompt_text=child_prompt_text,
                     reasoning_ended=True,
                 ),
             )
-            # ─── 收集 trial answer 的 logprobs (不转发到 result_queue) ───
-            stride_logprobs, trial_token_ids, trial_chunk, trial_generated_tokens = (
-                await _ConfidenceCheckState.consume_output_for_logprobs(gen))
-        if trial_chunk is None:
-            raise RuntimeError("trial_answer completed without a vLLM output")
+            observation = await _BaseState.consume_trial_output(
+                generator,
+                output_kind=output_kind,
+            )
+        if observation.last_output is None:
+            raise RuntimeError(
+                "confidence_probe completed without a vLLM output")
 
-        controller_segment_started_at = perf_counter()
-        # ─── vLLM logprobs 格式转换 ───
-        # stride_logprobs 是 list[dict[str, Logprob] | None] (vLLM SampleLogprobs)
-        # Think Budget 需要 list[float | None] + list[str | None]
-        ans_logprobs_float, ans_tokens_text = extract_token_logprobs_and_texts(
-            stride_logprobs, trial_token_ids)
-
-        # ─── Think Budget: 基础置信度/困惑度 ───
-        confidence = cal_confidence(ans_logprobs_float)
-        perplexity = cal_perplexity(ans_logprobs_float)
-
-        # ─── Think Budget: 双通道/单通道决策评分 ───
-        decision_score, value_min_raw, reasoning_score_raw, action_score_raw = compute_dual_channel_score(
-            context.reasoning_logprobs, context.reasoning_tokens,
-            ans_logprobs_float, ans_tokens_text,
-            confidence, perplexity,
-            enable_full_chain_confidence=context.config.enable_full_chain_confidence,
-            full_chain_min_percentile=context.config.full_chain_min_percentile,
-            enable_dual_channel=context.config.enable_dual_channel,
-            reasoning_min_percentile=context.config.reasoning_min_percentile,
-            enable_value_min_confidence=context.config.enable_value_min_confidence,
+        controller_started = perf_counter()
+        state.current_trial = observation
+        state.hidden_probe_tokens += observation.generated_tokens
+        assessment = assess_trial_confidence(
+            observation,
+            enable_value_min_confidence=(
+                context.config.enable_value_min_confidence),
             value_min_bottom_k=context.config.value_min_bottom_k,
         )
-
-        # ─── 构造 trial answer 文本 (用于 answer_list 和 consecutive_same) ───
-        # trial answer 的文本需要从 trial_chunk 获取
-        trial_answer_text = ""
-        if trial_chunk:
-            trial_answer_text = trial_chunk.outputs[0].text
-
-        # induced_prompt + trial_answer_text 用于 extract_answer_for_sc
-        # (使用 ans_engine_prompt 的文本形式作为 content — 这里简化处理)
-        full_answer_content = ans_prompt + trial_answer_text
-
-        trial_evaluation = (
-            context.trial_evaluator.evaluate_trial(full_answer_content, confidence)
-            if getattr(context, "trial_evaluator", None) is not None else None
-        )
-
-        # ─── Think Budget: 连续相同答案检测 ───
-        current_answer_text = extract_answer_for_sc(full_answer_content)
-        consecutive_same_stop = (
-            context.config.consecutive_same_stop
-            if getattr(context.config, "enable_consecutive_same_stop", False)
-            else 0
-        )
-        context.prev_answer_text, context.consecutive_same_count = check_consecutive_same(
-            current_answer_text, context.prev_answer_text,
-            context.consecutive_same_count, consecutive_same_stop,
-        )
-
-        # ─── Think Budget: 综合早停判断 ───
-        # 注意: is_think_tag_paired 需要文本，不能传 token_ids
-        prompt_text = _decode_prompt_text(context)
-        should_accept, accept_reason = make_accept_decision(
-            decision_score, context.config.prob_th,
-            context.actual_len, context.config.min_think_tokens,
-            is_think_tag_paired(prompt_text),
-            context.consecutive_same_count, consecutive_same_stop,
-            context.config.enable_value_min_confidence, value_min_raw,
-            enable_full_chain_confidence=context.config.enable_full_chain_confidence,
-            reasoning_score_raw=reasoning_score_raw,
-            action_score_raw=action_score_raw,
-            enable_dual_channel=context.config.enable_dual_channel,
-        )
-        if trial_evaluation and trial_evaluation["should_early_stop"]:
-            should_accept = True
-            accept_reason = "deer_trial_stable"
+        state.last_confidence = assessment.score
+        if not assessment.available:
+            accepted = True
+            accept_reason = "confidence_unavailable_fail_open"
+        elif (
+            state.thinking_tokens
+            < context.budget_plan.budget.min_think_budget
+        ):
+            accepted = False
+            accept_reason = "min_think_budget"
+        else:
+            accepted = bool(
+                assessment.score is not None
+                and assessment.score
+                >= context.budget_plan.confidence_threshold
+            )
+            accept_reason = (
+                assessment.method if accepted else "below_threshold")
 
         controller_cpu_ms += (
-            perf_counter() - controller_segment_started_at) * 1000
-        phase_wall_ms = (perf_counter() - phase_started_at) * 1000
+            perf_counter() - controller_started) * 1000
+        wall_ms = (perf_counter() - phase_started) * 1000
         context.timing.record_phase(
             parent_request_id=context.request_id,
             child_request_id=child_request_id,
             phase="confidence_probe",
-            round_id=context.trial_count,
-            wall_ms=phase_wall_ms,
+            round_id=state.probe_round,
+            wall_ms=wall_ms,
             controller_cpu_ms=controller_cpu_ms,
             prompt_tokens=prompt_tokens,
-            generated_tokens=trial_generated_tokens,
+            generated_tokens=observation.generated_tokens,
             visible=False,
-            output=trial_chunk,
-            confidence=decision_score,
-            accepted=should_accept,
+            output=observation.last_output,
+            confidence=assessment.score,
+            accepted=accepted,
+            stop_reason=(
+                observation.stop_reason or observation.finish_reason),
         )
         _BaseState.log_stage(
-            context, "complete", "confidence_check",
-            duration_ms=round(phase_wall_ms, 3),
-            trial_tokens=trial_generated_tokens, confidence=round(confidence, 6),
-            perplexity=round(perplexity, 6), decision_score=round(decision_score, 6),
-            accept=should_accept, accept_reason=accept_reason,
+            context,
+            "complete",
+            "confidence_probe",
+            generated_tokens=observation.generated_tokens,
+            confidence=assessment.score,
+            confidence_method=assessment.method,
+            accepted=accepted,
+            accept_reason=accept_reason,
         )
-
-        # ─── 记录到 answer_list ───
-        context.answer_list.append((
-            full_answer_content,
-            context.output_len,
-            confidence, perplexity,
-            'stop' if trial_chunk and trial_chunk.outputs[0].stop_reason else 'length',
-            decision_score, value_min_raw, 0.0, accept_reason,
-        ))
-
-        if should_accept:
-            # 置信度足够 → 进入 _AnswerState
-            if getattr(context.config, "verbose_stage_logging", False):
-                print(
-                    f"TB_CONFIDENCE event=accept request_id={context.request_id} "
-                    f"trial_round={context.trial_count} decision_score={decision_score:.4f} "
-                    f"prob_th={context.config.prob_th} reason={accept_reason}",
-                    flush=True,
-                )
-            return _AnswerState
-
-        # ─── 置信度不够 → 继续思考 ───
-        if getattr(context.config, "verbose_stage_logging", False):
-            print(
-                f"TB_CONFIDENCE event=continue request_id={context.request_id} "
-                f"trial_round={context.trial_count} decision_score={decision_score:.4f} "
-                f"prob_th={context.config.prob_th} reason={accept_reason}",
-                flush=True,
-            )
-
-        # Trial prompt is constructed as a shallow branch and is never appended to
-        # engine_prompt. This is the clean-context path: retrying continues from
-        # the thinking context rather than accumulating induced trial answers.
-
-        return _IterativeThinkState
+        return _FinalAnswerState if accepted else _ThinkingState
 
 
-class _AnswerState(_BaseState):
-    """状态4: 生成最终答案
+class _FinalAnswerState(_BaseState):
+    """Close reasoning once and generate a fresh answer from the main prompt."""
 
-    DEER behavior: inject "<think>" then generate final answer
-    (严格与 deer 源码一致，不做 answer_list 选优)
-    """
     @staticmethod
-    async def handle(context: RequestStateContext) -> Optional[Type[_BaseState]]:
-        phase_started_at = perf_counter()
-        controller_segment_started_at = perf_counter()
-        # 异常收口与正常回答共用，绝不重复输出闭合标签。
-        await _emit_think_end_once(context)
+    async def handle(
+        context: RequestStateContext,
+    ) -> Optional[Type[_BaseState]]:
+        state = context.algorithm_state
+        phase_started = perf_counter()
+        controller_started = perf_counter()
+        if state.reasoning_state is ReasoningState.OPEN:
+            await _emit_think_end_once(context)
+            context.close_reasoning()
 
-        prompt_already_closed = _decode_prompt_text(context).rstrip().endswith(THINK_END_TAG)
-        if prompt_already_closed:
-            # Natural-break truncation or an explicit stop token already put
-            # the close tag in the continuation prompt.
-            ans_prompt = ""
-        elif context.last_chunk and context.last_chunk.outputs[0].stop_reason is None:
-            # 上一轮思考因为超长退出，强制生成答案 (与 deer 源码一致)
-            ans_prompt = (
-                f"Considering the limited time by the user, I have to give the solution based on the thinking directly now.\n{THINK_END_TAG}\n\n"
-            )
-        else:
-            # 置信度足够高，可以直接结束思考 (与 deer 源码一致)
-            ans_prompt = THINK_END_TAG
-
-        context.append_prompt_suffix(ans_prompt)
-
-        remaining_context = (
-            context.serving_chat.model_config.max_model_len
-            - len(context.engine_prompt['prompt_token_ids'])
+        remaining_context = _BaseState.remaining_context(context)
+        requested_limit = (
+            getattr(context.request, "max_completion_tokens", None)
+            or getattr(context.request, "max_tokens", None)
         )
-        # The final answer is a separate, complete request.  Only the model
-        # context window limits it; trial/probe and legacy server caps must not
-        # truncate the user-visible answer.
-        answer_limit = remaining_context
+        answer_limit = min(
+            remaining_context,
+            context.config.final_answer_max_tokens,
+        )
+        if isinstance(requested_limit, int) and requested_limit > 0:
+            answer_limit = min(answer_limit, requested_limit)
         if answer_limit <= 0:
-            raise RuntimeError("no context space remains for the final answer")
+            raise RuntimeError(
+                "no context space remains for the final answer")
 
-        params = context.request.to_sampling_params(answer_limit, context.default_sampling_params)
+        params = context.request.to_sampling_params(
+            answer_limit, context.default_sampling_params)
         _configure_final_answer_stop(params)
+        output_kind = _output_kind_name(
+            getattr(params, "output_kind", None))
         prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
-        _BaseState.log_stage(
-            context, "enter", "final_answer", max_tokens=answer_limit,
-            prompt_tokens=prompt_tokens,
-            stop=getattr(params, "stop", None), include_stop_str_in_output=False,
-        )
-        child_request_id = _BaseState.next_engine_request_id(context, "answer")
+        child_request_id = _BaseState.next_engine_request_id(
+            context, "final_answer")
         controller_cpu_ms = (
-            perf_counter() - controller_segment_started_at) * 1000
+            perf_counter() - controller_started) * 1000
         generated_tokens = 0
-        last_result = None
+        last_output = None
+
         with context.timing.measure("engine.final_answer"):
-            async for res in context.engine_client.generate(
+            async for result in context.engine_client.generate(
                 context.engine_prompt,
                 params,
                 child_request_id,
                 **context.engine_request_kwargs(reasoning_ended=True),
             ):
-                generated_tokens += len(res.outputs[0].token_ids)
-                last_result = res
-                await context.stream_output(res)
-        if generated_tokens <= 0:
-            raise RuntimeError("final_answer completed without generated tokens")
-        phase_wall_ms = (perf_counter() - phase_started_at) * 1000
+                if not context.think_end_emitted:
+                    # A hard limit can enter FinalAnswer before any visible
+                    # thought chunk exists.  Use the first final output only as
+                    # a shallow RequestOutput template for the close marker.
+                    context.last_chunk = result
+                    await _emit_think_end_once(context)
+                chunk_tokens = len(result.outputs[0].token_ids or [])
+                if output_kind == "DELTA":
+                    generated_tokens += chunk_tokens
+                else:
+                    generated_tokens = chunk_tokens
+                last_output = result
+                await context.stream_output(result)
+        if last_output is None:
+            raise RuntimeError(
+                "final_answer completed without a vLLM output")
+
+        state.final_answer_tokens = generated_tokens
+        state.completion_status = "success"
+        wall_ms = (perf_counter() - phase_started) * 1000
         context.timing.record_phase(
             parent_request_id=context.request_id,
             child_request_id=child_request_id,
             phase="final_answer",
-            round_id=context.trial_count,
-            wall_ms=phase_wall_ms,
+            round_id=state.probe_round,
+            wall_ms=wall_ms,
             controller_cpu_ms=controller_cpu_ms,
             prompt_tokens=prompt_tokens,
             generated_tokens=generated_tokens,
             visible=True,
-            output=last_result,
-        )
-        _BaseState.log_stage(
-            context, "complete", "final_answer",
-            duration_ms=round(phase_wall_ms, 3),
-            generated_tokens=generated_tokens,
+            output=last_output,
         )
         return None
 
 
 class AsyncReasoningOrchestrator:
-    """流程编排器，负责驱动状态机运行。"""
     def __init__(self, context: RequestStateContext):
         self.context = context
 
-    async def run(self):
-        """执行状态机的主循环"""
-        current_state_class: Optional[Type[_BaseState]] = _InitialThinkState
+    async def run(self) -> None:
+        current: Optional[Type[_BaseState]] = _ThinkingState
         try:
-            while current_state_class is not None:
-                state_name = current_state_class.__name__
-                _BaseState.log_stage(self.context, "state_enter", state_name)
-                state_started_at = perf_counter()
-                current_state_class = await current_state_class.handle(self.context)
+            while current is not None:
+                state_name = current.__name__
                 _BaseState.log_stage(
-                    self.context, "state_complete", state_name,
-                    duration_ms=round((perf_counter() - state_started_at) * 1000, 3),
-                    next_state=(current_state_class.__name__ if current_state_class else None),
-                )
-        except Exception as e:
+                    self.context, "state_enter", state_name)
+                current = await current.handle(self.context)
+        except asyncio.CancelledError:
+            self.context.algorithm_state.completion_status = "cancelled"
+            raise
+        except Exception as exc:
             import traceback
+
+            self.context.algorithm_state.completion_status = "error"
+            self.context.orchestration_error = str(exc)
             print(
-                f"TB_ERROR event=orchestration request_id={self.context.request_id} "
-                f"error={e}",
+                "TB_ERROR event=orchestration "
+                f"request_id={self.context.request_id} error={exc}",
                 flush=True,
             )
             print(traceback.format_exc(), flush=True)
-            self.context.orchestration_error = str(e)
             try:
-                await _emit_think_end_once(self.context)
+                if (
+                    self.context.algorithm_state.reasoning_state
+                    is ReasoningState.OPEN
+                ):
+                    await _emit_think_end_once(self.context)
+                    self.context.close_reasoning()
             except Exception:
                 print(
                     "TB_ERROR event=emit_think_end_failed "
-                    f"request_id={self.context.request_id}\n{traceback.format_exc()}",
+                    f"request_id={self.context.request_id}",
                     flush=True,
                 )
         finally:
             print(
                 "TB_PROFILE "
                 f"request_id={self.context.request_id} "
-                f"model={getattr(self.context, 'model_name', None)} "
-                f"session_id={getattr(self.context, 'session_id', None)} "
                 f"profile={self.context.timing.snapshot()}",
                 flush=True,
             )
-            await self.context.stream_output(None)  # 确保最后总是发送结束信号
+            await self.context.stream_output(None)
+
+
+# Rolling-upgrade aliases.  They do not add states; both names refer to the
+# single ThinkingState in the reviewed three-state model.
+_InitialThinkState = _ThinkingState
+_IterativeThinkState = _ThinkingState
+_ConfidenceCheckState = _ConfidenceProbeState
+_AnswerState = _FinalAnswerState
