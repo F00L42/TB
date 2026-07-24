@@ -31,7 +31,7 @@ _RUNTIME_DEFAULTS: Dict[str, Any] = {
     'num_thinking': 10,
     'confidence_threshold': 0.95,
     'percentile_step': 0.75,
-    'enable_value_min_confidence': True,
+    'enable_value_min_confidence': False,
     'value_min_bottom_k': 5,
     'enable_safety_gate': False,
     'baseline_time_limit': 90.0,
