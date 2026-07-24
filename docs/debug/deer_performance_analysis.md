@@ -4,17 +4,35 @@
 
 本文分析 DEER 与 Think Budget 服务内控制器的端到端时延成本，目标是在质量约束下尽量降低“预算估算 + 置信度校验 + 多阶段调度”的额外耗时。
 
-数据基线更新到 2026-07-21 的 v0.23.0 汇总和 [`run_00`](../log/perf/run_00/RESULT.md) 请求级 phase 数据；上游源码基线为本地只读 checkout：vLLM `v0.23.0`（`0fc695f`）与 vLLM-Ascend `v0.23.0rc1`（`f4a08bd`）。当前环境没有目标模型和推理设备，因此结论分为“实测”“源码确定”“待验证假设”。服务器端验证步骤见第 9 节。
+数据基线更新到 2026-07-24 的 v0.23.0 汇总、[`run_00`](../log/perf/run_00/RESULT.md)
+和 [`run_01`](../log/perf/run_01/RESULT.md) 请求级 phase 数据；上游源码基线
+为本地只读 checkout：vLLM `v0.23.0`（`0fc695f`）与 vLLM-Ascend
+`v0.23.0rc1`（`f4a08bd`）。当前环境没有目标模型和推理设备，因此结论
+分为“实测”“源码确定”“假设”。服务器端验证步骤见第 9 节。
 
 ## 2. 结论摘要
 
-1. **最新 Think Budget 仍未达到时延盈亏平衡。** 16 个样本平均只减少 278.31 个可见 token（6.35%），平均时延却增加 30.25 秒（42.63%）。以 `baseline 总时延 / baseline 可见 token` 得到的 16.19 ms/token 作为偏乐观的 TPOT 上界，278 token 最多只值约 4.51 秒；当前控制器额外成本估计在 30.25–34.75 秒/请求之间。
-2. **最贵的“置信度计算”不是 Python 中求几何平均，而是为求置信度额外生成一条 trial answer。** 若执行 `k` 次校验，常见路径有 `2k+2` 次独立 `generate()`。这些隐藏 token 不进入客户端 completion-token 统计。
-3. **历史 Think Budget 的风险比简化版 DEER 更大，但裁决后已增加硬边界。** run_00 对应实现会让任务预算把单次 probe 放大到 2000–4000 token；当前 adapter 已固定为最多 50 token，并把 `max_internal_calls` 默认设为 20。试答 token 仍不进入 OpenAI usage，因此必须继续使用隐藏 phase 账本验证总工作量。
-4. **先减少 probe 次数和 probe token，再优化 KV。** `mtp_off.txt` 的一个样本中，10 段思考与 9 个置信度分支的重复 prefill 合计 7.79 秒，只占 202.50 秒 E2E 的 3.85%。这证明重复 prefill 确实存在，但在该样本中不是最大项。
-5. **“新 request_id 导致 KV 必然清零”和“一个外部请求同时占 N 个 scheduler slot”都不成立。** 状态机顺序等待每个 phase；开启 Automatic Prefix Caching 时，新请求可按内容复用完整 prefix block。真正应测的是每个子请求的 `num_cached_tokens` 和 prefill 时间。
-6. **run_00 已直接确认隐藏 probe 是主项。** 63 次 probe 生成 74871 个隐藏 token，wall/decode 分别占客户端 E2E 的 64.85%/62.90%；客户端 E2E 与 hidden token 的请求级相关系数为 0.933。已记录 controller CPU 只有 22.2 ms/请求。
-7. **run_00 的死 probe 已由新状态顺序消除，路由异常仍需独立处理。** 历史第四轮 15 次 probe 无论接受与否都进入最终回答，却消耗 433.54 秒；当前状态机在最后一次失败 probe 后只完成 stride 再 final。16/16 个长故障诊断/规划 prompt 被选项正则误判为 classification 的问题仍需单独回归，不能与本轮状态重构混为同一变量。
+1. **run_01 平均值已略优于 vanilla，但尾延迟仍退化。** 16 请求平均
+   `67.9792 s`，比 vanilla 低 `2.76%`；中位数低 `4.65%`，P95 却高
+   `12.38%`。可见 token 少 `44.63%`，说明 token 收益仍被多阶段执行成本
+   大量抵消。
+2. **固定 50-token probe 已解决 run_00 的主要故障。** hidden probe 从
+   74871 降至 2401 token，probe wall 从 1922.17 降至 107.38 秒；run_01
+   总 E2E 相比 run_00 降 `63.31%`，15/16 个 paired 请求更快。
+3. **当前主成本已迁移到可见思考。** initial + iterative thinking wall 为
+   `832.24 s`，占 E2E `76.52%`；固定 `1024 + N×512` 的预算是下一轮
+   第一优化变量，不能继续沿用“优先缩短 probe”的旧结论。
+4. **短 probe 当前有净收益。** 2401 个 hidden token 使可见思考相对全部
+   走满 3072 token 少 14329 token；直接取消 probe 反而可能增加总模型工作。
+5. **阈值存在可测空间，但必须绑定质量。** 对已记录轨迹静态回放，
+   `prob_th=0.88/0.875` 分别可少走 125.77/131.34 秒已观测 phase wall；
+   较早 final 的真实时延和语义质量尚未测量。
+6. **工程优化的上界已经较小。** prefill 占 E2E `9.32%`，排除首次
+   initial prefill 后的绝对上界为 `7.71%`；queue、decision、phase residual
+   和客户端 gap 均非主项。
+7. **质量只完成结构检查。** run_01 的 16/16 个最终答案可解析为目标 JSON
+   且 final 全部自然 stop；语义正确率与非劣界仍未采集，不能据此上线更激进
+   的阈值或预算。
 
 ## 3. 成本模型
 
@@ -64,23 +82,24 @@ $$
 
 最新同日汇总来自 [`docs/log/test_results/_SUMMARY.csv`](../log/test_results/_SUMMARY.csv)：
 
-| 指标 | Vanilla (2026-07-21) | Think Budget (2026-07-21) | 差值 |
+| 指标 | Vanilla | run_01 | 差值 |
 |---|---:|---:|---:|
 | 样本数 | 16 | 16 | — |
-| 平均时延 | 70.9483 s | 101.1941 s | **+30.2458 s / +42.63%** |
-| 时延中位数 | 65.7790 s | 105.8646 s | **+40.0856 s / +60.94%** |
-| 时延 P95 | 96.8884 s | 125.5645 s | **+28.6761 s / +29.60%** |
-| 平均可见 token | 4381.00 | 4102.69 | **-278.31 / -6.35%** |
-| 总可见 token | 70096 | 65643 | **-4453** |
+| 平均时延 | 69.9077 s | **67.9792 s** | **-1.9285 s / -2.76%** |
+| 时延中位数 | 69.9773 s | **66.7248 s** | **-3.2525 s / -4.65%** |
+| 时延 P95 | **84.0568 s** | 94.4605 s | **+10.4037 s / +12.38%** |
+| 平均可见 token | 4658.38 | **2579.25** | **-2079.13 / -44.63%** |
+| 总可见 token | 74534 | **41268** | **-33266** |
 
-`1135.1728 s / 70096 token = 16.1946 ms/token` 包含 TTFT/prefill/固定开销，因此只能作为 TPOT 的偏乐观上界，而不是精确 TPOT。即便使用这个上界：
+**聚合实测：** run_01 已跨过平均时延盈亏平衡，但 44.63% 的可见 token
+下降只转化为 2.76% 的平均时延下降，而且 P95 仍退化。这比单纯“是否比
+vanilla 快”更能说明后续目标：减少阶段化思考 decode、改善尾部接受轮次，
+并量化多 phase 对 batching/TPOT 的损失。
 
-- 每请求 278.31 token 的最大收益约 `4.507 s`；
-- 控制器额外成本约为 `30.246 + [0, 4.507] = 30.25–34.75 s/请求`；
-- 若额外成本不变，至少要节省约 1868–2146 token/请求才可能盈亏平衡，是当前节省量的 6.7–7.7 倍；
-- 若保持当前 278-token 节省量，则额外成本必须压到 4.51 秒以下，真实目标还应更低。
-
-**证据边界：** `_SUMMARY.csv` 只有聚合行，未保留每个样本的 ID/时延/token，因此上述是同日同样本数的聚合对照，尚不能计算严格的逐请求 paired delta。下一次实验必须同时保存 client 结果明细与稳定 sample ID。
+**证据边界：** 当前保存了 run_01 和 run_00 的请求明细，可按 QA_ID 配对；
+工作区没有 vanilla 明细与 phase 数据，因此 run_01 对 vanilla 仍只能做聚合
+对照。sampling params、seed、warmup 和 cache 初态也未采集，不能把 2.76%
+视为严格代码因果。
 
 ### 3.3 run_00 请求级归因
 
@@ -96,6 +115,27 @@ $$
 **实测：** phase wall 合计 2962.16 秒，客户端 E2E 合计 2964.20 秒，只差 2.04 秒。总模型生成量 114337 token，其中隐藏 probe 占 65.48%；同日 vanilla 可见生成量为 70096，因此 run_00 虽减少可见输出，真实生成量仍多 44241 token。
 
 **采集边界：** before/after Prometheus 快照的进程启动时间不同，不能直接相减；after 的 158 call、591201 prompt、181248 cache hit、114337 generated 与 phase JSONL 完全一致，只作为绝对计数交叉校验。质量分和服务器源码 SHA 未采集。
+
+### 3.4 run_01 请求级归因
+
+[`run_01/RESULT.md`](../log/perf/run_01/RESULT.md) 保存完整计算和实验方案。
+关键账本如下：
+
+| Phase | 调用数 | wall | 客户端 E2E 占比 | prefill | decode | 生成 token |
+|---|---:|---:|---:|---:|---:|---:|
+| initial_think | 16 | 355.32 s | 32.67% | 17.50 s | 332.25 s | 16384 |
+| iterative_think | 37 | 476.93 s | **43.85%** | 27.50 s | 446.26 s | 18439 |
+| confidence_probe | 49 | 107.38 s | 9.87% | 44.25 s | 58.11 s | 2401 |
+| final_answer | 16 | 145.97 s | 13.42% | 12.14 s | 132.63 s | 6450 |
+
+**实测：** phase 解释客户端 E2E 的 99.8177%；同进程 metrics 的 call、
+prompt 和 generated counter delta 与 phase 完全一致。run_01 相比 run_00
+少生成 70663 个 engine token，但 visible thinking 增加 22545，成本中心已
+由 hidden probe 转到固定思考预算。
+
+**实测：** 12/16 个请求在 1–4 轮 probe 内接受，4 个走满；50-token probe
+成本为 2401 hidden token，却相对“所有请求都走满 3072 thinking token”
+少生成 14329 visible token，当前不应直接取消。
 
 ## 4. 当前执行路径与成本放大器
 
@@ -155,102 +195,54 @@ confidence probe 由 `PerformancePolicy` 固定为最多 50 token，并通过
 
 ## 5. 优化优先级
 
-### P0：先改变模型调用账本
+### P0：语义质量门与严格 Vanilla 配对
 
-#### 5.1 probe 前的便宜门控
+run_01 只证明 16/16 个最终答案 JSON 结构完整，尚未证明诊断规划语义非劣。
+在继续减少 thinking 前，必须保存 vanilla 明细和同口径 phase，固定
+sampling params、seed、到达顺序、warmup、cache 初态，并预先声明质量非劣界。
 
-把以下检查放在创建 trial-answer 请求之前：
+### P1：先校准置信度阈值
 
-- 达到思考硬预算、context 上限或 `max_internal_calls`：保留 final，不再新增
-  probe；
-- 达到 `num_thinking` 后：最后失败 probe 只追加 stride，再进入 final；
-- safety gate 触发：进入新鲜 final，不选择 trial candidate；
-- `min_think_budget` 前若模型尝试输出 `</think>`：继续思考，不发起 probe。
+保持 `check=1024 / stride=512 / rounds=4 / probe=50`，做单变量
+`0.90 → 0.88 → 0.875`；`0.85` 只作为探索下界。run_01 轨迹静态回放：
 
-当前实现仍可能在模型没有尝试早停时，于首段小于 `min_think_budget` 的情况
-先做一次 probe。是否应无条件把 minimum 检查前移属于后续算法改动，需要用
-接受轮次、质量和时延做配对实验。
+| prob_th | 改变请求 | 静态少走 phase wall | 少生成 visible think |
+|---:|---:|---:|---:|
+| 0.88 | 4 | 125.77 s | 4096 |
+| 0.875 | 5 | 131.34 s | 4280 |
+| 0.85 | 11 | 393.90 s | 13319 |
 
-#### 5.2 固定 50-token trial
+这些不是已测收益；阈值改变 final prompt 和答案，必须按相同 QA_ID 做质量/E2E
+配对。
 
-裁决后 `PerformancePolicy.trial_answer_length=50`，任务类型和历史预算不能覆盖。
-collector 不要求 trial 形成完整 JSON/答案；它只为当前轮置信度提供证据，接受
-后仍重新生成完整 final。
+### P1：再缩减可见思考预算
 
-为避免 [`mtp_on.txt`](../log/API_simulations/mtp_on.txt) 中的大段重复 `!`，probe 还应有明确 stop 条件和重复输出保护。目标 vLLM v0.23.0 提供 `repetition_detection` sampling 参数，可在目标模型上单独验证其质量影响。
+分别测试 `check_length=512`、`think_stride=256`、`num_thinking=3`，不要一开始
+做全因子。run_01 中 8 个请求到达 round 4；若轮数改为 3，已观测路径会少走
+8 次 round-4 probe 和 4 次 terminal stride，wall 合计 57.69 秒。首段和
+stride 减半有更大 token 上界，但也更可能改变质量与接受轮次。
 
-#### 5.3 降低校验频率
+`fixed_num_thinking=4` 全失败时的最大思考量实际是
+`1024 + 4×512 = 3072`；`fixed_budget_tokens=10000` 不绑定，只是硬上限。
 
-当前策略是每个 stride 后都 probe。替代方案按风险从低到高排列：
+### P2：保持语义的 APC / resumable
 
-1. 最低思考长度前不 probe；之后用指数/递增间隔，例如 128、256、512、1024。
-2. 按历史 task type 学习首个 probe 位置与最多 probe 次数。
-3. 在线维护 `probe_cost_ms`、早停命中率和预计剩余 token，只有预期净收益为正时 probe。
-4. 若上游预算预测置信度高，直接走一次原生生成并使用 vLLM `thinking_token_budget`，仅把少量不确定请求送入多轮控制器。
+run_01 prefill 合计 101.40 秒，占 E2E 9.32%；排除首次 initial prefill 后，
+所有后续 prefill 的绝对上界为 83.90 秒 / 7.71%。iterative/probe/final 的
+phase cache 比例已经达到 53.28% / 42.35% / 57.12%，且 cached token 随
+轮次出现 1536、3072、4608，不再是 run_00 的固定 1536。
 
-`deer_confidence.txt` 的前三次置信度都未过阈值，是“推迟首个 probe”可能获益的直接样本，但需要更多请求验证。
+先校正 phase 与 Prometheus cached token 相差 1536 的口径，再做并发 1/4
+对照。只有增长前缀仍有稳定缺口时，才在 DEER 验证“主思考链 resumable、
+probe 独立分支”的方案；不能改变 token 序列、采样状态、取消语义或原生
+priority/LoRA/trace/DP 上下文。
 
-#### 5.4 不复用短 trial candidate
+### P3：暂缓普通 Python 与调度微优化
 
-当前 policy 明确丢弃最多 50-token 的 trial，并从单调主思考 prompt 新鲜生成
-final。这避免把截断或结构不完整的隐藏分支直接交付给用户，但保留一次 final
-prefill + decode 成本。
-
-trial 的流式聚合已经修复。若未来实验候选续写或复用，必须新建 policy
-version，并验证 child sequence 续写、LoRA/DP/parser 上下文、usage 和格式
-完整性；本轮不实现。
-
-#### 5.5 建立真实成本预算与真 bypass
-
-新增 `BudgetLedger`，统一扣减：
-
-- visible thought token；
-- hidden probe token；
-- 每个 phase 的 queue/prefill/decode 时间；
-- generate 调用次数；
-- controller wall time。
-
-请求未设置 `enable_think_budget=true`，或服务端 `BUDGET_ENABLED=false` 时，
-必须在 serving 入口直接进入原生单次生成路径。旧 `budget_disabled` 字段已
-退出请求契约，不能只关闭部分算法后继续状态机。
-
-### P1：降低调度与 KV 成本
-
-#### 5.6 透传完整原生调用上下文并固定 DP 亲和性
-
-v0.23.0 patch 现已在提取 `data_parallel_rank` 后劫持请求，并把以下上下文写入仅存在于服务进程的 route identity；各 child `generate()` 再统一透传：
-
-```text
-priority, lora_request, trace_headers, data_parallel_rank,
-prompt_text, reasoning_ended, reasoning_parser_kwargs
-```
-
-同一个 parent 的所有 phase 固定在同一 DP rank，才能稳定利用该 rank 的 prefix cache，也避免不同 phase 的优先级被改变。源码补丁已通过本地 vLLM `v0.23.0` 的 `git apply --check`；LoRA/DP/trace/structured-output 的运行时一致性仍须服务器测试。
-
-#### 5.7 先测 APC，再决定是否做 resumable/streaming input
-
-应记录每个子请求的 `RequestOutput.num_cached_tokens` 与 `request_prefill_kv_computed_tokens`。如果 probe/continue phase 的缓存命中已经很高，重构为 resumable 的收益可能小于复杂度。
-
-vLLM v0.23.0 的 streaming input 能把同一 request 置于 `WAITING_FOR_STREAMING_REQ` 后续写并保留 session，但当前实现明确不支持 `FINAL_ONLY` 和 stop string。更重要的是，confidence probe 是从主思考链分叉、失败后需丢弃的分支；单一 resumable session 不能直接替代 KV fork。因此可行的研究方向是：
-
-- 主思考链用 resumable session；
-- probe 仍是独立分支并依赖 APC；
-- 或改用不需要生成分支的 readiness/confidence 信号。
-
-不要把 streaming input 当作可直接替换现有 `generate()` 的低风险修复。
-
-### P2：Python 与对象管理微优化
-
-这些改动低风险，但要在 P0 后评估。标为“已实现”的项目尚不能据此宣称 NPU 端 E2E 已改善：
-
-- DEER 只需要 sampled-token logprob；vLLM 在 `logprobs=0` 时仍返回 sampled token，可替代 `logprobs=1`。长 probe 可评估 `flat_logprobs=True` 以降低 GC。
-- 用 `math.exp(logprob)` 替代逐 token `torch.exp(torch.tensor(...)).item()`，并用 `next(iter(values))` 避免临时 list。
-- **已实现：** trial prompt 使用浅拷贝 + 新 token list，避免 `copy.deepcopy(engine_prompt)`；多模态等其他 EngineInput 对象保持共享只读引用。
-- **已实现：** 缓存静态 prompt suffix 的 token，并维护增长中的 prompt text，不再为每次置信度判定解码完整 prompt。
-- **已实现：** 只浅拷贝 `RequestOutput → CompletionOutput` 两层对象来补发 `</think>`，不复制 prompt ids/logprobs/metrics。
-- **已实现：** 默认关闭每个 state 的 enter/complete flush；每个模型 phase 只输出一条结构化 `TB_PHASE` JSON。
-- 将 producer/queue/orchestrator 合并为单一 async generator 可减少上下文切换和无界队列风险，但预期收益应由 CPU profile 证明。
-- 初始对齐公式当前在 prompt 已是 128 倍数时仍额外加 128 token；若对齐确有必要，应验证是否改为 `(-prompt_len) % 128`，否则会无意增加 1–128 个思考 token。
+queue、decision、phase residual 加客户端 gap 的量级不足以解释当前时延。
+除非 CPU profiler 给出新证据，不优先改 JSON 序列化、对象复制、置信度
+arithmetic、producer queue 或 `max_num_seqs`。50-token probe 已产生净 token
+收益，也不应作为当前第一缩减变量。
 
 ## 6. 建议的控制器接口
 
@@ -366,7 +358,12 @@ docs/log/perf/<run_id>/
 
 `manifest.json` 至少记录：commit、dirty diff hash、vLLM/vLLM-Ascend/torch/torch-npu/CANN 版本、模型与 tokenizer revision、完整启动命令、设备、TP/DP、`max_num_seqs`、prefix cache、MTP 参数、数据集 hash、并发和随机种子。
 
-从 [`run_00/manifest.template.json`](../log/perf/run_00/manifest.template.json) 复制后填写。模板保留了 run_00 的版本基线和缺口状态；`installed_version`、实际 checkout SHA、dirty 状态、模型、设备和启动参数仍必须按目标服务器实填，不能只相信模板值。
+从 [`manifest.template.json`](../log/perf/manifest.template.json) 复制到
+`docs/log/perf/<run_id>/manifest.json` 后填写。模板保留当前优化阶段固定的
+vLLM、vLLM-Ascend、CANN、运行时、硬件、模型路径和服务启动基线；每轮仍须
+确认 TB commit/dirty、三个仓库的 dirty 状态、控制参数、采样参数和 metrics
+进程连续性。任何环境变化必须写入 `baseline_overrides`，不能只因为 package
+version 相同就认定实验环境一致。
 
 `controller_phases.jsonl` 每行一个 phase，推荐格式：
 
@@ -386,8 +383,8 @@ docs/log/perf/<run_id>/
 python -m vllm.collect_env > collect_env.txt
 python -m pip show vllm vllm-ascend torch torch-npu > packages.txt
 npu-smi info > npu_smi.txt
-curl -s http://127.0.0.1:8000/version > version.json
-curl -s http://127.0.0.1:8000/metrics > metrics.before.prom
+curl -s http://127.0.0.1:41016/version > version.json
+curl -s http://127.0.0.1:41016/metrics > metrics.before.prom
 ```
 
 版本字符串不足以证明服务器源码身份；每轮还必须采集实际 editable checkout、TB 源码和配置 hash：
@@ -405,9 +402,8 @@ sha256sum \
   "$TB_REPO/think_budget_vllm_adapter/config/budget_config.yaml" \
   run_server_qwen36.sh > config_hashes.txt
 
-find /usr/local/Ascend/ascend-toolkit/latest -maxdepth 3 -type f \
-  \( -name 'version.cfg' -o -name '*install.info' -o -name 'version.info' \) \
-  -print -exec sed -n '1,80p' {} \; > cann_version.txt
+cat /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/ascend_toolkit_install.info \
+  > docs/log/perf/cann.txt
 ```
 
 模型不是固定 revision checkout 时，至少记录 `readlink -f` 后的真实路径及 `config.json`、tokenizer 配置文件 hash。测试后先核对两份 metrics 的 `process_start_time_seconds`；不同则 counter delta 整体无效，不能选择性使用其中某些差值。
@@ -429,7 +425,14 @@ python tools/extract_tb_phase_metrics.py \
 
 脚本生成 `controller_phases.jsonl`、`requests.jsonl` 和 `phase_summary.csv`；其中 `requests.jsonl.accounted_phase_wall_ms` 是顺序 phase 的计量和，不等于客户端 HTTP E2E，必须按 `parent_request_id` 与客户端结果配对。
 
-3. 请求结束后保存 `/metrics`。重点指标：
+3. 请求结束后保存同一端口的 `/metrics`：
+
+```bash
+curl -s http://127.0.0.1:41016/metrics > metrics.after.prom
+```
+
+随后先比较前后快照的 `process_start_time_seconds`，再计算 counter delta。重点
+指标：
 
 ```text
 vllm:e2e_request_latency_seconds
@@ -526,50 +529,57 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 
 这些属于**源码确定/本地测试**，不是目标 NPU 的性能实测。尤其结构化 phase 日志本身仍有一次 JSON 序列化与 flush 成本；它替代了更多旧日志，但必须在服务器用 A/B 量化。
 
-### 11.2 run_00 已确认的假设
+### 11.2 run_01 已确认的结论
 
-- **H1 已支持：** probe decode 占客户端 E2E 62.90%，不是原先设定的最低 20% 边界问题，而是绝对主项。
-- **H2 已否定：** 整体 APC 命中率只有 30.66%；iterative/probe 分别 32.78%/33.03%，缓存 token 只出现 0 或 1536，没有随 parent 轮次增长。
-- **H3 得到数量级支持：** 已记录 controller CPU 平均 22.2 ms/请求，phase 与客户端未解释差值平均 127.6 ms/请求，普通 Python 微优化远小于平均 120.1 秒的 probe wall。
-- **新增发现：** 63 次 confidence score 全部低于 0.90；第四轮 15 次 probe 不改变后续控制流，却占总 E2E 14.63%。
+- **实测：** run_01 相比 run_00 总 E2E 降 63.31%，15/16 个 paired
+  QA_ID 更快；固定 50-token probe 已将 hidden probe token 降 96.79%。
+- **实测：** thinking wall 占 E2E 76.52%，probe wall 只占 9.87%；优化
+  第一变量必须从 probe 长度转向 threshold 与 visible budget。
+- **实测：** 50-token probe 以 2401 hidden token 换回 14329 visible
+  thinking token 的提前退出空间，当前有正的模型工作量收益。
+- **实测：** APC 已出现随轮次增长的 1536/3072/4608 cached token；
+  prefill 的总上界只有 9.32%，不是第一收益项。
+- **实测：** 16/16 final JSON 结构完整且自然 stop；语义质量未评分。
+- **采集缺口：** phase 与 Prometheus cached token 相差 1536，运行时配置
+  hash、sampling params、seed、warmup/cache 初态和 vanilla 明细仍缺失。
 
 ### 11.3 下一轮服务器测试
 
-使用完全相同的 16 个 sample ID，按交错顺序运行 `vanilla → 当前生产 DTB → 本轮 DTB`，至少 3 个随机化重复；每组都重新执行同样的 warmup/cache policy。比较：
+使用相同 16 个 QA_ID，按随机交错顺序运行，至少 3 个重复。第一批只做阈值
+单变量：
 
-1. paired HTTP E2E、TTFT、可见 token 与质量分；
-2. `hidden_probe_tokens`、probe rounds、generate calls；
-3. phase wall/queue/prefill/decode 与 `cached_prompt_tokens / prompt_tokens`；
-4. `sum(phase.wall_ms)` 与客户端 E2E 的未解释差值；
-5. 当前生产 DTB 与裁决后重构版的输出、accept round 与 quality；算法差异
-   必须按 fixed / task+difficulty / history 分支分层解释，不能再把全部差值
-   归因为工程微优化。
+```text
+T0 = prob_th 0.90
+T1 = prob_th 0.88
+T2 = prob_th 0.875
+T3 = prob_th 0.85（探索）
+```
 
-继续验证：
+第二批以 T0 为控制，分别测试：
 
-- 首段后立即 probe、失败后追加 stride、最后失败 probe 后不再发起额外
-  probe 的新轨迹，是否减少无效调用且保持质量。
-- 并发 1、单样本时 cached token 是否仍固定为 1536；若仍固定，查 child token/block hash/cache salt/生成 block 保留，若随轮次增长则查并发容量淘汰。
-- 记录 `confidence_method`、Value-Min raw、平均 confidence、pair 完整性和
-  fail-open 次数，解释接受轮次变化。
+```text
+B1 = check_length 512
+B2 = think_stride 256
+B3 = num_thinking 3
+```
 
-### 11.4 固定 50-token probe 验证
+每个变体报告 paired E2E 平均/P50/P95、accept round、visible/hidden/final
+token、phase wall/queue/prefill/decode、JSON 结构分和语义质量分。单变量通过
+非劣界后再组合，不允许先组合阈值和预算导致无法归因。
 
-裁决后 `trial_answer_length=50` 是 `PerformancePolicy` 不变量，不再由
-`RUNTIME` 或 `TASK_TYPES.*.check_answer_len` 覆盖。本轮只比较当前生产
-probe 与固定 50-token probe；若未来重新做长度消融，必须先形成新的算法
-裁决和 policy version，不能临时修改 YAML。
+另做两个工程诊断：
 
-每个变体报告：
+1. 为 vanilla 保存同口径客户端明细与 phase/metrics，解释“少 44.63%
+   可见 token 但平均仅快 2.76%”的 batching/TPOT 差异；
+2. 并发 1/4 对照 APC，校正 cached-token 口径，再决定是否研究 resumable
+   main chain。
 
-- paired E2E 平均/P50/P95；
-- hidden probe token、probe 命中轮次和最终可见 token；
-- 任务正确率、JSON/工具调用完整率、规划完整性及预先声明的非劣界；
-- 截断/length stop 比例与 value-min 分数分布。
+### 11.4 继续固定 50-token probe
 
-50-token trial 无论是否形成完整答案都不会直接复用；接受后必须从主思考
-prompt 新鲜生成 final。只有质量达到非劣界且 paired 净收益为正，当前 policy
-才能进入生产。
+`trial_answer_length=50` 继续作为当前 `PerformancePolicy` 不变量。48/49 个
+run_01 probe 以 length 结束，不能直接复用为平均 403-token 的 final。若未来
+重新做 probe 长度消融，必须建立新 policy version，并与 threshold/budget
+实验分开。
 
 ## 12. 外部版本依据
 
@@ -584,6 +594,8 @@ prompt 新鲜生成 final。只有质量达到非劣界且 paired 净收益为�
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-07-24 | 纳入 run_01 的 16 请求客户端明细、134 条 phase 和同进程 metrics；确认平均时延略优于 vanilla、P95 仍退化，成本中心由长 probe 转为可见思考；新增阈值/预算/APC 分级方案 | 重构后的 hidden probe 已降 96.79%，旧“先缩 probe”优先级不再适用 |
+| 2026-07-24 | 将 manifest 模板移到 `docs/log/perf/` 作为优化阶段公共基线，固化 vLLM/vLLM-Ascend commit、CANN 9.0.1 和既有运行环境；补充逐轮 override/dirty/配置/完整性要求 | 避免每轮重复填固定环境，同时防止把固定版本误当成已确认的运行时源码与配置身份 |
 | 2026-07-23 | 同步裁决后 adapter 重构：独立 AlgorithmConfig、三状态、固定 50-token 完整 trial collector、fail-open 和在线历史闭环；更新服务器实验口径 | 实现、默认参数和 probe 策略已变化，旧四状态/可配置 probe 消融描述不再适用 |
 | 2026-07-21 | 纳入 run_00 请求级 phase、环境和客户端明细；确认 probe decode 主导、APC 增长前缀未命中、最后一轮死 probe 与 classification 误路由；补齐 manifest/RESULT | 用 158 个 engine call 的实测账本替代历史聚合假设，并明确下一轮的首改与采集缺口 |
 | 2026-07-21 | 纳入 v0.23.0 最新 DTB 汇总；落地 phase ledger、浅拷贝/日志优化、v0.23.0 调用上下文透传、manifest 模板与日志提取工具 | 先获得隐藏 probe 与 child phase 的请求级证据，再对 2000–4000 token probe 做质量约束消融 |

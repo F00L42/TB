@@ -1,142 +1,288 @@
 {
-  "schema": 1,
+  "schema": 2,
   "template": {
     "copy_as": "docs/log/perf/<run_id>/manifest.json",
-    "version_baseline_run": "run_00",
-    "version_baseline_status": "PACKAGE_VERSIONS_CAPTURED_SOURCE_COMMITS_UNVERIFIED",
-    "comparison_rule": "后续轮次必须同时比较安装包版本和实际 server checkout commit；只匹配版本字符串不能标记为完全一致"
-  },
-  "version_baseline": {
-    "vllm": {
-      "required_tag": "v0.23.0",
-      "reference_commit_sha": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
-      "run_00_package_version": "0.23.0+empty",
-      "run_00_api_version": "0.23.0",
-      "run_00_install_mode": "editable",
-      "run_00_editable_path": "/vllm-workspace/vllm",
-      "run_00_source_commit_sha": null,
-      "status": "VERSION_MATCH_SOURCE_COMMIT_NOT_COLLECTED"
-    },
-    "vllm_ascend": {
-      "required_tag": "v0.23.0rc1",
-      "reference_commit_sha": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db",
-      "run_00_package_version": "0.23.0rc1",
-      "run_00_install_mode": "editable",
-      "run_00_editable_path": "/vllm-workspace/vllm-ascend",
-      "run_00_source_commit_sha": null,
-      "status": "VERSION_MATCH_SOURCE_COMMIT_NOT_COLLECTED"
-    },
-    "runtime": {
-      "python": "3.12.13",
-      "pytorch": "2.10.0+cpu",
-      "torch_npu": "2.10.0.post2",
-      "transformers": "5.5.4",
-      "triton": "3.5.0",
-      "triton_ascend": "3.2.1",
-      "os": "openEuler 24.03 (LTS-SP3) aarch64",
-      "npu_smi": "25.0.rc1",
-      "cann": null,
-      "status": "CANN_VERSION_NOT_COLLECTED"
-    },
-    "hardware": {
-      "device_model": "Ascend 910B4",
-      "run_00_selected_devices": [0, 1, 2, 3],
-      "host_visible_device_count": 8
-    },
-    "model": {
-      "name_or_path": "/opt/foundation_model/Qwen3.6-27B",
-      "served_model_name": "Qwen3.6-27B",
-      "model_revision": null,
-      "tokenizer_revision": null,
-      "status": "MODEL_AND_TOKENIZER_REVISIONS_NOT_COLLECTED"
+    "baseline_id": "qwen36-27b-vllm-0.23.0-ascend-0.23.0rc1-cann-9.0.1",
+    "baseline_scope": "当前 Think Budget 性能分析与优化阶段；除非某轮 manifest 在 baseline_overrides 中明确声明，否则复用本模板的环境、模型和服务启动配置",
+    "reuse_rule": "复制后必须填写所有 PER_RUN_REQUIRED 字段，并逐轮确认 TB commit/dirty、上游 dirty、请求控制参数、工作负载和 metrics 进程连续性；固定版本不等于允许省略变更声明",
+    "fixed_sections": [
+      "upstream 中除 dirty 外的字段",
+      "runtime",
+      "hardware",
+      "model.name_or_path、model.tokenizer_name_or_path、model.served_model_name",
+      "server 中除 controller_config 外的启动配置"
+    ],
+    "per_run_required": [
+      "run_id",
+      "created_at",
+      "code.commit_sha",
+      "code.dirty",
+      "upstream.vllm.dirty",
+      "upstream.vllm_ascend.dirty",
+      "server.controller_config",
+      "controller.request_overrides",
+      "workload.client_results",
+      "workload.client_results_sha256",
+      "workload.sampling_params",
+      "workload.random_seed",
+      "workload.prefix_cache_state",
+      "integrity"
+    ],
+    "fixed_baseline_evidence": {
+      "operator_confirmed_at": "2026-07-24",
+      "environment_artifacts": {
+        "collect_env": {
+          "path": "docs/log/perf/run_00/collect_env.txt",
+          "sha256": "79376f50d5e769ec070d5df8bc9c34451d204c2635e316bd2aed56d5f5b1b0ab"
+        },
+        "packages": {
+          "path": "docs/log/perf/run_00/packages.txt",
+          "sha256": "206ffa5583add09f7045516945e8263fd3d175159343224f6006c2eeaec8fca6"
+        },
+        "npu_smi": {
+          "path": "docs/log/perf/run_00/npu_smi.txt",
+          "sha256": "ea0846e0614edd44000ba0fad92ca80ccec0571933d2c0bac26b347b321cfd7e"
+        },
+        "api_version": {
+          "path": "docs/log/perf/run_00/version.json",
+          "sha256": "075e267960c71451371b4267a2b98efd65f045237544f950a51ceef72ad63700"
+        },
+        "cann": {
+          "path": "docs/log/perf/cann.txt",
+          "sha256": "fc113dfb80c21915336894674561adbc7783bc9d2c0d9a63afb81e219a4e28b7"
+        },
+        "server_script": {
+          "path": "docs/log/perf/run_00/run_server_qwen36.sh",
+          "sha256": "c5cc5e8b31537be9e547d966d350ed07683febdd077241eaa96621ebd2139e42"
+        }
+      },
+      "note": "操作者确认：如无单独声明，CANN、vLLM/vLLM-Ascend commit SHA 及其他环境信息在本优化阶段不变"
     }
   },
   "run_id": null,
   "created_at": null,
-  "created_at_timezone": null,
-  "variant": null,
+  "created_at_timezone": "Asia/Shanghai",
+  "variant": "think_budget",
+  "baseline_overrides": [],
+  "collection_procedure": {
+    "working_directory": "repository root",
+    "metrics_before": "curl -s http://127.0.0.1:41016/metrics > docs/log/perf/<run_id>/metrics.before.prom",
+    "workload": "发送端到端请求",
+    "metrics_after": "curl -s http://127.0.0.1:41016/metrics > docs/log/perf/<run_id>/metrics.after.prom",
+    "cann": "cat /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/ascend_toolkit_install.info > docs/log/perf/cann.txt",
+    "extract": "python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>/server.log docs/log/perf/<run_id>/"
+  },
   "code": {
     "repository": "TB",
-    "server_path": null,
+    "server_path": "/opt/p00906181/260707/TB",
     "commit_sha": null,
     "dirty": null,
     "dirty_diff_sha256": null,
-    "status": "REQUIRED"
+    "status": "PER_RUN_REQUIRED"
   },
   "upstream": {
     "vllm": {
       "reference_path": "third_party/vllm",
       "remote_url": "git@github.com:vllm-project/vllm.git",
-      "required_tag": "v0.23.0",
-      "reference_commit_sha": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
-      "server_checkout_path": null,
-      "source_commit_sha": null,
+      "server_checkout_path": "/vllm-workspace/vllm",
+      "tag": "v0.23.0",
+      "source_commit_sha": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
+      "git_refs": [
+        "HEAD",
+        "tag: v0.23.0"
+      ],
+      "repository_state": "grafted",
       "dirty": null,
-      "installed_version": null,
-      "api_version": null,
-      "comparison_status": null
+      "installed_version": "0.23.0+empty",
+      "api_version": "0.23.0",
+      "install_mode": "editable",
+      "baseline_status": "EXACT_COMMIT_CONFIRMED_DIRTY_STATE_PER_RUN_REQUIRED"
     },
     "vllm_ascend": {
       "reference_path": "third_party/vllm-ascend",
       "remote_url": "git@github.com:vllm-project/vllm-ascend.git",
-      "required_tag": "v0.23.0rc1",
-      "reference_commit_sha": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db",
-      "server_checkout_path": null,
-      "source_commit_sha": null,
+      "server_checkout_path": "/vllm-workspace/vllm-ascend",
+      "tag": "v0.23.0rc1",
+      "source_commit_sha": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db",
+      "git_refs": [
+        "HEAD",
+        "tag: v0.23.0rc1",
+        "origin/releases/v0.23.0"
+      ],
       "dirty": null,
-      "installed_version": null,
-      "comparison_status": null
+      "installed_version": "0.23.0rc1",
+      "install_mode": "editable",
+      "baseline_status": "EXACT_COMMIT_CONFIRMED_DIRTY_STATE_PER_RUN_REQUIRED"
     }
   },
   "runtime": {
-    "python": null,
-    "pytorch": null,
-    "torch_npu": null,
-    "transformers": null,
-    "triton": null,
-    "triton_ascend": null,
-    "cann": null,
-    "npu_smi": null,
-    "os": null,
-    "container_image": null
+    "python": "3.12.13",
+    "pytorch": "2.10.0+cpu",
+    "torch_npu": "2.10.0.post2",
+    "transformers": "5.5.4",
+    "triton": "3.5.0",
+    "triton_ascend": "3.2.1",
+    "cann": {
+      "package_name": "Ascend-cann-toolkit",
+      "version": "9.0.1",
+      "inner_version": "V100R001C10SPC002B220",
+      "compatible_versions": [
+        "V100R001C21",
+        "V100R001C22",
+        "V100R001C23",
+        "V100R001C25",
+        "V100R001C10"
+      ],
+      "arch": "aarch64",
+      "os": "linux",
+      "path": "/usr/local/Ascend/cann-9.0.1",
+      "artifact": "../cann.txt",
+      "artifact_sha256": "fc113dfb80c21915336894674561adbc7783bc9d2c0d9a63afb81e219a4e28b7"
+    },
+    "npu_smi": "25.0.rc1",
+    "os": "openEuler 24.03 (LTS-SP3) aarch64",
+    "kernel": "5.10.0-136.12.0.86.h2196.eulerosv2r12",
+    "container_image": null,
+    "baseline_status": "FIXED_UNLESS_DECLARED_OVERRIDE",
+    "missing_fields": [
+      "container_image"
+    ]
+  },
+  "hardware": {
+    "cpu": "Kunpeng-920",
+    "host_cpu_count": 256,
+    "device_model": "Ascend 910B4",
+    "selected_devices": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "host_visible_device_count": 8,
+    "selected_device_hbm_total_mb_each": 32768,
+    "baseline_status": "FIXED_UNLESS_DECLARED_OVERRIDE"
   },
   "model": {
-    "name_or_path": null,
+    "name_or_path": "/opt/foundation_model/Qwen3.6-27B",
     "revision": null,
-    "tokenizer_name_or_path": null,
+    "tokenizer_name_or_path": "/opt/foundation_model/Qwen3.6-27B",
     "tokenizer_revision": null,
-    "served_model_name": null
+    "served_model_name": "Qwen3.6-27B",
+    "baseline_status": "PATHS_FIXED_REVISIONS_NOT_COLLECTED"
   },
   "server": {
-    "script": null,
-    "script_sha256": null,
-    "command": null,
-    "argv": null,
-    "environment": null,
-    "devices": null,
-    "device_model": null,
-    "tensor_parallel_size": null,
-    "data_parallel_size": null,
-    "pipeline_parallel_size": null,
-    "max_model_len": null,
-    "max_num_seqs": null,
+    "script": "../run_00/run_server_qwen36.sh",
+    "script_sha256": "c5cc5e8b31537be9e547d966d350ed07683febdd077241eaa96621ebd2139e42",
+    "command": "python -m vllm.entrypoints.openai.api_server（完整参数见 server.script）",
+    "argv": [
+      "python",
+      "-m",
+      "vllm.entrypoints.openai.api_server",
+      "--model",
+      "/opt/foundation_model/Qwen3.6-27B",
+      "--served-model-name",
+      "Qwen3.6-27B",
+      "--max-model-len",
+      "32768",
+      "--max-num-seqs",
+      "8",
+      "--data-parallel-size",
+      "1",
+      "--tensor-parallel-size",
+      "4",
+      "--port",
+      "41016",
+      "--host",
+      "0.0.0.0",
+      "--block-size",
+      "128",
+      "--gpu-memory-utilization",
+      "0.95",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser",
+      "qwen3_coder",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--compilation-config",
+      "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}",
+      "--speculative_config",
+      "{\"method\":\"mtp\",\"num_speculative_tokens\":4}",
+      "--async-scheduling",
+      "--language-model-only"
+    ],
+    "environment": {
+      "ASCEND_RT_VISIBLE_DEVICES": "0,1,2,3",
+      "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
+      "VLLM_USE_V1": "1",
+      "PYTHONPATH_prefix": "/opt/p00906181/260707/TB"
+    },
+    "host": "0.0.0.0",
+    "port": 41016,
+    "devices": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "tensor_parallel_size": 4,
+    "data_parallel_size": 1,
+    "pipeline_parallel_size": 1,
+    "max_model_len": 32768,
+    "max_num_seqs": 8,
     "max_num_batched_tokens": null,
-    "block_size": null,
-    "enable_prefix_caching": null,
-    "enable_chunked_prefill": null,
-    "gpu_memory_utilization": null,
-    "async_scheduling": null,
-    "compilation_config": null,
-    "torch_compile_cache_cleared_before_start": null,
-    "mtp_config": null,
-    "budget_config_sha256": null,
+    "max_num_batched_tokens_status": "NOT_EXPLICIT_AND_EFFECTIVE_VALUE_NOT_COLLECTED",
+    "block_size": 128,
+    "enable_prefix_caching": true,
+    "enable_chunked_prefill": true,
+    "gpu_memory_utilization": 0.95,
+    "async_scheduling": true,
+    "language_model_only": true,
+    "enable_auto_tool_choice": true,
+    "tool_call_parser": "qwen3_coder",
+    "compilation_config": {
+      "cudagraph_mode": "FULL_DECODE_ONLY"
+    },
+    "torch_compile_cache_cleared_before_start": true,
+    "mtp_config": {
+      "method": "mtp",
+      "num_speculative_tokens": 4
+    },
+    "controller_config": {
+      "budget_config_path": "think_budget_vllm_adapter/config/budget_config.yaml",
+      "budget_config_sha256": null,
+      "unified_config_path": "think_budget_vllm_adapter/config/unified_config.py",
+      "unified_config_sha256": null,
+      "effective_enable_value_min_confidence": null,
+      "status": "PER_RUN_REQUIRED"
+    },
     "phase_metrics_enabled": true,
-    "verbose_stage_logging": false
+    "verbose_stage_logging": false,
+    "baseline_status": "FIXED_UNLESS_DECLARED_OVERRIDE"
+  },
+  "controller": {
+    "adapter": "think_budget_vllm_adapter",
+    "design_document": "docs/debug/think_budget_vllm_adapter_refactor_plan.md",
+    "policy_version": "think-budget-performance-v1",
+    "request_overrides": {
+      "enable_think_budget": null,
+      "fixed_prob_th": null,
+      "fixed_check_length": null,
+      "fixed_think_stride": null,
+      "fixed_num_thinking": null,
+      "fixed_min_think_tokens": null,
+      "fixed_budget_tokens": null
+    },
+    "status": "PER_RUN_REQUIRED"
   },
   "workload": {
     "dataset_path": null,
+    "dataset_label": null,
     "dataset_sha256": null,
+    "dataset_hash_method": "SHA256(QA_ID, question, reference answer sorted by QA_ID as UTF-8 TSV with trailing LF)",
+    "client_results": null,
+    "client_results_sha256": null,
     "sample_count": null,
+    "sample_ids": null,
     "sample_ids_sha256": null,
     "sample_ids_hash_method": "SHA256(sorted sample IDs joined by LF with trailing LF)",
     "concurrency": null,
@@ -144,12 +290,14 @@
     "random_seed": null,
     "warmup_requests": null,
     "prefix_cache_state": null,
-    "sampling_params": null
+    "sampling_params": null,
+    "status": "PER_RUN_REQUIRED"
   },
   "quality": {
     "evaluator": null,
     "evaluator_version": null,
-    "non_inferiority_margin": null
+    "non_inferiority_margin": null,
+    "status": "NOT_COLLECTED"
   },
   "integrity": {
     "metrics_before_process_start_time_seconds": null,
@@ -157,23 +305,29 @@
     "metrics_same_process": null,
     "metrics_counter_delta_valid": null,
     "phase_parent_request_count": null,
+    "phase_record_count": null,
     "phase_engine_call_count": null,
     "client_request_count": null,
-    "phase_wall_vs_client_e2e_gap_ms": null
+    "phase_wall_total_ms": null,
+    "client_e2e_total_ms": null,
+    "phase_wall_vs_client_e2e_gap_ms": null,
+    "metrics_cross_check": null,
+    "status": "PER_RUN_REQUIRED"
   },
   "artifacts": {
-    "collect_env": "collect_env.txt",
-    "packages": "packages.txt",
+    "environment_baseline": {
+      "collect_env": "../run_00/collect_env.txt",
+      "packages": "../run_00/packages.txt",
+      "npu_smi": "../run_00/npu_smi.txt",
+      "version": "../run_00/version.json",
+      "cann": "../cann.txt",
+      "server_script": "../run_00/run_server_qwen36.sh"
+    },
     "source_versions": "source_versions.txt",
-    "cann_version": "cann_version.txt",
     "config_hashes": "config_hashes.txt",
-    "npu_smi": "npu_smi.txt",
-    "version": "version.json",
-    "server_script": "run_server_qwen36.sh",
+    "server_log": "server.log",
     "metrics_before": "metrics.before.prom",
     "metrics_after": "metrics.after.prom",
-    "server_log": "server.log",
-    "client_results": null,
     "controller_phases": "controller_phases.jsonl",
     "request_summary": "requests.jsonl",
     "phase_summary": "phase_summary.csv",

@@ -24,7 +24,9 @@
 | CANN | 未采集 | 下轮必填 |
 | 模型 / tokenizer revision | 未采集 | 下轮必填 |
 
-完整字段和缺口标记见 [`manifest.json`](manifest.json)。[`manifest.template.json`](manifest.template.json) 已保留本轮版本基线；后续轮次不能只因 package version 相同就认定源码相同。
+完整字段和缺口标记见 [`manifest.json`](manifest.json)。公共
+[`manifest.template.json`](../manifest.template.json) 已保留优化阶段的固定
+环境基线；后续轮次不能只因 package version 相同就认定源码相同。
 
 ## 3. 端到端模型工作账本
 

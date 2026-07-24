@@ -1,0 +1,385 @@
+{
+  "schema": 2,
+  "template": {
+    "source": "../manifest.template.json",
+    "baseline_id": "qwen36-27b-vllm-0.23.0-ascend-0.23.0rc1-cann-9.0.1"
+  },
+  "run_id": "run_01",
+  "created_at": "2026-07-24T15:42:06+08:00",
+  "created_at_timezone": "Asia/Shanghai",
+  "client_filename_timestamp": "2026-07-24_06-41-01",
+  "variant": "think_budget",
+  "baseline_overrides": [],
+  "collection_procedure": {
+    "working_directory": "repository root",
+    "metrics_before": "curl -s http://127.0.0.1:41016/metrics > docs/log/perf/run_01/metrics.before.prom",
+    "workload": "发送 16 条、4 并发端到端请求",
+    "metrics_after": "curl -s http://127.0.0.1:41016/metrics > docs/log/perf/run_01/metrics.after.prom",
+    "cann": "cat /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/ascend_toolkit_install.info > docs/log/perf/cann.txt",
+    "extract": "python tools/extract_tb_phase_metrics.py docs/log/perf/run_01/server.log docs/log/perf/run_01/",
+    "extract_output": "extracted 134 phases for 16 requests"
+  },
+  "code": {
+    "repository": "TB",
+    "server_path": "/opt/p00906181/260707/TB",
+    "commit_sha": "ec79f53f3e035edf705974e8f93347799430d49c",
+    "commit_refs_reported": [
+      "HEAD -> main",
+      "origin/main",
+      "origin/HEAD"
+    ],
+    "commit_parent": "d6f5195f034cca93f7fc2688d868e69623c046d0",
+    "commit_time": "2026-07-24T09:11:46+08:00",
+    "dirty": null,
+    "dirty_diff_sha256": null,
+    "status": "COMMIT_CONFIRMED_DIRTY_STATE_NOT_COLLECTED",
+    "version_note": "操作者确认 run_01 服务代码 commit 为 ec79f53f；但该 commit 中两个默认配置的 enable_value_min_confidence 都是 true，而操作者确认运行时为 false。精确运行时配置文件 hash 未采集，因此 commit 本身不足以重现该有效配置。"
+  },
+  "upstream": {
+    "vllm": {
+      "reference_path": "third_party/vllm",
+      "remote_url": "git@github.com:vllm-project/vllm.git",
+      "server_checkout_path": "/vllm-workspace/vllm",
+      "tag": "v0.23.0",
+      "source_commit_sha": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
+      "git_refs": [
+        "HEAD",
+        "tag: v0.23.0"
+      ],
+      "repository_state": "grafted",
+      "dirty": null,
+      "installed_version": "0.23.0+empty",
+      "api_version": "0.23.0",
+      "install_mode": "editable",
+      "status": "EXACT_COMMIT_CONFIRMED_DIRTY_STATE_NOT_COLLECTED"
+    },
+    "vllm_ascend": {
+      "reference_path": "third_party/vllm-ascend",
+      "remote_url": "git@github.com:vllm-project/vllm-ascend.git",
+      "server_checkout_path": "/vllm-workspace/vllm-ascend",
+      "tag": "v0.23.0rc1",
+      "source_commit_sha": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db",
+      "git_refs": [
+        "HEAD",
+        "tag: v0.23.0rc1",
+        "origin/releases/v0.23.0"
+      ],
+      "dirty": null,
+      "installed_version": "0.23.0rc1",
+      "install_mode": "editable",
+      "status": "EXACT_COMMIT_CONFIRMED_DIRTY_STATE_NOT_COLLECTED"
+    }
+  },
+  "runtime": {
+    "python": "3.12.13",
+    "pytorch": "2.10.0+cpu",
+    "torch_npu": "2.10.0.post2",
+    "transformers": "5.5.4",
+    "triton": "3.5.0",
+    "triton_ascend": "3.2.1",
+    "cann": {
+      "package_name": "Ascend-cann-toolkit",
+      "version": "9.0.1",
+      "inner_version": "V100R001C10SPC002B220",
+      "compatible_versions": [
+        "V100R001C21",
+        "V100R001C22",
+        "V100R001C23",
+        "V100R001C25",
+        "V100R001C10"
+      ],
+      "arch": "aarch64",
+      "os": "linux",
+      "path": "/usr/local/Ascend/cann-9.0.1",
+      "artifact": "../cann.txt",
+      "artifact_sha256": "fc113dfb80c21915336894674561adbc7783bc9d2c0d9a63afb81e219a4e28b7"
+    },
+    "npu_smi": "25.0.rc1",
+    "os": "openEuler 24.03 (LTS-SP3) aarch64",
+    "kernel": "5.10.0-136.12.0.86.h2196.eulerosv2r12",
+    "container_image": null,
+    "status": "REUSED_FIXED_BASELINE_CONTAINER_IMAGE_NOT_COLLECTED"
+  },
+  "hardware": {
+    "cpu": "Kunpeng-920",
+    "host_cpu_count": 256,
+    "device_model": "Ascend 910B4",
+    "selected_devices": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "host_visible_device_count": 8,
+    "selected_device_hbm_total_mb_each": 32768,
+    "status": "REUSED_FIXED_BASELINE"
+  },
+  "model": {
+    "name_or_path": "/opt/foundation_model/Qwen3.6-27B",
+    "revision": null,
+    "tokenizer_name_or_path": "/opt/foundation_model/Qwen3.6-27B",
+    "tokenizer_revision": null,
+    "served_model_name": "Qwen3.6-27B",
+    "status": "REUSED_FIXED_PATHS_REVISIONS_NOT_COLLECTED"
+  },
+  "server": {
+    "script": "../run_00/run_server_qwen36.sh",
+    "script_sha256": "c5cc5e8b31537be9e547d966d350ed07683febdd077241eaa96621ebd2139e42",
+    "script_status": "REUSED_FIXED_BASELINE_NOT_COPIED_INTO_RUN_01",
+    "command": "python -m vllm.entrypoints.openai.api_server（完整参数见 server.script）",
+    "argv": [
+      "python",
+      "-m",
+      "vllm.entrypoints.openai.api_server",
+      "--model",
+      "/opt/foundation_model/Qwen3.6-27B",
+      "--served-model-name",
+      "Qwen3.6-27B",
+      "--max-model-len",
+      "32768",
+      "--max-num-seqs",
+      "8",
+      "--data-parallel-size",
+      "1",
+      "--tensor-parallel-size",
+      "4",
+      "--port",
+      "41016",
+      "--host",
+      "0.0.0.0",
+      "--block-size",
+      "128",
+      "--gpu-memory-utilization",
+      "0.95",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser",
+      "qwen3_coder",
+      "--enable-prefix-caching",
+      "--enable-chunked-prefill",
+      "--compilation-config",
+      "{\"cudagraph_mode\":\"FULL_DECODE_ONLY\"}",
+      "--speculative_config",
+      "{\"method\":\"mtp\",\"num_speculative_tokens\":4}",
+      "--async-scheduling",
+      "--language-model-only"
+    ],
+    "environment": {
+      "ASCEND_RT_VISIBLE_DEVICES": "0,1,2,3",
+      "PYTORCH_NPU_ALLOC_CONF": "expandable_segments:True",
+      "VLLM_USE_V1": "1",
+      "PYTHONPATH_prefix": "/opt/p00906181/260707/TB"
+    },
+    "host": "0.0.0.0",
+    "port": 41016,
+    "devices": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "tensor_parallel_size": 4,
+    "data_parallel_size": 1,
+    "pipeline_parallel_size": 1,
+    "max_model_len": 32768,
+    "max_num_seqs": 8,
+    "max_num_batched_tokens": null,
+    "max_num_batched_tokens_status": "NOT_EXPLICIT_AND_EFFECTIVE_VALUE_NOT_COLLECTED",
+    "block_size": 128,
+    "enable_prefix_caching": true,
+    "enable_chunked_prefill": true,
+    "gpu_memory_utilization": 0.95,
+    "async_scheduling": true,
+    "language_model_only": true,
+    "enable_auto_tool_choice": true,
+    "tool_call_parser": "qwen3_coder",
+    "compilation_config": {
+      "cudagraph_mode": "FULL_DECODE_ONLY"
+    },
+    "torch_compile_cache_cleared_before_start": true,
+    "mtp_config": {
+      "method": "mtp",
+      "num_speculative_tokens": 4
+    },
+    "controller_config": {
+      "effective_enable_value_min_confidence": false,
+      "effective_value_source": "operator-confirmed",
+      "runtime_file_sha256": null,
+      "declared_commit_files": {
+        "budget_config": {
+          "path": "think_budget_vllm_adapter/config/budget_config.yaml",
+          "git_blob_sha1": "5767a8e2b2a080dff070fea7d2ca86423f50c687",
+          "git_blob_sha256": "e90d0fc3598050abe6a818d67a84ab8a6737d2ec16d1d37ea36f93759318f9c3",
+          "enable_value_min_confidence": true
+        },
+        "unified_config": {
+          "path": "think_budget_vllm_adapter/config/unified_config.py",
+          "git_blob_sha1": "d0266517758a4532ad1b83cc7ef751a9b3e46cca",
+          "git_blob_sha256": "604f300aa0ddd7940d60ab5784442bce3e80efe675be5e51e2e2fd31a7820833",
+          "enable_value_min_confidence": true
+        }
+      },
+      "post_run_archived_reference": {
+        "commit_sha": "8e6fa50a2671f3c8739259f79835826d82b23fdf",
+        "commit_time": "2026-07-24T15:33:23+08:00",
+        "budget_config_git_blob_sha1": "2b31160ec826649f2ab07e3851872ca288f333cd",
+        "budget_config_git_blob_sha256": "f8f411aaabc4896b7ca345ee400be8edb6d5b815cc1c2a0824f12320dc7949e2",
+        "unified_config_git_blob_sha1": "8fe74a1355e719a71259fb025f3a771128fa5610",
+        "unified_config_git_blob_sha256": "4c2ed8c15e4fcf00605ad91a7080e62ed0b355677af59f7ab7f235b1093e3c7c",
+        "enable_value_min_confidence": false,
+        "status": "REFERENCE_ONLY_NOT_DECLARED_SERVER_COMMIT"
+      },
+      "status": "EFFECTIVE_VALUE_CONFIRMED_RUNTIME_FILE_IDENTITY_NOT_COLLECTED"
+    },
+    "phase_metrics_enabled": true,
+    "verbose_stage_logging": false
+  },
+  "controller": {
+    "adapter": "think_budget_vllm_adapter",
+    "design_document": "docs/debug/think_budget_vllm_adapter_refactor_plan.md",
+    "major_change": "算法表现重构",
+    "policy_version": "think-budget-performance-v1",
+    "request_overrides": {
+      "enable_think_budget": true,
+      "fixed_prob_th": 0.9,
+      "fixed_check_length": 1024,
+      "fixed_think_stride": 512,
+      "fixed_num_thinking": 4,
+      "fixed_min_think_tokens": 100,
+      "fixed_budget_tokens": 10000
+    },
+    "effective_enable_value_min_confidence": false,
+    "status": "OPERATOR_CONFIRMED_AND_PHASE_POLICY_VERSION_OBSERVED"
+  },
+  "workload": {
+    "dataset_path": null,
+    "dataset_label": "2026-02-11_ReAct白盒-整体规划",
+    "dataset_sha256": "fb8626a8a304fd5c60f4caf1d4df556992670c332f288821d1634b44f4de18e3",
+    "dataset_hash_method": "SHA256(QA_ID, question, reference answer sorted by QA_ID as UTF-8 TSV with trailing LF)",
+    "dataset_match_check": "QA_ID、问题、参考答案与 run_00 客户端明细逐字段一致",
+    "client_results": "../../test_results/dtb_2026-02-11_ReAct白盒-整体规划_2026-07-24_06-41-01.csv",
+    "client_results_sha256": "2b61edc29490f79bba05a00c4658d210a00427f6fada867228dc8950df0a3fe8",
+    "sample_count": 16,
+    "sample_ids": [
+      "TC0000000201",
+      "TC0000000202",
+      "TC0000000203",
+      "TC0000000204",
+      "TC0000000205",
+      "TC0000000206",
+      "TC0000000207",
+      "TC0000000208",
+      "TC0000000209",
+      "TC0000000210",
+      "TC0000000211",
+      "TC0000000212",
+      "TC0000000213",
+      "TC0000000214",
+      "TC0000000215",
+      "TC0000000216"
+    ],
+    "sample_ids_sha256": "ad682f566a3cec5d2b1d2f5ab30fcd015c422c161713508021c3a39a6be7524c",
+    "sample_ids_hash_method": "SHA256(sorted sample IDs joined by LF with trailing LF)",
+    "concurrency": 4,
+    "concurrency_source": "operator-provided",
+    "arrival_pattern": null,
+    "random_seed": null,
+    "warmup_requests": null,
+    "prefix_cache_state": null,
+    "sampling_params": null,
+    "status": "ARRIVAL_SEED_WARMUP_CACHE_STATE_AND_SAMPLING_PARAMS_NOT_COLLECTED"
+  },
+  "quality": {
+    "evaluator": null,
+    "evaluator_version": null,
+    "non_inferiority_margin": null,
+    "status": "NOT_COLLECTED"
+  },
+  "integrity": {
+    "extraction_command": "python tools/extract_tb_phase_metrics.py docs/log/perf/run_01/server.log docs/log/perf/run_01/",
+    "extraction_output": "extracted 134 phases for 16 requests",
+    "metrics_before_process_start_time_seconds": 1784874848.73,
+    "metrics_after_process_start_time_seconds": 1784874848.73,
+    "metrics_process_start_difference_seconds": 0.0,
+    "metrics_same_process": true,
+    "metrics_counter_delta_valid": true,
+    "phase_parent_request_count": 16,
+    "phase_record_count": 134,
+    "phase_counts": {
+      "decision": 16,
+      "initial_think": 16,
+      "iterative_think": 37,
+      "confidence_probe": 49,
+      "final_answer": 16
+    },
+    "phase_engine_call_count": 118,
+    "client_request_count": 16,
+    "client_request_id_match": true,
+    "client_error_count": 0,
+    "phase_wall_total_ms": 1085684.613,
+    "client_e2e_total_ms": 1087667.4,
+    "phase_wall_vs_client_e2e_gap_ms": 1982.787,
+    "phase_wall_vs_client_e2e_gap_ms_per_request": 123.924,
+    "phase_wall_explained_client_e2e_percent": 99.8177,
+    "metrics_cross_check": {
+      "engine_calls": {
+        "phase": 118,
+        "metrics_delta": 118,
+        "status": "EXACT_MATCH"
+      },
+      "prompt_tokens": {
+        "phase": 555357,
+        "metrics_delta": 555357,
+        "status": "EXACT_MATCH"
+      },
+      "generated_tokens": {
+        "phase": 43674,
+        "metrics_delta": 43674,
+        "status": "EXACT_MATCH"
+      },
+      "cached_prompt_tokens": {
+        "phase": 245760,
+        "metrics_prefix_cache_hits_delta": 247296,
+        "difference": 1536,
+        "status": "MISMATCH_REQUIRES_FOLLOW_UP"
+      }
+    },
+    "status": "VALID_SAME_PROCESS_COUNTER_DELTA_WITH_CACHED_TOKEN_MISMATCH"
+  },
+  "artifacts": {
+    "environment_baseline": {
+      "collect_env": "../run_00/collect_env.txt",
+      "collect_env_sha256": "79376f50d5e769ec070d5df8bc9c34451d204c2635e316bd2aed56d5f5b1b0ab",
+      "packages": "../run_00/packages.txt",
+      "packages_sha256": "206ffa5583add09f7045516945e8263fd3d175159343224f6006c2eeaec8fca6",
+      "npu_smi": "../run_00/npu_smi.txt",
+      "npu_smi_sha256": "ea0846e0614edd44000ba0fad92ca80ccec0571933d2c0bac26b347b321cfd7e",
+      "version": "../run_00/version.json",
+      "version_sha256": "075e267960c71451371b4267a2b98efd65f045237544f950a51ceef72ad63700",
+      "cann": "../cann.txt",
+      "cann_sha256": "fc113dfb80c21915336894674561adbc7783bc9d2c0d9a63afb81e219a4e28b7",
+      "server_script": "../run_00/run_server_qwen36.sh",
+      "server_script_sha256": "c5cc5e8b31537be9e547d966d350ed07683febdd077241eaa96621ebd2139e42"
+    },
+    "source_versions": null,
+    "source_versions_status": "NOT_COLLECTED_CONTENT_RECORDED_FROM_OPERATOR_INPUT",
+    "config_hashes": null,
+    "config_hashes_status": "NOT_COLLECTED_RUNTIME_EFFECTIVE_VALUE_RECORDED_WITHOUT_FILE_HASH",
+    "server_log": "server.log",
+    "server_log_present": false,
+    "server_log_status": "DECLARED_EXTRACTION_SOURCE_NOT_PRESENT_IN_CURRENT_CHECKOUT",
+    "metrics_before": "metrics.before.prom",
+    "metrics_before_sha256": "3658187e7d33a15471a67c3c4f63ffbe779a472e90602cb6e9517399b5dd2640",
+    "metrics_after": "metrics.after.prom",
+    "metrics_after_sha256": "aef215fc74a86dc19e55201aa040da9084cf10deb8a1d84c91a4af58092fc2d2",
+    "controller_phases": "controller_phases.jsonl",
+    "controller_phases_sha256": "488a9b858a371af3d2cbb4f56e68118081569add360607f25130259fc8b7bbc2",
+    "request_summary": "requests.jsonl",
+    "request_summary_sha256": "279675f38b345c993eca0faf8ed9c5bbc001d27d90bcc17bc0ccd3638dbaabaa",
+    "phase_summary": "phase_summary.csv",
+    "phase_summary_sha256": "4ff103cebf93480e8159b28ca85ebaf923fd264bdee82a8d3fcb25f6264453c2",
+    "client_results": "../../test_results/dtb_2026-02-11_ReAct白盒-整体规划_2026-07-24_06-41-01.csv",
+    "quality_summary": null,
+    "result": "RESULT.md",
+    "result_sha256": "8150d5675b7c64b2c329462a9f92fd7811e2a40b85a9b31371e58fef2dd82941"
+  }
+}
