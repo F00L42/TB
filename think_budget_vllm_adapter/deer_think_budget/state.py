@@ -536,6 +536,12 @@ class _ConfidenceProbeState(_BaseState):
             output=observation.last_output,
             confidence=assessment.score,
             accepted=accepted,
+            confidence_method=assessment.method,
+            average_confidence=assessment.average_confidence,
+            value_min_raw=assessment.value_min_raw,
+            pair_count=assessment.pair_count,
+            value_pair_count=assessment.value_pair_count,
+            accept_reason=accept_reason,
             stop_reason=(
                 observation.stop_reason or observation.finish_reason),
         )

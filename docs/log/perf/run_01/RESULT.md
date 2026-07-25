@@ -6,7 +6,10 @@
 明细为
 [`dtb_..._06-41-01.csv`](../../test_results/dtb_2026-02-11_ReAct白盒-整体规划_2026-07-24_06-41-01.csv)，
 聚合对照来自 [`_SUMMARY.csv`](../../test_results/_SUMMARY.csv)，控制器账本为
-[`controller_phases.jsonl`](controller_phases.jsonl)。
+[`controller_phases.jsonl`](controller_phases.jsonl)。新 Vanilla 基线包含三次
+聚合重复，其中
+[`vanilla_..._09-27-57.csv`](../../test_results/vanilla_2026-02-11_ReAct白盒-整体规划_2026-07-24_09-27-57.csv)
+保留了 16 条请求明细。
 
 请求级固定参数为：
 
@@ -22,9 +25,10 @@
 }
 ```
 
-服务有效配置由操作者确认为 `enable_value_min_confidence=false`。版本与配置
-可复现性缺口见 [`manifest.json`](manifest.json)：声明的服务 commit
-`ec79f53f` 中该默认值仍是 `true`，且本轮没有保存运行时配置文件 hash。
+服务有效配置由操作者确认为 `enable_value_min_confidence=false`。TB commit、
+有效控制器配置、固定上游版本和环境证据见 [`manifest.json`](manifest.json)；
+按当前实验身份规则不采集三个仓库的 dirty 状态，vLLM 侵入式修改由该 TB
+commit 中的 `dtb.patch` 标识。
 
 - **实测：** 134 条 phase 覆盖 16 个 parent，其中 118 次 engine call；
   phase parent 与客户端 `request_id` 完全对应。
@@ -36,18 +40,21 @@
 - **采集缺口：** phase 的 cached token 为 245760，Prometheus
   `prefix_cache_hits_total` 增量为 247296，相差 1536；APC 结论使用
   phase 分解时必须保留这一差异。
-- **质量边界：** 16/16 最终输出都能解析为 JSON，并包含相同的五个必需
-  顶层字段；没有语义正确率或人工评分，不能据此声明质量非劣。
+- **结构实测：** 客户端明细新增的 `Judge` 列为 16/16 `True`；该指标只表示
+  final JSON 结构校验通过，校验器版本未归档，也没有语义正确率或人工评分，
+  不能据此声明语义质量非劣。
 
 ## 2. 端到端结果
 
-| 指标 | Vanilla | run_00 | run_01 |
+| 指标 | Vanilla 新基线（3 次均值） | run_00 | run_01 |
 |---|---:|---:|---:|
-| E2E 合计 | 1118.5239 s | 2964.2027 s | **1087.6674 s** |
-| E2E 平均 | 69.9077 s | 185.2627 s | **67.9792 s** |
-| E2E 中位数 | 69.9773 s | 179.8645 s | **66.7248 s** |
-| E2E P95 | **84.0568 s** | 269.2437 s | 94.4605 s |
-| 可见 token 合计 | 74534 | 39466 | 41268 |
+| E2E 合计/次 | **1045.1766 s** | 2964.2027 s | 1087.6674 s |
+| E2E 平均/请求 | **65.3235 s** | 185.2627 s | 67.9792 s |
+| E2E 中位数 | **66.0511 s** | 179.8645 s | 66.7248 s |
+| E2E P95 | **79.5103 s** | 269.2437 s | 94.4605 s |
+| 可见 token 合计/次 | 72419.33 | 39466 | **41268** |
+| 平均可见 token/请求 | 4526.21 | 2466.63 | **2579.25** |
+| final JSON 结构正确率 | 100%（1 次明细） | 12.5%（2/16） | 100% |
 
 ### 2.1 相对 run_00
 
@@ -61,16 +68,26 @@
 
 ### 2.2 相对 Vanilla
 
-- **聚合实测：** run_01 平均和中位数分别改善 `2.76%`、`4.65%`，
-  但 P95 恶化 `12.38%`（`+10.40 s`）。
-- **聚合实测：** 可见 token 减少 `44.63%`，但平均时延只改善
-  `2.76%`，说明多阶段生成、较差的阶段化 decode 效率和重复 prefill
-  吃掉了大部分 token 收益。
-- **证据边界：** 当前工作区没有 vanilla 客户端明细与 phase 账本，无法做
-  run_01 对 vanilla 的逐请求配对或严格拆分 batching/TPOT 差异。
+- **三次聚合实测：** Vanilla 平均时延为 `65.3235 s/请求`，重复范围
+  `63.1573–67.2567 s`；run_01 比三次均值慢 `2.6557 s / 4.07%`，
+  且比三次中最慢的平均值仍慢 `1.07%`。
+- **三次聚合实测：** run_01 中位数慢 `1.02%`，P95 慢
+  `14.9502 s / 18.80%`；Q1 反而快 `2.21%`，退化主要集中在中后段和尾部。
+- **聚合实测：** run_01 平均可见 token 少 `1946.96 / 43.02%`，但时延
+  没有盈利，进一步支持“阶段化 decode / batching 损失抵消 token 收益”。
+- **配对实测：** 保存的 `09-27-57` Vanilla 明细与 run_01 的 16 个样本在
+  规范化 CRLF/LF 后，QA_ID、问题和参考答案逐条一致；run_01 仅 5/16 更快，
+  paired delta 平均 `+2.4226 s`、中位数 `+3.7218 s`。
+- **数据质量实测：** `_SUMMARY.csv` 的“正确率”把非空 JSON 解析错误字符串
+  也计为真：run_00 明细只有 2 个字面量 `True`，另 14 个为错误字符串，
+  汇总却是 `1.0`。因此本表按明细重算 run_00；另两次无明细 Vanilla 的
+  `1.0` 不能作为已复核结构证据。
+- **证据边界：** 另外两次 Vanilla 只保留汇总，且三次基线均无 phase
+  账本、sampling params、seed、warmup 与 cache 初态，不能把差值严格归因为
+  控制器代码；但“run_01 平均略优”的旧结论已被更稳定的新基线推翻。
 
-当前版本已经达到“平均值略优于 vanilla”，但还没有达到“尾延迟不退化”，
-也没有完成语义质量非劣验证。
+当前版本只达到了“可见 token 大幅减少、结构正确率不退化”，尚未达到端到端
+时延收益，也没有完成语义质量非劣验证。
 
 ## 3. run_01 成本中心
 
@@ -104,9 +121,11 @@
 **实测：** 固定 50-token probe 和新状态机已经解决 run_00 的主要性能
 故障；成本中心从隐藏长 probe 转移为固定 `1024 + N×512` 的可见思考。
 
-**实测：** run_00 只有 7/16 个最终输出可解析为目标 JSON，final phase
-有 8 次 length stop；run_01 为 16/16 可解析且 16 次 final 全部自然 stop。
-这支持结构完整性改善，但不能替代语义质量评分。
+**实测：** 既有离线解析口径下，run_00 只有 7/16 个最终输出可解析为目标
+JSON，final phase 有 8 次 length stop；新加入但版本未归档的 `Judge` 严格
+口径只有 2/16 为字面量 `True`。run_01 两种口径均为 16/16，且 16 次 final
+全部自然 stop。这支持结构完整性改善，但不能替代语义质量评分；后续必须固定
+结构校验器版本，避免混用 7/16 与 2/16。
 
 ## 4. 置信度门是否值得保留
 
@@ -146,13 +165,16 @@ phase 静态扣除；较早 final 的长度、质量和真实时延未知，不�
 
 ## 5. 优化优先级
 
-### P0：先建立语义质量门与严格 Vanilla 基线
+### P0：补齐语义质量门与可复现 Vanilla 基线
 
-当前只能证明结构完整，不能证明诊断规划质量。下一轮必须：
+当前已有三次 Vanilla 聚合和一次可配对明细，也已建立 final JSON 结构检查，
+但汇总正确率需先修正，且仍不能证明诊断规划语义质量。下一轮必须：
 
-1. 保存相同 QA_ID 的 vanilla 明细和 phase/metrics；
+1. 将正确率聚合改为只接受 `Judge is True`，并保存每次 Vanilla 的相同样本
+   明细和 metrics；若能获得原生请求级 stats，同时保存
+   prefill/decode/queue；
 2. 固定 sampling params、seed、到达顺序、warmup 和 prefix-cache 初态；
-3. 对最终 `</think>` 后的 JSON 评分：可解析率、五字段完整率、事实一致性、
+3. 对最终 `</think>` 后的 JSON 评分：可解析率、结构完整率、事实一致性、
    已执行步骤识别、后续计划可执行性和工具参数正确性；
 4. 至少 3 个随机化重复，先看 paired delta，再看平均/P50/P95；
 5. 预先声明非劣界，任何时延变体未过质量门都不能合入。
@@ -225,12 +247,13 @@ JSON 序列化、对象复制、controller arithmetic 或 scheduler 参数。
 
 ## 6. 下一轮采集补充
 
-除现有 schema 1 phase 外，建议持久化：
+最新 adapter 已在 schema 1 中以可选字段补充以下内容；下一轮需要确认
+`controller_phases.jsonl` 与 `requests.jsonl` 实际写出且能被提取脚本保留：
 
 - effective `BudgetPlan`、decision branch、task type 与各字段来源；
 - `confidence_method`、average confidence、Value-Min raw、pair/value-pair
-  count、`accept_reason`；
-- 运行时 `budget_config.yaml` 与 `unified_config.py` SHA256、三个仓库 dirty；
+  count、`accept_reason`；Value-Min 未启用时 raw 仅用于离线反事实分析，
+  不改变实际 average score；
 - final JSON 结构分和语义质量分；
-- vanilla 的同口径 phase 账本，用于验证阶段化生成是否导致 batching/TPOT
+- 每次 vanilla 明细及 metrics，用于验证阶段化生成是否导致 batching/TPOT
   损失。

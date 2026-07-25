@@ -89,9 +89,31 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
 
     result: list[dict[str, object]] = []
     for request_id, request_records in sorted(grouped.items()):
+        decision = next((
+            record for record in request_records
+            if record.get("phase") == "decision"
+        ), {})
+        probe_assessments = [
+            {
+                "round": record.get("round"),
+                "confidence": record.get("confidence"),
+                "confidence_method": record.get("confidence_method"),
+                "average_confidence": record.get("average_confidence"),
+                "value_min_raw": record.get("value_min_raw"),
+                "pair_count": record.get("pair_count"),
+                "value_pair_count": record.get("value_pair_count"),
+                "accepted": record.get("accepted"),
+                "accept_reason": record.get("accept_reason"),
+            }
+            for record in request_records
+            if record.get("phase") == "confidence_probe"
+        ]
         result.append({
             "schema": 1,
             "parent_request_id": request_id,
+            "task_type": decision.get("task_type"),
+            "decision_branch": decision.get("decision_branch"),
+            "budget_plan": decision.get("budget_plan"),
             # Phases are sequential. This is controller-accounted wall time,
             # not HTTP E2E; pair it with the client-side result CSV.
             "accounted_phase_wall_ms": round(sum(
@@ -121,6 +143,7 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
                 if record.get("phase") == "confidence_probe"
                 and record.get("accepted") is True
             ), None),
+            "probe_assessments": probe_assessments,
         })
     return result
 

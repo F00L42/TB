@@ -41,6 +41,12 @@ class TimingCollectorTests(unittest.TestCase):
             output=output,
             confidence=0.91234567,
             accepted=False,
+            confidence_method="value_min",
+            average_confidence=0.92345678,
+            value_min_raw=-0.23456789,
+            pair_count=50,
+            value_pair_count=37,
+            accept_reason="below_threshold",
         )
 
         self.assertEqual(record["queue_ms"], 250.0)
@@ -48,6 +54,12 @@ class TimingCollectorTests(unittest.TestCase):
         self.assertEqual(record["decode_ms"], 500.0)
         self.assertEqual(record["cached_prompt_tokens"], 96)
         self.assertEqual(record["confidence"], 0.912346)
+        self.assertEqual(record["confidence_method"], "value_min")
+        self.assertEqual(record["average_confidence"], 0.923457)
+        self.assertEqual(record["value_min_raw"], -0.234568)
+        self.assertEqual(record["pair_count"], 50)
+        self.assertEqual(record["value_pair_count"], 37)
+        self.assertEqual(record["accept_reason"], "below_threshold")
         self.assertEqual(
             collector.snapshot()["ledger"],
             {
@@ -96,10 +108,75 @@ class TimingCollectorTests(unittest.TestCase):
         self.assertTrue(line.startswith("TB_PHASE "))
         self.assertEqual(json.loads(line.removeprefix("TB_PHASE "))["phase"], "decision")
 
+    def test_decision_record_persists_effective_budget_plan(self) -> None:
+        plan = {
+            "task_type": "planning",
+            "task_matched": True,
+            "decision_branch": "fixed",
+            "budget": {
+                "check_length": 1024,
+                "min_think_budget": 100,
+                "num_thinking": 4,
+                "think_stride": 512,
+            },
+            "confidence_threshold": 0.9,
+            "source_by_field": {
+                "check_length": {
+                    "source": "fixed_check_length",
+                    "final": 1024,
+                },
+            },
+        }
+        record = TimingCollector(
+            emit_phase_metrics=False,
+        ).record_phase(
+            parent_request_id="p",
+            child_request_id="",
+            phase="decision",
+            round_id=0,
+            wall_ms=2.0,
+            controller_cpu_ms=2.0,
+            prompt_tokens=10,
+            generated_tokens=0,
+            visible=False,
+            budget_plan=plan,
+        )
+
+        self.assertEqual(record["task_type"], "planning")
+        self.assertEqual(record["decision_branch"], "fixed")
+        self.assertEqual(record["budget_plan"], plan)
+
 
 class PhaseLogExtractionTests(unittest.TestCase):
     def test_extracts_timestamp_prefixed_phase_lines_and_summarizes_hidden_work(self) -> None:
         records = [
+            {
+                "schema": 1,
+                "parent_request_id": "p",
+                "child_request_id": "",
+                "phase": "decision",
+                "round": 0,
+                "wall_ms": 2.0,
+                "queue_ms": None,
+                "prefill_ms": None,
+                "decode_ms": None,
+                "prompt_tokens": 90,
+                "cached_prompt_tokens": None,
+                "generated_tokens": 0,
+                "visible": False,
+                "task_type": "planning",
+                "decision_branch": "fixed",
+                "budget_plan": {
+                    "task_type": "planning",
+                    "decision_branch": "fixed",
+                    "source_by_field": {
+                        "check_length": {
+                            "source": "fixed_check_length",
+                            "final": 1024,
+                        },
+                    },
+                },
+            },
             {
                 "schema": 1,
                 "parent_request_id": "p",
@@ -131,22 +208,50 @@ class PhaseLogExtractionTests(unittest.TestCase):
                 "generated_tokens": 8,
                 "visible": False,
                 "accepted": True,
+                "confidence": 0.91,
+                "confidence_method": "average_fallback",
+                "average_confidence": 0.91,
+                "value_min_raw": None,
+                "pair_count": 8,
+                "value_pair_count": 6,
+                "accept_reason": "average_fallback",
             },
         ]
         lines = [
             "ignored\n",
             "2026-07-21 INFO TB_PHASE " + json.dumps(records[0]) + "\n",
             "TB_PHASE " + json.dumps(records[1]) + "\n",
+            "TB_PHASE " + json.dumps(records[2]) + "\n",
         ]
 
         parsed = parse_phase_records(lines)
         requests = summarize_requests(parsed)
         phases = {row["phase"]: row for row in summarize_phases(parsed)}
 
-        self.assertEqual(len(parsed), 2)
+        self.assertEqual(len(parsed), 3)
         self.assertEqual(requests[0]["visible_think_tokens"], 4)
         self.assertEqual(requests[0]["hidden_probe_tokens"], 8)
         self.assertEqual(requests[0]["accepted_probe_round"], 1)
+        self.assertEqual(requests[0]["task_type"], "planning")
+        self.assertEqual(requests[0]["decision_branch"], "fixed")
+        self.assertEqual(
+            requests[0]["budget_plan"]["source_by_field"]["check_length"]["source"],
+            "fixed_check_length",
+        )
+        self.assertEqual(
+            requests[0]["probe_assessments"],
+            [{
+                "round": 1,
+                "confidence": 0.91,
+                "confidence_method": "average_fallback",
+                "average_confidence": 0.91,
+                "value_min_raw": None,
+                "pair_count": 8,
+                "value_pair_count": 6,
+                "accepted": True,
+                "accept_reason": "average_fallback",
+            }],
+        )
         self.assertEqual(phases["confidence_probe"]["generated_tokens_total"], 8)
         self.assertEqual(phases["confidence_probe"]["queue_ms_known"], 0)
 

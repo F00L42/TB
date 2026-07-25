@@ -11,7 +11,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from time import perf_counter
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 
 
 def _interval_ms(start: object, end: object) -> float | None:
@@ -108,6 +108,13 @@ class TimingCollector:
         output: Any = None,
         confidence: float | None = None,
         accepted: bool | None = None,
+        budget_plan: Mapping[str, Any] | None = None,
+        confidence_method: str | None = None,
+        average_confidence: float | None = None,
+        value_min_raw: float | None = None,
+        pair_count: int | None = None,
+        value_pair_count: int | None = None,
+        accept_reason: str | None = None,
         stop_reason: object = None,
     ) -> dict[str, object]:
         """Build and optionally emit one schema-stable phase record.
@@ -173,6 +180,33 @@ class TimingCollector:
             "accepted": accepted,
             "stop_reason": stop_reason,
         }
+        if budget_plan is not None:
+            effective_plan = dict(budget_plan)
+            record.update({
+                "task_type": effective_plan.get("task_type"),
+                "decision_branch": effective_plan.get("decision_branch"),
+                "budget_plan": effective_plan,
+            })
+        if phase == "confidence_probe":
+            record.update({
+                "confidence_method": confidence_method,
+                "average_confidence": (
+                    round(average_confidence, 6)
+                    if average_confidence is not None else None
+                ),
+                "value_min_raw": (
+                    round(value_min_raw, 6)
+                    if value_min_raw is not None else None
+                ),
+                "pair_count": (
+                    max(pair_count, 0) if pair_count is not None else None
+                ),
+                "value_pair_count": (
+                    max(value_pair_count, 0)
+                    if value_pair_count is not None else None
+                ),
+                "accept_reason": accept_reason,
+            })
         self.ledger.record(phase, max(generated_tokens, 0))
         if self.emit_phase_metrics:
             print(

@@ -147,6 +147,32 @@ class ConfidenceTests(unittest.TestCase):
         self.assertTrue(result.available)
         self.assertEqual(result.method, "average_fallback")
         self.assertAlmostEqual(result.score, math.exp(-0.1) / 2)
+        self.assertAlmostEqual(result.value_min_raw, -0.1)
+
+    def test_disabled_value_min_still_reports_counterfactual_raw(self):
+        observation = TrialObservation(
+            full_text="AB",
+            all_token_ids=[1, 2],
+            sample_logprobs=[
+                logprob(1, -0.1, "A"),
+                logprob(2, -0.5, "B"),
+            ],
+            sampled_token_ids=[1, 2],
+            generated_tokens=2,
+        )
+        result = assess_trial_confidence(
+            observation,
+            enable_value_min_confidence=False,
+            value_min_bottom_k=2,
+        )
+
+        self.assertEqual(result.method, "average_fallback")
+        self.assertAlmostEqual(
+            result.score,
+            (math.exp(-0.1) + math.exp(-0.5)) / 2,
+        )
+        self.assertAlmostEqual(result.value_min_raw, -0.3)
+        self.assertEqual(result.value_pair_count, 2)
 
     def test_no_logprobs_is_explicit_fail_open_signal(self):
         result = assess_trial_confidence(

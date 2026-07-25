@@ -1,12 +1,12 @@
 {
-  "schema": 2,
+  "schema": 3,
   "template": {
     "copy_as": "docs/log/perf/<run_id>/manifest.json",
     "baseline_id": "qwen36-27b-vllm-0.23.0-ascend-0.23.0rc1-cann-9.0.1",
     "baseline_scope": "当前 Think Budget 性能分析与优化阶段；除非某轮 manifest 在 baseline_overrides 中明确声明，否则复用本模板的环境、模型和服务启动配置",
-    "reuse_rule": "复制后必须填写所有 PER_RUN_REQUIRED 字段，并逐轮确认 TB commit/dirty、上游 dirty、请求控制参数、工作负载和 metrics 进程连续性；固定版本不等于允许省略变更声明",
+    "reuse_rule": "复制后必须填写所有 PER_RUN_REQUIRED 字段，并逐轮确认 TB commit、请求控制参数、工作负载和 metrics 进程连续性；vLLM 的侵入式集成由该 TB commit 中的 dtb.patch 标识，三个仓库的 dirty 状态不作为实验身份字段",
     "fixed_sections": [
-      "upstream 中除 dirty 外的字段",
+      "upstream",
       "runtime",
       "hardware",
       "model.name_or_path、model.tokenizer_name_or_path、model.served_model_name",
@@ -16,9 +16,6 @@
       "run_id",
       "created_at",
       "code.commit_sha",
-      "code.dirty",
-      "upstream.vllm.dirty",
-      "upstream.vllm_ascend.dirty",
       "server.controller_config",
       "controller.request_overrides",
       "workload.client_results",
@@ -76,8 +73,11 @@
     "repository": "TB",
     "server_path": "/opt/p00906181/260707/TB",
     "commit_sha": null,
-    "dirty": null,
-    "dirty_diff_sha256": null,
+    "vllm_integration_patch": {
+      "path_from_copied_manifest": "../../../../dtb.patch",
+      "identity": "content at code.commit_sha",
+      "description": "vLLM Chat Completion 协议与 serving 入口的侵入式修改"
+    },
     "status": "PER_RUN_REQUIRED"
   },
   "upstream": {
@@ -92,11 +92,10 @@
         "tag: v0.23.0"
       ],
       "repository_state": "grafted",
-      "dirty": null,
       "installed_version": "0.23.0+empty",
       "api_version": "0.23.0",
       "install_mode": "editable",
-      "baseline_status": "EXACT_COMMIT_CONFIRMED_DIRTY_STATE_PER_RUN_REQUIRED"
+      "baseline_status": "EXACT_COMMIT_CONFIRMED_FIXED_BASELINE"
     },
     "vllm_ascend": {
       "reference_path": "third_party/vllm-ascend",
@@ -109,10 +108,9 @@
         "tag: v0.23.0rc1",
         "origin/releases/v0.23.0"
       ],
-      "dirty": null,
       "installed_version": "0.23.0rc1",
       "install_mode": "editable",
-      "baseline_status": "EXACT_COMMIT_CONFIRMED_DIRTY_STATE_PER_RUN_REQUIRED"
+      "baseline_status": "EXACT_COMMIT_CONFIRMED_FIXED_BASELINE"
     }
   },
   "runtime": {
@@ -249,10 +247,9 @@
     },
     "controller_config": {
       "budget_config_path": "think_budget_vllm_adapter/config/budget_config.yaml",
-      "budget_config_sha256": null,
       "unified_config_path": "think_budget_vllm_adapter/config/unified_config.py",
-      "unified_config_sha256": null,
       "effective_enable_value_min_confidence": null,
+      "identity": "files at code.commit_sha plus effective values recorded in this section",
       "status": "PER_RUN_REQUIRED"
     },
     "phase_metrics_enabled": true,
@@ -294,10 +291,16 @@
     "status": "PER_RUN_REQUIRED"
   },
   "quality": {
-    "evaluator": null,
+    "evaluator": "final_json_structure",
     "evaluator_version": null,
+    "definition": "Judge=true 仅表示 final 输出通过测试端的 JSON 结构校验；不表示答案语义正确",
+    "aggregation": "passed = count(Judge is literal True); JSON 解析错误字符串必须计为失败",
+    "passed": null,
+    "total": null,
+    "accuracy": null,
+    "semantic_evaluation": "DEFERRED",
     "non_inferiority_margin": null,
-    "status": "NOT_COLLECTED"
+    "status": "PER_RUN_REQUIRED"
   },
   "integrity": {
     "metrics_before_process_start_time_seconds": null,
@@ -323,8 +326,6 @@
       "cann": "../cann.txt",
       "server_script": "../run_00/run_server_qwen36.sh"
     },
-    "source_versions": "source_versions.txt",
-    "config_hashes": "config_hashes.txt",
     "server_log": "server.log",
     "metrics_before": "metrics.before.prom",
     "metrics_after": "metrics.after.prom",

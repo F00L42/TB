@@ -199,6 +199,14 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
                 "answer", [30], finish_reason="stop",
                 stop_reason="eos")],
         ])
+        recorded_phases = []
+        original_record_phase = context.timing.record_phase
+
+        def capture_phase(**kwargs):
+            recorded_phases.append(kwargs)
+            return original_record_phase(**kwargs)
+
+        context.timing.record_phase = capture_phase
         visible = await run_and_drain(context)
 
         self.assertEqual(
@@ -217,6 +225,16 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             context.algorithm_state.completion_status, "success")
         self.assertEqual(context.prompt_text.count("</think>"), 1)
+        probe = next(
+            phase for phase in recorded_phases
+            if phase["phase"] == "confidence_probe"
+        )
+        self.assertEqual(probe["confidence_method"], "value_min")
+        self.assertAlmostEqual(probe["average_confidence"], 0.99005, places=5)
+        self.assertEqual(probe["value_min_raw"], -0.01)
+        self.assertEqual(probe["pair_count"], 1)
+        self.assertEqual(probe["value_pair_count"], 1)
+        self.assertEqual(probe["accept_reason"], "value_min")
 
     async def test_second_probe_accepts_after_one_stride(self):
         context, engine = make_context([

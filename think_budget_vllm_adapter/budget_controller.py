@@ -792,6 +792,7 @@ class BudgetController:
             )
         decision_wall_ms = (
             time.perf_counter() - decision_started_at) * 1000
+        plan_telemetry = plan.telemetry()
         timing.record_phase(
             parent_request_id=request_id,
             child_request_id="",
@@ -802,12 +803,7 @@ class BudgetController:
             prompt_tokens=len(prompt_token_ids),
             generated_tokens=0,
             visible=False,
-        )
-        print(
-            "TB_DECISION "
-            f"request_id={request_id} plan={plan.telemetry()} "
-            f"timings={timing.snapshot()}",
-            flush=True,
+            budget_plan=plan_telemetry,
         )
 
         state = RequestAlgorithmState(budget_plan=plan)

@@ -59,12 +59,16 @@ def assess_trial_confidence(
         )
 
     value_logprobs = extract_value_logprobs(logprobs, tokens)
+    raw = (
+        cal_value_min_confidence(
+            logprobs, tokens, bottom_k=value_min_bottom_k)
+        if value_logprobs else None
+    )
     if (
         enable_value_min_confidence
         and len(value_logprobs) >= max(1, value_min_bottom_k)
     ):
-        raw = cal_value_min_confidence(
-            logprobs, tokens, bottom_k=value_min_bottom_k)
+        assert raw is not None
         return ConfidenceAssessment(
             score=min(math.exp(raw), 1.0),
             average_confidence=average,
@@ -82,7 +86,9 @@ def assess_trial_confidence(
         score=average,
         average_confidence=average,
         perplexity=perplexity,
-        value_min_raw=None,
+        # Keep the counterfactual raw value observable even when Value-Min is
+        # disabled or has too few value pairs to control the decision.
+        value_min_raw=raw,
         method="average_fallback",
         available=True,
         pair_count=len(valid_pairs),
