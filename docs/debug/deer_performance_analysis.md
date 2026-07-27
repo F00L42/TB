@@ -4,36 +4,37 @@
 
 本文分析 DEER 与 Think Budget 服务内控制器的端到端时延成本，目标是在质量约束下尽量降低“预算估算 + 置信度校验 + 多阶段调度”的额外耗时。
 
-数据基线更新到 2026-07-25 的 v0.23.0 汇总、[`run_00`](../log/perf/run_00/RESULT.md)
-和 [`run_01`](../log/perf/run_01/RESULT.md) 请求级 phase 数据；上游源码基线
-为本地只读 checkout：vLLM `v0.23.0`（`0fc695f`）与 vLLM-Ascend
-`v0.23.0rc1`（`f4a08bd`）。当前环境没有目标模型和推理设备，因此结论
-分为“实测”“源码确定”“假设”。服务器端验证步骤见第 9 节。
+数据基线更新到 2026-07-27 的 v0.23.0 汇总、[`run_00`](../log/perf/run_00/RESULT.md)、
+[`run_01`](../log/perf/run_01/RESULT.md) 和
+[`run_02`](../log/perf/run_02/RESULT.md) 请求级 phase 数据；上游源码基线为
+本地只读 checkout：vLLM `v0.23.0`（`0fc695f`）与 vLLM-Ascend
+`v0.23.0rc1`（`f4a08bd`）。当前环境没有目标模型和推理设备，因此结论分为
+“实测”“源码确定”“假设”。服务器端验证步骤见第 9 节。
 
 ## 2. 结论摘要
 
-1. **新的三次 Vanilla 基线推翻了“run_01 平均略优”的旧结论。**
-   Vanilla 平均为 `65.3235 s/请求`，run_01 为 `67.9792 s`，慢
-   `4.07%`；P95 慢 `18.80%`。run_01 可见 token 少 `43.02%` 却没有获得
-   E2E 收益，说明 token 收益被多阶段执行成本大量抵消。
-2. **固定 50-token probe 已解决 run_00 的主要故障。** hidden probe 从
-   74871 降至 2401 token，probe wall 从 1922.17 降至 107.38 秒；run_01
-   总 E2E 相比 run_00 降 `63.31%`，15/16 个 paired 请求更快。
-3. **当前主成本已迁移到可见思考。** initial + iterative thinking wall 为
-   `832.24 s`，占 E2E `76.52%`；固定 `1024 + N×512` 的预算是下一轮
-   第一优化变量，不能继续沿用“优先缩短 probe”的旧结论。
-4. **短 probe 当前有净收益。** 2401 个 hidden token 使可见思考相对全部
-   走满 3072 token 少 14329 token；直接取消 probe 反而可能增加总模型工作。
-5. **阈值存在可测空间，但必须绑定质量。** 对已记录轨迹静态回放，
-   `prob_th=0.88/0.875` 分别可少走 125.77/131.34 秒已观测 phase wall；
-   较早 final 的真实时延和语义质量尚未测量。
-6. **工程优化的上界已经较小。** prefill 占 E2E `9.32%`，排除首次
-   initial prefill 后的绝对上界为 `7.71%`；queue、decision、phase residual
-   和客户端 gap 均非主项。
-7. **质量只完成结构检查，而且汇总正确率存在聚合缺陷。** run_01 与唯一
-   保存明细的新 Vanilla 均为 16/16 `Judge=True`，run_01 final 也全部自然
-   stop；另两次 Vanilla 只有汇总，暂不能复核。`Judge` 不评价语义，语义
-   正确率与非劣界仍未采集。
+1. **run_02 首次在平均和 P95 上同时优于三次 Vanilla 均值。** Vanilla
+   平均为 `65.3235 s/请求`，run_02 为 `44.7622 s`，改善 `31.48%`；
+   P95 从 `79.5103 s` 降到 `67.7917 s`，改善 `14.74%`。相对唯一保存明细
+   的 Vanilla，14/16 个 paired 请求更快。
+2. **收益来自更早接受，不是已知代码语义改动。** run_02 相比 run_01 少
+   `36` 次 engine call，iterative wall 少 `305.42 s`，解释两轮 E2E 改善的
+   约 `82.2%`。但两次测试参数与 cold-cache 口径不完整一致，且两 commit
+   之间没有改变 average score 或接受状态机，必须先重复 run_02。
+3. **可见思考仍是最大成本中心。** run_02 initial + iterative thinking
+   wall 为 `492.89 s / 68.82% E2E`；阈值、首段和 stride 是主要算法优化变量。
+4. **短 probe 仍有净收益。** 1650 个 hidden token 使可见思考相对全部走满
+   3072 token 少 24064 token，净少 22414 个模型生成 token；不能直接取消。
+5. **阈值存在可测空间，但必须绑定质量。** run_02 静态回放显示
+   `prob_th=0.89` 可让 5 个请求更早接受，少走约 `95.24 s` 已观测 phase wall；
+   较早 final 的真实时延、内容和语义质量尚未测量。
+6. **工程优化上界较小。** prefill 占 E2E `10.28%`，排除首次 initial
+   prefill 后的绝对上界为 `7.97%`；queue、decision、controller CPU 和客户端
+   gap 均非主项。
+7. **质量只完成结构检查。** `_SUMMARY.csv` 已修复“非空错误字符串计真”的
+   聚合问题，run_00 正确显示为 `12.5%`；run_02 为 16/16 `Judge=True` 且
+   final 全部自然 stop，但 `Judge` 只评价 final JSON 结构，语义正确率与非劣
+   界仍未采集。
 
 ## 3. 成本模型
 
@@ -83,32 +84,30 @@ $$
 
 最新同日汇总来自 [`docs/log/test_results/_SUMMARY.csv`](../log/test_results/_SUMMARY.csv)：
 
-| 指标 | Vanilla 新基线（3 次均值） | run_01 | run_01 差值 |
-|---|---:|---:|---:|
-| 样本数 | 16 | 16 | — |
-| 平均时延 | **65.3235 s** | 67.9792 s | **+2.6557 s / +4.07%** |
-| 时延 Q1 | 56.2285 s | **54.9850 s** | **-1.2435 s / -2.21%** |
-| 时延中位数 | **66.0511 s** | 66.7248 s | **+0.6737 s / +1.02%** |
-| 时延 P95 | **79.5103 s** | 94.4605 s | **+14.9502 s / +18.80%** |
-| 平均可见 token | 4526.21 | **2579.25** | **-1946.96 / -43.02%** |
-| 总可见 token/次 | 72419.33 | **41268** | **-31151.33** |
-| final JSON 结构正确率 | 100%（1 次明细） | 100% | 0 |
+| 指标 | Vanilla 新基线（3 次均值） | run_01 | run_02 | run_02 相对 Vanilla |
+|---|---:|---:|---:|---:|
+| 样本数 | 16 | 16 | 16 | — |
+| 平均时延 | 65.3235 s | 67.9792 s | **44.7622 s** | **-20.5613 s / -31.48%** |
+| 时延 Q1 | 56.2285 s | 54.9850 s | **32.5439 s** | **-42.12%** |
+| 时延中位数 | 66.0511 s | 66.7248 s | **39.7866 s** | **-39.76%** |
+| 时延 P95 | 79.5103 s | 94.4605 s | **67.7917 s** | **-14.74%** |
+| 平均可见 token | 4526.21 | 2579.25 | **2015.06** | **-55.48%** |
+| 总可见 token/次 | 72419.33 | 41268 | **32241** | **-55.48%** |
+| final JSON 结构正确率 | 100%（1 次明细） | 100% | 100% | 0 |
 
 **聚合实测：** 三次 Vanilla 的平均时延范围为
-`63.1573–67.2567 s/请求`，run_01 比三次中最慢的一次仍慢 `1.07%`。
-Q1 略好而 P95 明显退化，优化目标应聚焦于阶段化思考 decode 和尾部接受轮次，
-并量化多 phase 对 batching/TPOT 的损失。
+`63.1573–67.2567 s/请求`。run_02 不仅优于三次均值，也低于其中最快一次；
+但 Vanilla 轮次与 run_02 没有完全一致的 sampling/cache manifest，因此它是
+强相关证据，不是严格代码因果。
 
 **配对实测：** 当前保存的一次 Vanilla 明细
-`vanilla_..._09-27-57.csv` 与 run_01 在规范化 CRLF/LF 后，16 个 QA_ID 的
-问题和参考答案逐条一致；run_01 仅 5/16 更快，paired delta 平均
-`+2.4226 s`、中位数 `+3.7218 s`。
+`vanilla_..._09-27-57.csv` 与 run_02 在规范化 CRLF/LF 后，16 个 QA_ID 的
+问题和参考答案逐条一致；run_02 有 14/16 更快，paired delta 平均
+`-20.7944 s`、中位数 `-22.4341 s`。两个退化请求均在第 4 轮才接受。
 
-**数据质量实测：** `_SUMMARY.csv` 的“正确率”当前不能直接使用：run_00
-明细只有 2/16 的 `Judge` 为字面量 `True`，其余 14 条是 JSON 解析错误
-字符串，但汇总仍为 `1.0`，说明聚合过程把非空错误字符串也计为真。本文只把
-明细中 `Judge == True` 的请求计为结构通过；另两次无明细 Vanilla 的 `1.0`
-保留为待复核值。
+**数据质量实测：** `_SUMMARY.csv` 已改为只把字面量 `True` 计作结构通过；
+run_00 从错误的 `1.0` 修正为 `0.125`。另两次无明细 Vanilla 的 `1.0`
+仍只能作为汇总值，无法从逐请求文件复核。
 
 **证据边界：** 另外两次 Vanilla 仅有汇总，所有 Vanilla 轮次都没有 phase
 数据。sampling params、seed、warmup 和 cache 初态也未采集，不能把差值视为
@@ -149,6 +148,32 @@ prompt 和 generated counter delta 与 phase 完全一致。run_01 相比 run_00
 **实测：** 12/16 个请求在 1–4 轮 probe 内接受，4 个走满；50-token probe
 成本为 2401 hidden token，却相对“所有请求都走满 3072 thinking token”
 少生成 14329 visible token，当前不应直接取消。
+
+### 3.5 run_02 请求级归因
+
+[`run_02/RESULT.md`](../log/perf/run_02/RESULT.md) 保存完整账本、配对结果和
+离线回放：
+
+| Phase | 调用数 | wall | 客户端 E2E 占比 | prefill | decode | 生成 token |
+|---|---:|---:|---:|---:|---:|---:|
+| initial_think | 16 | 321.39 s | 44.87% | 16.50 s | 300.43 s | 16384 |
+| iterative_think | 17 | 171.51 s | 23.95% | 12.52 s | 156.82 s | 8704 |
+| confidence_probe | 33 | 79.98 s | 11.17% | 32.91 s | 43.74 s | 1650 |
+| final_answer | 16 | 141.23 s | 19.72% | 11.67 s | 127.85 s | 7153 |
+
+**实测：** phase 解释客户端 E2E 的 `99.7198%`；同进程 Prometheus 的
+82 次 engine call、370399 prompt token、33891 generated token 和 150528
+cached token 与 phase 精确一致。run_02 相比 run_01 的 iterative 调用从
+37 降到 17，iterative wall 降 `64.04%`，是两轮差异的主因。
+
+**实测：** 16 个请求接受轮次分布为 `8/2/3/3`；33 个 probe 全部使用
+`average_fallback`。启用 Value-Min 的反事实 raw score 后，16 个实际接受
+probe 中只有 2 个仍能达到 `0.90`，在获得语义收益证据前不应启用。
+
+**源码确定：** 16/16 effective decision branch 都是 fixed，预算字段来源与
+请求 override 一致；但 task classifier 扫描完整 prompt，固定说明中的
+“classify actions” 会让全部请求被标记为 classification。fixed branch 下不
+影响本轮预算；动态预算实验前必须先只分类真实任务区段并增加黄金测试。
 
 ## 4. 当前执行路径与成本放大器
 
@@ -208,24 +233,25 @@ confidence probe 由 `PerformancePolicy` 固定为最多 50 token，并通过
 
 ## 5. 优化优先级
 
-### P0：语义质量门与可复现 Vanilla 配对
+### P0：重复 run_02，并建立语义质量门
 
-run_01 与已保存明细的新 Vanilla 均为 16/16 `Judge=True`，但另外两次基线
-无法复核，且尚未证明诊断规划语义非劣。在继续减少 thinking 前，必须修正
-正确率聚合为“仅字面量 True 成功”，为每次重复保存客户端明细和 metrics，
-固定 sampling params、seed、到达顺序、warmup、cache 初态，并预先声明语义
-质量非劣界。
+run_02 与已保存明细的新 Vanilla 均为 16/16 `Judge=True`，但尚未证明诊断
+规划语义非劣，也没有足够重复排除生成轨迹波动。先完全复用 run_02 payload、
+到达顺序、并发 4 和 cold cache 再重复至少 2 次；每轮保存客户端明细、
+metrics、phase 与 manifest。固定 seed（若后端支持）并预先声明语义质量非劣
+界。`_SUMMARY.csv` 的字面量 True 聚合已修复。
 
 ### P1：先校准置信度阈值
 
 保持 `check=1024 / stride=512 / rounds=4 / probe=50`，做单变量
-`0.90 → 0.88 → 0.875`；`0.85` 只作为探索下界。run_01 轨迹静态回放：
+`0.90 → 0.89 → 0.88 → 0.875`；`0.85` 只作为探索下界。run_02 轨迹静态回放：
 
-| prob_th | 改变请求 | 静态少走 phase wall | 少生成 visible think |
-|---:|---:|---:|---:|
-| 0.88 | 4 | 125.77 s | 4096 |
-| 0.875 | 5 | 131.34 s | 4280 |
-| 0.85 | 11 | 393.90 s | 13319 |
+| prob_th | 改变请求 | 静态少走 phase wall | 少生成 visible think | 少生成后续 probe |
+|---:|---:|---:|---:|---:|
+| 0.89 | 5 | 95.24 s | 4096 | 400 |
+| 0.88 | 5 | 120.09 s | 5120 | 500 |
+| 0.875 | 5 | 132.43 s | 5632 | 550 |
+| 0.85 | 7 | 182.25 s | 7680 | 750 |
 
 这些不是已测收益；阈值改变 final prompt 和答案，必须按相同 QA_ID 做质量/E2E
 配对。
@@ -233,24 +259,25 @@ run_01 与已保存明细的新 Vanilla 均为 16/16 `Judge=True`，但另外两
 ### P1：再缩减可见思考预算
 
 分别测试 `check_length=512`、`think_stride=256`、`num_thinking=3`，不要一开始
-做全因子。run_01 中 8 个请求到达 round 4；若轮数改为 3，已观测路径会少走
-8 次 round-4 probe 和 4 次 terminal stride，wall 合计 57.69 秒。首段和
-stride 减半有更大 token 上界，但也更可能改变质量与接受轮次。
+做全因子。run_02 只有 3 个请求到达 round 4；若轮数改为 3，已观测路径最多
+少走 3 次 round-4 probe，wall 合计 `5.95 s / 0.83% E2E`，优先级低。首段
+和 stride 减半的静态 decode 上界约为 `150.2 s` 和 `78.4 s`，但更可能改变
+质量与接受轮次，且两个上界不能相加。
 
 `fixed_num_thinking=4` 全失败时的最大思考量实际是
 `1024 + 4×512 = 3072`；`fixed_budget_tokens=10000` 不绑定，只是硬上限。
+切换 task/difficulty/history 动态预算前，必须先修复完整 prompt 引起的
+classification 误判，不能直接移除 fixed overrides 做性能对照。
 
 ### P2：保持语义的 APC / resumable
 
-run_01 prefill 合计 101.40 秒，占 E2E 9.32%；排除首次 initial prefill 后，
-所有后续 prefill 的绝对上界为 83.90 秒 / 7.71%。iterative/probe/final 的
-phase cache 比例已经达到 53.28% / 42.35% / 57.12%，且 cached token 随
-轮次出现 1536、3072、4608，不再是 run_00 的固定 1536。
+run_02 prefill 合计 `73.61 s / 10.28% E2E`；排除首次 initial prefill 后，
+所有后续 prefill 的绝对上界为 `57.11 s / 7.97%`。phase cached token 与
+Prometheus 本轮精确一致，旧 run_01 的 1536-token 口径缺口不再阻塞分析。
 
-先校正 phase 与 Prometheus cached token 相差 1536 的口径，再做并发 1/4
-对照。只有增长前缀仍有稳定缺口时，才在 DEER 验证“主思考链 resumable、
-probe 独立分支”的方案；不能改变 token 序列、采样状态、取消语义或原生
-priority/LoRA/trace/DP 上下文。
+做并发 1/4 对照后，只有增长前缀仍有稳定缺口时，才在 DEER 验证“主思考链
+resumable、probe 独立分支”的方案；不能改变 token 序列、采样状态、取消语义
+或原生 priority/LoRA/trace/DP 上下文。
 
 ### P3：暂缓普通 Python 与调度微优化
 
@@ -530,13 +557,14 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 - 平均和 P95 `paired_net_gain_ms > 0`；
 - 任务质量达到预先定义的非劣界；
 - `hidden_probe_tokens`、`probe_rounds`、`generate_calls` 有硬上限且日志可审计；
-- 总模型生成量必须包含 hidden probe；按三次 Vanilla 均值，run_01 虽净少
-  约 `1796.6 token/请求`，E2E 仍多 `2.6557 s/请求`，当前不满足验收；
+- 总模型生成量必须包含 hidden probe；按三次 Vanilla 均值，run_02 净少约
+  `2408.0 token/请求`，平均 E2E 改善 `20.5613 s/请求`，时延指标已达到
+  单轮候选标准，但仍缺语义非劣和重复验证；
 - 流式取消、非流式聚合、异常、超时和 DP/priority 透传测试通过；
 
 ## 11. 本轮实现与下一轮实验
 
-### 11.1 已落地但尚待服务器量化
+### 11.1 已落地实现与 run_02 遥测状态
 
 - `TimingCollector` 增加真实模型工作账本：`visible_think_tokens`、`hidden_probe_tokens`、`final_answer_tokens`、`generate_calls`。
 - 每个 `decision / initial_think / iterative_think / confidence_probe / final_answer` 输出 schema 1 的 `TB_PHASE`；若 vLLM stats 可用，则从 child `RequestOutput` 计算 queue/prefill/decode，并记录 `num_cached_tokens`。
@@ -555,37 +583,44 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 - 在线历史增加 parent request 幂等、非阻塞 JSONL writer 和未评分语义；error/cancel 不进入 token 分位数。
 - `dtb.patch` 已在固定的 vLLM `v0.23.0` checkout 上通过 `git apply --check`；本地 41 个无模型单元测试覆盖预算分支与覆盖优先级、三状态轨迹、trial collector、置信度与补充遥测、历史闭环、写入失败隔离、phase 账本、浅拷贝、`n=1` 契约与原生路由上下文。
 
-这些属于**源码确定/本地测试**，不是目标 NPU 的性能实测。尤其结构化 phase 日志本身仍有一次 JSON 序列化与 flush 成本；它替代了更多旧日志，但必须在服务器用 A/B 量化。
+run_02 已在目标 NPU 上验证 BudgetPlan、字段来源、confidence method/raw、
+pair count 与 `accept_reason` 的持久化完整性，并以 phase/Prometheus 精确闭环。
+其余接口、异常和流式行为仍属于**源码确定/本地测试**，不能写成目标 NPU
+性能实测。结构化 phase 日志本身仍有一次 JSON 序列化与 flush 成本，但
+run_02 controller CPU 与 E2E residual 已表明它不是当前主项。
 
-### 11.2 run_01 已确认的结论
+### 11.2 run_02 已确认的结论
 
-- **实测：** run_01 相比 run_00 总 E2E 降 63.31%，15/16 个 paired
-  QA_ID 更快；固定 50-token probe 已将 hidden probe token 降 96.79%。
-- **实测：** thinking wall 占 E2E 76.52%，probe wall 只占 9.87%；优化
-  第一变量必须从 probe 长度转向 threshold 与 visible budget。
-- **实测：** 50-token probe 以 2401 hidden token 换回 14329 visible
-  thinking token 的提前退出空间，当前有正的模型工作量收益。
-- **实测：** APC 已出现随轮次增长的 1536/3072/4608 cached token；
-  prefill 的总上界只有 9.32%，不是第一收益项。
-- **实测：** run_01 与已保存明细的新 Vanilla 均为 16/16
-  `Judge=True`；run_01 final 全部自然 stop，语义质量未评分。另两次
-  Vanilla 只有存在聚合缺陷的汇总正确率，不能据此确认 100%。
-- **实测：** 三次 Vanilla 平均为 `65.3235 s/请求`，run_01 慢 `4.07%`，
-  P95 慢 `18.80%`；旧的“平均略优”结论不再成立。
-- **采集缺口：** phase 与 Prometheus cached token 相差 1536；
-  sampling params、seed、warmup/cache 初态仍缺失；另外两次 Vanilla 只有
-  汇总，没有逐请求明细。
+- **实测：** run_02 相比三次 Vanilla 均值，平均/P95 时延改善
+  `31.48% / 14.74%`；相比保存的 Vanilla 明细，14/16 个 paired QA_ID
+  更快。
+- **实测：** run_02 相比 run_01 总 E2E 降 `34.15%`；iterative wall
+  单项减少 `305.42 s`，约解释总改善的 `82.2%`。
+- **实测：** thinking wall 占 E2E `68.82%`，probe wall 占 `11.17%`；
+  threshold、initial check 和 stride 是优先变量。
+- **实测：** 50-token probe 以 1650 hidden token 换回 24064 visible
+  thinking token，净少 22414 个模型生成 token。
+- **实测：** prefill 总上界为 `10.28%`，排除首次 initial 后为 `7.97%`；
+  phase 与同进程 Prometheus 的 call、prompt、generated、cached token 全部
+  精确一致。
+- **实测：** run_02 为 16/16 `Judge=True` 且 final 全部自然 stop；仅证明
+  JSON 结构正确，语义质量未评分。`_SUMMARY.csv` 的旧聚合缺陷已修复。
+- **源码确定/证据边界：** run_01 到 run_02 的 TB 运行时代码没有改变
+  average score 或接受状态机；34.15% 改善不能归因于 telemetry commit。
+  random seed、精确到达节奏仍缺失，另两次 Vanilla 没有逐请求明细。
 
 ### 11.3 下一轮服务器测试
 
-使用相同 16 个 QA_ID，按随机交错顺序运行，至少 3 个重复。第一批只做阈值
-单变量：
+先使用完全相同的 run_02 payload、到达顺序、并发 4 和 cold cache 重复至少
+2 次，确认当前候选可复现。之后使用相同 16 个 QA_ID、随机交错顺序运行每个
+变体至少 3 次。第一批只做阈值单变量：
 
 ```text
 T0 = prob_th 0.90
-T1 = prob_th 0.88
-T2 = prob_th 0.875
-T3 = prob_th 0.85（探索）
+T1 = prob_th 0.89
+T2 = prob_th 0.88
+T3 = prob_th 0.875
+T4 = prob_th 0.85（探索）
 ```
 
 第二批以 T0 为控制，分别测试：
@@ -600,19 +635,19 @@ B3 = num_thinking 3
 token、phase wall/queue/prefill/decode、JSON 结构分和语义质量分。单变量通过
 非劣界后再组合，不允许先组合阈值和预算导致无法归因。
 
-另做两个工程诊断：
+另做三个工程/算法诊断：
 
-1. 为每次 vanilla 保存同口径客户端明细与 metrics，解释“少 43.02%
-   可见 token 但平均慢 4.07%”的 batching/TPOT 差异；
-2. 并发 1/4 对照 APC，校正 cached-token 口径，再决定是否研究 resumable
-   main chain。
+1. 为每次 Vanilla 保存同口径客户端明细、请求参数、metrics 与 cache 初态；
+2. 修复 task classifier 读取完整 prompt 导致的 classification 误判并增加
+   16 个样本的黄金测试，再考虑 task/difficulty/history 动态预算；
+3. 并发 1/4 对照 APC，再决定是否研究 resumable main chain。
 
 ### 11.4 继续固定 50-token probe
 
-`trial_answer_length=50` 继续作为当前 `PerformancePolicy` 不变量。48/49 个
-run_01 probe 以 length 结束，不能直接复用为平均 403-token 的 final。若未来
-重新做 probe 长度消融，必须建立新 policy version，并与 threshold/budget
-实验分开。
+`trial_answer_length=50` 继续作为当前 `PerformancePolicy` 不变量。run_02
+的 33/33 probe 均以 length 结束，不能直接复用为平均约 447-token 的 final。
+若未来重新做 probe 长度消融，必须建立新 policy version，并与
+threshold/budget 实验分开。
 
 ## 12. 外部版本依据
 
@@ -627,6 +662,7 @@ run_01 probe 以 length 结束，不能直接复用为平均 403-token 的 final
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-07-27 | 纳入 run_02 的 16 请求明细、98 条 phase、同进程 metrics 和完整 BudgetPlan/confidence 遥测；从模板生成 manifest；更新 Vanilla 与验收结论 | run_02 相对三次 Vanilla 均值平均/P95 改善 31.48%/14.74%，但主要来自无法归因于代码提交的更早接受，必须先重复并补语义质量门 |
 | 2026-07-25 | 纳入三次新 Vanilla 汇总和一次 16 请求明细；纠正 run_01 相对 Vanilla 的结论；发现“正确率”把解析错误字符串计真的聚合缺陷；phase 增加 BudgetPlan 来源与置信度决策遥测；manifest 不再要求三个仓库 dirty | 三次基线均值显示 run_01 平均慢 4.07%、P95 慢 18.80%；结构质量只能按明细中的字面量 `True` 计数 |
 | 2026-07-24 | 纳入 run_01 的 16 请求客户端明细、134 条 phase 和同进程 metrics；确认平均时延略优于 vanilla、P95 仍退化，成本中心由长 probe 转为可见思考；新增阈值/预算/APC 分级方案 | 重构后的 hidden probe 已降 96.79%，旧“先缩 probe”优先级不再适用 |
 | 2026-07-24 | 将 manifest 模板移到 `docs/log/perf/` 作为优化阶段公共基线，固化 vLLM/vLLM-Ascend commit、CANN 9.0.1 和既有运行环境；补充逐轮 override/dirty/配置/完整性要求 | 避免每轮重复填固定环境，同时防止把固定版本误当成已确认的运行时源码与配置身份 |
