@@ -3,8 +3,10 @@
 ## 1. 设计目的
 
 本文设计 Think Budget 从“单场景固定参数可获得收益”走向“服务端开启后自动
-选择安全且有效的策略”的实施方案。目标是在 13 个产品慢思考场景上尽量扩大
-端到端时延收益，同时用独立的产品留出集和通用任务集约束质量退化与场景过拟合。
+选择有效策略”的实施方案。第一优先级是在 13 个产品慢思考场景上，在语义质量
+非劣的硬约束下最大化端到端时延改善；通用任务只承担最低限度的泛化校验。
+生产灰度、在线自适应和自动回滚不进入第一阶段关键路径，等算法候选收敛后再
+实施。
 
 设计起点：
 
@@ -21,6 +23,10 @@
 
 这是一次受质量约束的性能优化与自动策略选择设计，不是单纯的任务分类器扩词，
 也不是让线上用户继续传递 `fixed_*` 超参数。
+
+2026-07-31 优先级裁决：原计划中的完整生产验证链路偏重，修订为“先离线寻优、
+再生产化”的两阶段方案。设计起点仍保持上述 revision；本次只调整达到原目标的
+实施路径。
 
 ### 1.1 “开启即优化”的操作定义
 
@@ -49,9 +55,10 @@ auto_net_gain
 本计划覆盖：
 
 - 13 个产品场景的数据分层、预算策略发现、路由与留出验证；
-- 通用/OOD 任务的质量和性能护栏；
+- 通用/OOD 任务的最低限度质量护栏；
 - `_decide()`、任务分类、难度估计、历史预算和配置模型的演进；
-- 请求级 telemetry、实验产物、灰度、回滚和验收。
+- 请求级 telemetry、实验产物和验收；
+- 算法候选收敛后的生产灰度、回滚和在线历史。
 
 本计划不改变已经裁决的首版性能策略：
 
@@ -63,6 +70,28 @@ auto_net_gain
 - 不恢复 answer list、soft truncation 或候选答案复用。
 
 MTP 维持生产默认，不作为本轮泛化实验变量。
+
+### 1.3 两阶段实施边界
+
+```mermaid
+flowchart LR
+    A["阶段一：算法寻优<br/>13 场景基线与质量门"] --> B["逐场景质量合格最优参数"]
+    B --> C["合并少量 profile"]
+    C --> D["自动路由离线/测试环境验证"]
+    D --> E["产品留出 + 通用集最低校验"]
+    E --> F{"达到阶段一验收?"}
+    F -- 否 --> B
+    F -- 是 --> G["阶段二：生产化<br/>服务内自动路由、灰度、回滚"]
+```
+
+| 阶段 | 第一目标 | 必做 | 明确推迟 |
+| --- | --- | --- | --- |
+| 阶段一：算法寻优 | 在声明的候选空间内获得质量合格的最大产品 E2E 改善 | Vanilla 配对基线、语义质量门、逐场景 oracle、profile 合并、自动路由测试、一次产品留出和通用集检查 | 生产 shadow/canary、自动回滚、在线 history、延迟质量回填、完整漂移监控 |
+| 阶段二：生产化 | 将阶段一候选安全地变成 `auto on/off` 产品能力 | 原生旁路、PolicyBundle、接口回归、灰度、监控、回滚 | 新一轮无证据的算法扩展 |
+
+阶段一可以继续通过请求级 fixed override 或实验 harness 下发候选参数，不要求
+先完成 `dtb.patch` 的自动路由改造。这样先回答“哪些参数和 profile 真正快且
+质量合格”，再承担服务化成本。
 
 ## 2. 当前结论与问题定义
 
@@ -116,19 +145,23 @@ final answer。自动策略选择目标为：
 
 ```text
 最大化：
-  产品场景等权宏平均 gain_latency
-  + 真实流量加权 gain_latency
-  - 尾时延和最坏场景退化惩罚
+  阶段一主指标 gain_latency_product
+  = 预先选择的产品场景等权宏平均或真实流量加权 gain_latency
 
 约束：
   每个产品场景的质量非劣
   产品宏平均质量非劣
-  通用/OOD 集质量非劣
+  通用/OOD 集最低质量检查通过
   隐藏 token、内部调用、错误和取消有硬上限
 ```
 
-等权宏平均防止大数据集掩盖小场景退化；流量加权指标反映实际业务收益。二者
-必须同时报告，不能互相替代。
+如果尚无可信流量权重，阶段一默认用 13 场景等权宏平均作为唯一排序主指标；
+流量加权、P50、P95 和最坏场景同时报告，但不再组成复杂的联合目标。存在可信
+权重时，可在第一轮实验前将流量加权均值声明为主指标。等权与流量加权不能在
+看到候选结果后互换。
+
+“最大”指声明候选空间和实验预算内的 `best_observed`，不声称找到连续超参数
+空间的数学全局最优。候选空间、停止搜索条件和最小有意义时延差写入 manifest。
 
 ### 3.2 质量门
 
@@ -145,7 +178,7 @@ QualityContract
   minimum_effective_samples
 ```
 
-质量门必须在查看候选策略的密封留出结果前固定。新增语义质量分上传后，根据
+质量门必须在查看候选策略的产品留出结果前固定。新增语义质量分上传后，根据
 其量纲、基线方差和产品容忍度填写 `non_inferiority_margin`；本文不以结构
 正确率替代语义质量，也不预设一个不适用于所有场景的统一分值差。
 
@@ -154,7 +187,8 @@ QualityContract
 1. 解析错误、工具名/参数错误、关键事实错误等 `hard_failure` 不得新增；
 2. 每个产品场景的 paired quality delta 单侧置信区间下界不得越过非劣界；
 3. 产品等权宏平均和流量加权质量都必须非劣；
-4. 通用/OOD 集独立通过同样的非劣判断；
+4. 阶段一只对最终自动策略运行一次通用/OOD 质量检查；不要求每个搜索候选
+   都跑完整通用测试；
 5. 只有全部通过后才按时延选择候选。
 
 小数据集不应以“均值碰巧没降”判定通过。样本数不足以建立有效区间时，结果为
@@ -162,7 +196,8 @@ QualityContract
 
 ### 3.3 性能门
 
-质量通过后，再比较：
+质量通过后，阶段一按预声明的产品 E2E 主指标排序；以下指标用于解释和发现
+明显回归，不与主指标组成新的加权优化函数：
 
 - paired E2E mean、P50、P95 和单侧置信区间；
 - visible thinking、hidden probe、final 和 total generated token；
@@ -172,9 +207,20 @@ QualityContract
 - `auto_net_gain`、受控请求条件收益、策略覆盖率；
 - 相对“每场景最佳合格固定参数”的自动路由 regret。
 
-候选策略必须至少在产品宏平均 E2E 上有正净收益。具体最坏场景容忍值、P95
-目标和最低自动覆盖率应在第一次 13 场景摸底后写入 campaign manifest，不能
-在看到最终结果后调整。
+阶段一候选必须在产品 E2E 主指标上有正净收益，并尽可能保留逐场景 oracle 的
+收益。`oracle_retention_target` 在摸底后、最终 profile 选择前写入 manifest。
+P95、最坏场景和覆盖率在阶段一默认是报告项；只有业务方预先声明其为硬要求时
+才成为准入门。阶段二再为生产发布补充 P95、错误率和覆盖率门。
+
+### 3.4 两阶段验收摘要
+
+| 验收项 | 阶段一：算法候选 | 阶段二：生产能力 |
+| --- | --- | --- |
+| 产品质量 | 每场景与宏平均通过预声明非劣界 | 沿用阶段一合同并做 canary 复核 |
+| 产品性能 | `best_observed` 自动策略最大化预声明 E2E 主指标；报告 oracle retention | 生产 canary 相对 Vanilla 仍保持正净收益 |
+| 通用性 | 最终候选做一次独立 OOD 质量检查和路由拒识检查 | 未验证/OOD 请求可原生旁路 |
+| 可靠性 | 只要求实验无错误、账本完整、结果可复现 | stream/non-stream、取消、异常、版本错误、灰度和回滚全部通过 |
+| 历史 | 不启用在线 history；可离线评估难度 bucket | 先 shadow，证明额外收益后才 bounded |
 
 ## 4. 核心概念
 
@@ -252,7 +298,8 @@ RouteDecision
 
 ### 4.4 PolicyBundle
 
-`PolicyBundle` 是离线验证后随服务部署的只读策略包：
+`PolicyBundle` 是阶段二才实现的、随服务部署的只读策略包；阶段一用普通
+`policy_candidates.json` 保存相同信息即可：
 
 ```text
 PolicyBundle
@@ -274,7 +321,8 @@ PolicyBundle
 
 ### 4.5 HistoryPrior
 
-离线 13 场景实验得到的先验使用显式 `HistoryPrior`，不伪造成
+`HistoryPrior` 属于阶段二的可选增强。离线 13 场景实验得到的先验使用显式
+`HistoryPrior`，不伪造成
 `inference_history.jsonl` 中的历史请求：
 
 ```text
@@ -294,6 +342,10 @@ HistoryPrior
 这样可以区分“经过质量验证的离线先验”和“线上尚未评分的观测”。
 
 ## 5. 目标决策流程
+
+下图是阶段二的服务内目标流程。阶段一只在实验 harness 中执行相同的
+TaskView/RouteDecision/profile 选择，并继续通过 fixed override 运行候选，
+不要求先改 serving 路径。
 
 ```mermaid
 flowchart TD
@@ -318,7 +370,8 @@ flowchart TD
 
 ### 5.1 原生旁路
 
-新增 `NATIVE_BYPASS` 是泛化质量的关键护栏：
+阶段二新增 `NATIVE_BYPASS` 作为泛化质量护栏；阶段一统计时将被拒识样本按
+Vanilla 的实测结果计入自动策略：
 
 - OOD 或低置信路由默认旁路；
 - 没有经当前模型版本验证的 profile 时旁路；
@@ -371,7 +424,8 @@ native
 
 1. 先测试父 profile；
 2. 只有父 profile 在该场景质量通过但性能明显非最优，才搜索专用候选；
-3. 专用候选在开发集、交叉留出和密封留出都优于父 profile 才晋级；
+3. 专用候选先在优化集 group OOF 上优于父 profile 才进入最终候选；产品留出
+   只在 profile 集合冻结后的 A4 使用；
 4. 数据不足、收益不稳定或路由不可分时继续使用父 profile。
 
 run_02 的 `check=1024 / stride=512 / rounds=4 / min=100 /
@@ -398,8 +452,9 @@ Vanilla reasoning token 分位数和已观测 accept round，而不是对 1–60
 2. threshold 通过质量门后，分别缩放 check 和 stride；
 3. 再测试 rounds/max_visible_think；
 4. 单变量候选筛出后才组合；
-5. 用开发集上的 successive halving 或约束贝叶斯搜索减少完整服务器实验数；
-6. 密封留出只评估最终少量候选，不参与继续调参。
+5. 优先用简单的 successive halving 减少完整服务器实验数；只有已有搜索工具
+   时才使用约束贝叶斯搜索，不为阶段一新建复杂调参平台；
+6. 产品留出只评估最终少量候选，不参与继续调参。
 
 run_02 的 `0.90 → 0.89 → 0.88 → 0.875` 离线回放仍可用于该 profile
 预筛，但回放不能替代真实 final 和质量测试。
@@ -414,7 +469,8 @@ run_02 的 `0.90 → 0.89 → 0.88 → 0.875` 离线回放仍可用于该 profil
 
 ### 5.5 难度估计
 
-首版不直接启用当前 0–1 连续难度到 400–6000 token 的宽区间外推。改为
+阶段一静态 profile 未收敛前不启用当前 0–1 连续难度到 400–6000 token 的
+宽区间外推。只有 A4 显示明显的 profile 内 oracle regret 时，才尝试
 profile 内的离散、有界调整：
 
 ```text
@@ -467,7 +523,8 @@ p_safe_stop = calibrate(
 
 ### 5.7 历史预算
 
-历史功能遵循“先验与观测分离、成本与质量分离、只做有界调整”：
+在线历史整体推迟到阶段二。届时遵循“先验与观测分离、成本与质量分离、只做
+有界调整”：
 
 1. 13 场景已验证结果写入 `PolicyBundle/HistoryPrior`，不预填伪历史请求；
 2. 线上历史 key 至少包含 `profile_id + model_revision +
@@ -495,7 +552,7 @@ probe_net_gain
 - probe wall
 ```
 
-若开发集上 probe 净收益非正，该 profile 应优先 native bypass，而不是仅为
+若优化集上 probe 净收益非正，该 profile 应优先 native bypass，而不是仅为
 维持统一状态机强制 probe。动态 `should_probe()` 和按轮停止概率模型属于
 第二阶段优化；首版先用少量静态 profile 降低验证复杂度。
 
@@ -521,18 +578,20 @@ ScenarioCard
   sample_count
 ```
 
-13 个数据集不能直接全部作为调参集。需要：
+13 个数据集一旦用于调参，其中对应部分就是“优化集”，不能再作为最终测试
+证据。阶段一采用最低充分切分：
 
 - 去除精确和近重复样本；
 - 识别共享 system prompt、few-shot 和 schema 的模板族；
-- 按模板族/问题族分组切分，避免同模板样本跨开发与密封留出造成泄漏；
-- 保留每场景的开发集、校准集和密封留出集；
-- 如果样本过少，采用 group K-fold 产生 OOF 结果，但仍保留最终未触碰集；
+- 按模板族/问题族分成“优化集 + 产品留出集”，避免同模板跨组泄漏；
+- 优化集用于候选搜索和 profile 合并，产品留出只运行最终少量候选；
+- 样本过少时在优化集内使用 group K-fold，不再额外建立独立校准集；
 - 数据集 hash、split manifest 和 judge version 固定进实验产物。
 
 ### 6.2 通用/OOD 验证集
 
-通用集不是 13 场景的随机混合，应包含产品模板之外的独立任务族：
+阶段一只准备一个规模受控、覆盖主要风险的通用集，不为所有候选反复运行。
+它不是 13 场景的随机混合，应包含产品模板之外的独立任务族：
 
 - 数学和逻辑推理；
 - 代码生成/修复；
@@ -544,23 +603,26 @@ ScenarioCard
 - 特意包含会误触产品关键词、选项标记和 schema 文本的 adversarial routing
   样本。
 
-按能力类型等权报告，不能让大量短 QA 掩盖 hard reasoning 退化。通用集用于：
+按能力类型等权报告，不能让大量短 QA 掩盖 hard reasoning 退化。阶段一的
+通用集只用于：
 
-1. 训练/调参阶段的 OOD 开发子集；
-2. 完全隔离的 OOD 密封留出；
-3. 分类器拒识和 `general_safe` 的验证。
+1. 最终自动策略的一次质量 sanity check；
+2. 分类器对未知任务的拒识检查；
+3. 判断是否存在可安全复用的 `general_safe`。
 
 如果某类 OOD 没有合格 profile，native bypass 是正确结果。需要同时报告
 OOD 旁路率，防止以旁路全部请求“获得质量非劣”却声称算法已全面泛化。
+更大规模、多轮 OOD 和漂移验证放到阶段二。
 
 ### 6.3 基线和上界
 
-每轮至少包含：
+整个阶段一 campaign 包含以下基线和上界，不要求每个候选轮次都重跑全部变体；
+环境身份不变时可复用 A0 的 Vanilla：
 
 | 变体 | 作用 |
 | --- | --- |
 | `VANILLA` | 原生质量、时延和 token 基线 |
-| `CURRENT_AUTO` | 当前 task/difficulty/history 实现，识别已有行为 |
+| `CURRENT_AUTO` | 可选；只摸底一次当前 task/difficulty/history 行为 |
 | `GLOBAL_SAFE` | 不做专用路由的共享合格候选 |
 | `PROFILE_AUTO` | 本计划的自动路由策略 |
 | `SCENE_ORACLE` | 每场景离线最佳质量合格固定候选，只作为上界，不部署 |
@@ -570,86 +632,97 @@ OOD 旁路率，防止以旁路全部请求“获得质量非劣”却声称算�
 
 run_02 fixed 配置只在对应场景中作为额外锚点，不冒充 `GLOBAL_SAFE`。
 
-### 6.4 分阶段实验
+### 6.4 阶段一：快速算法寻优
 
-#### E0：摸底与基线冻结
+#### A0：最低充分基线
 
-1. 对 13 场景和 OOD 集运行 Vanilla 至少 3 个随机交错重复；
-2. 固定 sampling、seed、到达节奏、并发、cache 初态和 MTP；
-3. 上传并验证语义评分，填写每个 `QualityContract`；
-4. 记录 Vanilla reasoning/final token、E2E 和模板分布；
-5. 重复 run_02 两轮，确认现有单场景候选可复现。
+1. 固定 sampling、seed、到达节奏、生产并发、cache 初态和 MTP；
+2. 对 13 场景运行一次完整 Vanilla，记录样本级 E2E、reasoning/final token
+   和语义质量；
+3. 填写 `QualityContract`、产品主指标和场景权重；
+4. 对 run_02 场景再重复两次已知候选，确认现有收益不是单轮偶然；
+5. 只有最终候选和时延差接近噪声的候选才增加重复，不在初筛阶段把所有变体
+   固定运行三次。
 
-输出：基线 manifest、split、quality baseline、样本级明细和场景权重。
+输出：baseline manifest、优化/留出 split、样本级基线和实验预算。
 
-#### E1：路由 shadow
+#### A1：逐场景 oracle 搜索
 
-1. 实现 `TaskView` 和可拒识 `RouteDecision`；
-2. 所有请求仍走 Vanilla，仅记录路由建议；
-3. 用人工黄金标签报告 confusion matrix、margin、拒识率；
-4. 检查固定模板是否仍污染分类；
-5. 构建误路由损失矩阵，确定 `min_score/min_margin`。
+1. 先在每个场景优化集上独立搜索质量合格参数；
+2. threshold、check、stride、rounds 按第 5.4 节逐层筛选；
+3. 第一轮单次运行快速淘汰明显慢或质量失败候选；
+4. 对每场景前 2–3 个候选做随机交错重复和质量复核；
+5. 得到 `SCENE_ORACLE`，作为自动策略的性能上界。
 
-退出条件：run_02 的 16 个样本不再因固定 “classify actions” 误判，且所有
-高风险混淆均会被正确路由或拒识。
+退出条件：继续扩大相邻候选已不能带来超过 manifest 中
+`minimum_meaningful_gain` 的稳定收益，或实验预算耗尽；两种停止原因必须记录。
 
-#### E2：共享安全 profile
+#### A2：profile 合并
 
-1. 从 Vanilla token 分位数和 run_02 锚点生成少量候选；
-2. 在产品开发集和 OOD 开发集上做 threshold、check、stride、rounds 的
-   分阶段搜索；
-3. 选出同时通过质量门的 `general_safe`，否则保持 native；
-4. 测量 probe 净收益和 controlled coverage。
+1. 比较 13 个 oracle 的 BudgetVector、threshold、accept round 和误用代价；
+2. 从共享 profile 开始，将参数和响应曲线相近的场景合并；
+3. 用合并后的 profile 回放/复测对应场景；
+4. 只有合并造成的时延损失超过 `oracle_retention_target` 或质量失败时才
+   拆分 profile；
+5. 输出最少 profile 数量与最高产品主指标之间的 Pareto 候选。
 
-退出条件：共享 profile 在声明覆盖范围内质量非劣，产品宏平均时延有正净
-收益，并且没有未解释的 P95/错误回归。
+退出条件：选出一个 `PROFILE_SET_CANDIDATE`，质量合格且达到预声明的 oracle
+收益保留目标。
 
-#### E3：层次化专用 profile
+#### A3：自动路由验证
 
-1. 按候选预算响应曲线聚合场景；
-2. 只对父 profile 明显非最优的组做专用搜索；
-3. 对每次拆分做 group OOF 和密封留出验证；
-4. profile 数量、覆盖率和 oracle regret 一起报告；
-5. 无稳定增益的专用 profile 合并回父级。
+阶段一不先改 vLLM 服务入口。使用离线/测试 harness：
 
-退出条件：每个专用 profile 都有独立收益证据和可靠生产路由特征。
+1. 从现有 `conversation/request` 构造 `TaskView`；
+2. 在优化集内用 group OOF 生成 `RouteDecision`；
+3. 按路由结果下发对应 fixed profile；拒识样本按 Vanilla 计入；
+4. 报告分类 confusion、拒识率、auto-vs-oracle regret 和全量
+   `auto_net_gain`；
+5. 修复 run_02 固定 “classify actions” 污染等高损失误路由。
 
-#### E4：难度和历史消融
+退出条件：自动路由后的产品主指标为所有质量合格自动候选中的
+`best_observed`，且达到 oracle 收益保留目标。
 
-依次比较：
+#### A4：一次最终检查
 
-```text
-profile only
-profile + difficulty bucket
-profile + offline prior
-profile + shadow online history
-```
+1. 冻结 profile、路由规则和全部超参数；
+2. 对产品留出执行冻结的自动路由并运行最终候选，候选数量限制为 1 个主候选
+   和至多 1 个保守备选，二者的使用优先级预先声明；
+3. 对通用/OOD 小集运行一次质量和拒识检查；
+4. 最终候选做至少 3 个随机交错重复，报告 paired E2E、质量、total token
+   和 phase 账本；
+5. 形成阶段一 `RESULT.md`，决定是否进入阶段二。
 
-只有某层在质量门内继续提升 `auto_net_gain`，才进入下一层。不得一次同时
-启用难度、历史和新分类规则后只报告组合结果。
+阶段一不要求 production shadow、canary、在线 history、自动回滚、原子 bundle
+热更新或完整漂移监控。
 
-#### E5：密封留出和发布候选
+### 6.5 阶段二：生产化验证
 
-1. 冻结 classifier、PolicyBundle 和全部超参数；
-2. 一次性运行产品与 OOD 密封留出；
-3. 计算分层 paired bootstrap 置信区间；
-4. 做 13 场景多重比较控制或报告同时置信区间；
-5. 失败后回到开发阶段，新版本不得重复查看并继续拟合原密封留出；
-6. 形成只读 release bundle 和完整验证摘要。
+只有 A4 通过后才执行：
 
-### 6.5 服务器测试控制
+1. 将冻结的 profile 和路由规则打包为只读 `PolicyBundle`；
+2. 在 vLLM serving 中实现一次 auto decision 和原生旁路；
+3. 补齐 stream/non-stream、取消、异常、LoRA、priority、parser、DP rank
+   回归；
+4. 先 shadow，再 canary，验证生产负载下仍保留正净收益；
+5. 增加按 profile 回滚和最低限度漂移监控；
+6. 只有静态 profile 仍存在显著 oracle regret 时，再依次评估 difficulty
+   bucket 和在线 history。
+
+### 6.6 服务器测试控制
 
 沿用性能 runbook，并额外要求：
 
 - 同一样本的各变体按 block 随机交错，避免温度、负载和 cache 时间漂移；
-- cold/warm cache 作为显式实验层，不混合汇总；
-- 并发至少包含生产默认和并发 1 诊断；
+- 阶段一固定一种与生产一致的 cache 初态，不同时展开 cold/warm 两层；
+- 阶段一以生产并发为正式数字；只有结果异常时才补并发 1 诊断；
 - 每个外部请求按 `parent_request_id` 关联所有 phase；
-- 保存 routing、profile、difficulty/history source 和实际 BudgetPlan；
+- 阶段一保存候选/profile/route 和实际 BudgetPlan；difficulty/history 未启用时
+  不增加对应实验；
 - 语义 judge 与生成服务解耦，judge 版本和提示 hash 入 manifest；
 - profiler 结果不进入正式时延数字。
 
-### 6.6 汇总表
+### 6.7 汇总表
 
 每个场景输出：
 
@@ -670,6 +743,10 @@ profile + shadow online history
 ## 7. 配置与核心数据结构
 
 ### 7.1 新增结构
+
+阶段一只需要 `TaskView`、`RouteDecision` 和 `BudgetProfile` 的实验侧表示；
+`ExecutionAction`、`PolicySource`、`AutoBudgetDecision` 和正式
+`PolicyBundle` 留到阶段二服务集成。
 
 ```python
 @dataclass(frozen=True)
@@ -744,7 +821,8 @@ class AutoBudgetDecision:
 
 ### 7.2 配置模型
 
-建议将当前 `TASK_TYPES` 的可编辑预算升级为版本化策略包，YAML 只保留：
+阶段一继续使用 fixed override 和实验侧候选文件，不先重构生产 YAML。阶段二
+再将当前 `TASK_TYPES` 的可编辑预算升级为版本化策略包，YAML 只保留：
 
 ```text
 AUTO_ROUTING
@@ -781,6 +859,8 @@ telemetry 标记。
 
 ### 8.1 核心接口
 
+阶段一实验侧接口：
+
 ```python
 def build_task_view(
     conversation,
@@ -793,11 +873,21 @@ def build_task_view(
 
 def route_task(
     task_view: TaskView,
-    policy_bundle: PolicyBundle,
+    routing_rules,
 ) -> RouteDecision:
     """返回可拒识路由和可审计证据。"""
 
 
+def select_experiment_profile(
+    route: RouteDecision,
+    profiles: tuple[BudgetProfile, ...],
+) -> BudgetProfile | None:
+    """选择实验 profile；None 表示本样本按 Vanilla 计入。"""
+```
+
+阶段二服务侧接口：
+
+```python
 def select_auto_budget(
     route: RouteDecision,
     task_view: TaskView,
@@ -818,7 +908,14 @@ def record_quality_observation(
     """为延迟质量信号幂等回填历史；不得阻塞生成响应。"""
 ```
 
-调用关系：
+阶段一调用关系：
+
+1. 实验 harness 从原始 `conversation/request` 构造 `TaskView`；
+2. 为样本生成 route 和 profile；
+3. profile 通过已有 fixed override 下发，拒识样本复用 Vanilla 结果；
+4. 不修改 vLLM serving，不读在线 history。
+
+阶段二调用关系：
 
 1. vLLM serving 完成原生 prompt 解析和 DP/LoRA/trace 上下文构造；
 2. `build_task_view()`、`route_task()` 和 `select_auto_budget()` 只执行一次；
@@ -826,7 +923,30 @@ def record_quality_observation(
 4. `CONTROLLED` 才创建 `RequestStateContext` 和三状态机；
 5. 两条路径都记录同一 schema 的 parent-level auto decision。
 
-### 8.2 文件级修改
+### 8.2 阶段一文件级修改
+
+#### 实验 harness 与配置
+
+- 增加候选生成、逐场景运行、质量过滤、profile 合并和自动路由汇总；
+- 通过现有请求级 fixed override 下发 BudgetVector/threshold；
+- 产出 `SCENE_ORACLE`、`PROFILE_SET_CANDIDATE` 和 auto-vs-oracle regret；
+- 不要求先新增正式 PolicyBundle。
+
+#### `optimizations/task_type_budget.py` 与 `scene_classifier.py`
+
+- 支持从结构化 `TaskView` 或实验数据中的真实任务区段分类；
+- 增加词边界、独立选项行、排除区、score/margin 门和 unknown；
+- 返回命中 evidence code；
+- 删除“任意 confidence > 0 即 task matched”；
+- 先供离线路由验证，暂不切换生产 `_decide()`。
+
+#### 遥测和提取工具
+
+- 复用现有 phase schema，保证候选、BudgetPlan、visible/hidden/final token
+  和 parent E2E 可配对；
+- 增加实验结果侧的 scenario/profile/route 字段，不先修改生产 Prometheus。
+
+### 8.3 阶段二文件级修改
 
 #### `dtb.patch`
 
@@ -855,11 +975,8 @@ def record_quality_observation(
 
 #### `optimizations/task_type_budget.py` 与 `scene_classifier.py`
 
-- 统一结构化输入和证据；
-- 增加词边界、独立选项行、排除区、score/margin 门和 unknown；
-- 返回命中 evidence code；
-- 删除“任意 confidence > 0 即 task matched”；
-- 保留兼容 API 直到新黄金测试和 server shadow 通过。
+- 将阶段一已验证的 TaskView 路由接入生产 `_decide()`；
+- 保留兼容 API 直到 server shadow 通过。
 
 #### `optimizations/difficulty_estimator.py`
 
@@ -892,7 +1009,8 @@ def record_quality_observation(
 
 ### 9.1 Decision telemetry
 
-每个请求记录一条：
+阶段一只在实验结果中记录 route/profile，不改生产热路径。以下 schema 在
+阶段二接入服务后每个请求记录一条：
 
 ```json
 {
@@ -920,8 +1038,26 @@ def record_quality_observation(
 
 ### 9.2 Campaign 目录
 
+阶段一的必需产物只有：
+
 ```text
-docs/log/perf/generalization/<campaign_id>/
+manifest.json
+split_manifest.json
+policy_candidates.json
+requests.jsonl
+controller_phases.jsonl
+quality_results.jsonl
+per_scenario.csv
+macro_summary.csv
+metrics.before.prom
+metrics.after.prom
+RESULT.md
+```
+
+以下是阶段二生产化后的完整目录；阶段一不要求为了填满目录而生成无用文件：
+
+```text
+docs/log/perf/<campaign_run_id>/
 ├── manifest.json
 ├── scenario_cards.json
 ├── split_manifest.json
@@ -943,42 +1079,47 @@ docs/log/perf/generalization/<campaign_id>/
 
 - dataset/split/judge hash；
 - candidate generation code revision；
-- classifier/profile/bundle version；
+- classifier/profile version；阶段二再增加 bundle version；
 - traffic weights；
-- 质量非劣界、P95/最坏场景/coverage 准入值；
-- 是否为开发、校准或密封留出；
-- history mode 和 prior identity。
+- 质量非劣界、产品 E2E 主指标、`minimum_meaningful_gain` 和
+  `oracle_retention_target`；P95/最坏场景/coverage 只有被声明为硬要求时记录
+  准入值；
+- 是否为优化集或产品留出；
+- 阶段二才记录 history mode 和 prior identity。
 
 ## 10. 测试计划
 
-### 10.1 无模型单元测试
+### 10.1 阶段一最低测试集
 
 - `TaskView` 不包含 system/few-shot/schema 正文；
 - 同一 user task 在不同 chat template 下得到同一路由；
 - “classify actions” 只出现在固定说明时不会命中 classification；
 - `A.` 只有在独立选项行且数量满足规则时命中；
 - top score、margin、unknown 和拒识原因；
-- 低置信、bundle 缺失、版本不符和异常都 native bypass；
-- validated profile 选择和父 profile 回退；
-- difficulty bucket 不越出验证包络；
-- 未评分 history 不降低预算；
-- quality 回填幂等；
-- fixed debug override 的优先级和 telemetry；
-- controlled/native 两条路径只做一次决策；
-- stream/non-stream、取消、错误、LoRA、priority、parser 和 DP 上下文不回归。
+- profile 合并与 oracle retention 计算正确；
+- 拒识样本以 Vanilla 计入 `auto_net_gain`；
+- fixed experiment override 的预算与实际 BudgetPlan 一致；
+- phase token 账本包含 hidden probe。
 
 ### 10.2 黄金路由测试
 
-建立三组：
+建立两组最低黄金数据：
 
 1. 13 场景真实任务区段的人工 semantic label；
-2. 对应完整模板 prompt，用于证明模板不污染；
-3. OOD/adversarial 样本，用于验证 unknown 和危险误路由。
+2. 少量完整模板和 OOD/adversarial 样本，用于证明模板不污染并验证 unknown。
 
 断言不仅包括 label，还包括 profile、拒识和 evidence code。规则升级必须报告
 新旧 confusion 与 misroute regret。
 
-### 10.3 服务器验收
+### 10.3 阶段一服务器验收
+
+- 每个场景至少得到一个质量合格 oracle，或明确记录该场景无合格控制器候选；
+- 最终 profile 自动策略通过产品留出和一次 OOD 检查；
+- 最终候选至少 3 次随机交错重复；
+- phase 与客户端 E2E/total generated token 可闭环；
+- 没有客户端错误、空响应或新增 hard failure。
+
+### 10.4 阶段二生产验收
 
 - native bypass 与完全关闭特性的请求输出、usage、sampling 和 engine call
   数一致；
@@ -988,9 +1129,12 @@ docs/log/perf/generalization/<campaign_id>/
 - policy bundle 原子更新和故障回退；
 - cold/warm cache、并发 1/生产并发；
 - 流式断开、非流式、超时和引擎错误；
-- 13 场景与 OOD 密封留出通过第 3 节质量和性能门。
+- production canary 通过第 3.4 节阶段二质量和性能门。
 
-## 11. 灰度、漂移与回滚
+## 11. 阶段二：灰度、漂移与回滚
+
+本节不属于阶段一验收，不应阻塞 13 个产品集的参数搜索、profile 合并和最终
+候选选择。只有阶段一 A4 通过并决定进入生产集成后才实施。
 
 发布顺序：
 
@@ -1055,6 +1199,8 @@ decode 和可用性依赖。先用结构化输入、可拒识规则和 native fa
 
 - **目标一致性**：优化指标包含所有开启请求和 hidden probe，不能用条件收益
   或 completion usage 代替端到端收益。
+- **阶段一致性**：阶段一只以算法候选和最低泛化检查验收，PolicyBundle、
+  canary、在线 history 和自动回滚不得成为其前置条件。
 - **概念一致性**：semantic task、budget profile、dataset scenario 和 history
   key 不混用。
 - **路由完备性**：每个请求只能得到 controlled 或 native bypass；所有拒识、
@@ -1062,86 +1208,106 @@ decode 和可用性依赖。先用结构化输入、可拒识规则和 native fa
 - **状态完备性**：只有 controlled 进入 Thinking/Probe/Final；native 不创建
   控制器 child request。
 - **质量一致性**：结构正确率、语义质量和 hard failure 分开报告。
-- **统计一致性**：开发、校准、密封留出和 OOD 不交叉；候选选择不能回看密封
-  留出继续调参。
+- **统计一致性**：优化集、产品留出和 OOD 不交叉；候选选择不能回看产品留出
+  继续调参。
 - **历史一致性**：未评分记录不推导成功率，不把策略截断后的 token 当作质量
   最优预算。
 - **接口一致性**：stream/non-stream、LoRA、priority、trace、parser、DP rank
   和取消语义在 controlled/native 两条路径保持原生上下文。
 - **性能一致性**：相同模型、采样、到达节奏、并发、cache 和 MTP 下配对；
   profiler 时延不与正式实验混用。
-- **配置一致性**：正式 profile 只能来自已验证 PolicyBundle；YAML 或 bundle
-  失败采用 native-safe fallback。
+- **配置一致性**：阶段一候选必须关联 manifest；阶段二正式 profile 只能来自
+  已验证 PolicyBundle，YAML 或 bundle 失败采用 native-safe fallback。
 - **可调试性**：每个自动决策记录 version、evidence、profile、field source
   和 fallback reason，能从产物离线重放。
 
 ## 14. 实施顺序与退出条件
 
-### P0：冻结评价合同
+### 阶段一：算法寻优
 
-1. 上传 13 场景样本级摸底结果和语义质量分；
-2. 完成 ScenarioCard、去重、group split 和 QualityContract；
-3. 冻结 Vanilla 基线与产品/OOD 准入值；
-4. 重复 run_02，确认单场景锚点。
+#### S1.0 基线和评价合同
 
-退出：质量指标可在样本级配对，split/judge/manifest 可复现。
+上传 13 场景样本级结果与语义分，完成优化/留出 split、QualityContract、
+Vanilla 基线和主指标声明。
 
-### P1：TaskView、拒识和原生旁路
+退出：质量和 E2E 可以按同一 QA_ID 配对，manifest 可复现。
 
-1. 修复完整 prompt 分类；
-2. 实现统一 RouteDecision；
-3. 增加 native bypass；
-4. 补黄金路由与 vLLM 原生回归；
-5. 服务器 shadow。
+#### S1.1 逐场景 oracle
 
-退出：高风险误路由被消除或拒识，native 与完全关闭行为一致。
+使用 fixed override 完成 A1，得到每场景质量合格的最佳已观测候选。
 
-### P2：PolicyBundle 与共享 profile
+退出：13 个场景各有 oracle 或明确的“无质量合格候选”结论。
 
-1. 实现只读 bundle 和版本校验；
-2. 完成 E2 的共享候选搜索；
-3. 形成 `general_safe` 或明确保持 native；
-4. 完成 parent/phase telemetry schema 2。
+#### S1.2 profile 合并
 
-退出：声明覆盖范围内质量非劣且全流量产品宏平均净收益为正。
+完成 A2，在 profile 数量与 oracle 收益保留之间选择 Pareto 点。
 
-### P3：层次化专用 profile
+退出：`PROFILE_SET_CANDIDATE` 达到预声明 `oracle_retention_target`。
 
-1. 完成 13 场景响应曲线和 archetype 聚类；
-2. 只拆分有证据的专用 profile；
-3. 降低 auto-vs-oracle regret；
-4. 完成产品与 OOD 密封留出。
+#### S1.3 自动路由
 
-退出：每个 profile 都有稳定路由、独立质量与收益证据。
+修复 TaskView 分类污染，在实验 harness 中完成 route → fixed profile，并把
+拒识样本按 Vanilla 计入全量收益。
 
-### P4：难度与历史
+退出：自动策略的产品主指标为质量合格候选中的 `best_observed`，且高损失
+误路由已消除或拒识。
 
-1. 难度改成 profile-specific validated bucket；
-2. 离线先验显式入 bundle；
-3. delayed quality 回填；
-4. history shadow 和 bounded canary。
+#### S1.4 最终检查
 
-退出：相对 profile-only 继续提高净收益，且没有历史自反馈或漂移回归。
+冻结后只运行产品留出、一次通用/OOD 检查和最终候选 3 次交错重复。
 
-### P5：生产灰度
+阶段一总验收：
 
-按 profile canary、扩大和自动回滚，保留 Vanilla control。默认产品接口只暴露
-`auto on/off`，不要求用户理解内部参数。
+1. 每个产品场景及产品宏平均质量通过非劣界；
+2. 产品 E2E 主指标为声明搜索空间中的 `best_observed`；
+3. 达到 oracle 收益保留目标，或明确记录未达到的路由/profile 原因；
+4. 通用/OOD 检查没有新增 hard failure，未知任务能拒识；
+5. total generated token 包含 hidden probe，phase 与客户端账本可闭环；
+6. 形成进入阶段二或继续算法搜索的明确决策。
+
+### 阶段二：生产化
+
+#### S2.0 服务集成
+
+实现 PolicyBundle、服务内一次 auto decision 和 native bypass。
+
+#### S2.1 接口回归
+
+验证 stream/non-stream、取消、异常、LoRA、priority、parser、trace 和 DP。
+
+#### S2.2 灰度与回滚
+
+按 profile shadow/canary，增加生产监控和回滚；保留 Vanilla control。
+
+#### S2.3 可选动态增强
+
+只有静态 profile 仍存在显著 oracle regret 时，才依次评估 difficulty bucket、
+离线 prior 和 bounded online history。
+
+阶段二总验收：
+
+1. native bypass 与关闭特性的原生行为一致；
+2. 生产 canary 仍满足阶段一质量合同和正 E2E 净收益；
+3. 接口、异常、取消和上下文透传不回归；
+4. profile 级回滚可用；
+5. 默认产品接口只暴露 `auto on/off`。
 
 ## 15. 执行前需要固化的输入
 
-以下信息缺失不妨碍当前设计，但会阻塞 E0 之后的候选准入：
+以下第 1–5 项会阻塞阶段一 S1.0 之后的候选准入；第 6 项只影响阶段二路由：
 
 1. 13 个数据集的样本数、模板族、重复关系和预期流量权重；
 2. 新增语义质量分的量纲、judge 版本、样本级结果与基线方差；
 3. 每个场景不可接受的 hard failure；
-4. 产品宏平均、最坏场景、P95 和最低 coverage 的准入值；
-5. 可用的独立通用/OOD 数据集及其 scorer；
-6. 线上是否存在可信的产品内部场景 metadata。它可作为可选强证据，但正式
-   自动模式不能依赖用户传一组超参数。
+4. 阶段一采用等权还是流量加权产品 E2E 主指标，以及
+   `minimum_meaningful_gain/oracle_retention_target`；
+5. 可用的小规模独立通用/OOD 数据集及其 scorer；
+6. 线上是否存在可信的产品内部场景 metadata。它可作为阶段二的可选强证据，
+   但正式自动模式不能依赖用户传一组超参数。
 
 ## 16. 变更历史
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-07-31 | 重构为“算法寻优 → 生产化”两阶段，简化阶段一数据切分、重复、OOD、接口与产物要求 | 以 13 个产品集最大 E2E 改善为首要目标，避免灰度、在线 history 和自动回滚阻塞算法收敛 |
 | 2026-07-30 | 创建 Think Budget 泛化性实施计划 | 将单场景固定参数收益转化为 13 产品场景与 OOD 约束下的自动策略、实验和发布方案 |
