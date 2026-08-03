@@ -387,16 +387,26 @@ flowchart TD
 ```text
 docs/log/perf/<run_id>/
 ├── manifest.json
-├── requests.jsonl
-├── controller_phases.jsonl
-├── phase_summary.csv
+├── extraction_manifest.json
+├── request_index.csv
+├── test_results/
+│   ├── _SUMMARY.csv
+│   └── <具体结果文件>.csv
+├── extracted/
+│   └── <具体结果文件名去扩展名>/
+│       ├── requests.jsonl
+│       ├── controller_phases.jsonl
+│       └── phase_summary.csv
 ├── metrics.before.prom
 ├── metrics.after.prom
 ├── server.log
-├── quality_summary.csv
 ├── torch_profile/ or ascend_profile/
 └── RESULT.md
 ```
+
+`server.log` 固定在 run 根目录。`_SUMMARY.csv` 与结果 CSV 可以在根目录，也可以在
+`test_results/` 等子目录；提取时递归搜索整个 run，但每个文件名必须唯一。顺序执行
+多个数据集且中间复用同一服务做 Judge 时，目录边界不依赖两轮之间的等待时长。
 
 `manifest.json` 至少记录：TB commit、该 commit 中 `dtb.patch` 的集成身份、
 vLLM/vLLM-Ascend/torch/torch-npu/CANN 版本、模型与 tokenizer revision、
@@ -436,8 +446,7 @@ curl -s http://127.0.0.1:41016/metrics \
 # 发送端到端请求
 curl -s http://127.0.0.1:41016/metrics \
   > docs/log/perf/<run_id>/metrics.after.prom
-python tools/extract_tb_phase_metrics.py \
-  docs/log/perf/<run_id>/server.log docs/log/perf/<run_id>/
+python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>/
 ```
 
 固定基线发生变化时，才刷新模板引用的公共证据：
@@ -466,11 +475,25 @@ curl -s http://127.0.0.1:41016/version \
 请求完成后从服务日志提取标准产物：
 
 ```bash
-python tools/extract_tb_phase_metrics.py \
-  docs/log/perf/<run_id>/server.log docs/log/perf/<run_id>/
+python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>/
 ```
 
-脚本生成 `controller_phases.jsonl`、`requests.jsonl` 和 `phase_summary.csv`；其中 `requests.jsonl.accounted_phase_wall_ms` 是顺序 phase 的计量和，不等于客户端 HTTP E2E，必须按 `parent_request_id` 与客户端结果配对。
+提取器固定读取 `<run_id>/server.log`，递归查找唯一 `_SUMMARY.csv`，再在同一 run
+内解析 summary 引用的全部具体结果 CSV；明细必须包含 `request_id`。提取器用这些 ID 与
+`TB_PHASE.parent_request_id` 精确等值关联，并为每个具体结果文件生成独立的
+`extracted/<result_stem>/controller_phases.jsonl`、`requests.jsonl` 和
+`phase_summary.csv`。未出现在结果 CSV 中的旧请求和 Judge phase 只计入
+`extraction_manifest.json.excluded_phase_records`，不进入任何被测目录。
+
+`request_index.csv` 是逐客户端结果行的关联审计；首末匹配日志行用于确认顺序和发现
+交错请求，不参与归属裁决，也不等于客户端 HTTP 测试的精确起止时间。原生路径未打印
+该 request ID 时首末行允许为空；Vanilla 没有内部 phase 时允许生成空 phase 文件。
+`requests.jsonl.accounted_phase_wall_ms` 是顺序 phase 的计量和，不等于客户端 HTTP
+E2E，最终 E2E 仍读取原始结果 CSV。Judge 可以在每个数据集后复用同一服务运行，但
+必须在下一数据集开始前完成；Judge 自身耗时不得写入被测客户端的 `耗时(s)` 字段。
+服务器文件可能不会完整上传到 GitHub，因此应在服务器上先执行提取；至少回传
+`extraction_manifest.json`、`request_index.csv`、每个结果的 `requests.jsonl` 与
+`phase_summary.csv`，完整 `controller_phases.jsonl` 仍可按体积选择是否上传。
 
 3. 请求结束后保存同一端口的 `/metrics`：
 
@@ -662,6 +685,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-03 | 按结果 CSV 的 `request_id` 隔离跨数据集 phase；提取命令收敛为单一 run 目录参数，固定读取根部 `server.log` 并递归发现唯一 summary 与全部结果 CSV | 适配数据集后复用同一服务做 Judge 的现有流程；一次实验的日志和客户端结果已同属一个 run，无需依赖 10 秒空档或重复传入可推导路径 |
 | 2026-07-31 | 泛化运行时统一为 `scene → budget/reject`，删除 task type 分类、预算和动态注册；配置合并为 `SCENES`；phase schema 2 增加路由证据、拒识原因、有效预算、难度/history 与决策模块耗时 | 修复完整 prompt 污染和双分类概念冲突，为 13 场景 Vanilla/DTB/fixed 数据回传建立可解释的自动策略入口 |
 | 2026-07-27 | 纳入 run_02 的 16 请求明细、98 条 phase、同进程 metrics 和完整 BudgetPlan/confidence 遥测；从模板生成 manifest；更新 Vanilla 与验收结论 | run_02 相对三次 Vanilla 均值平均/P95 改善 31.48%/14.74%，但主要来自无法归因于代码提交的更早接受，必须先重复并补语义质量门 |
 | 2026-07-25 | 纳入三次新 Vanilla 汇总和一次 16 请求明细；纠正 run_01 相对 Vanilla 的结论；发现“正确率”把解析错误字符串计真的聚合缺陷；phase 增加 BudgetPlan 来源与置信度决策遥测；manifest 不再要求三个仓库 dirty | 三次基线均值显示 run_01 平均慢 4.07%、P95 慢 18.80%；结构质量只能按明细中的字面量 `True` 计数 |

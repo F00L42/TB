@@ -67,9 +67,13 @@ Think Budget 不依赖 vLLM/Python 的日志等级；运行期诊断直接写入
 `RUNTIME.verbose_stage_logging: true` 可临时恢复 `TB_STAGE`/`TB_CONFIDENCE` 的详细 enter/complete 日志；生产性能实验保持默认 `false`。用以下命令把服务日志转成标准产物：
 
 ```bash
-python tools/extract_tb_phase_metrics.py \
-  docs/log/perf/<run_id>/server.log docs/log/perf/<run_id>/
+python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>/
 ```
+
+run 根目录必须包含 `server.log`，其下必须有唯一 `_SUMMARY.csv` 及 summary 引用的全部
+逐请求结果 CSV；CSV 可以位于 `test_results/` 等子目录。提取器会自动发现输入，按结果
+CSV 的 `request_id` 精确过滤，并在 `extracted/<result_stem>/` 下生成互相隔离的 phase
+产物。
 
 可据此检索 `request_id`，定位请求是否停在初始思考、某次 rethink、trial 置信度检查或最终回答阶段；日志不包含 prompt、trial answer 或最终答案正文。
 

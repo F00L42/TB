@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import csv
 import io
 import json
+import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from types import SimpleNamespace
 
 from think_budget_vllm_adapter.telemetry import TimingCollector
 from tools.extract_tb_phase_metrics import (
+    load_test_result_specs,
+    main as extract_phase_metrics,
     parse_phase_records,
     summarize_phases,
     summarize_requests,
@@ -291,6 +296,133 @@ class PhaseLogExtractionTests(unittest.TestCase):
         )
         self.assertEqual(phases["confidence_probe"]["generated_tokens_total"], 8)
         self.assertEqual(phases["confidence_probe"]["queue_ms_known"], 0)
+
+    def test_request_id_bound_extraction_isolates_results_and_excludes_judge(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            run_dir = root / "run_04"
+            test_results_dir = run_dir / "test_results"
+            test_results_dir.mkdir(parents=True)
+            result_a = test_results_dir / "dtb_scene_a.csv"
+            result_b = test_results_dir / "dtb_scene_b.csv"
+            summary = test_results_dir / "_SUMMARY.csv"
+            server_log = run_dir / "server.log"
+
+            for path, request_ids in (
+                (result_a, ["request-a1", "request-a2"]),
+                (result_b, ["request-b1"]),
+            ):
+                with path.open("w", encoding="utf-8-sig", newline="") as file:
+                    writer = csv.DictWriter(file, fieldnames=["request_id", "耗时(s)"])
+                    writer.writeheader()
+                    for request_id in request_ids:
+                        writer.writerow({"request_id": request_id, "耗时(s)": "1.0"})
+
+            with summary.open("w", encoding="utf-8-sig", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=["结果文件名", "平均时延"])
+                writer.writeheader()
+                writer.writerow({"结果文件名": result_a.name, "平均时延": "1.0"})
+                writer.writerow({"结果文件名": result_b.name, "平均时延": "1.0"})
+
+            def phase(request_id: str, phase_name: str = "decision") -> str:
+                return "TB_PHASE " + json.dumps({
+                    "schema": 2,
+                    "parent_request_id": request_id,
+                    "phase": phase_name,
+                    "wall_ms": 1.0,
+                    "generated_tokens": 0,
+                })
+
+            server_log.write_text("\n".join([
+                phase("old-request"),
+                "TB_ROUTE event=selected request_id=request-a1 controller=think_budget",
+                phase("request-a1"),
+                phase("judge-request", "final_answer"),
+                phase("request-a2", "final_answer"),
+                "TB_PROFILE request_id=request-a2 profile={}",
+                phase("request-b1"),
+            ]) + "\n", encoding="utf-8")
+
+            stream = io.StringIO()
+            with redirect_stdout(stream):
+                extract_phase_metrics([str(run_dir)])
+
+            manifest = json.loads(
+                (run_dir / "extraction_manifest.json").read_text(
+                    encoding="utf-8"))
+            result_manifest = {
+                row["result_file"]: row for row in manifest["results"]
+            }
+            extracted_a = run_dir / "extracted" / result_a.stem
+            phases_a = [
+                json.loads(line)
+                for line in (extracted_a / "controller_phases.jsonl").read_text(
+                    encoding="utf-8").splitlines()
+            ]
+
+            self.assertEqual(manifest["total_phase_records_in_log"], 5)
+            self.assertEqual(manifest["selected_phase_records"], 3)
+            self.assertEqual(manifest["excluded_phase_records"], 2)
+            self.assertEqual(
+                {row["parent_request_id"] for row in phases_a},
+                {"request-a1", "request-a2"},
+            )
+            self.assertEqual(
+                result_manifest[result_a.name]["first_matching_log_line"], 2)
+            self.assertEqual(
+                result_manifest[result_a.name]["last_matching_log_line"], 6)
+            self.assertEqual(
+                result_manifest[result_a.name]["interleaved_other_phase_records"],
+                1,
+            )
+            self.assertEqual(manifest["server_log"], "server.log")
+            self.assertEqual(manifest["summary"], "test_results/_SUMMARY.csv")
+            self.assertEqual(
+                result_manifest[result_a.name]["source_path"],
+                "test_results/dtb_scene_a.csv",
+            )
+            self.assertFalse((run_dir / "phase_summary.csv").exists())
+            self.assertIn("excluded 2 unrelated phases", stream.getvalue())
+
+    def test_duplicate_request_id_across_result_files_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            result_paths = [root / "scene_a.csv", root / "scene_b.csv"]
+            for path in result_paths:
+                with path.open("w", encoding="utf-8", newline="") as file:
+                    writer = csv.DictWriter(file, fieldnames=["request_id"])
+                    writer.writeheader()
+                    writer.writerow({"request_id": "same-request"})
+            summary = root / "_SUMMARY.csv"
+            with summary.open("w", encoding="utf-8", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=["结果文件名"])
+                writer.writeheader()
+                for path in result_paths:
+                    writer.writerow({"结果文件名": path.name})
+
+            with self.assertRaisesRegex(ValueError, "belongs to both"):
+                load_test_result_specs(root, summary)
+
+    def test_summary_alone_resolves_details_from_archived_child(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            archived = root / "archived"
+            archived.mkdir()
+            result = archived / "dtb_scene.csv"
+            with result.open("w", encoding="utf-8", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=["request_id"])
+                writer.writeheader()
+                writer.writerow({"request_id": "request-1"})
+            summary = root / "_SUMMARY.csv"
+            with summary.open("w", encoding="utf-8", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=["结果文件名"])
+                writer.writeheader()
+                writer.writerow({"结果文件名": result.name})
+
+            specs = load_test_result_specs(root, summary)
+
+            self.assertEqual([spec.source_path for spec in specs], [result.resolve()])
+            self.assertEqual(specs[0].request_rows, {"request-1": 2})
 
 
 if __name__ == "__main__":

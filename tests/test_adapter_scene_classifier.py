@@ -38,7 +38,7 @@ class SceneClassifierTests(unittest.TestCase):
     ) -> None:
         root = Path(__file__).resolve().parents[1]
         path = next(
-            (root / "docs" / "log" / "test_results").glob("*07-27*.csv"))
+            (root / "docs" / "log").rglob("dtb_*07-27*.csv"))
         with path.open("r", encoding="utf-8-sig", newline="") as stream:
             rows = {row["QA_ID"]: row for row in csv.DictReader(stream)}
 

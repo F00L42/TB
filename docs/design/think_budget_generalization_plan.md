@@ -281,11 +281,35 @@ decision module timings
 probe 继续记录置信度方法、原始值、pair count、是否接受及原因。日志不记录 prompt 或
 回答正文。
 
-提取器兼容 schema 1 和 2，并输出：
+提取器兼容 schema 1 和 2，命令行只接收一个 `run_<id>` 目录。该目录根部必须有
+`server.log`，目录内必须恰有一个 `_SUMMARY.csv`，summary 引用的每个具体结果文件名
+也必须在目录内唯一可解析。多个数据集、Judge 和历史请求共用日志时，使用客户端结果
+CSV 中的 `request_id` 作为权威白名单，与 `TB_PHASE.parent_request_id` 做精确等值关联：
 
-- `controller_phases.jsonl`；
-- `requests.jsonl`；
-- `phase_summary.csv`。
+```text
+具体结果 CSV request_id
+  → 结果文件归属表
+  → server.log 中同 parent_request_id 的 phase
+  → 每个具体结果文件的独立提取目录
+```
+
+10 秒等待和首末日志行号只用于检查执行顺序，不作为归属条件。首末行表示已知
+`request_id` 在结构化服务日志中的可见范围，不等同于客户端 HTTP 测试的精确起止时间；
+原生路径完全不打印该 ID 时允许为 `null`。Judge 或旧请求没有出现
+在被测结果 CSV 的白名单中，因此即使 phase 与测试请求交错也会被排除。提取器同时输出
+`request_index.csv`，逐行记录结果 CSV 行号、是否在日志出现、phase 数及首末日志行；
+跨结果文件重复的非空 `request_id` 属于不可消歧输入，直接拒绝提取。Vanilla 没有
+`TB_PHASE` 是合法状态，客户端 E2E 结果仍归档，phase 文件为空。
+
+接口固定为：
+
+```bash
+python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
+```
+
+提取器不再接收或推导 run 外部输入，也不复制原始 CSV。若服务器产物未完整上传，必须
+先在服务器完成提取，再回传 `extraction_manifest.json`、`request_index.csv` 和各隔离
+目录中的摘要；GitHub 上缺失 `server.log` 或明细 CSV 的 run 不要求可重新执行提取。
 
 ## 5. 具体重构清单
 
@@ -360,17 +384,31 @@ fixed_prob_th = 0.93
 
 ### 6.3 回传产物
 
-每个 run 放到 `docs/log/perf/<run_id>/`：
+每个 run 放到 `docs/log/perf/<run_id>/`。测试脚本无法按场景切日志时，使用以下层级；
+`test_results` 下移为 run 的子目录，每个具体结果文件对应一个隔离的提取目录：
 
 ```text
-manifest.json
-client_requests.jsonl 或原始结果 CSV
-server.log
-controller_phases.jsonl
-requests.jsonl
-phase_summary.csv
-RESULT.md
+docs/log/perf/<run_id>/
+├── manifest.json
+├── server.log
+├── test_results/
+│   ├── _SUMMARY.csv
+│   └── <具体结果文件>.csv
+├── extraction_manifest.json
+├── request_index.csv
+├── extracted/
+│   └── <具体结果文件名去扩展名>/
+│       ├── controller_phases.jsonl
+│       ├── requests.jsonl
+│       └── phase_summary.csv
+└── RESULT.md
 ```
+
+`extraction_manifest.json` 记录整份服务日志中 phase 总数、被白名单选中的数量、排除
+数量，以及每个结果文件的请求覆盖率和首末匹配行。禁止把不同具体结果文件重新聚合到
+同一个 `phase_summary.csv`；跨场景比较在后续分析阶段从各隔离目录读取。`_SUMMARY.csv`
+和结果 CSV 可以直接放在 run 根目录，也可以放在 `test_results/` 等子目录；只要求在
+整个 run 下名称唯一。
 
 `manifest.json` 最低字段：
 
@@ -446,6 +484,11 @@ P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结�
       `max_visible_think`；
 - [x] schema 2 decision 日志能还原 scene 选择、拒识原因和所有有效预算来源；
 - [x] schema 1 历史日志仍可由提取器读取。
+- [x] 共享服务日志可按结果 CSV 的 `request_id` 精确拆分，旧请求和 Judge phase 不进入
+      被测结果目录；
+- [x] 每个具体结果文件有独立 `phase_summary.csv`，并有逐请求关联审计与首末日志行；
+- [x] 提取 CLI 只需一个 run 目录参数，并能递归发现唯一 summary 和结果 CSV；
+- [x] 所有原始输入均位于 `<run_id>` 内，Vanilla 无 phase 时仍可完整归档。
 
 ### 8.2 阶段一算法结果
 
@@ -471,3 +514,4 @@ P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结�
 | 2026-07-30 | 初版：定义 13 场景寻优、自动路由和生产化方案 |
 | 2026-07-31 | 调整为算法寻优优先、生产化后置的两阶段计划 |
 | 2026-07-31 | 根据评审删除强制语义类型、PolicyBundle 和重复指标；统一 scene，明确拒识门、history 无在线质量反馈目的、源码重构和三类服务器数据采集计划 |
+| 2026-08-03 | 增加共享服务日志的 request-id 白名单隔离；结果 CSV 下移到 run；提取接口收敛为单一 `run_<id>` 目录参数，自动发现固定日志、唯一 summary 和全部结果 CSV |
