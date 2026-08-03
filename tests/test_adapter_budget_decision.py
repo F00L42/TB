@@ -4,25 +4,23 @@ import unittest
 from unittest.mock import patch
 
 from think_budget_vllm_adapter.budget_controller import BudgetController
-from think_budget_vllm_adapter.context import (
-    AlgorithmConfig,
-    DecisionBranch,
-)
+from think_budget_vllm_adapter.context import AlgorithmConfig, DecisionBranch
 from think_budget_vllm_adapter.telemetry import TimingCollector
 
 
-def scene() -> dict:
+def route(
+    scene: str = "code_generation",
+    matched: bool = True,
+) -> dict:
     return {
-        "scene_type": "general",
+        "scene": scene if matched else "general",
+        "scene_matched": matched,
+        "candidate_scene": scene,
         "typical_tokens": 1000,
-        "scene_confidence": 0.5,
-    }
-
-
-def task(task_type: str = "coding", confidence: float = 1.0) -> dict:
-    return {
-        "task_type": task_type,
-        "task_confidence": confidence,
+        "top_score": 6.0 if matched else 2.0,
+        "second_score": 0.0,
+        "score_margin": 6.0 if matched else 2.0,
+        "reject_reason": None if matched else "below_min_score",
     }
 
 
@@ -40,25 +38,15 @@ class BudgetDecisionTests(unittest.TestCase):
     @patch(
         "think_budget_vllm_adapter.budget_controller.estimate_difficulty")
     @patch(
-        "think_budget_vllm_adapter.budget_controller.get_task_type_budget")
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.is_known_task_type",
-        return_value=True,
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_task_type",
-        return_value=task(),
-    )
+        "think_budget_vllm_adapter.budget_controller.get_scene_budget")
     @patch(
         "think_budget_vllm_adapter.budget_controller.classify_scene",
-        return_value=scene(),
+        return_value=route(),
     )
-    def test_fixed_budget_still_classifies_but_skips_dynamic_budget(
+    def test_fixed_budget_collects_route_but_skips_dynamic_budget(
         self,
-        classify_scene_mock,
-        classify_task_mock,
-        known_mock,
-        task_budget_mock,
+        classifier_mock,
+        scene_budget_mock,
         difficulty_mock,
     ) -> None:
         config = AlgorithmConfig(
@@ -67,17 +55,23 @@ class BudgetDecisionTests(unittest.TestCase):
             fixed_check_length=30,
             max_thinking_tokens=1000,
         )
+        trace: dict = {}
         plan = BudgetController._decide(
-            "prompt", config, self.timing, hard_token_limit=500)
+            "prompt",
+            config,
+            self.timing,
+            hard_token_limit=500,
+            decision_trace=trace,
+        )
 
         self.assertEqual(plan.decision_branch, DecisionBranch.FIXED)
         self.assertEqual(plan.budget.check_length, 30)
         self.assertEqual(plan.budget.min_think_budget, 120)
         self.assertEqual(plan.budget.num_thinking, 7)
         self.assertEqual(plan.hard_think_token_limit, 120)
-        classify_scene_mock.assert_called_once()
-        classify_task_mock.assert_called_once()
-        task_budget_mock.assert_not_called()
+        self.assertEqual(trace["route"]["scene"], "code_generation")
+        classifier_mock.assert_called_once()
+        scene_budget_mock.assert_not_called()
         difficulty_mock.assert_not_called()
 
     @patch(
@@ -94,7 +88,7 @@ class BudgetDecisionTests(unittest.TestCase):
         return_value={"difficulty": 0.5},
     )
     @patch(
-        "think_budget_vllm_adapter.budget_controller.get_task_type_budget",
+        "think_budget_vllm_adapter.budget_controller.get_scene_budget",
         return_value={
             "check_length": 100,
             "min_think_tokens": 50,
@@ -103,33 +97,19 @@ class BudgetDecisionTests(unittest.TestCase):
             "prob_th": 0.90,
         },
     )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.is_known_task_type",
-        return_value=True,
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_task_type",
-        return_value=task("statistics_aggregation"),
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_scene",
-        return_value=scene(),
-    )
-    def test_known_statistics_task_averages_each_vector_field_half_up(
+    @patch.object(BudgetController, "_match_scene", return_value=route())
+    def test_matched_scene_averages_each_vector_field_half_up(
         self,
-        _scene_mock,
-        _task_mock,
-        _known_mock,
-        _task_budget_mock,
+        _route_mock,
+        _scene_budget_mock,
         difficulty_mock,
         _difficulty_budget_mock,
     ) -> None:
         plan = BudgetController._decide(
-            "statistics", self.config, self.timing,
-            hard_token_limit=1000)
+            "statistics", self.config, self.timing, hard_token_limit=1000)
 
         self.assertEqual(
-            plan.decision_branch, DecisionBranch.TASK_DIFFICULTY)
+            plan.decision_branch, DecisionBranch.SCENE_DIFFICULTY)
         self.assertEqual(
             plan.budget.to_dict(),
             {
@@ -140,14 +120,10 @@ class BudgetDecisionTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            plan.source_by_field["num_thinking"]["rounding"],
-            "half_up",
-        )
+            plan.source_by_field["num_thinking"]["rounding"], "half_up")
         self.assertEqual(plan.confidence_threshold, 0.90)
         self.assertEqual(
-            plan.source_by_field["confidence_threshold"]["source"],
-            "task",
-        )
+            plan.source_by_field["confidence_threshold"]["source"], "scene")
         difficulty_mock.assert_called_once()
 
     @patch(
@@ -159,52 +135,46 @@ class BudgetDecisionTests(unittest.TestCase):
             "think_stride": 15,
             "prob_th": 0.93,
             "budget_mode": "warm_start",
-            "history_snapshot_id": "general:general:2:90",
+            "history_snapshot_id": "general:2:90",
         },
     )
     @patch(
         "think_budget_vllm_adapter.budget_controller.estimate_difficulty")
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_task_type",
-        return_value=task("general", 0.0),
+    @patch.object(
+        BudgetController,
+        "_match_scene",
+        return_value=route("planning", matched=False),
     )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_scene",
-        return_value=scene(),
-    )
-    def test_unmatched_task_uses_only_history(
+    def test_rejected_scene_uses_only_history(
         self,
-        _scene_mock,
-        _task_mock,
+        _route_mock,
         difficulty_mock,
         history_mock,
     ) -> None:
         config = AlgorithmConfig(
-            check_length=40,
-            min_think_budget=20,
-            num_thinking=3,
-            think_stride=10,
             history_stride_percentile=0.60,
             max_thinking_tokens=1000,
         )
+        trace: dict = {}
         plan = BudgetController._decide(
-            "unknown", config, self.timing,
-            hard_token_limit=1000)
+            "unknown",
+            config,
+            self.timing,
+            hard_token_limit=1000,
+            decision_trace=trace,
+        )
 
         self.assertEqual(plan.decision_branch, DecisionBranch.HISTORY)
+        self.assertEqual(plan.scene, "general")
+        self.assertFalse(plan.scene_matched)
         self.assertEqual(plan.budget.think_stride, 15)
         self.assertEqual(plan.confidence_threshold, 0.93)
         self.assertEqual(plan.percentile_step, 0.60)
         self.assertEqual(
-            plan.history_snapshot_id, "general:general:2:90")
+            trace["history"]["history_snapshot_id"], "general:2:90")
         difficulty_mock.assert_not_called()
         history_mock.assert_called_once()
-        self.assertEqual(
-            history_mock.call_args.kwargs["config"][
-                "history_stride_percentile"
-            ],
-            0.60,
-        )
+        self.assertEqual(history_mock.call_args.kwargs["scene"], "general")
 
     @patch(
         "think_budget_vllm_adapter.budget_controller.compute_budget_from_difficulty",
@@ -220,7 +190,7 @@ class BudgetDecisionTests(unittest.TestCase):
         return_value={"difficulty": 0.5},
     )
     @patch(
-        "think_budget_vllm_adapter.budget_controller.get_task_type_budget",
+        "think_budget_vllm_adapter.budget_controller.get_scene_budget",
         return_value={
             "check_length": 100,
             "min_think_tokens": 50,
@@ -228,18 +198,7 @@ class BudgetDecisionTests(unittest.TestCase):
             "think_stride": 20,
         },
     )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.is_known_task_type",
-        return_value=True,
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_task_type",
-        return_value=task(),
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_scene",
-        return_value=scene(),
-    )
+    @patch.object(BudgetController, "_match_scene", return_value=route())
     def test_fixed_subfield_and_hard_limit_apply_after_dynamic_merge(
         self,
         *_mocks,
@@ -257,61 +216,9 @@ class BudgetDecisionTests(unittest.TestCase):
         self.assertEqual(plan.confidence_threshold, 0.88)
         self.assertEqual(
             plan.source_by_field["check_length"]["clamped_from"], 150)
-        self.assertEqual(
-            plan.source_by_field["think_stride"]["source"],
-            "fixed_think_stride",
-        )
 
     @patch(
-        "think_budget_vllm_adapter.budget_controller.compute_budget_from_difficulty",
-        return_value={
-            "check_length": 222,
-            "min_think_tokens": 88,
-            "num_thinking": 6,
-            "think_stride": 44,
-        },
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.estimate_difficulty",
-        return_value={"difficulty": 0.5},
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.get_task_type_budget",
-        return_value={
-            "min_think_tokens": 50,
-            "num_thinking": 4,
-            "think_stride": 20,
-        },
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.is_known_task_type",
-        return_value=True,
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_task_type",
-        return_value=task(),
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.classify_scene",
-        return_value=scene(),
-    )
-    def test_missing_task_field_uses_difficulty_without_averaging_default(
-        self,
-        *_mocks,
-    ) -> None:
-        plan = BudgetController._decide(
-            "code", self.config, self.timing, hard_token_limit=1000)
-        self.assertEqual(plan.budget.check_length, 222)
-        self.assertEqual(
-            plan.source_by_field["check_length"]["source"], "difficulty")
-
-    @patch.object(
-        BudgetController,
-        "_classify_task",
-        return_value=(scene(), task(), "coding", True),
-    )
-    @patch(
-        "think_budget_vllm_adapter.budget_controller.get_task_type_budget",
+        "think_budget_vllm_adapter.budget_controller.get_scene_budget",
         return_value={
             "check_length": 100,
             "min_think_tokens": 50,
@@ -320,10 +227,11 @@ class BudgetDecisionTests(unittest.TestCase):
             "prob_th": 0.90,
         },
     )
-    def test_nondefault_global_confidence_overrides_task_threshold(
+    @patch.object(BudgetController, "_match_scene", return_value=route())
+    def test_nondefault_global_confidence_overrides_scene_threshold(
         self,
-        _task_budget_mock,
-        _classify_mock,
+        _route_mock,
+        _scene_budget_mock,
     ) -> None:
         config = AlgorithmConfig(
             confidence_threshold=0.92,
@@ -337,14 +245,10 @@ class BudgetDecisionTests(unittest.TestCase):
             "confidence_threshold_override",
         )
 
-    @patch.object(
-        BudgetController,
-        "_classify_task",
-        return_value=(scene(), task(), "coding", True),
-    )
+    @patch.object(BudgetController, "_match_scene", return_value=route())
     def test_fixed_budget_derives_rounds_to_cover_total_budget(
         self,
-        _classify_mock,
+        _route_mock,
     ) -> None:
         config = AlgorithmConfig(
             check_length=200,
@@ -360,6 +264,19 @@ class BudgetDecisionTests(unittest.TestCase):
         self.assertEqual(plan.budget.min_think_budget, 1000)
         self.assertEqual(plan.budget.num_thinking, 8)
         self.assertEqual(plan.budget.think_stride, 100)
+
+    def test_visible_request_text_uses_latest_user_message(self) -> None:
+        text, source = BudgetController._visible_request_text(
+            [
+                {"role": "system", "content": "classify all requests"},
+                {"role": "user", "content": "old"},
+                {"role": "assistant", "content": "answer"},
+                {"role": "user", "content": [{"type": "text", "text": "排查告警"}]},
+            ],
+            "fallback",
+        )
+        self.assertEqual(text, "排查告警")
+        self.assertEqual(source, "latest_user_message")
 
 
 if __name__ == "__main__":

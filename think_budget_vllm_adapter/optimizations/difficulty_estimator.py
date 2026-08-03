@@ -343,7 +343,7 @@ def _compute_history_weight(history_count: int) -> float:
 def estimate_difficulty(
     question: str,
     reference: str = '',
-    task_type: str = 'naie',
+    scene: str = 'general',
     tool_count: int = 0,
     param_slots: int = 0,
     candidate_tool_list: Optional[List[str]] = None,
@@ -352,9 +352,7 @@ def estimate_difficulty(
     history_category_avg_tokens: float = 0.0,
     history_category_failure_rate: float = 0.0,
     history_count: int = 0,
-    scene_type: str = '',
     scene_typical_tokens: int = 0,
-    scene_confidence: float = 0.0,
 ) -> Dict[str, Any]:
     """估计题目难度, 输出 difficulty ∈ [0, 1] + 特征分解。"""
     q_len = len(question)
@@ -411,8 +409,8 @@ def estimate_difficulty(
     history_weight = _compute_history_weight(history_count)
 
     scene_prior_weight = 0.0
-    if scene_typical_tokens > 0 and scene_confidence > 0:
-        scene_prior_weight = (1.0 - history_weight) * scene_confidence
+    if scene_typical_tokens > 0 and scene != 'general':
+        scene_prior_weight = 1.0 - history_weight
 
     history_token_score = 0.0
     effective_history_tokens = history_category_avg_tokens if history_category_avg_tokens > 0 else history_avg_tokens
@@ -458,8 +456,7 @@ def estimate_difficulty(
 
     return {
         'difficulty': round(difficulty, 4),
-        'scene_type': scene_type,
-        'scene_confidence': scene_confidence,
+        'scene': scene,
         'text_len': q_len,
         'entity_count': entity_count,
         'constraint_count': constraint_count,

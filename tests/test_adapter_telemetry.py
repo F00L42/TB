@@ -110,8 +110,8 @@ class TimingCollectorTests(unittest.TestCase):
 
     def test_decision_record_persists_effective_budget_plan(self) -> None:
         plan = {
-            "task_type": "planning",
-            "task_matched": True,
+            "scene": "planning",
+            "scene_matched": True,
             "decision_branch": "fixed",
             "budget": {
                 "check_length": 1024,
@@ -140,18 +140,42 @@ class TimingCollectorTests(unittest.TestCase):
             generated_tokens=0,
             visible=False,
             budget_plan=plan,
+            decision_details={
+                "route": {
+                    "candidate_scene": "planning",
+                    "top_score": 6.0,
+                    "score_margin": 3.0,
+                    "reject_reason": None,
+                },
+            },
         )
 
-        self.assertEqual(record["task_type"], "planning")
+        self.assertEqual(record["schema"], 2)
+        self.assertEqual(record["scene"], "planning")
+        self.assertTrue(record["scene_matched"])
         self.assertEqual(record["decision_branch"], "fixed")
         self.assertEqual(record["budget_plan"], plan)
+        self.assertEqual(
+            record["decision_details"]["route"]["top_score"], 6.0)
 
 
 class PhaseLogExtractionTests(unittest.TestCase):
+    def test_parser_remains_compatible_with_schema_one(self) -> None:
+        parsed = parse_phase_records([
+            "TB_PHASE "
+            + json.dumps({
+                "schema": 1,
+                "parent_request_id": "legacy",
+                "phase": "decision",
+            })
+            + "\n",
+        ])
+        self.assertEqual(parsed[0]["schema"], 1)
+
     def test_extracts_timestamp_prefixed_phase_lines_and_summarizes_hidden_work(self) -> None:
         records = [
             {
-                "schema": 1,
+                "schema": 2,
                 "parent_request_id": "p",
                 "child_request_id": "",
                 "phase": "decision",
@@ -164,16 +188,26 @@ class PhaseLogExtractionTests(unittest.TestCase):
                 "cached_prompt_tokens": None,
                 "generated_tokens": 0,
                 "visible": False,
-                "task_type": "planning",
+                "scene": "planning",
+                "scene_matched": True,
                 "decision_branch": "fixed",
                 "budget_plan": {
-                    "task_type": "planning",
+                    "scene": "planning",
+                    "scene_matched": True,
                     "decision_branch": "fixed",
                     "source_by_field": {
                         "check_length": {
                             "source": "fixed_check_length",
                             "final": 1024,
                         },
+                    },
+                },
+                "decision_details": {
+                    "route": {
+                        "candidate_scene": "planning",
+                        "top_score": 6.0,
+                        "score_margin": 3.0,
+                        "reject_reason": None,
                     },
                 },
             },
@@ -232,8 +266,11 @@ class PhaseLogExtractionTests(unittest.TestCase):
         self.assertEqual(requests[0]["visible_think_tokens"], 4)
         self.assertEqual(requests[0]["hidden_probe_tokens"], 8)
         self.assertEqual(requests[0]["accepted_probe_round"], 1)
-        self.assertEqual(requests[0]["task_type"], "planning")
+        self.assertEqual(requests[0]["scene"], "planning")
+        self.assertTrue(requests[0]["scene_matched"])
         self.assertEqual(requests[0]["decision_branch"], "fixed")
+        self.assertEqual(
+            requests[0]["decision_details"]["route"]["top_score"], 6.0)
         self.assertEqual(
             requests[0]["budget_plan"]["source_by_field"]["check_length"]["source"],
             "fixed_check_length",

@@ -45,7 +45,10 @@
 
 计算顺序为：固定预算（如有）→ 任务类型 → 难度 → 历史。难度估计开启时，历史模块只能调整 `think_stride`；初始思考长度、轮数和总 token 预算保持难度模块结果，避免同类请求因历史采样波动而频繁改变子请求数量。没有开启难度估计时，历史模块仍按原算法补全全部未由外部传入的预算字段。
 
-`task_type` 与 `scene_type` 不再是外部字段，只能在服务端配置或内部决策链中使用。配置文件中的 `TASK_TYPE_INDICATORS` 可维护检索、分类和推理的规则词；其中 `statistics_aggregation` 用于带有多行 `*_count` 统计数据且要求计数/求和的请求，避免其被误路由为普通检索。
+运行时只保留一个分类标识 `scene`：控制器从最新一条用户消息直接匹配
+`scene`，命中拒识门后从配置文件同名 `SCENES` 节点读取预算，未命中则进入
+history/general 路径。`SCENES.*.indicators` 可维护强弱证据，
+`scene_match_min_score` 与 `scene_match_min_margin` 控制拒识。
 
 生产环境必须安装 `PyYAML`，否则系统会记录警告并退回内置默认配置，`budget_config.yaml` 的静态配置不会生效。
 

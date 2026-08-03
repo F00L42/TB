@@ -581,7 +581,7 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 - adapter 算法层已取消 DEER 字段投影，状态机改为 Thinking / ConfidenceProbe / FinalAnswer；首段后立即 probe，最后失败 probe 后仍完成 stride，主 prompt 只追加。
 - trial 上限由 `PerformancePolicy` 固定为 50，DELTA/FINAL_ONLY/CUMULATIVE 使用完整 collector；Value Min 缺少完整 bottom-k 时降级平均置信度，无可用 logprob 时 fail-open。
 - 在线历史增加 parent request 幂等、非阻塞 JSONL writer 和未评分语义；error/cancel 不进入 token 分位数。
-- `dtb.patch` 已在固定的 vLLM `v0.23.0` checkout 上通过 `git apply --check`；本地 41 个无模型单元测试覆盖预算分支与覆盖优先级、三状态轨迹、trial collector、置信度与补充遥测、历史闭环、写入失败隔离、phase 账本、浅拷贝、`n=1` 契约与原生路由上下文。
+- `dtb.patch` 已在固定的 vLLM `v0.23.0` checkout 上通过 `git apply --check`；本地 46 个无模型单元测试覆盖 scene 预算/拒识、真实产品问题抽样、三状态轨迹、trial collector、置信度与补充遥测、历史闭环、写入失败隔离、phase 账本、浅拷贝、`n=1` 契约与原生路由上下文。
 
 run_02 已在目标 NPU 上验证 BudgetPlan、字段来源、confidence method/raw、
 pair count 与 `accept_reason` 的持久化完整性，并以 phase/Prometheus 精确闭环。
@@ -638,8 +638,8 @@ token、phase wall/queue/prefill/decode、JSON 结构分和语义质量分。单
 另做三个工程/算法诊断：
 
 1. 为每次 Vanilla 保存同口径客户端明细、请求参数、metrics 与 cache 初态；
-2. 修复 task classifier 读取完整 prompt 导致的 classification 误判并增加
-   16 个样本的黄金测试，再考虑 task/difficulty/history 动态预算；
+2. 使用最新用户消息进行 scene 匹配，以 score+margin 拒识门替代双分类裁决；
+   当前已从既有 16 个产品问题抽样建立黄金测试，收到 13 场景数据后补齐正负例；
 3. 并发 1/4 对照 APC，再决定是否研究 resumable main chain。
 
 ### 11.4 继续固定 50-token probe
@@ -662,6 +662,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-07-31 | 泛化运行时统一为 `scene → budget/reject`，删除 task type 分类、预算和动态注册；配置合并为 `SCENES`；phase schema 2 增加路由证据、拒识原因、有效预算、难度/history 与决策模块耗时 | 修复完整 prompt 污染和双分类概念冲突，为 13 场景 Vanilla/DTB/fixed 数据回传建立可解释的自动策略入口 |
 | 2026-07-27 | 纳入 run_02 的 16 请求明细、98 条 phase、同进程 metrics 和完整 BudgetPlan/confidence 遥测；从模板生成 manifest；更新 Vanilla 与验收结论 | run_02 相对三次 Vanilla 均值平均/P95 改善 31.48%/14.74%，但主要来自无法归因于代码提交的更早接受，必须先重复并补语义质量门 |
 | 2026-07-25 | 纳入三次新 Vanilla 汇总和一次 16 请求明细；纠正 run_01 相对 Vanilla 的结论；发现“正确率”把解析错误字符串计真的聚合缺陷；phase 增加 BudgetPlan 来源与置信度决策遥测；manifest 不再要求三个仓库 dirty | 三次基线均值显示 run_01 平均慢 4.07%、P95 慢 18.80%；结构质量只能按明细中的字面量 `True` 计数 |
 | 2026-07-24 | 纳入 run_01 的 16 请求客户端明细、134 条 phase 和同进程 metrics；确认平均时延略优于 vanilla、P95 仍退化，成本中心由长 probe 转为可见思考；新增阈值/预算/APC 分级方案 | 重构后的 hidden probe 已降 96.79%，旧“先缩 probe”优先级不再适用 |

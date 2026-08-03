@@ -7,6 +7,7 @@ from think_budget_vllm_adapter.config.unified_config import (
     _get_default_config,
     get_performance_policy_config,
     get_runtime_config,
+    get_scene_budget,
 )
 from think_budget_vllm_adapter.context import (
     AlgorithmConfig,
@@ -29,7 +30,12 @@ class AlgorithmConfigTests(unittest.TestCase):
             "token_budget",
             "trial_answers",
             "is_code",
+            "enable_task_type_budget",
+            "task_type_override",
+            "default_task_type",
         }.isdisjoint(names))
+        self.assertIn("enable_scene_budget", names)
+        self.assertIn("scene_override", names)
 
     def test_performance_policy_is_not_tunable(self):
         with self.assertRaises(ValueError):
@@ -51,6 +57,10 @@ class AlgorithmConfigTests(unittest.TestCase):
         )
         self.assertTrue(config.budget_enabled)
         self.assertEqual(config.check_length, 200)
+        self.assertEqual(
+            get_scene_budget("code_generation", raw)["check_length"],
+            2000,
+        )
 
     def test_policy_manifest_matches_code_invariants(self):
         policy = get_performance_policy_config(_get_default_config())

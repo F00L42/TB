@@ -10,7 +10,7 @@ from think_budget_vllm_adapter.history import history_module
 from think_budget_vllm_adapter.history.history_module import (
     AsyncHistoryRecorder,
     HistoryOutcome,
-    get_task_type_stats,
+    get_scene_stats,
 )
 
 
@@ -23,10 +23,8 @@ def outcome(
     return HistoryOutcome.from_request(
         parent_request_id=request_id,
         question=f"question {request_id}",
-        task_type="unknown",
-        scene_type="general",
+        scene="general",
         decision_branch="history",
-        difficulty=None,
         budget_plan={"budget": {"check_length": 10}},
         thinking_tokens=thinking_tokens,
         hidden_probe_tokens=5,
@@ -45,8 +43,7 @@ class HistoryRecorderTests(unittest.IsolatedAsyncioTestCase):
             self.temp_dir.name, "history.jsonl")
         history_module._history_cache = None
         history_module._stats_cache.clear()
-        history_module._task_type_index.clear()
-        history_module._scene_type_index.clear()
+        history_module._scene_index.clear()
         history_module._parent_request_ids.clear()
         self.recorder = AsyncHistoryRecorder(max_queue_size=128)
 
@@ -55,14 +52,13 @@ class HistoryRecorderTests(unittest.IsolatedAsyncioTestCase):
         history_module._HISTORY_FILE = self.old_path
         history_module._history_cache = None
         history_module._stats_cache.clear()
-        history_module._task_type_index.clear()
-        history_module._scene_type_index.clear()
+        history_module._scene_index.clear()
         history_module._parent_request_ids.clear()
         self.temp_dir.cleanup()
 
     async def test_record_is_immediately_readable_and_persisted_once(self):
         self.assertTrue(self.recorder.record_outcome(outcome("p1")))
-        immediate = get_task_type_stats("unknown")
+        immediate = get_scene_stats("general")
         self.assertEqual(immediate["count"], 1)
         self.assertEqual(immediate["quality_count"], 0)
         self.assertEqual(immediate["failure_rate"], 0.0)
@@ -84,7 +80,7 @@ class HistoryRecorderTests(unittest.IsolatedAsyncioTestCase):
             outcome("cancel", status="cancelled", thinking_tokens=800))
         await self.recorder.flush()
 
-        stats = get_task_type_stats("unknown")
+        stats = get_scene_stats("general")
         self.assertEqual(stats["count"], 1)
         self.assertEqual(stats["avg_tokens"], 120)
         self.assertEqual(stats["reliability_count"], 3)
@@ -113,7 +109,7 @@ class HistoryRecorderTests(unittest.IsolatedAsyncioTestCase):
                 self.recorder.record_outcome(outcome("write-failure")))
             self.assertTrue(await self.recorder.flush())
         self.assertIn("disk unavailable", self.recorder.last_error)
-        self.assertEqual(get_task_type_stats("unknown")["count"], 1)
+        self.assertEqual(get_scene_stats("general")["count"], 1)
 
 
 if __name__ == "__main__":

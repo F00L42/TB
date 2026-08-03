@@ -10,6 +10,7 @@ from typing import Any, Optional, TYPE_CHECKING
 from think_budget_vllm_adapter.config.unified_config import (
     get_performance_policy_config,
     get_runtime_config,
+    get_scene_budget,
 )
 from think_budget_vllm_adapter.context import (
     AlgorithmConfig,
@@ -36,11 +37,6 @@ from think_budget_vllm_adapter.optimizations.difficulty_estimator import (
 )
 from think_budget_vllm_adapter.optimizations.scene_classifier import (
     classify_scene,
-)
-from think_budget_vllm_adapter.optimizations.task_type_budget import (
-    classify_task_type,
-    get_task_type_budget,
-    is_known_task_type,
 )
 from think_budget_vllm_adapter.telemetry import TimingCollector
 
@@ -82,7 +78,6 @@ _RETIRED_REQUEST_FIELDS = frozenset({
     "budget_token_limit",
     "budget_disabled",
     "budget_confidence_threshold",
-    "budget_task_type_override",
     "think_budget_config",
     "think_budget_session_id",
     "think_budget_resume",
@@ -142,11 +137,16 @@ class BudgetController:
             value_min_bottom_k=int(defaults["value_min_bottom_k"]),
             enable_safety_gate=bool(defaults["enable_safety_gate"]),
             baseline_time_limit=float(defaults["baseline_time_limit"]),
-            enable_task_type_budget=bool(
-                defaults["enable_task_type_budget"]),
+            enable_scene_budget=bool(
+                defaults["enable_scene_budget"]),
             enable_history_budget=bool(defaults["enable_history_budget"]),
             enable_difficulty_estimator=bool(
                 defaults["enable_difficulty_estimator"]),
+            scene_override=str(defaults["scene_override"]),
+            scene_match_min_score=float(
+                defaults["scene_match_min_score"]),
+            scene_match_min_margin=float(
+                defaults["scene_match_min_margin"]),
             difficulty_check_length_base=int(
                 defaults["difficulty_check_length_base"]),
             difficulty_check_length_max=int(
@@ -172,19 +172,12 @@ class BudgetController:
                 defaults["fixed_min_think_tokens"]),
             history_budget_multiplier=float(
                 defaults["history_budget_multiplier"]),
-            history_low_success_boost=float(
-                defaults["history_low_success_boost"]),
             history_stride_percentile=float(
                 defaults["history_stride_percentile"]),
             history_warmup_count=int(defaults["history_warmup_count"]),
             history_warmup_strategy=str(
                 defaults["history_warmup_strategy"]),
             new_task_unlimited=bool(defaults["new_task_unlimited"]),
-            auto_cluster_threshold=int(
-                defaults["auto_cluster_threshold"]),
-            custom_task_types_path=defaults["custom_task_types_path"],
-            default_task_type=str(defaults["default_task_type"]),
-            task_type_override=str(defaults["task_type_override"]),
             max_internal_calls=int(defaults["max_internal_calls"]),
             max_thinking_tokens=int(defaults["max_thinking_tokens"]),
             final_answer_max_tokens=int(
@@ -251,31 +244,65 @@ class BudgetController:
     _build_budget_config = _build_algorithm_config
 
     @staticmethod
-    def _classify_task(
+    def _match_scene(
         prompt_text: str,
         config: AlgorithmConfig,
         timing: TimingCollector,
-    ) -> tuple[dict[str, Any], dict[str, Any], str, bool]:
+    ) -> dict[str, Any]:
         with timing.measure("decision.scene_classifier"):
-            scene_info = classify_scene(prompt_text)
-        with timing.measure("decision.task_type"):
-            task_match = classify_task_type(
-                prompt_text, scene_info, include_budget=False)
-        task_type = (
-            config.task_type_override
-            or task_match.get("task_type")
-            or config.default_task_type
-        )
-        task_matched = bool(
-            config.enable_task_type_budget
-            and task_type != "general"
-            and is_known_task_type(task_type)
-            and (
-                config.task_type_override
-                or float(task_match.get("task_confidence", 0.0)) > 0
+            scene_info = classify_scene(
+                prompt_text,
+                min_score=config.scene_match_min_score,
+                min_margin=config.scene_match_min_margin,
+                scene_override=config.scene_override,
             )
+        scene_info["scene_matched"] = bool(
+            config.enable_scene_budget
+            and scene_info.get("scene_matched")
         )
-        return scene_info, task_match, task_type, task_matched
+        if not config.enable_scene_budget:
+            scene_info["scene"] = "general"
+            scene_info["reject_reason"] = "scene_budget_disabled"
+        return scene_info
+
+    @staticmethod
+    def _visible_request_text(
+        conversation: list[Any],
+        fallback: str,
+    ) -> tuple[str, str]:
+        """Extract the latest user text instead of classifying a chat template."""
+
+        def flatten(content: Any) -> str:
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                parts = []
+                for item in content:
+                    if isinstance(item, str):
+                        parts.append(item)
+                    elif isinstance(item, dict):
+                        value = item.get("text") or item.get("content")
+                        if isinstance(value, str):
+                            parts.append(value)
+                    else:
+                        value = getattr(item, "text", None)
+                        if isinstance(value, str):
+                            parts.append(value)
+                return "\n".join(parts)
+            return ""
+
+        for message in reversed(conversation or []):
+            if isinstance(message, dict):
+                role = message.get("role")
+                content = message.get("content")
+            else:
+                role = getattr(message, "role", None)
+                content = getattr(message, "content", None)
+            if role == "user":
+                text = flatten(content).strip()
+                if text:
+                    return text, "latest_user_message"
+        return fallback, "decoded_prompt_fallback"
 
     @staticmethod
     def _clamp_vector(
@@ -306,16 +333,17 @@ class BudgetController:
         *,
         hard_token_limit: int | None = None,
         reference: str = "",
+        decision_trace: dict[str, Any] | None = None,
     ) -> BudgetPlan:
-        """Apply the reviewed FIXED / TASK_DIFFICULTY / HISTORY tree."""
+        """Apply the FIXED / SCENE_DIFFICULTY / HISTORY decision tree."""
         policy = PerformancePolicy()
-        scene_info, task_match, task_type, task_matched = cls._classify_task(
-            prompt_text, config, timing)
+        scene_info = cls._match_scene(prompt_text, config, timing)
+        scene = str(scene_info.get("scene", "general"))
+        scene_matched = bool(scene_info.get("scene_matched"))
         default_vector = config.default_budget
         source_by_field: dict[str, Any] = {}
         difficulty_info: dict[str, Any] | None = None
         history_info: dict[str, Any] | None = None
-        history_snapshot_id: str | None = None
         branch_confidence_threshold = _DEFAULT_CONFIDENCE_THRESHOLD
         branch_confidence_source = "runtime_default"
         if config.percentile_step != _DEFAULT_PERCENTILE_STEP:
@@ -369,31 +397,26 @@ class BudgetController:
                 }
                 for field_name in _VECTOR_FIELDS
             })
-        elif task_matched:
-            branch = DecisionBranch.TASK_DIFFICULTY
-            with timing.measure("decision.task_budget"):
-                task_values = get_task_type_budget(
-                    task_type, config.custom_task_types_path)
-            task_vector = BudgetVector.from_mapping(
-                task_values, default_vector)
-            task_confidence = task_values.get(
-                "confidence_threshold", task_values.get("prob_th"))
-            if isinstance(task_confidence, (int, float)):
+        elif scene_matched:
+            branch = DecisionBranch.SCENE_DIFFICULTY
+            with timing.measure("decision.scene_budget"):
+                scene_values = get_scene_budget(scene)
+            scene_vector = BudgetVector.from_mapping(
+                scene_values, default_vector)
+            scene_threshold = scene_values.get(
+                "confidence_threshold", scene_values.get("prob_th"))
+            if isinstance(scene_threshold, (int, float)):
                 branch_confidence_threshold = max(
-                    0.0, min(1.0, float(task_confidence)))
-                branch_confidence_source = "task"
+                    0.0, min(1.0, float(scene_threshold)))
+                branch_confidence_source = "scene"
             if config.enable_difficulty_estimator:
                 with timing.measure("decision.difficulty"):
                     difficulty_info = estimate_difficulty(
                         prompt_text,
                         reference,
-                        task_type=task_type,
-                        scene_type=scene_info.get(
-                            "scene_type", "general"),
+                        scene=scene,
                         scene_typical_tokens=int(
                             scene_info.get("typical_tokens", 0)),
-                        scene_confidence=float(
-                            scene_info.get("scene_confidence", 0.0)),
                     )
                     difficulty_values = compute_budget_from_difficulty(
                         float(difficulty_info.get("difficulty", 0.5)),
@@ -415,17 +438,17 @@ class BudgetController:
                 merged: dict[str, int] = {}
                 raw_sources: dict[str, tuple[int | None, int | None]] = {}
                 for field_name in _VECTOR_FIELDS:
-                    task_value = _optional_vector_value(
-                        task_values, field_name)
+                    scene_value = _optional_vector_value(
+                        scene_values, field_name)
                     difficulty_value = _optional_vector_value(
                         difficulty_values, field_name)
                     raw_sources[field_name] = (
-                        task_value, difficulty_value)
-                    if task_value is not None and difficulty_value is not None:
+                        scene_value, difficulty_value)
+                    if scene_value is not None and difficulty_value is not None:
                         merged[field_name] = _round_half_up_average(
-                            task_value, difficulty_value)
-                    elif task_value is not None:
-                        merged[field_name] = task_value
+                            scene_value, difficulty_value)
+                    elif scene_value is not None:
+                        merged[field_name] = scene_value
                     elif difficulty_value is not None:
                         merged[field_name] = difficulty_value
                     else:
@@ -433,27 +456,27 @@ class BudgetController:
                             default_vector, field_name)
                 vector = BudgetVector(**merged)
                 for field_name in _VECTOR_FIELDS:
-                    task_value, difficulty_value = raw_sources[field_name]
-                    if task_value is not None and difficulty_value is not None:
-                        source = "task+difficulty"
-                    elif task_value is not None:
-                        source = "task"
+                    scene_value, difficulty_value = raw_sources[field_name]
+                    if scene_value is not None and difficulty_value is not None:
+                        source = "scene+difficulty"
+                    elif scene_value is not None:
+                        source = "scene"
                     elif difficulty_value is not None:
                         source = "difficulty"
                     else:
                         source = "default"
                     source_by_field[field_name] = {
                         "source": source,
-                        "task": task_value,
+                        "scene": scene_value,
                         "difficulty": difficulty_value,
                         "rounding": "half_up",
                         "final": getattr(vector, field_name),
                     }
             else:
-                vector = task_vector
+                vector = scene_vector
                 source_by_field.update({
                     field_name: {
-                        "source": "task",
+                        "source": "scene",
                         "final": getattr(vector, field_name),
                     }
                     for field_name in _VECTOR_FIELDS
@@ -468,14 +491,10 @@ class BudgetController:
                 with timing.measure("decision.history"):
                     history_info = compute_history_budget(
                         prompt_text,
-                        task_type=task_type,
-                        scene_type=scene_info.get(
-                            "scene_type", "general"),
+                        scene=scene,
                         config={
                             "history_budget_multiplier":
                                 config.history_budget_multiplier,
-                            "history_low_success_boost":
-                                config.history_low_success_boost,
                             "history_stride_percentile":
                                 effective_percentile_step,
                             "history_warmup_count":
@@ -484,16 +503,10 @@ class BudgetController:
                                 config.history_warmup_strategy,
                             "new_task_unlimited":
                                 config.new_task_unlimited,
-                            "auto_cluster_threshold":
-                                config.auto_cluster_threshold,
-                            "custom_task_types_path":
-                                config.custom_task_types_path,
                         },
                     )
                 vector = BudgetVector.from_mapping(
                     history_info, default_vector)
-                history_snapshot_id = history_info.get(
-                    "history_snapshot_id")
                 history_source = history_info.get(
                     "budget_mode", "history")
                 history_confidence = history_info.get(
@@ -572,20 +585,24 @@ class BudgetController:
             "final": hard_limit,
         }
 
+        if decision_trace is not None:
+            decision_trace.update({
+                "route": scene_info,
+                "difficulty": difficulty_info,
+                "history": history_info,
+                "decision_modules": timing.snapshot().get("modules", {}),
+            })
+
         return BudgetPlan(
-            task_type=task_type,
-            task_matched=task_matched,
+            scene=scene,
+            scene_matched=scene_matched,
             decision_branch=branch,
             budget=vector,
             confidence_threshold=confidence_threshold,
             percentile_step=effective_percentile_step,
             source_by_field=source_by_field,
-            history_snapshot_id=history_snapshot_id,
             policy_version=policy.version,
             hard_think_token_limit=hard_limit,
-            scene_type=scene_info.get("scene_type", "general"),
-            difficulty_info=difficulty_info,
-            history_info=history_info,
         )
 
     @staticmethod
@@ -636,18 +653,12 @@ class BudgetController:
 
     def _record_history(self, context: RequestStateContext) -> None:
         plan = context.budget_plan
-        difficulty = None
-        if plan.difficulty_info is not None:
-            difficulty = float(
-                plan.difficulty_info.get("difficulty", 0.0))
         ledger = context.timing.ledger.snapshot()
         outcome = HistoryOutcome.from_request(
             parent_request_id=context.request_id,
             question=context.question_text,
-            task_type=plan.task_type,
-            scene_type=plan.scene_type,
+            scene=plan.scene,
             decision_branch=plan.decision_branch.value,
-            difficulty=difficulty,
             budget_plan=plan.telemetry(),
             thinking_tokens=int(ledger["visible_think_tokens"]),
             hidden_probe_tokens=int(ledger["hidden_probe_tokens"]),
@@ -768,6 +779,9 @@ class BudgetController:
                     prompt_token_ids, skip_special_tokens=True)
         except Exception:
             prompt_text = ""
+        classification_text, classification_source = (
+            self._visible_request_text(conversation, prompt_text)
+        )
 
         remaining_context = max(
             1,
@@ -783,12 +797,17 @@ class BudgetController:
             hard_token_limit = min(hard_token_limit, requested_limit)
 
         decision_started_at = time.perf_counter()
+        decision_trace: dict[str, Any] = {
+            "classification_source": classification_source,
+            "classification_input_chars": len(classification_text),
+        }
         with timing.measure("decision.total"):
             plan = self._decide(
-                prompt_text,
+                classification_text,
                 config,
                 timing,
                 hard_token_limit=hard_token_limit,
+                decision_trace=decision_trace,
             )
         decision_wall_ms = (
             time.perf_counter() - decision_started_at) * 1000
@@ -804,6 +823,7 @@ class BudgetController:
             generated_tokens=0,
             visible=False,
             budget_plan=plan_telemetry,
+            decision_details=decision_trace,
         )
 
         state = RequestAlgorithmState(budget_plan=plan)
@@ -833,7 +853,7 @@ class BudgetController:
             model_name=model_name,
             session_id=request_id,
             timing=timing,
-            question_text=prompt_text,
+            question_text=classification_text,
         )
         orchestrator = AsyncReasoningOrchestrator(context)
         response_generator = self._build_managed_generator(

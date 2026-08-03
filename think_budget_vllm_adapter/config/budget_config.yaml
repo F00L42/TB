@@ -1,7 +1,4 @@
-# Think Budget 预算配置文件
-# 放置于 think_budget_vllm_adapter/config/ 目录下
-# 如果此文件不存在，程序使用 _get_default_config() 中的内置默认值
-
+# Think Budget 服务端配置。scene 同时承担分类标识和预算查找键。
 RUNTIME:
   BUDGET_ENABLED: true
   check_length: 200
@@ -14,9 +11,12 @@ RUNTIME:
   value_min_bottom_k: 5
   enable_safety_gate: false
   baseline_time_limit: 90.0
-  enable_task_type_budget: true
+  enable_scene_budget: true
   enable_history_budget: true
   enable_difficulty_estimator: true
+  scene_override: ""
+  scene_match_min_score: 3.0
+  scene_match_min_margin: 1.0
   difficulty_check_length_base: 400
   difficulty_check_length_max: 6000
   difficulty_min_think_base: 100
@@ -32,24 +32,16 @@ RUNTIME:
   fixed_prob_th: 0.0
   fixed_min_think_tokens: 0
   history_budget_multiplier: 1.2
-  history_low_success_boost: 1.3
   history_stride_percentile: 0.75
   history_warmup_count: 3
   history_warmup_strategy: moderate
   new_task_unlimited: true
-  auto_cluster_threshold: 5
-  custom_task_types_path: null
-  default_task_type: general
-  task_type_override: ""
   max_internal_calls: 20
   max_thinking_tokens: 65536
   final_answer_max_tokens: 2048
-  # 每个模型 phase 输出一条 TB_PHASE JSON；不记录 prompt/答案正文。
   emit_phase_metrics: true
-  # 调试时才开启。默认关闭每个 state 的 enter/complete 同步刷盘。
   verbose_stage_logging: false
 
-# 此节用于部署清单/回放；这些值是裁决后的不变量，不是调参入口。
 PERFORMANCE_POLICY:
   version: think-budget-performance-v1
   trial_answer_length: 50
@@ -62,106 +54,164 @@ PERFORMANCE_POLICY:
   enable_safety_amplification: false
   enable_safety_candidate_fallback: false
 
-TASK_TYPES:
+# 每个 scene 节点同时保存匹配证据和预算。新增产品场景只需增加一个节点。
+SCENES:
   retrieval:
     description: 检索任务
     typical_tokens: 500
+    token_range: [200, 2000]
     check_length: 200
     think_stride: 100
     num_thinking: 3
     min_think_tokens: 50
     check_answer_len: 2000
     prob_th: 0.90
+    indicators:
+      strong: [查询, 检索, 查找, 搜索, retrieve, search, lookup, fetch, 帮我查, 查一下]
+      weak: [获取, 列出, where, which, is there]
   statistics_aggregation:
     description: 统计聚合任务
     typical_tokens: 4000
+    token_range: [1000, 8000]
     check_length: 800
     think_stride: 300
     num_thinking: 6
     min_think_tokens: 600
     check_answer_len: 4000
     prob_th: 0.90
+    indicators:
+      strong: [统计, 汇总, 聚合, 求和, 计数, aggregate, aggregation, sum, count by, group by]
+      weak: [总数, 合计, 占比, 平均, average]
   classification:
-    description: 分类任务
+    description: 分类判断任务
     typical_tokens: 800
+    token_range: [300, 3000]
     check_length: 300
     think_stride: 100
     num_thinking: 4
     min_think_tokens: 100
     check_answer_len: 2000
     prob_th: 0.90
-  coding:
-    description: 编码任务
+    indicators:
+      strong: [分类, 归类, 属于哪类, classify, categorize, 判断对错, true or false, 选择题, 选项]
+      weak: [区分, 辨别, identify]
+  code_generation:
+    description: 代码生成任务
     typical_tokens: 12000
+    token_range: [5000, 20000]
     check_length: 2000
     think_stride: 500
     num_thinking: 15
     min_think_tokens: 2000
     check_answer_len: 4000
     prob_th: 0.95
-  math:
-    description: 数学推理
+    indicators:
+      strong: [编写程序, 编写代码, 实现函数, 代码补全, implement a function, write a program, leetcode, livecodebench, competitive programming]
+      weak: [python, java, javascript, 输入格式, 输出格式, input format, output format, test case]
+  math_reasoning:
+    description: 数学推理任务
     typical_tokens: 8000
+    token_range: [3000, 22000]
     check_length: 1500
     think_stride: 400
     num_thinking: 12
     min_think_tokens: 1500
     check_answer_len: 4000
     prob_th: 0.95
+    indicators:
+      strong: [证明, 方程, 积分, integral, prove, equation, derivative, polynomial, aime, mathematical]
+      weak: [求解, 化简, 计算, calculate, compute, determine the value, find the value]
   reasoning:
-    description: 逻辑推理
+    description: 逻辑推理任务
     typical_tokens: 5000
+    token_range: [1500, 12000]
     check_length: 800
     think_stride: 300
     num_thinking: 8
     min_think_tokens: 500
     check_answer_len: 3000
     prob_th: 0.93
+    indicators:
+      strong: [推理, 推导, 前提, 结论, infer, deduce, logically, 逻辑判断]
+      weak: [因果关系, therefore, hence]
   tool_call:
-    description: 工具调用
+    description: 工具或函数调用任务
     typical_tokens: 1000
+    token_range: [500, 2000]
     check_length: 400
     think_stride: 200
     num_thinking: 8
     min_think_tokens: 100
     check_answer_len: 4000
     prob_th: 0.95
+    indicators:
+      strong: [调用工具, 调用函数, 函数调用, API调用, 参数填充, tool_call, function call, invoke, execute query]
+      weak: [接口调用, parameter, argument]
   fault_diagnosis:
-    description: 故障诊断
+    description: 故障诊断任务
     typical_tokens: 1500
+    token_range: [800, 3000]
     check_length: 500
     think_stride: 200
     num_thinking: 8
     min_think_tokens: 200
     check_answer_len: 4000
     prob_th: 0.95
+    indicators:
+      strong: [告警, 故障, 诊断, 根因, 排障, 自愈, alarm, fault, troubleshoot, 指标异常, 网元, KPI]
+      weak: [运维, 巡检, 监控, 基站, 核心网]
   knowledge_qa:
-    description: 知识问答
+    description: 知识问答任务
     typical_tokens: 3000
+    token_range: [1000, 7000]
     check_length: 600
     think_stride: 200
     num_thinking: 6
     min_think_tokens: 200
     check_answer_len: 3000
     prob_th: 0.92
+    indicators:
+      strong: [解释一下, 请解释, what is, define]
+      weak: [解释, 说明, 描述, explain, describe, 是什么]
   planning:
-    description: 任务规划
+    description: 任务规划任务
     typical_tokens: 2500
+    token_range: [1000, 5000]
     check_length: 600
     think_stride: 200
     num_thinking: 8
     min_think_tokens: 300
     check_answer_len: 3000
     prob_th: 0.93
+    indicators:
+      strong: [规划, 计划, 编排, 执行顺序, plan, workflow, orchestrate, 第一步, 第二步]
+      weak: [步骤, 流程, 方案, 策略, 先后]
   general:
-    description: 兜底通用
+    description: 拒识或通用任务
     typical_tokens: 3000
+    token_range: [500, 15000]
     check_length: 500
     think_stride: 200
     num_thinking: 8
     min_think_tokens: 200
     check_answer_len: 3000
     prob_th: 0.93
+    indicators:
+      strong: []
+      weak: []
+
+SCENE_PRIORITY:
+  - code_generation
+  - math_reasoning
+  - reasoning
+  - planning
+  - fault_diagnosis
+  - tool_call
+  - statistics_aggregation
+  - classification
+  - retrieval
+  - knowledge_qa
+  - general
 
 DIFFICULTY_TIERS:
   easy:
@@ -193,19 +243,6 @@ DIFFICULTY_TIERS:
     num_thinking_min: 10
     num_thinking_max: 20
 
-TASK_TYPE_PRIORITY:
-  - coding
-  - math
-  - reasoning
-  - planning
-  - fault_diagnosis
-  - tool_call
-  - statistics_aggregation
-  - classification
-  - retrieval
-  - knowledge_qa
-  - general
-
 HISTORY_NEW_TASK:
   unlimited: true
   unlimited_budget_placeholder: 99999
@@ -223,44 +260,3 @@ HISTORY_HOT_START:
   stride_percentile: 0.75
   low_success_boost: 1.3
   high_failure_stride_factor: 0.8
-
-SCENE_TYPES:
-  tool_call:
-    typical_tokens: 1000
-    token_range: [500, 2000]
-  fault_diagnosis:
-    typical_tokens: 1500
-    token_range: [800, 3000]
-  math_reasoning:
-    typical_tokens: 8000
-    token_range: [3000, 22000]
-  code_generation:
-    typical_tokens: 12000
-    token_range: [5000, 20000]
-  knowledge_qa:
-    typical_tokens: 3000
-    token_range: [1000, 7000]
-  retrieval:
-    typical_tokens: 500
-    token_range: [200, 2000]
-  classification:
-    typical_tokens: 800
-    token_range: [300, 3000]
-  planning:
-    typical_tokens: 2500
-    token_range: [1000, 5000]
-  general:
-    typical_tokens: 3000
-    token_range: [500, 15000]
-
-# 任务类型规则指示词。修改此处即可调整检索、分类和推理路由，毋须修改代码。
-TASK_TYPE_INDICATORS:
-  retrieval:
-    strong: ["查询", "检索", "查找", "获取", "搜索", "query", "retrieve", "search", "find", "lookup", "fetch", "查出", "列出", "帮我查", "查一下"]
-    weak: ["什么", "哪个", "哪些", "where", "which", "what", "有没有", "是否存在", "is there"]
-  classification:
-    strong: ["分类", "归类", "属于哪类", "classify", "categorize", "判断对错", "true or false", "选择题", "A.", "B.", "C.", "D.", "which of the following", "选项"]
-    weak: ["判断", "选择", "区分", "辨别", "identify"]
-  reasoning:
-    strong: ["推理", "推导", "前提", "结论", "推断", "infer", "deduce", "therefore", "hence", "conclude", "必然", "逻辑判断", "逻辑推理", "logically"]
-    weak: ["分析", "因为", "所以", "由于", "because", "since", "so", "thus", "首先", "然后", "最后", "因果关系"]

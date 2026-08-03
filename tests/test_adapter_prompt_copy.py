@@ -39,14 +39,13 @@ def make_context() -> RequestStateContext:
     request = SimpleNamespace(priority=7)
     serving = SimpleNamespace(engine_client=object(), default_sampling_params={})
     plan = BudgetPlan(
-        task_type="general",
-        task_matched=False,
+        scene="general",
+        scene_matched=False,
         decision_branch=DecisionBranch.HISTORY,
         budget=BudgetVector(10, 1, 2, 4),
         confidence_threshold=0.9,
         percentile_step=0.75,
         source_by_field={},
-        history_snapshot_id=None,
         policy_version="think-budget-performance-v1",
         hard_think_token_limit=20,
     )

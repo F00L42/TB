@@ -109,6 +109,7 @@ class TimingCollector:
         confidence: float | None = None,
         accepted: bool | None = None,
         budget_plan: Mapping[str, Any] | None = None,
+        decision_details: Mapping[str, Any] | None = None,
         confidence_method: str | None = None,
         average_confidence: float | None = None,
         value_min_raw: float | None = None,
@@ -160,7 +161,7 @@ class TimingCollector:
             stop_reason = str(stop_reason)
 
         record: dict[str, object] = {
-            "schema": 1,
+            "schema": 2,
             "parent_request_id": parent_request_id,
             "child_request_id": child_request_id,
             "variant": "think_budget",
@@ -183,10 +184,13 @@ class TimingCollector:
         if budget_plan is not None:
             effective_plan = dict(budget_plan)
             record.update({
-                "task_type": effective_plan.get("task_type"),
+                "scene": effective_plan.get("scene"),
+                "scene_matched": effective_plan.get("scene_matched"),
                 "decision_branch": effective_plan.get("decision_branch"),
                 "budget_plan": effective_plan,
             })
+        if decision_details is not None:
+            record["decision_details"] = dict(decision_details)
         if phase == "confidence_probe":
             record.update({
                 "confidence_method": confidence_method,

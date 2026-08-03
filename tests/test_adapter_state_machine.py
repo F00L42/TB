@@ -125,9 +125,9 @@ def make_context(
         model_config=SimpleNamespace(max_model_len=1000),
     )
     plan = BudgetPlan(
-        task_type="coding",
-        task_matched=True,
-        decision_branch=DecisionBranch.TASK_DIFFICULTY,
+        scene="code_generation",
+        scene_matched=True,
+        decision_branch=DecisionBranch.SCENE_DIFFICULTY,
         budget=BudgetVector(
             check_length=5,
             min_think_budget=min_think_budget,
@@ -137,7 +137,6 @@ def make_context(
         confidence_threshold=0.9,
         percentile_step=0.75,
         source_by_field={},
-        history_snapshot_id=None,
         policy_version="think-budget-performance-v1",
         hard_think_token_limit=hard_limit,
     )

@@ -19,7 +19,7 @@ POLICY_VERSION = "think-budget-performance-v1"
 
 class DecisionBranch(str, Enum):
     FIXED = "fixed"
-    TASK_DIFFICULTY = "task_difficulty"
+    SCENE_DIFFICULTY = "scene_difficulty"
     HISTORY = "history"
 
 
@@ -135,19 +135,15 @@ class BudgetVector:
 
 @dataclass(frozen=True)
 class BudgetPlan:
-    task_type: str
-    task_matched: bool
+    scene: str
+    scene_matched: bool
     decision_branch: DecisionBranch
     budget: BudgetVector
     confidence_threshold: float
     percentile_step: float
     source_by_field: Mapping[str, Any]
-    history_snapshot_id: str | None
     policy_version: str
     hard_think_token_limit: int
-    scene_type: str = "general"
-    difficulty_info: Mapping[str, Any] | None = None
-    history_info: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not 0 <= self.confidence_threshold <= 1:
@@ -159,25 +155,15 @@ class BudgetPlan:
 
     def telemetry(self) -> dict[str, Any]:
         return {
-            "task_type": self.task_type,
-            "task_matched": self.task_matched,
+            "scene": self.scene,
+            "scene_matched": self.scene_matched,
             "decision_branch": self.decision_branch.value,
             "budget": self.budget.to_dict(),
             "confidence_threshold": self.confidence_threshold,
             "percentile_step": self.percentile_step,
             "source_by_field": dict(self.source_by_field),
-            "history_snapshot_id": self.history_snapshot_id,
             "policy_version": self.policy_version,
             "hard_think_token_limit": self.hard_think_token_limit,
-            "scene_type": self.scene_type,
-            "difficulty_info": (
-                dict(self.difficulty_info)
-                if self.difficulty_info is not None else None
-            ),
-            "history_info": (
-                dict(self.history_info)
-                if self.history_info is not None else None
-            ),
         }
 
 
@@ -195,12 +181,12 @@ class AlgorithmConfig:
     enable_value_min_confidence: bool = True
     value_min_bottom_k: int = 5
 
-    enable_task_type_budget: bool = True
+    enable_scene_budget: bool = True
     enable_difficulty_estimator: bool = True
     enable_history_budget: bool = True
-    default_task_type: str = "general"
-    task_type_override: str = ""
-    custom_task_types_path: str | None = None
+    scene_override: str = ""
+    scene_match_min_score: float = 3.0
+    scene_match_min_margin: float = 1.0
 
     difficulty_check_length_base: int = 400
     difficulty_check_length_max: int = 6000
@@ -212,12 +198,10 @@ class AlgorithmConfig:
     difficulty_num_thinking_max: int = 20
 
     history_budget_multiplier: float = 1.2
-    history_low_success_boost: float = 1.3
     history_stride_percentile: float = 0.75
     history_warmup_count: int = 3
     history_warmup_strategy: str = "moderate"
     new_task_unlimited: bool = True
-    auto_cluster_threshold: int = 5
 
     fixed_budget_tokens: int = 0
     fixed_num_thinking: int = 0
@@ -251,7 +235,6 @@ class AlgorithmConfig:
             "difficulty_num_thinking_base",
             "difficulty_num_thinking_max",
             "history_warmup_count",
-            "auto_cluster_threshold",
             "max_thinking_tokens",
             "final_answer_max_tokens",
         )
@@ -273,8 +256,10 @@ class AlgorithmConfig:
                 "history_stride_percentile must be in (0, 1]")
         if self.history_budget_multiplier <= 0:
             raise ValueError("history_budget_multiplier must be positive")
-        if self.history_low_success_boost <= 0:
-            raise ValueError("history_low_success_boost must be positive")
+        if self.scene_match_min_score < 0:
+            raise ValueError("scene_match_min_score must be non-negative")
+        if self.scene_match_min_margin < 0:
+            raise ValueError("scene_match_min_margin must be non-negative")
         if self.baseline_time_limit < 0:
             raise ValueError("baseline_time_limit must be non-negative")
         for base_name, maximum_name in (

@@ -42,7 +42,7 @@ def parse_phase_records(lines: Iterable[str]) -> list[dict[str, object]]:
             record = json.loads(payload)
         except json.JSONDecodeError as exc:
             raise ValueError(f"invalid TB_PHASE JSON at log line {line_number}") from exc
-        if record.get("schema") != 1:
+        if record.get("schema") not in {1, 2}:
             raise ValueError(
                 f"unsupported TB_PHASE schema at log line {line_number}: "
                 f"{record.get('schema')!r}")
@@ -109,11 +109,13 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
             if record.get("phase") == "confidence_probe"
         ]
         result.append({
-            "schema": 1,
+            "schema": decision.get("schema", 1),
             "parent_request_id": request_id,
-            "task_type": decision.get("task_type"),
+            "scene": decision.get("scene"),
+            "scene_matched": decision.get("scene_matched"),
             "decision_branch": decision.get("decision_branch"),
             "budget_plan": decision.get("budget_plan"),
+            "decision_details": decision.get("decision_details"),
             # Phases are sequential. This is controller-accounted wall time,
             # not HTTP E2E; pair it with the client-side result CSV.
             "accounted_phase_wall_ms": round(sum(
