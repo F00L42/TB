@@ -432,7 +432,56 @@ quality / hard_failure / error
 服务端通过相同 `parent_request_id` 关联所有内部 phase。Vanilla 没有内部 phase 时，
 仍需提供客户端 E2E、思考/答案 token 分解和质量结果。
 
-### 6.4 选择规则
+### 6.4 裁决分支与生效配置审计
+
+每个 run 在完成请求白名单隔离后、进入性能候选比较前，必须执行一次离线**裁决审计**。
+它的目的不是增加运行时抽象，而是证明被测请求实际走了预期分支、使用了预期配置，
+避免把 scene 误路由、难度动态预算或 fixed 未生效造成的结果归因给候选参数。
+
+权威输入只使用：
+
+```text
+_SUMMARY.csv 与具体结果 CSV
+extraction_manifest.json
+extracted/<具体结果名>/requests.jsonl
+```
+
+对每个预期经过控制器的请求，从 `requests.jsonl` 读取：
+
+```text
+decision_branch / scene / scene_matched / reject_reason
+effective BudgetPlan / confidence_threshold / percentile_step
+hard_think_token_limit / source_by_field / policy_version
+```
+
+生效配置签名固定为：
+
+```text
+(check_length, min_think_budget, num_thinking, think_stride,
+ confidence_threshold, percentile_step, hard_think_token_limit)
+```
+
+按具体结果文件分别汇总分支、scene、配置签名和字段来源；同一测试集出现多个 scene、
+多个配置或拒识时必须展开，不能只报告众数。`DecisionBranch.HISTORY` 只表示进入未命中
+scene 的代码分支；若 `decision_details.history.budget_mode=history_disabled`，应报告为
+“history 兜底、实际使用 default”，不能描述成使用了历史预算。
+
+每个 run 的 `RESULT.md` 至少记录覆盖率闭合、总体分支/scene 计数、全部有效配置、逐
+测试集分解、拒识原因和异常请求。进入性能选择前必须满足：
+
+```text
+sum(各结果客户端行) = extraction_manifest.client_rows
+sum(decision_branch) = sum(scene) = 被审计 DTB 请求总数
+每个 DTB 请求恰有一个 effective BudgetPlan
+Vanilla 原生路径没有 DTB decision phase
+dtb_default 不出现 fixed 分支或 fixed 字段来源
+dtb_fixed_* 全部进入 fixed，且字段来源与传入参数一致
+```
+
+任一不等式、缺失 BudgetPlan 或 variant 分支断言失败时，该 run 只能用于排障，不能
+参与 E2E 排名。实例见 [`run_04/RESULT.md`](../log/perf/run_04/RESULT.md)。
+
+### 6.5 选择规则
 
 对每个样本 \(i\) 做配对：
 
@@ -493,6 +542,8 @@ P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结�
 ### 8.2 阶段一算法结果
 
 - [ ] 13 场景均有可配对的 Vanilla、DTB default、fixed 数据；
+- [ ] 每个候选 run 的 `RESULT.md` 已完成裁决审计，覆盖率、分支和配置计数全部闭合；
+- [ ] 所有 `dtb_fixed_*` 请求均命中 fixed 分支，且有效字段来源和值与候选文件一致；
 - [ ] 唯一排序结果为 13 场景等权宏平均 paired E2E gain；
 - [ ] 每个场景及宏平均质量均通过预声明非劣界；
 - [ ] 不新增解析错误、工具错误、关键事实错误等 hard failure；
@@ -515,3 +566,4 @@ P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结�
 | 2026-07-31 | 调整为算法寻优优先、生产化后置的两阶段计划 |
 | 2026-07-31 | 根据评审删除强制语义类型、PolicyBundle 和重复指标；统一 scene，明确拒识门、history 无在线质量反馈目的、源码重构和三类服务器数据采集计划 |
 | 2026-08-03 | 增加共享服务日志的 request-id 白名单隔离；结果 CSV 下移到 run；提取接口收敛为单一 `run_<id>` 目录参数，自动发现固定日志、唯一 summary 和全部结果 CSV |
+| 2026-08-05 | 固化提取后的裁决审计：按测试集还原最终分支、scene、生效配置与字段来源；增加 Vanilla/default/fixed variant 断言，并以 run 内 `RESULT.md` 作为性能选择前置证据 |
