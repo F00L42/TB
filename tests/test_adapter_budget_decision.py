@@ -33,6 +33,7 @@ class BudgetDecisionTests(unittest.TestCase):
             num_thinking=3,
             think_stride=10,
             max_thinking_tokens=1000,
+            enable_difficulty_estimator=True,
         )
 
     @patch(
@@ -69,6 +70,10 @@ class BudgetDecisionTests(unittest.TestCase):
         self.assertEqual(plan.budget.min_think_budget, 120)
         self.assertEqual(plan.budget.num_thinking, 7)
         self.assertEqual(plan.hard_think_token_limit, 120)
+        self.assertEqual(
+            plan.source_by_field["hard_think_token_limit"]["source"],
+            "fixed_budget_tokens",
+        )
         self.assertEqual(trace["route"]["scene"], "code_generation")
         classifier_mock.assert_called_once()
         scene_budget_mock.assert_not_called()
@@ -154,6 +159,7 @@ class BudgetDecisionTests(unittest.TestCase):
         config = AlgorithmConfig(
             history_stride_percentile=0.60,
             max_thinking_tokens=1000,
+            enable_history_budget=True,
         )
         trace: dict = {}
         plan = BudgetController._decide(
@@ -207,6 +213,7 @@ class BudgetDecisionTests(unittest.TestCase):
             fixed_think_stride=17,
             fixed_prob_th=0.88,
             max_thinking_tokens=1000,
+            enable_difficulty_estimator=True,
         )
         plan = BudgetController._decide(
             "code", config, self.timing, hard_token_limit=80)
@@ -244,6 +251,85 @@ class BudgetDecisionTests(unittest.TestCase):
             plan.source_by_field["confidence_threshold"]["source"],
             "confidence_threshold_override",
         )
+
+    @patch(
+        "think_budget_vllm_adapter.budget_controller.get_scene_budget",
+        return_value={
+            "check_length": 500,
+            "min_think_tokens": 500,
+            "num_thinking": 2,
+            "think_stride": 250,
+            "max_think_tokens": 850,
+            "prob_th": 0.93,
+        },
+    )
+    @patch.object(
+        BudgetController,
+        "_match_scene",
+        return_value=route("react_machine_data_analysis"),
+    )
+    def test_scene_route_preserves_frozen_vector_and_hard_cap(
+        self,
+        _route_mock,
+        _scene_budget_mock,
+    ) -> None:
+        config = AlgorithmConfig(
+            max_thinking_tokens=65536,
+            enable_difficulty_estimator=False,
+            enable_history_budget=False,
+        )
+        plan = BudgetController._decide(
+            "machine data", config, self.timing, hard_token_limit=10000)
+
+        self.assertEqual(
+            plan.decision_branch, DecisionBranch.SCENE_DIFFICULTY)
+        self.assertEqual(
+            plan.budget.to_dict(),
+            {
+                "check_length": 500,
+                "min_think_budget": 500,
+                "num_thinking": 2,
+                "think_stride": 250,
+            },
+        )
+        self.assertEqual(plan.hard_think_token_limit, 850)
+        self.assertEqual(plan.confidence_threshold, 0.93)
+        self.assertEqual(
+            plan.source_by_field["hard_think_token_limit"]["source"],
+            "scene.max_think_tokens",
+        )
+
+    @patch.object(
+        BudgetController,
+        "_match_scene",
+        return_value=route("planning", matched=False),
+    )
+    def test_reject_uses_default_budget_when_history_is_disabled(
+        self,
+        _route_mock,
+    ) -> None:
+        config = AlgorithmConfig(
+            check_length=200,
+            min_think_budget=100,
+            num_thinking=10,
+            think_stride=100,
+            max_thinking_tokens=1000,
+            enable_history_budget=False,
+        )
+        trace: dict = {}
+        plan = BudgetController._decide(
+            "unknown",
+            config,
+            self.timing,
+            hard_token_limit=1000,
+            decision_trace=trace,
+        )
+
+        self.assertEqual(plan.decision_branch, DecisionBranch.HISTORY)
+        self.assertEqual(plan.budget, config.default_budget)
+        self.assertEqual(trace["history"]["budget_mode"], "history_disabled")
+        self.assertEqual(trace["history"]["fallback_mode"], "default_budget")
+        self.assertEqual(trace["history"]["reject_reason"], "below_min_score")
 
     @patch.object(BudgetController, "_match_scene", return_value=route())
     def test_fixed_budget_derives_rounds_to_cover_total_budget(

@@ -344,6 +344,7 @@ class BudgetController:
         source_by_field: dict[str, Any] = {}
         difficulty_info: dict[str, Any] | None = None
         history_info: dict[str, Any] | None = None
+        scene_values: dict[str, Any] = {}
         branch_confidence_threshold = _DEFAULT_CONFIDENCE_THRESHOLD
         branch_confidence_source = "runtime_default"
         if config.percentile_step != _DEFAULT_PERCENTILE_STEP:
@@ -517,7 +518,11 @@ class BudgetController:
                     branch_confidence_source = "history"
             else:
                 vector = default_vector
-                history_info = {"budget_mode": "history_disabled"}
+                history_info = {
+                    "budget_mode": "history_disabled",
+                    "fallback_mode": "default_budget",
+                    "reject_reason": scene_info.get("reject_reason"),
+                }
                 history_source = "default"
             source_by_field.update({
                 field_name: {
@@ -549,15 +554,26 @@ class BudgetController:
                 }
         vector = BudgetVector(**vector_values)
 
-        hard_limit = max(1, min(
-            config.max_thinking_tokens,
-            hard_token_limit or config.max_thinking_tokens,
-            (
-                config.fixed_budget_tokens
-                if config.fixed_budget_tokens > 0
-                else config.max_thinking_tokens
-            ),
-        ))
+        hard_limit_candidates = {
+            "config.max_thinking_tokens": config.max_thinking_tokens,
+        }
+        if hard_token_limit is not None and hard_token_limit > 0:
+            hard_limit_candidates["context/request"] = hard_token_limit
+        if config.fixed_budget_tokens > 0:
+            hard_limit_candidates["fixed_budget_tokens"] = (
+                config.fixed_budget_tokens)
+        elif scene_matched:
+            scene_hard_limit = scene_values.get("max_think_tokens")
+            if isinstance(scene_hard_limit, (int, float)):
+                scene_hard_limit = int(scene_hard_limit)
+                if scene_hard_limit > 0:
+                    hard_limit_candidates["scene.max_think_tokens"] = (
+                        scene_hard_limit)
+        hard_limit = max(1, min(hard_limit_candidates.values()))
+        hard_limit_sources = [
+            source for source, value in hard_limit_candidates.items()
+            if value == hard_limit
+        ]
         vector = cls._clamp_vector(
             vector, hard_limit, source_by_field)
         if config.fixed_prob_th > 0:
@@ -581,7 +597,8 @@ class BudgetController:
             "final": effective_percentile_step,
         }
         source_by_field["hard_think_token_limit"] = {
-            "source": "context/request/config",
+            "source": "+".join(hard_limit_sources),
+            "candidates": hard_limit_candidates,
             "final": hard_limit,
         }
 

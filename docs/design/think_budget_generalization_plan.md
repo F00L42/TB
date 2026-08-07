@@ -273,8 +273,10 @@ scene / scene_matched / decision_branch / effective BudgetPlan
 classification_source / classification_input_chars
 candidate_scene / scores / top_score / second_score / score_margin
 min_score / min_margin / reject_reason
+required_matches / missing_required
 strong_matches / weak_matches / structural_matches
 difficulty breakdown / history mode and statistics
+hard_think_token_limit 的全部候选上限、生效来源与最终值
 decision module timings
 ```
 
@@ -319,7 +321,7 @@ python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
 | --- | --- |
 | `context.py` | `BudgetPlan` 和决策分支改为 scene 语义，删除双分类字段和重复诊断状态 |
 | `config/unified_config.py`、`budget_config.yaml` | 合并原任务预算、scene token 和指示词为 `SCENES` |
-| `optimizations/scene_classifier.py` | 配置驱动的词边界/结构匹配、score+margin 拒识 |
+| `optimizations/scene_classifier.py` | 配置驱动的词边界/结构匹配、产品模板 required gate、score+margin 拒识 |
 | `optimizations/task_type_budget.py` | 删除 |
 | `budget_controller.py` | 最新用户消息直达 scene；scene 命中读预算，拒识走 history |
 | `history/*` | 只保留 scene 索引、统计和预算，不再动态注册任务类型 |
@@ -420,6 +422,24 @@ sampling / seed / concurrency / arrival_pattern / prefix_cache_state
 fixed parameters
 dataset path / sample count
 ```
+
+### 6.4 run_06：分类与 fixed_v3 并行
+
+run_06 不等待 fixed_v3 收口再启动分类验证，但也不提前把未验证的聚类中心写入运行时：
+
+- 6 个 fixed_v2 已过质量门的场景只传 `enable_think_budget = true`，验证模板路由能
+  自动恢复各自的冻结向量；
+- 其余 7 个场景显式传入各自 fixed_v3，fixed 分支优先于 scene 预算；
+- 第一阶段固定 `enable_difficulty_estimator = false`、
+  `enable_history_budget = false`；未识别请求使用 default budget，暂不宣称 native bypass；
+- `max_think_tokens` 作为 scene 的硬预算上限参与统一取最小值，避免只恢复四维
+  `BudgetVector`、却丢失 fixed 实验中的 `fixed_budget_tokens` 约束；
+- 6 组冻结配置按 hard limit 暂记为 fast（850/1050）、medium（1500/1600）、
+  deep（2600/3050）三类候选。该标签只用于分析和后续交叉回放，不进入运行时对象，
+  run_06 前不合并类内参数。
+
+具体场景映射、锚点、预算和验收命令见
+[`run_06_scene_routing_and_fixed_v3_plan.md`](../debug/run_06_scene_routing_and_fixed_v3_plan.md)。
 
 客户端逐样本结果最低字段：
 
@@ -535,6 +555,12 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 - [x] 最新用户消息是 scene 匹配唯一自然语言输入；
 - [x] 每个可路由 scene 在 `SCENES` 中同时具有匹配证据和预算；
 - [x] 英文证据使用边界匹配，真实产品样本覆盖命中、拒识和负例；
+- [x] run_05 的 633 条请求已离线全量回放：6 个冻结场景 282/282 命中目标 scene，
+      其余 351/351 未误入这 6 个产品 scene；
+- [x] scene 命中时四维预算、置信度阈值和 hard limit 均能恢复 frozen v2，且字段来源
+      可由 decision telemetry 还原；
+- [x] 第一阶段默认关闭 difficulty/history；拒识 telemetry 明确记录
+      `history_disabled`、`default_budget` 和拒识原因；
 - [x] `BudgetPlan` 不存 RouteResult、难度分解、history 统计或可推导
       `max_visible_think`；
 - [x] schema 2 decision 日志能还原 scene 选择、拒识原因和所有有效预算来源；
@@ -574,3 +600,4 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-03 | 增加共享服务日志的 request-id 白名单隔离；结果 CSV 下移到 run；提取接口收敛为单一 `run_<id>` 目录参数，自动发现固定日志、唯一 summary 和全部结果 CSV |
 | 2026-08-05 | 固化提取后的裁决审计：按测试集还原最终分支、scene、生效配置与字段来源；增加 Vanilla/default/fixed variant 断言，并以 run 内 `RESULT.md` 作为性能选择前置证据 |
 | 2026-08-07 | 根据 fixed_v2 结果允许局部 fixed 搜索与离线聚类/分类调试并行；自动配置收口仍要求质量合格策略或已验证的 native reject，详见 [`run_05_fixed_v2/RESULT.md`](../log/perf/run_05_fixed_v2/RESULT.md) |
+| 2026-08-07 | 实现 run_06 第一阶段：6 个 frozen v2 产品模板直达精确 scene 预算，增加 scene hard limit、required gate 和拒识回退 telemetry；633 条历史请求完成正负全量回放，聚类中心合并等待 fixed_v3 与交叉回放。 |

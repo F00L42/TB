@@ -182,8 +182,8 @@ class AlgorithmConfig:
     value_min_bottom_k: int = 5
 
     enable_scene_budget: bool = True
-    enable_difficulty_estimator: bool = True
-    enable_history_budget: bool = True
+    enable_difficulty_estimator: bool = False
+    enable_history_budget: bool = False
     scene_override: str = ""
     scene_match_min_score: float = 3.0
     scene_match_min_margin: float = 1.0

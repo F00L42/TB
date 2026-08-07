@@ -27,6 +27,7 @@ _COUNT_FIELD_RE = re.compile(r"\b[A-Za-z][A-Za-z0-9_]*_count\b")
 _SQL_RE = re.compile(
     r"(?i)\b(?:select|insert|update|delete)\s+(?:from|into|set|\*)?")
 _CJK_RE = re.compile(r"[\u3400-\u9fff]")
+_TEMPLATE_MATCH_SCORE = 100.0
 
 
 def _matches(text: str, keyword: str) -> bool:
@@ -94,21 +95,52 @@ def classify_scene(
     scores: Dict[str, float] = {}
     strong_matches: Dict[str, list[str]] = {}
     weak_matches: Dict[str, list[str]] = {}
+    required_matches: Dict[str, Dict[str, list[str]]] = {}
+    missing_required: Dict[str, Dict[str, list[str]]] = {}
     structural_matches: Dict[str, list[str]] = {}
 
     for scene, definition in definitions.items():
         indicators = definition.get("indicators", {})
+        required_all = [
+            str(keyword) for keyword in indicators.get("required_all", [])
+        ]
+        required_any = [
+            str(keyword) for keyword in indicators.get("required_any", [])
+        ]
+        matched_required_all = _matched_keywords(question, required_all)
+        matched_required_any = _matched_keywords(question, required_any)
+        has_required_gate = bool(required_all or required_any)
+        required_gate_matched = (
+            len(matched_required_all) == len(required_all)
+            and (not required_any or bool(matched_required_any))
+        )
         strong = _matched_keywords(
             question, indicators.get("strong", []))
         weak = _matched_keywords(
             question, indicators.get("weak", []))
         contributions = structural.get(scene, [])
-        score = (
-            3.0 * len(strong)
-            + 1.0 * len(weak)
-            + sum(value for _, value in contributions)
-        )
+        if has_required_gate and not required_gate_matched:
+            score = 0.0
+        else:
+            score = (
+                (_TEMPLATE_MATCH_SCORE if has_required_gate else 0.0)
+                + 3.0 * len(strong)
+                + 1.0 * len(weak)
+                + sum(value for _, value in contributions)
+            )
         scores[scene] = round(score, 3)
+        if has_required_gate:
+            required_matches[scene] = {
+                "all": matched_required_all,
+                "any": matched_required_any,
+            }
+            missing_required[scene] = {
+                "all": [
+                    keyword for keyword in required_all
+                    if keyword not in matched_required_all
+                ],
+                "any": [] if matched_required_any else required_any,
+            }
         if strong:
             strong_matches[scene] = strong
         if weak:
@@ -173,6 +205,8 @@ def classify_scene(
         "min_margin": float(min_margin),
         "reject_reason": reject_reason,
         "scores": scores,
+        "required_matches": required_matches,
+        "missing_required": missing_required,
         "strong_matches": strong_matches,
         "weak_matches": weak_matches,
         "structural_matches": structural_matches,

@@ -31,8 +31,8 @@ _RUNTIME_DEFAULTS: Dict[str, Any] = {
     "enable_safety_gate": False,
     "baseline_time_limit": 90.0,
     "enable_scene_budget": True,
-    "enable_history_budget": True,
-    "enable_difficulty_estimator": True,
+    "enable_history_budget": False,
+    "enable_difficulty_estimator": False,
     "scene_override": "",
     "scene_match_min_score": 3.0,
     "scene_match_min_margin": 1.0,
@@ -64,6 +64,129 @@ _RUNTIME_DEFAULTS: Dict[str, Any] = {
 
 
 _SCENE_DEFAULTS: Dict[str, Dict[str, Any]] = {
+    # run_06 phase-one product routes. Keep the six frozen vectors exact until
+    # cross-profile replay proves that a shared cluster center is non-inferior.
+    "react_whitebox_overall_planning": {
+        "description": "ReAct 白盒整体规划",
+        "typical_tokens": 1500,
+        "token_range": [850, 1500],
+        "check_length": 850,
+        "think_stride": 450,
+        "num_thinking": 2,
+        "min_think_tokens": 850,
+        "max_think_tokens": 1500,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "## Executed Records step1",
+                "Actions in category (a) should be automated using their "
+                "corresponding APIs.",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "react_machine_data_analysis": {
+        "description": "ReAct 白盒机器数据分析",
+        "typical_tokens": 850,
+        "token_range": [500, 850],
+        "check_length": 500,
+        "think_stride": 250,
+        "num_thinking": 2,
+        "min_think_tokens": 500,
+        "max_think_tokens": 850,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "<Packet Parameter Description>",
+                "Can_a_conclusion_be_drawn",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "kpi_configuration_assurance": {
+        "description": "KPI 配置保障",
+        "typical_tokens": 1600,
+        "token_range": [500, 1600],
+        "check_length": 500,
+        "think_stride": 300,
+        "num_thinking": 4,
+        "min_think_tokens": 500,
+        "max_think_tokens": 1600,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_any": [
+                "根因分析规则和分析线索",
+                "root cause analysis rules and analysis clues",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "netqad_e2e_single_step": {
+        "description": "NetQAD 云核 E2E 单步规划",
+        "typical_tokens": 1050,
+        "token_range": [300, 1050],
+        "check_length": 300,
+        "think_stride": 300,
+        "num_thinking": 3,
+        "min_think_tokens": 300,
+        "max_think_tokens": 1050,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "绝对不允许超出“当前诊断思路”",
+                "根据“当前诊断思路”、“已执行记录”",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "netqad_e2e_planning": {
+        "description": "NetQAD 云核 E2E 规划模块",
+        "typical_tokens": 3050,
+        "token_range": [950, 3050],
+        "check_length": 950,
+        "think_stride": 450,
+        "num_thinking": 5,
+        "min_think_tokens": 950,
+        "max_think_tokens": 3050,
+        "check_answer_len": 50,
+        "prob_th": 0.95,
+        "indicators": {
+            "required_all": [
+                "一个步骤编号可能包含多个可执行的操作",
+                "工单中告警参数定义",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "long_context_root_cause": {
+        "description": "长文本根因推理",
+        "typical_tokens": 2600,
+        "token_range": [1200, 2600],
+        "check_length": 1200,
+        "think_stride": 400,
+        "num_thinking": 4,
+        "min_think_tokens": 1200,
+        "max_think_tokens": 2600,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "### 背景知识",
+                "故障对应KPI说明",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
     "retrieval": {
         "description": "检索任务",
         "typical_tokens": 500,
@@ -264,6 +387,12 @@ _SCENE_DEFAULTS: Dict[str, Dict[str, Any]] = {
 
 
 _SCENE_PRIORITY = [
+    "react_whitebox_overall_planning",
+    "react_machine_data_analysis",
+    "kpi_configuration_assurance",
+    "netqad_e2e_single_step",
+    "netqad_e2e_planning",
+    "long_context_root_cause",
     "code_generation",
     "math_reasoning",
     "reasoning",
