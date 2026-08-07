@@ -514,6 +514,12 @@ P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结�
 7. 对最终自动候选运行一次开源通用/OOD 测试；
 8. 输出 best observed 策略和未解决的拒识场景。
 
+步骤 3 与步骤 4～5 不必全局串行。只要已有多个场景通过质量门，就可以用这些
+CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过场景继续局部 fixed
+搜索并标记为 `reject/native`。步骤 6 仍是收口门：只有待覆盖场景已有质量合格策略，
+或拒识已验证真正回到原生单次生成，才能写入并测试自动运行配置。聚类结果只用于让
+多个 scene 共享相同预算值，不引入运行时必经的 `BudgetProfile` 对象。
+
 ### 阶段二：在线增强
 
 1. 对陌生 scene 实现真正的原生首次观察；
@@ -541,9 +547,9 @@ P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结�
 
 ### 8.2 阶段一算法结果
 
-- [ ] 13 场景均有可配对的 Vanilla、DTB default、fixed 数据；
-- [ ] 每个候选 run 的 `RESULT.md` 已完成裁决审计，覆盖率、分支和配置计数全部闭合；
-- [ ] 所有 `dtb_fixed_*` 请求均命中 fixed 分支，且有效字段来源和值与候选文件一致；
+- [x] 13 场景均有可配对的 Vanilla、DTB default、fixed 数据；
+- [x] run_04、fixed_v1 和 fixed_v2 的 `RESULT.md` 已完成裁决审计，覆盖率、分支和配置计数全部闭合；
+- [x] fixed_v1/fixed_v2 请求均命中 fixed 分支，且有效字段来源和值与候选文件一致；
 - [ ] 唯一排序结果为 13 场景等权宏平均 paired E2E gain；
 - [ ] 每个场景及宏平均质量均通过预声明非劣界；
 - [ ] 不新增解析错误、工具错误、关键事实错误等 hard failure；
@@ -567,3 +573,4 @@ P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结�
 | 2026-07-31 | 根据评审删除强制语义类型、PolicyBundle 和重复指标；统一 scene，明确拒识门、history 无在线质量反馈目的、源码重构和三类服务器数据采集计划 |
 | 2026-08-03 | 增加共享服务日志的 request-id 白名单隔离；结果 CSV 下移到 run；提取接口收敛为单一 `run_<id>` 目录参数，自动发现固定日志、唯一 summary 和全部结果 CSV |
 | 2026-08-05 | 固化提取后的裁决审计：按测试集还原最终分支、scene、生效配置与字段来源；增加 Vanilla/default/fixed variant 断言，并以 run 内 `RESULT.md` 作为性能选择前置证据 |
+| 2026-08-07 | 根据 fixed_v2 结果允许局部 fixed 搜索与离线聚类/分类调试并行；自动配置收口仍要求质量合格策略或已验证的 native reject，详见 [`run_05_fixed_v2/RESULT.md`](../log/perf/run_05_fixed_v2/RESULT.md) |
