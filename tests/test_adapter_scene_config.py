@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import fnmatch
 import re
 import unittest
 from pathlib import Path
@@ -12,7 +13,7 @@ from think_budget_vllm_adapter.telemetry import TimingCollector
 
 
 _EXPECTED_PROFILES = {
-    "react_whitebox_single_step": (450, 400, 3, 450, 1400, 0.93),
+    "react_whitebox_single_step": (450, 200, 4, 450, 1100, 0.93),
     "react_whitebox_overall_planning": (850, 450, 2, 850, 1500, 0.93),
     "react_machine_data_analysis": (500, 250, 2, 500, 850, 0.93),
     "kpi_configuration_assurance": (500, 300, 4, 500, 1600, 0.93),
@@ -22,8 +23,8 @@ _EXPECTED_PROFILES = {
     "alarm_diagnosis_advice": (850, 450, 3, 850, 2150, 0.93),
     "alarm_diagnosis_conclusion": (1300, 450, 4, 1300, 2750, 0.93),
     "long_context_root_cause": (1200, 400, 4, 1200, 2600, 0.93),
-    "complaint_tool_use": (750, 250, 4, 750, 1650, 0.93),
-    "complaint_classification_zh": (400, 200, 3, 400, 850, 0.93),
+    "complaint_tool_use": (1000, 250, 3, 1000, 1650, 0.93),
+    "complaint_classification_zh": (400, 200, 3, 400, 1000, 0.93),
     "complaint_classification_en": (400, 200, 4, 400, 1050, 0.93),
 }
 
@@ -50,6 +51,16 @@ _DATASET_PATTERNS = {
     "complaint_tool_use": "*投诉助理*.csv",
     "complaint_classification_zh": "*分类_164*.csv",
     "complaint_classification_en": "*分类_20*.csv",
+}
+
+_V3_SCENES = {
+    "react_whitebox_single_step",
+    "event_self_closure",
+    "alarm_diagnosis_advice",
+    "alarm_diagnosis_conclusion",
+    "complaint_tool_use",
+    "complaint_classification_zh",
+    "complaint_classification_en",
 }
 
 
@@ -87,6 +98,104 @@ class SceneConfigTests(unittest.TestCase):
                 self.assertTrue(
                     indicators.get("required_all")
                     or indicators.get("required_any")
+                )
+
+    def test_profiles_follow_quality_tier_then_e2e_selection(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        summary_paths = {
+            "vanilla": root / "docs/log/perf/run_04/test_result/_SUMMARY.csv",
+            "v1": root / (
+                "docs/log/perf/run_04_fixed_v1/test_result/_SUMMARY.csv"
+            ),
+            "v2": root / (
+                "docs/log/perf/run_05_fixed_v2/test_result/_SUMMARY.csv"
+            ),
+            "v3": root / (
+                "docs/log/perf/run_06_v3/test_result/_SUMMARY.csv"
+            ),
+        }
+        summaries = {}
+        for variant, path in summary_paths.items():
+            with path.open(
+                "r", encoding="utf-8-sig", newline=""
+            ) as stream:
+                rows = list(csv.DictReader(stream))
+            if variant == "vanilla":
+                rows = [
+                    row for row in rows
+                    if row["结果文件名"].startswith("vanilla_")
+                ]
+            summaries[variant] = rows
+
+        fixed_dir = root / "docs/debug/fixed_param"
+        for scene, csv_pattern in _DATASET_PATTERNS.items():
+            vanilla_row = next(
+                row for row in summaries["vanilla"]
+                if fnmatch.fnmatch(row["结果文件名"], csv_pattern)
+            )
+            vanilla_valid = int(float(vanilla_row["裁判有效条目"]))
+            vanilla_correct = int(float(vanilla_row["裁判正确条目"]))
+            variants = ["v1", "v2"]
+            if scene in _V3_SCENES:
+                variants.append("v3")
+
+            candidates = []
+            for variant in variants:
+                row = next(
+                    item for item in summaries[variant]
+                    if fnmatch.fnmatch(item["结果文件名"], csv_pattern)
+                )
+                self.assertEqual(
+                    int(float(row["裁判有效条目"])),
+                    vanilla_valid,
+                )
+                candidates.append({
+                    "variant": variant,
+                    "correct": int(float(row["裁判正确条目"])),
+                    "e2e": float(row["平均时延"]),
+                })
+
+            strict = [
+                item for item in candidates
+                if item["correct"] >= vanilla_correct
+            ]
+            tolerance = [
+                item for item in candidates
+                if item["correct"] == vanilla_correct - 1
+            ]
+            eligible = strict if strict else tolerance
+            self.assertTrue(eligible, scene)
+            selected = min(eligible, key=lambda item: item["e2e"])
+
+            txt_pattern = csv_pattern.removesuffix(".csv") + ".txt"
+            param_path = next(fixed_dir.glob(txt_pattern))
+            text = param_path.read_text(encoding="utf-8")
+            block = re.search(
+                rf"(?ms)^===== fixed_{selected['variant']}[^\r\n]* =====\s*"
+                rf"(?P<body>.*?)(?=^=====|\Z)",
+                text,
+            )
+            self.assertIsNotNone(block, (scene, selected["variant"]))
+            values = {
+                key.strip(): value.strip()
+                for key, value in (
+                    line.split("=", 1)
+                    for line in block.group("body").splitlines()
+                    if "=" in line
+                )
+            }
+            selected_profile = (
+                int(values["fixed_check_length"]),
+                int(values["fixed_think_stride"]),
+                int(values["fixed_num_thinking"]),
+                int(values["fixed_min_think_tokens"]),
+                int(values["fixed_budget_tokens"]),
+                float(values["fixed_prob_th"]),
+            )
+            with self.subTest(scene=scene, variant=selected["variant"]):
+                self.assertEqual(
+                    selected_profile,
+                    _EXPECTED_PROFILES[scene],
                 )
 
     def test_yaml_declares_phase_one_switches(self) -> None:

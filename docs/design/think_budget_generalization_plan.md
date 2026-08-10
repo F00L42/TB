@@ -38,12 +38,14 @@ Think Budget 的第一目标是在 13 个产品慢思考场景上，在质量不
    `PolicyBundle`。
 3. 能推导的字段不存储；实验状态、revision 和验证 run ID 放在实验 manifest，
    不进入运行时 dataclass。
-4. 唯一排序指标是 13 个产品场景等权宏平均 paired E2E gain；候选必须同时通过
-   每场景及宏平均质量非劣、不得新增 hard failure 两个硬门。收益近似时选择
-   profile 更少的方案。
-5. 性能账本必须包含 visible thinking、hidden probe 和 final answer 的全部模型
+4. 每个场景独立执行质量分层：先只保留正确率不低于 Vanilla 的候选并选择 E2E
+   最低者；只有该层为空时，才允许从比 Vanilla 少 1 个正确样本的候选中选择 E2E
+   最低者。其他场景的质量增益不能抵消本场景缺口，低质量层的时延优势不能越级。
+5. 完成逐场景选择后，用 13 个产品场景等权宏平均 paired E2E gain 汇总最终策略；
+   不得新增 hard failure，收益近似时才选择 profile 更少的方案。
+6. 性能账本必须包含 visible thinking、hidden probe 和 final answer 的全部模型
    token，并区分 queue、prefill、decode 和控制器耗时。
-6. 拒识是自动策略的正常结果。弱证据或 top1/top2 差距不足时不得强行匹配产品
+7. 拒识是自动策略的正常结果。弱证据或 top1/top2 差距不足时不得强行匹配产品
    scene。
 
 ## 2. 已有证据与待回答问题
@@ -514,9 +516,17 @@ macro_gain    = mean(scene_gain_s over 13 scenes)
 选择顺序固定为：
 
 1. 删除新增 hard failure 的候选；
-2. 删除任一场景或 13 场景宏平均质量不满足预声明非劣界的候选；
-3. 在剩余候选中按 `macro_gain` 从高到低排序；
-4. 收益差落在预声明“近似区间”内时，选择不同预算 profile 更少的候选。
+2. 对每个场景建立严格质量层
+   `quality(candidate) >= quality(Vanilla)`，层内选择平均 E2E 最低的候选；
+3. 只有严格质量层为空时，才建立一题容差层
+   `candidate_correct = vanilla_correct - 1`，并在该层选择平均 E2E 最低的候选；
+4. 两个质量层均为空时，该场景没有可发布的 DTB 候选，应继续搜索或 reject/native；
+5. 将 13 个逐场景选择结果组合后报告 `macro_gain`，只在不改变上述逐场景选择的
+   前提下考虑 profile 合并和复杂度门。
+
+同一数据集的有效样本数相同时直接比较正确条目数；有效样本数不同时比较预声明的
+正确率指标。步骤 2 的任何候选都优先于步骤 3，即使步骤 3 的 E2E 更低。宏平均质量
+和其他场景的增益只用于汇总，不能把单场景不合格候选提升到更高质量层。
 
 P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结果，不参与重新加权
 排名。
@@ -576,7 +586,9 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 - [x] 13 场景均有可配对的 Vanilla、DTB default、fixed 数据；
 - [x] run_04、fixed_v1 和 fixed_v2 的 `RESULT.md` 已完成裁决审计，覆盖率、分支和配置计数全部闭合；
 - [x] fixed_v1/fixed_v2 请求均命中 fixed 分支，且有效字段来源和值与候选文件一致；
-- [ ] 唯一排序结果为 13 场景等权宏平均 paired E2E gain；
+- [x] search 数据按“严格质量层优先、无严格候选才允许少一题、层内最低 E2E”完成
+      13 场景选点：9 个严格层、4 个一题容差层；
+- [x] search 数据组合已报告 13 场景等权宏平均 paired E2E gain；
 - [ ] 每个场景及宏平均质量均通过预声明非劣界；
 - [ ] 不新增解析错误、工具错误、关键事实错误等 hard failure；
 - [ ] 收益近似时已选择 profile 数更少的方案；
@@ -601,3 +613,4 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-05 | 固化提取后的裁决审计：按测试集还原最终分支、scene、生效配置与字段来源；增加 Vanilla/default/fixed variant 断言，并以 run 内 `RESULT.md` 作为性能选择前置证据 |
 | 2026-08-07 | 根据 fixed_v2 结果允许局部 fixed 搜索与离线聚类/分类调试并行；自动配置收口仍要求质量合格策略或已验证的 native reject，详见 [`run_05_fixed_v2/RESULT.md`](../log/perf/run_05_fixed_v2/RESULT.md) |
 | 2026-08-07 | 实现 run_06 第一阶段：6 个 frozen v2 产品模板直达精确 scene 预算，增加 scene hard limit、required gate 和拒识回退 telemetry；633 条历史请求完成正负全量回放，聚类中心合并等待 fixed_v3 与交叉回放。 |
+| 2026-08-10 | 澄清逐场景质量优先级：严格非劣候选优先于一题容差候选，只在同一质量层比较 E2E；按 fixed_v1/v2/v3 重新选点并更新运行时配置。 |
