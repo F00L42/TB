@@ -64,8 +64,28 @@ _RUNTIME_DEFAULTS: Dict[str, Any] = {
 
 
 _SCENE_DEFAULTS: Dict[str, Dict[str, Any]] = {
-    # run_06 phase-one product routes. Keep the six frozen vectors exact until
-    # cross-profile replay proves that a shared cluster center is non-inferior.
+    # run_07 phase-one product routes. Keep the thirteen frozen vectors exact
+    # until cross-profile replay proves a shared cluster center non-inferior.
+    "react_whitebox_single_step": {
+        "description": "ReAct 白盒单步规划",
+        "typical_tokens": 1400,
+        "token_range": [450, 1400],
+        "check_length": 450,
+        "think_stride": 400,
+        "num_thinking": 3,
+        "min_think_tokens": 450,
+        "max_think_tokens": 1400,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "## Current Diagnosis Roadmap",
+                "Only one step is planned at a time.",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
     "react_whitebox_overall_planning": {
         "description": "ReAct 白盒整体规划",
         "typical_tokens": 1500,
@@ -167,6 +187,66 @@ _SCENE_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "weak": [],
         },
     },
+    "event_self_closure": {
+        "description": "事件自闭环",
+        "typical_tokens": 1700,
+        "token_range": [700, 1700],
+        "check_length": 700,
+        "think_stride": 350,
+        "num_thinking": 3,
+        "min_think_tokens": 700,
+        "max_think_tokens": 1700,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "FaultGraph类结构如下",
+                "根因告警判定规则（严格遵守）",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "alarm_diagnosis_advice": {
+        "description": "告警诊断建议总结",
+        "typical_tokens": 2150,
+        "token_range": [850, 2150],
+        "check_length": 850,
+        "think_stride": 450,
+        "num_thinking": 3,
+        "min_think_tokens": 850,
+        "max_think_tokens": 2150,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "NextOperationRecommendation",
+                "CheckedInformation",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "alarm_diagnosis_conclusion": {
+        "description": "告警诊断结论总结",
+        "typical_tokens": 2750,
+        "token_range": [1300, 2750],
+        "check_length": 1300,
+        "think_stride": 450,
+        "num_thinking": 4,
+        "min_think_tokens": 1300,
+        "max_think_tokens": 2750,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "FaultDescription",
+                "CauseOfMalfunction",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
     "long_context_root_cause": {
         "description": "长文本根因推理",
         "typical_tokens": 2600,
@@ -182,6 +262,67 @@ _SCENE_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "required_all": [
                 "### 背景知识",
                 "故障对应KPI说明",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "complaint_tool_use": {
+        "description": "投诉助理工具调用",
+        "typical_tokens": 1650,
+        "token_range": [750, 1650],
+        "check_length": 750,
+        "think_stride": 250,
+        "num_thinking": 4,
+        "min_think_tokens": 750,
+        "max_think_tokens": 1650,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "需要提取的每个关键信息的含义",
+                "faultTimeRange",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "complaint_classification_zh": {
+        "description": "投诉分类中文",
+        "typical_tokens": 850,
+        "token_range": [400, 850],
+        "check_length": 400,
+        "think_stride": 200,
+        "num_thinking": 3,
+        "min_think_tokens": 400,
+        "max_think_tokens": 850,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "先按照分类维度1分类",
+                "最终分类结果格式为：result:维度1-维度2-维度3",
+            ],
+            "strong": [],
+            "weak": [],
+        },
+    },
+    "complaint_classification_en": {
+        "description": "投诉分类英文",
+        "typical_tokens": 1050,
+        "token_range": [400, 1050],
+        "check_length": 400,
+        "think_stride": 200,
+        "num_thinking": 4,
+        "min_think_tokens": 400,
+        "max_think_tokens": 1050,
+        "check_answer_len": 50,
+        "prob_th": 0.93,
+        "indicators": {
+            "required_all": [
+                "First, classify according to Dimension 1:",
+                "The final classification result format is: result: "
+                "Dimension1-Dimension2-Dimension3",
             ],
             "strong": [],
             "weak": [],
@@ -387,12 +528,19 @@ _SCENE_DEFAULTS: Dict[str, Dict[str, Any]] = {
 
 
 _SCENE_PRIORITY = [
+    "react_whitebox_single_step",
     "react_whitebox_overall_planning",
     "react_machine_data_analysis",
     "kpi_configuration_assurance",
     "netqad_e2e_single_step",
     "netqad_e2e_planning",
+    "event_self_closure",
+    "alarm_diagnosis_advice",
+    "alarm_diagnosis_conclusion",
     "long_context_root_cause",
+    "complaint_tool_use",
+    "complaint_classification_zh",
+    "complaint_classification_en",
     "code_generation",
     "math_reasoning",
     "reasoning",
