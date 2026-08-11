@@ -30,7 +30,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 
-SCRIPT_VERSION = "1.1.0"
+SCRIPT_VERSION = "1.2.0"
 TIMESTAMP_RE = re.compile(r"_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$")
 
 PALETTE = {
@@ -360,15 +360,66 @@ def reconcile_summary(
 ) -> None:
     e2e = [parse_float(row["耗时(s)"], field="耗时(s)", location=label) for row in rows]
     tokens = [parse_float(row["Token数"], field="Token数", location=label) for row in rows]
-    correct = [parse_bool(row["裁判正确"], field="裁判正确", location=label) for row in rows]
-    _assert_close(len(rows), float(summary["裁判有效条目"]), 1e-9, f"{label} row count")
+    correct = [
+        parse_bool(row["裁判正确"], field="裁判正确", location=label)
+        for row in rows
+        if str(row.get("裁判正确", "")).strip()
+    ]
+    _assert_close(
+        len(correct),
+        float(summary["裁判有效条目"]),
+        1e-9,
+        f"{label} valid Judge row count",
+    )
     _assert_close(float(np.mean(e2e)), float(summary["平均时延"]), 0.00011, f"{label} mean E2E")
     _assert_close(float(np.mean(tokens)), float(summary["平均Token数"]), 0.011, f"{label} mean tokens")
     _assert_close(sum(correct), float(summary["裁判正确条目"]), 1e-9, f"{label} correct count")
 
 
+def build_judge_override_map(config: dict[str, Any]) -> dict[tuple[str, str, str], dict[str, Any]]:
+    result: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for index, override in enumerate(config.get("judge_overrides", []), start=1):
+        variant = str(override.get("variant", "")).strip()
+        scene_key = str(override.get("scene_key", "")).strip()
+        qa_id = str(override.get("qa_id", "")).strip()
+        correct = override.get("correct")
+        if variant not in {"baseline", "candidate"}:
+            raise ValueError(f"judge_overrides[{index}] has invalid variant {variant!r}")
+        if not scene_key or not qa_id or not isinstance(correct, bool):
+            raise ValueError(
+                f"judge_overrides[{index}] requires scene_key, qa_id, and boolean correct"
+            )
+        key = (variant, scene_key, qa_id)
+        if key in result:
+            raise ValueError(f"Duplicate Judge override: {key}")
+        result[key] = override
+    return result
+
+
+def resolve_judge_correct(
+    row: dict[str, str],
+    *,
+    variant: str,
+    scene_key: str,
+    qa_id: str,
+    overrides: dict[tuple[str, str, str], dict[str, Any]],
+    used_overrides: set[tuple[str, str, str]],
+) -> bool:
+    key = (variant, scene_key, qa_id)
+    if key in overrides:
+        used_overrides.add(key)
+        return bool(overrides[key]["correct"])
+    return parse_bool(
+        row.get("裁判正确", ""),
+        field="裁判正确",
+        location=f"{variant}/{scene_key}/{qa_id}",
+    )
+
+
 def load_comparison(config_path: Path) -> dict[str, Any]:
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    judge_overrides = build_judge_override_map(config)
+    used_overrides: set[tuple[str, str, str]] = set()
     base_dir = (config_path.parent / config["baseline"]["run_dir"]).resolve()
     candidate_dir = (config_path.parent / config["candidate"]["run_dir"]).resolve()
     baseline_prefix = config["baseline"]["prefix"]
@@ -393,9 +444,15 @@ def load_comparison(config_path: Path) -> dict[str, Any]:
     all_pairs: list[PairRecord] = []
     pairs_by_scene: dict[str, list[PairRecord]] = {}
     input_files: list[Path] = [
+        config_path,
         base_dir / "test_result" / "_SUMMARY.csv",
         candidate_dir / "test_result" / "_SUMMARY.csv",
     ]
+    for relative_path in config.get("additional_inputs", []):
+        input_path = (config_path.parent / relative_path).resolve()
+        if not input_path.is_file():
+            raise FileNotFoundError(f"Missing additional input: {input_path}")
+        input_files.append(input_path)
 
     for scene_key in sorted(baseline_files):
         baseline_path = baseline_files[scene_key]
@@ -437,11 +494,21 @@ def load_comparison(config_path: Path) -> dict[str, Any]:
                 candidate_e2e_s=parse_float(candidate_row["耗时(s)"], field="耗时(s)", location=location),
                 baseline_tokens=parse_float(baseline_row["Token数"], field="Token数", location=location),
                 candidate_tokens=parse_float(candidate_row["Token数"], field="Token数", location=location),
-                baseline_correct=parse_bool(
-                    baseline_row["裁判正确"], field="裁判正确", location=f"baseline/{location}"
+                baseline_correct=resolve_judge_correct(
+                    baseline_row,
+                    variant="baseline",
+                    scene_key=scene_key,
+                    qa_id=qa_id,
+                    overrides=judge_overrides,
+                    used_overrides=used_overrides,
                 ),
-                candidate_correct=parse_bool(
-                    candidate_row["裁判正确"], field="裁判正确", location=f"candidate/{location}"
+                candidate_correct=resolve_judge_correct(
+                    candidate_row,
+                    variant="candidate",
+                    scene_key=scene_key,
+                    qa_id=qa_id,
+                    overrides=judge_overrides,
+                    used_overrides=used_overrides,
                 ),
                 baseline_error=baseline_row.get("错误", "").strip(),
                 candidate_error=candidate_row.get("错误", "").strip(),
@@ -449,6 +516,10 @@ def load_comparison(config_path: Path) -> dict[str, Any]:
             scene_pairs.append(pair)
         pairs_by_scene[scene_key] = scene_pairs
         all_pairs.extend(scene_pairs)
+
+    unused_overrides = sorted(set(judge_overrides) - used_overrides)
+    if unused_overrides:
+        raise ValueError(f"Unused Judge overrides: {unused_overrides}")
 
     expected = config.get("expected", {})
     if expected.get("scenes") is not None and len(pairs_by_scene) != expected["scenes"]:
@@ -463,7 +534,8 @@ def load_comparison(config_path: Path) -> dict[str, Any]:
         "candidate_dir": candidate_dir,
         "pairs": all_pairs,
         "pairs_by_scene": pairs_by_scene,
-        "input_files": input_files,
+        "input_files": list(dict.fromkeys(input_files)),
+        "judge_overrides": config.get("judge_overrides", []),
     }
 
 
@@ -521,12 +593,18 @@ def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
     baseline_label = comparison["config"]["baseline"]["label"]
     candidate_label = comparison["config"]["candidate"]["label"]
     scene_summaries = []
+    override_counts: dict[str, int] = {}
+    for override in comparison["judge_overrides"]:
+        scene_key = override["scene_key"]
+        override_counts[scene_key] = override_counts.get(scene_key, 0) + 1
     for scene_key, pairs in comparison["pairs_by_scene"].items():
         summary = summarize_pairs(pairs, "SCENE", pairs[0].scene)
         summary["scene_key"] = scene_key
         summary["slug"] = pairs[0].slug
         summary["baseline_label"] = baseline_label
         summary["candidate_label"] = candidate_label
+        if override_counts.get(scene_key):
+            summary["status"] = f"paired; {override_counts[scene_key]} manual Judge override"
         scene_summaries.append(summary)
     scene_summaries.sort(key=lambda row: row["e2e_gain_pct"], reverse=True)
 
@@ -575,6 +653,10 @@ def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
     macro["candidate_label"] = candidate_label
 
     micro = summarize_pairs(comparison["pairs"], "MICRO", "请求加权微平均")
+    if comparison["judge_overrides"]:
+        micro["status"] = (
+            f"all paired requests; {len(comparison['judge_overrides'])} manual Judge override"
+        )
     micro["baseline_label"] = baseline_label
     micro["candidate_label"] = candidate_label
     return {
@@ -583,6 +665,7 @@ def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
         "micro": micro,
         "baseline_label": baseline_label,
         "candidate_label": candidate_label,
+        "judge_overrides": comparison["judge_overrides"],
     }
 
 
@@ -684,10 +767,19 @@ def write_allin1(output_dir: Path, summaries: dict[str, Any]) -> list[Path]:
         f"Token 节省 = {baseline_label} - {candidate_label}；",
         f"> 精度变化 = {candidate_label} - {baseline_label}。"
         "可见 Token 不包含隐藏 confidence probe Token。",
-        "",
-        "| " + " | ".join(headers) + " |",
-        "| " + " | ".join(["---"] * len(headers)) + " |",
     ]
+    if summaries["judge_overrides"]:
+        md_lines.append(
+            f"> Judge 结果包含 {len(summaries['judge_overrides'])} 条人工裁决；"
+            "裁决依据记录在配置与 report_manifest.json。"
+        )
+    md_lines.extend(
+        [
+            "",
+            "| " + " | ".join(headers) + " |",
+            "| " + " | ".join(["---"] * len(headers)) + " |",
+        ]
+    )
     for row in rows:
         net = fmt_number(row.get("net_correct"), 0)
         faster_count = row.get("faster_count")
@@ -818,17 +910,17 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
         width,
         height,
         f"{candidate_label} vs {baseline_label}：13 场景总览",
-        "按场景展示端到端时延优化、可见 Token 节省和 Judge 精度变化。",
+        "按场景展示端到端时延优化、可见 Token 节省和 Judge 净正确条目变化。",
     )
     canvas.text(28, 24, f"{candidate_label} vs {baseline_label}：13 场景总览", 28, bold=True)
     micro = summaries["micro"]
-    macro = summaries["macro"]
     canvas.text(
         28,
         67,
         f"13/13 场景平均更快；请求加权 E2E -{micro['e2e_gain_pct']:.2f}%，"
         f"可见 Token -{micro['visible_token_saving_pct']:.2f}%；"
-        f"Judge 宏平均 {macro['accuracy_delta_pp']:+.2f} pp / 微平均 {micro['accuracy_delta_pp']:+.2f} pp",
+        f"Judge 净正确条目 {micro['net_correct']:+d}"
+        f"（{baseline_label}-only {micro['vanilla_only']} / {candidate_label}-only {micro['candidate_only']}）",
         16,
         PALETTE["muted"],
     )
@@ -844,14 +936,16 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
     panels = [
         ("端到端时延优化", "e2e_gain_pct", (390, 790), PALETTE["candidate"], "%"),
         ("可见 Token 节省", "visible_token_saving_pct", (875, 1275), PALETTE["token"], "%"),
-        ("Judge 精度变化", "accuracy_delta_pp", (1360, 1700), None, " pp"),
+        ("Judge 净正确条目变化", "net_correct", (1360, 1700), None, " 条"),
     ]
     e2e_domain = nice_domain([row["e2e_gain_pct"] for row in rows], include_zero=True)
     token_domain = nice_domain([row["visible_token_saving_pct"] for row in rows], include_zero=True)
-    accuracy_domain = nice_domain(
-        [row["accuracy_delta_pp"] for row in rows], include_zero=True, symmetric=True
+    judge_count_domain = nice_domain(
+        [row["net_correct"] for row in rows if row["net_correct"] is not None],
+        include_zero=True,
+        symmetric=True,
     )
-    domains = [e2e_domain, token_domain, accuracy_domain]
+    domains = [e2e_domain, token_domain, judge_count_domain]
 
     for (title, _, x_range, _, unit), domain in zip(panels, domains):
         canvas.text((x_range[0] + x_range[1]) / 2, 122, title, 16, anchor="middle", bold=True)
@@ -869,7 +963,18 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
         canvas.text(label_x, y - 13, label, 14, bold=is_summary)
         canvas.text(338, y - 12, n_label, 12, PALETTE["muted"], anchor="end")
         for panel_index, ((_, key, x_range, base_color, _), domain) in enumerate(zip(panels, domains)):
-            value = float(row[key])
+            raw_value = row[key]
+            if raw_value is None:
+                canvas.text(
+                    (x_range[0] + x_range[1]) / 2,
+                    y - 11,
+                    "—",
+                    13,
+                    PALETTE["muted"],
+                    anchor="middle",
+                )
+                continue
+            value = float(raw_value)
             x_zero = scale(0.0, domain, x_range)
             x_value = scale(value, domain, x_range)
             if panel_index == 2:
@@ -878,7 +983,7 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
                 color = base_color or PALETTE["candidate"]
             canvas.line(x_zero, y, x_value, y, color, 3.0, opacity=0.85)
             canvas.circle(x_value, y, 5.5 if not is_summary else 6.5, color)
-            value_label = f"{value:+.2f}" if panel_index == 2 else f"{value:.2f}"
+            value_label = f"{int(value):+d}" if panel_index == 2 else f"{value:.2f}"
             if x_value > x_range[1] - 48:
                 canvas.text(x_value - 9, y - 11, value_label, 12, color, anchor="end", bold=is_summary)
             else:
@@ -887,7 +992,7 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
     canvas.text(
         28,
         height - 44,
-        "可见 Token = 客户端 completion Token，不含隐藏 confidence probe；宏平均为场景等权，微平均为请求等权。",
+        "可见 Token 不含隐藏 confidence probe；Judge 使用绝对条目变化，宏平均行不适用，微平均行为全量净变化。",
         12,
         PALETTE["muted"],
     )
@@ -1295,6 +1400,7 @@ def write_workbook_source(
         "candidate_run_dir": str(comparison["candidate_dir"]),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "palette": PALETTE,
+        "judge_overrides": comparison["judge_overrides"],
         "scene_summaries": [dict(row, **offsets[row["scene_key"]]) for row in summaries["scenes"]],
         "macro": summaries["macro"],
         "micro": summaries["micro"],
@@ -1359,14 +1465,17 @@ def write_manifest(
             "visible_token_saving": "mean(vanilla_completion_tokens - candidate_completion_tokens)",
             "visible_token_saving_pct": "mean(saving) / mean(vanilla_completion_tokens)",
             "accuracy_delta_pp": "100 * (candidate_correct_rate - vanilla_correct_rate)",
+            "overview_judge_delta": "candidate_correct_count - baseline_correct_count (items)",
             "pairing": "normalized scene key + QA_ID",
         },
+        "judge_overrides": comparison["judge_overrides"],
         "actual": {
             "scenes": len(summaries["scenes"]),
             "pairs": summaries["micro"]["n"],
             "faster": summaries["micro"]["faster_count"],
             "baseline_correct": summaries["micro"]["baseline_correct"],
             "candidate_correct": summaries["micro"]["candidate_correct"],
+            "net_correct": summaries["micro"]["net_correct"],
             "macro_e2e_gain_pct": summaries["macro"]["e2e_gain_pct"],
             "micro_e2e_gain_pct": summaries["micro"]["e2e_gain_pct"],
             "micro_visible_token_saving_pct": summaries["micro"]["visible_token_saving_pct"],

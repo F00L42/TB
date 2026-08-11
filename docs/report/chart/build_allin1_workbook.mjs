@@ -194,7 +194,7 @@ source.scene_summaries.forEach((scene, index) => {
   const start = scene.start_row;
   const end = scene.end_row;
   allin1.getRange(`A${row}:B${row}`).values = [["SCENE", scene.scene]];
-  allin1.getRange(`AA${row}`).values = [["paired"]];
+  allin1.getRange(`AA${row}`).values = [[scene.status]];
   allin1.getRange(`C${row}:Z${row}`).formulas = [[
     `=ROWS('Pair Data'!$A$${start}:$A$${end})`,
     `=AVERAGE('Pair Data'!$C$${start}:$C$${end})`,
@@ -227,7 +227,7 @@ const sceneEndRow = sceneStartRow + source.scene_summaries.length - 1;
 const macroRow = sceneEndRow + 1;
 const microRow = sceneEndRow + 2;
 allin1.getRange(`A${macroRow}:B${macroRow}`).values = [["MACRO", "场景等权宏平均"]];
-allin1.getRange(`AA${macroRow}`).values = [["13 scenes, equal weight"]];
+allin1.getRange(`AA${macroRow}`).values = [[source.macro.status]];
 allin1.getRange(`C${macroRow}:Z${macroRow}`).formulas = [[
   `=ROWS(B${sceneStartRow}:B${sceneEndRow})`,
   `=AVERAGE(D${sceneStartRow}:D${sceneEndRow})`,
@@ -256,7 +256,7 @@ allin1.getRange(`C${macroRow}:Z${macroRow}`).formulas = [[
 ]];
 
 allin1.getRange(`A${microRow}:B${microRow}`).values = [["MICRO", "请求加权微平均"]];
-allin1.getRange(`AA${microRow}`).values = [["all paired requests"]];
+allin1.getRange(`AA${microRow}`).values = [[source.micro.status]];
 allin1.getRange(`C${microRow}:Z${microRow}`).formulas = [[
   `=ROWS('Pair Data'!$A$2:$A$${pairEndRow})`,
   `=AVERAGE('Pair Data'!$C$2:$C$${pairEndRow})`,
@@ -337,12 +337,16 @@ allin1.getRange("C:C").format.columnWidth = 8;
 allin1.getRange("D:Q").format.columnWidth = 14;
 allin1.getRange("R:T").format.columnWidth = 15;
 allin1.getRange("U:Z").format.columnWidth = 12;
-allin1.getRange("AA:AA").format.columnWidth = 24;
+allin1.getRange("AA:AA").format.columnWidth = 38;
 allin1.freezePanes.freezeRows(5);
 allin1.freezePanes.freezeColumns(2);
 
-notes.getRange("A1:B1").values = [["项目", "说明"]];
-notes.getRange("A2:B13").values = [
+const judgeOverrideNote = source.judge_overrides?.length
+  ? source.judge_overrides
+      .map((item) => `${item.variant}/${item.scene_key}/${item.qa_id}=${item.correct}；${item.reason}`)
+      .join("；")
+  : "无";
+const noteRows = [
   ["对比", `${source.candidate_label} vs ${source.baseline_label}`],
   ["基线目录", source.baseline_run_dir],
   ["候选目录", source.candidate_run_dir],
@@ -351,24 +355,28 @@ notes.getRange("A2:B13").values = [
   ["E2E gain %", `每场景 mean(gain) / mean(${source.baseline_label} E2E)`],
   ["可见 Token saving", "客户端 completion Token 差；不含隐藏 confidence probe"],
   ["精度变化", `${source.candidate_label} Judge accuracy - ${source.baseline_label} Judge accuracy`],
+  ["人工裁决", judgeOverrideNote],
   ["宏平均", "13 个场景等权；百分比为场景级百分比的算术平均"],
   ["微平均", "633 个配对请求等权"],
   ["证据边界", "本工作簿复算本地实测结果，不代表重新运行 vLLM 性能实验"],
   ["生成时间", `'${source.generated_at}`],
 ];
+const notesEndRow = noteRows.length + 1;
+notes.getRange("A1:B1").values = [["项目", "说明"]];
+notes.getRange(`A2:B${notesEndRow}`).values = noteRows;
 notes.getRange("A1:B1").format = {
   fill: palette.candidate,
   font: { bold: true, color: "#FFFFFF" },
 };
-notes.getRange("A2:A13").format = { fill: palette.surface_alt, font: { bold: true, color: palette.text } };
-notes.getRange("A1:B13").format.borders = {
+notes.getRange(`A2:A${notesEndRow}`).format = { fill: palette.surface_alt, font: { bold: true, color: palette.text } };
+notes.getRange(`A1:B${notesEndRow}`).format.borders = {
   insideHorizontal: { style: "thin", color: palette.grid },
   outside: { style: "thin", color: palette.frame },
 };
 notes.getRange("A:A").format.columnWidth = 18;
 notes.getRange("B:B").format.columnWidth = 88;
-notes.getRange("A1:B13").format.wrapText = true;
-notes.getRange("A1:B13").format.rowHeight = 28;
+notes.getRange(`A1:B${notesEndRow}`).format.wrapText = true;
+notes.getRange(`A1:B${notesEndRow}`).format.rowHeight = 28;
 notes.freezePanes.freezeRows(1);
 
 const keyRange = await workbook.inspect({
@@ -407,7 +415,7 @@ await fs.mkdir(previewDir, { recursive: true });
 const previews = [
   ["ALLin1", `A1:AA${allin1EndRow}`, "allin1-preview.png", 0.8],
   ["Pair Data", "A1:O26", "pair-data-preview.png", 1],
-  ["Notes", "A1:B13", "notes-preview.png", 1.2],
+  ["Notes", `A1:B${notesEndRow}`, "notes-preview.png", 1.2],
 ];
 for (const [sheetName, range, filename, scale] of previews) {
   const preview = await workbook.render({ sheetName, range, scale, format: "png" });
