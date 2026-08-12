@@ -22,8 +22,10 @@ Think Budget 的第一目标是在 13 个产品慢思考场景上，在质量不
 设计基线：
 
 - 文档日期：2026-07-31；
+- 当前状态日期：2026-08-12；
 - 目标环境：vLLM `v0.23.0`、vLLM-Ascend `v0.23.0rc1`；
 - 当前单场景证据：[`run_02/RESULT.md`](../log/perf/run_02/RESULT.md)；
+- 当前 13 场景自动模式证据：[`run_07/RESULT.md`](../log/perf/run_07/RESULT.md)；
 - 性能归因口径：[`deer_performance_analysis.md`](../debug/deer_performance_analysis.md)；
 - 算法状态机边界：
   [`think_budget_vllm_adapter_refactor_plan.md`](../debug/think_budget_vllm_adapter_refactor_plan.md)。
@@ -52,19 +54,25 @@ Think Budget 的第一目标是在 13 个产品慢思考场景上，在质量不
 
 | 结论 | 证据强度 | 对本计划的影响 |
 | --- | --- | --- |
-| run_02 相对三次 Vanilla 均值，E2E 降低 `20.5613 s / 31.48%`，可见 token 降低 `55.48%` | 实测 | 固定策略在单场景存在显著收益，值得扩展到 13 场景 |
-| 计入 hidden probe 后总模型 generated token 仍约降低 `53.20%` | 实测 | probe 成本必须保留，但不否定该策略的净收益 |
-| 旧双分类链在 run_02 上把 16/16 请求判为 `classification` | 实测 + 源码确定 | 必须只分类最新用户消息，并删除双分类裁决 |
-| 当前 decision 约为毫秒级，主要成本仍在模型生成 | 实测 | scene 匹配应保持本地确定性规则，不新增 LLM 分类请求 |
-| 已有 Judge 主要验证输出结构，语义质量分尚待回填 | 实测 | 当前不能声明跨场景质量非劣 |
+| run_02 证明固定策略在单场景可获得显著 E2E 和 token 收益 | 实测 | 支持启动 13 场景 fixed 搜索；不再作为当前自动模式主证据 |
+| run_04、fixed_v1/v2/v3 已完成 13 场景三类基线和质量优先选点 | 实测 | search 阶段已有 13 个可发布候选：9 个严格质量层、4 个一题容差层 |
+| run_07 的 633/633 请求只传开关后均命中预期 scene 和冻结预算 | 实测 | 已知产品 search 集的“开启即优化”路由与配置闭环已经完成 |
+| run_07 相对 run_04 Vanilla 的请求加权 E2E 降低 44.58%，13 场景等权相对降幅 50.65% | 实测 | 13/13 场景平均 E2E 与 P95 均改善，核心产品时延里程碑通过 |
+| run_07 人工处理 1 条无效 Judge 后，两侧均为 558/633；7 场景严格非劣、6 场景少 1 题 | 实测 | 通过当前预声明的一题容差门，但不是严格逐场景非劣证明 |
+| run_07 hidden probe 为 58,728 token、占 phase wall 8.65%，完整账本为 937,389 generated token | 实测 | hidden probe 已进入结果口径，不能再用客户端 completion token 代替总工作量 |
+| run_07 使用参与规则和选点的同一批 633 条 search 样本，且缺少实验 manifest | 实测 | 不能据此声明产品 holdout、通用/OOD 泛化或解释跨 run 质量波动 |
 
-下一批数据需要回答：
+当前尚待回答：
 
-1. 每个产品场景的 Vanilla 思考 token 分布和 E2E 分布是什么；
-2. 仅开启 DTB 的默认策略在哪些场景已有净收益；
-3. 依据 Vanilla 构造的首个定制 fixed 策略能否在质量合格时进一步降低 E2E；
-4. 哪些场景可共享同一组预算，哪些必须保留专用策略；
-5. scene 匹配的误路由、拒识和覆盖情况是否足以保留逐场景收益。
+1. 未参与规则设计的产品 holdout 能否保持正确路由、逐场景质量门和正宏平均 E2E；
+2. 通用/OOD 请求是否会误命中产品 scene，reject/default 路径的质量与时延如何；
+3. 新增错误中是否存在解析、工具调用或关键事实 hard failure；
+4. 哪些近似预算可在不改变质量层和时延收益的情况下合并；
+5. 模型、量化/后训练状态或服务配置变化后，同身份 Vanilla 与自动 DTB 的收益是否仍然成立。
+
+因此当前状态固定表述为：**13 个已知产品 search 场景的核心里程碑通过，完整阶段一
+尚未通过**。完成 holdout、通用/OOD、hard failure 和复杂度门之前，不得缩写为“阶段一
+已完成”。
 
 ## 3. 最小数据模型
 
@@ -312,8 +320,11 @@ python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
 ```
 
 提取器不再接收或推导 run 外部输入，也不复制原始 CSV。若服务器产物未完整上传，必须
-先在服务器完成提取，再回传 `extraction_manifest.json`、`request_index.csv` 和各隔离
-目录中的摘要；GitHub 上缺失 `server.log` 或明细 CSV 的 run 不要求可重新执行提取。
+先在服务器完成提取，再回传 `_SUMMARY.csv`、具体结果 CSV、
+`extraction_manifest.json`、`request_index.csv`、每个隔离目录的 `requests.jsonl` 与
+`phase_summary.csv`；`controller_phases.jsonl` 可按体积选择上传。GitHub 上缺失
+`server.log` 的 run 不要求可重新执行提取，但缺失具体结果 CSV 时不能完成请求级配对和
+质量转移分析。
 
 ## 5. 具体重构清单
 
@@ -330,18 +341,20 @@ python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
 | `telemetry.py`、提取器 | schema 2 决策证据、有效预算、history/难度和模块耗时 |
 | `tests/*` | 更新 scene-only 决策测试，并从现有产品 CSV 抽样验证分类 |
 
-收到 13 场景数据后再做的改动：
+截至 run_07 的实现状态：
 
-1. 为每个可稳定识别的产品场景补充 `SCENES` 节点和离线正/负样本；
-2. 写入质量合格的 CandidatePolicy，优先把相同或近似参数合并；
-3. 校准 `scene_match_min_score` 与 `scene_match_min_margin`；
-4. 对自动模式做产品 holdout 回放和一次通用/OOD 校验；
-5. 阶段二再实现 history 的真实 native bypass。
+1. [x] 13 个产品场景均已补充 `SCENES` 节点、required gate、离线正/负样本和冻结预算；
+2. [x] 质量合格 CandidatePolicy 已写入运行时，633/633 条 search 请求自动恢复预期预算；
+3. [x] 已知产品样本的 `scene_match_min_score`、`scene_match_min_margin` 与冲突规则已离线校验；
+4. [ ] 近似参数的 profile 合并尚未通过质量—时延复杂度门；当前保留 scene 直达预算；
+5. [ ] 产品 holdout 和一次通用/OOD 校验尚未执行；
+6. [ ] history 的真实 native bypass 仍属于阶段二。
 
 ## 6. 阶段一实验与数据采集
 
-### 6.1 三类必需 run
+### 6.1 新实验身份的三类必需 run
 
+首次搜索一个新算法版本，或模型、量化/后训练状态、硬件与关键服务配置发生变化时，
 每个产品场景使用相同样本、顺序、采样参数、随机种子、并发、到达节奏和 prefix
 cache 状态，至少提供：
 
@@ -350,7 +363,8 @@ cache 状态，至少提供：
 3. `dtb_fixed_v1`：按本节公式由 Vanilla 构造的场景定制参数。
 
 不要把三个 variant 混在同一进程热状态中。若必须复用进程，manifest 中记录执行
-顺序并在结果中标注 cache 状态。
+顺序并在结果中标注 cache 状态。新实验身份必须使用同身份 Vanilla；不得因为数据集
+名称相同就跨模型、量化/后训练版本或关键服务配置复用旧 Vanilla。
 
 ### 6.2 基于 Vanilla 构造首个 fixed 候选
 
@@ -389,13 +403,13 @@ fixed_prob_th = 0.93
 ### 6.3 回传产物
 
 每个 run 放到 `docs/log/perf/<run_id>/`。测试脚本无法按场景切日志时，使用以下层级；
-`test_results` 下移为 run 的子目录，每个具体结果文件对应一个隔离的提取目录：
+`test_result` 下移为 run 的子目录，每个具体结果文件对应一个隔离的提取目录：
 
 ```text
 docs/log/perf/<run_id>/
 ├── manifest.json
 ├── server.log
-├── test_results/
+├── test_result/
 │   ├── _SUMMARY.csv
 │   └── <具体结果文件>.csv
 ├── extraction_manifest.json
@@ -411,10 +425,12 @@ docs/log/perf/<run_id>/
 `extraction_manifest.json` 记录整份服务日志中 phase 总数、被白名单选中的数量、排除
 数量，以及每个结果文件的请求覆盖率和首末匹配行。禁止把不同具体结果文件重新聚合到
 同一个 `phase_summary.csv`；跨场景比较在后续分析阶段从各隔离目录读取。`_SUMMARY.csv`
-和结果 CSV 可以直接放在 run 根目录，也可以放在 `test_results/` 等子目录；只要求在
-整个 run 下名称唯一。
+和结果 CSV 可以直接放在 run 根目录，也可以放在子目录；新 run 约定使用
+`test_result/`，提取器仍兼容其他历史层级。无论层级如何，整个 run 下的 summary 和其
+引用的结果文件名都必须唯一。
 
-`manifest.json` 最低字段：
+`manifest.json` 从 [`manifest.template.json`](../log/perf/manifest.template.json) 复制；
+最低字段：
 
 ```text
 run_id / variant / scene / policy_id
@@ -425,7 +441,7 @@ fixed parameters
 dataset path / sample count
 ```
 
-### 6.4 run_06：分类与 fixed_v3 并行
+### 6.4 历史过渡实验 run_06：分类与 fixed_v3 并行
 
 run_06 不等待 fixed_v3 收口再启动分类验证，但也不提前把未验证的聚类中心写入运行时：
 
@@ -454,7 +470,7 @@ quality / hard_failure / error
 服务端通过相同 `parent_request_id` 关联所有内部 phase。Vanilla 没有内部 phase 时，
 仍需提供客户端 E2E、思考/答案 token 分解和质量结果。
 
-### 6.4 裁决分支与生效配置审计
+### 6.5 裁决分支与生效配置审计
 
 每个 run 在完成请求白名单隔离后、进入性能候选比较前，必须执行一次离线**裁决审计**。
 它的目的不是增加运行时抽象，而是证明被测请求实际走了预期分支、使用了预期配置，
@@ -503,7 +519,7 @@ dtb_fixed_* 全部进入 fixed，且字段来源与传入参数一致
 任一不等式、缺失 BudgetPlan 或 variant 分支断言失败时，该 run 只能用于排障，不能
 参与 E2E 排名。实例见 [`run_04/RESULT.md`](../log/perf/run_04/RESULT.md)。
 
-### 6.5 选择规则
+### 6.6 选择规则
 
 对每个样本 \(i\) 做配对：
 
@@ -530,6 +546,224 @@ macro_gain    = mean(scene_gain_s over 13 scenes)
 
 P50、P95、token 分解、phase 耗时、覆盖率和拒识率用于解释结果，不参与重新加权
 排名。
+
+### 6.7 新性能结果的标准分析流程
+
+本节是新 session 的执行入口。目标是只依赖一个 run 目录、明确的基线和本节规则，
+生成可复核的 `RESULT.md`，不依赖前序对话中的临时脚本或记忆。
+
+#### 6.7.1 数据流与权威来源
+
+```mermaid
+flowchart LR
+    A["run 目录：manifest、server.log、客户端 CSV"] --> B["request_id 白名单提取"]
+    B --> C["extraction_manifest / request_index"]
+    B --> D["每结果 requests.jsonl / phase_summary.csv"]
+    A --> E["按数据集键 + QA_ID 配对"]
+    E --> F["E2E、Token、Judge、错误复算"]
+    C --> G["覆盖率与归属审计"]
+    D --> H["scene、分支、BudgetPlan 与模型工作量审计"]
+    F --> I["逐场景、MACRO、MICRO"]
+    G --> J["RESULT.md 与阶段门"]
+    H --> J
+    I --> J
+```
+
+| 数据 | 权威用途 | 不能替代的内容 |
+| --- | --- | --- |
+| 用户实验说明 + `manifest.json` | 实验身份、variant、基线、代码/模型/采样/cache | 不能由文件名前缀反推完整环境 |
+| 具体结果 CSV | 请求 E2E、TTFT、completion token、`QA_ID`、回答、Judge、客户端错误 | summary 不能替代请求级配对 |
+| `_SUMMARY.csv` | 发现结果文件并与明细复算对账 | 不能单独证明样本相同或路由正确 |
+| `extraction_manifest.json` / `request_index.csv` | request-id 归属、覆盖率、排除项与日志行范围 | 不包含最终 BudgetPlan 细节 |
+| `requests.jsonl` | 每请求 scene、分支、有效预算、来源、visible/hidden/final token | 不用于替代客户端 E2E |
+| `phase_summary.csv` | 每结果的 phase calls、wall/queue/prefill/decode、prompt/cache/generated 汇总 | 异常请求仍需回到 phase JSONL |
+| `controller_phases.jsonl` | phase 级异常和停止原因调查 | 正常总体分析无需把多个结果目录重新混合 |
+| `RESULT.md` | 派生结论、人工裁决、限制和阶段决策 | 不得反向覆盖原始 CSV |
+
+`docs/report/chart/generate_report.py` 是可选的客户端配对复算和图表层。它与上表共享
+具体结果 CSV，但不读取 telemetry，所以不能替代覆盖率、分支、配置和 hidden probe
+审计。
+
+#### 6.7.2 第一步：确定比较身份
+
+分析前先写出：
+
+```text
+candidate run / variant
+baseline run / variant
+model、量化/后训练状态、代码和服务身份
+数据集集合与 split（search / holdout / OOD）
+请求 overrides、sampling/seed、并发/到达节奏、prefix cache
+Judge 版本与采样参数
+```
+
+基线优先级：同一 run、同一实验身份的 Vanilla > manifest 证明身份相同的其他 run
+Vanilla > 只能确认数据集相同的历史 Vanilla。最后一种只能报告观察差异，不能把变化
+归因给 DTB。模型、量化、后训练权重或关键 serving 配置改变后，必须重新建立 Vanilla。
+
+结果文件名前缀由实验显式声明，例如 `vanilla_`/`dtb_` 或
+`qp_vanilla_`/`qp_dtb_`。规范化数据集键只删除**该 variant 的已声明前缀**、扩展名和
+末尾 `_YYYY-MM-DD_HH-MM-SS`；不要维护一个会误删业务名称的全局前缀列表。每个 variant
+中的规范化键必须唯一。
+
+#### 6.7.3 第二步：提取与完整性门
+
+存在原始输入但还没有提取产物时执行：
+
+```bash
+python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
+```
+
+实际 run 目录名含空格、`&` 等 shell 特殊字符时，必须给整个路径加引号。
+
+随后依次检查：
+
+```text
+只有一个 _SUMMARY.csv，且其每个结果文件名在 run 内唯一存在
+每个具体结果行都有非空、run 内唯一的 request_id
+sum(具体结果行) = extraction_manifest.client_rows = request_index 行数
+selected_phase_records + excluded_phase_records = total_phase_records_in_log
+每个结果 manifest 的 client_rows/request_ids 与具体 CSV 一致
+sum(每结果 phase_summary.calls) = selected_phase_records
+每个 DTB 请求恰有一个 decision 和一个 effective BudgetPlan
+```
+
+`extraction_manifest.request_ids` 可以同时包含 Vanilla 和 DTB 请求，而
+`total_phase_parent_requests` 只统计日志中实际有 TB phase 的 parent；原生 Vanilla 没有
+phase 时两者不相等是合法的。phase wall 闭合只与**具有 phase 的候选请求 E2E 总和**
+比较，不能把同 run 的 Vanilla E2E 也加进分母。
+
+若缺失原始 `server.log`，但已上传 extraction manifest、request index、每结果
+`requests.jsonl` 和 `phase_summary.csv`，可以从已提取产物继续分析；必须声明本地未重新
+提取。若连这些产物也缺失，只能分析客户端 E2E/质量，不能给出路由、配置或总模型
+工作量结论。
+
+#### 6.7.4 第三步：裁决分支和配置审计
+
+按第 6.5 节签名逐结果文件汇总，至少报告：
+
+```text
+scene / scene_matched / candidate_scene / reject_reason
+decision_branch / classification_source / score_margin
+四维预算 / confidence / percentile / hard limit
+每个字段 source_by_field / policy_version
+difficulty 与 history 是否实际参与
+```
+
+同一结果文件出现多个 scene、配置签名或 reject 时全部展开并定位请求，不能只报告众数。
+分支名不等于模块实际生效：例如 `scene_difficulty` 且 `difficulty=null` 只表示 scene
+预算分支，`HISTORY` 且 `budget_mode=history_disabled` 实际仍使用 default。
+
+variant 断言：
+
+```text
+Vanilla：允许没有 TB phase
+dtb_default / 仅开开关：不得出现 fixed 字段来源
+dtb_fixed_*：应进入 fixed，且请求值、BudgetPlan 和 source_by_field 一致
+自动 scene 验证：预期产品请求应命中目标 scene 和冻结预算
+OOD：重点报告产品 scene 误命中率、reject_reason 与实际兜底预算
+```
+
+任一请求归属、BudgetPlan 或预期分支不闭合时，先判为路由/配置实验失败，不进入参数
+优劣排序。
+
+#### 6.7.5 第四步：请求级配对和指标
+
+在每个规范化数据集键内按 `QA_ID` 做一对一配对，拒绝空值、重复和集合不相等。还应
+比较同一 `QA_ID` 的问题与参考答案，或用 manifest 的数据集哈希证明输入内容相同；
+只有 ID 相同但内容变化时不能称为 paired 实验。
+
+从明细复算行数、E2E、Token 和正确数，再与两侧 `_SUMMARY.csv` 对账。定义：
+
+```text
+gain_i                  = vanilla_e2e_i - candidate_e2e_i
+scene_gain_s            = mean(gain_i in scene s)
+macro_gain_s            = mean(scene_gain_s over scenes)
+macro_gain_pct          = mean(scene_gain_s / mean(vanilla_e2e in scene s))
+request_weighted_gain_s = mean(gain_i over all requests)
+request_weighted_pct    = sum(gain_i) / sum(vanilla_e2e_i)
+faster_count            = count(gain_i > 0)
+```
+
+Token 使用相同宏/微结构，但客户端 `Token数` 只叫“响应 completion token”。同时报告
+两侧平均/P50/P95；P50/P95 是解释指标，不替代唯一排序指标 `macro_gain_s`。
+
+若需要可重复的配对表或图：复制
+[`run_07.json`](../report/chart/configs/run_07.json)，显式修改 baseline/candidate run、
+variant 前缀、scene 映射和 `comparison_id`，按
+[`report_chart_workflow.md`](../report/chart/report_chart_workflow.md) 生成新的 revision。
+新实验第一次运行时，`expected` 先只保留已人工确认的 scene/pair 数；复核后再固化收益
+断言。生成器是复算辅助，`RESULT.md` 仍需补 telemetry 和阶段判断。
+
+#### 6.7.6 第五步：质量、错误和人工裁决
+
+自动 Judge 只把去空白后的字面量 `True` 计为正确。质量状态分三类：
+
+```text
+correct        # Judge 明确 True
+incorrect      # Judge 明确 False
+unresolved     # judge_invalid、空白或裁判协议错误，尚无人工结论
+```
+
+`unresolved` 不得为了通过门槛静默计对或计错。人工复核后，在 `RESULT.md` 记录 variant、
+scene、`QA_ID`、布尔结论、理由和来源；可视化配置通过 `judge_overrides` 应用同一结论，
+并把来源文档加入 `additional_inputs`。未解决项存在时，质量门保持 pending。
+
+分别报告：
+
+- 两侧正确数、有效/未解决数和正确率；
+- `Vanilla-only correct`、`candidate-only correct` 与净变化；
+- 客户端 `错误` 非空项；
+- 解析、工具调用、关键事实错误等 hard failure 人工审计。
+
+当前 13 场景自动模式质量门为：每场景优先严格非劣；若该场景没有严格候选，允许
+`candidate_correct = vanilla_correct - 1`；任何场景少 2 题及以上均失败。微平均和
+场景等权质量必须报告，但不能用其他场景增益抵消某场景超过一题的缺口。新增 hard
+failure 独立一票否决。
+
+#### 6.7.7 第六步：模型工作量账本
+
+从每个结果的 `requests.jsonl` 汇总 visible thinking、hidden probe、final answer、
+generate calls 和 probe rounds；从 `phase_summary.csv` 按 phase 汇总 calls、wall、
+queue、prefill、decode、prompt/cache/generated token 和 known coverage。
+
+必须对账：
+
+```text
+total_model_generated = visible_think + hidden_probe + final_answer
+phase generated 合计 = total_model_generated
+visible_think + final_answer ≈ 客户端 completion token
+phase wall 合计 ≈ 具有 phase 的候选客户端 E2E 合计
+```
+
+最后两式允许有 tokenizer、usage 边界和控制器外开销造成的小差值，必须报告绝对值与
+比例，不能强行改写为相等。queue/prefill/decode 的 known count 必须随数值一起报告；
+`decision` 是 CPU phase，没有这些模型时序字段是合法的。
+
+#### 6.7.8 第七步：RESULT 和停止条件
+
+每个新 run 的 `RESULT.md` 使用固定顺序：
+
+1. 一屏结论与是否通过预声明门；
+2. 输入、实验身份、基线和证据限制；
+3. 提取覆盖与请求归属；
+4. 分支、scene、有效配置和值来源；
+5. 逐场景和总体 E2E/Token/质量表；
+6. Judge 转移、人工裁决、客户端错误和 hard failure；
+7. visible/hidden/final 与 phase 账本；
+8. 与上一候选或已冻结策略的关系；
+9. 阶段验收、下一轮动作、证据强度和变更记录。
+
+停止并降级结论的条件：
+
+| 条件 | 允许结论 |
+| --- | --- |
+| 样本或输入内容不一致 | 只能做非配对描述，不参与候选选择 |
+| 路由、配置或 request-id 归属不闭合 | 只能用于排障 |
+| Judge 存在未解决项 | 性能可报告，质量门 pending |
+| 缺 telemetry | 可报告客户端 E2E/质量，不能归因分支或声称总模型 token |
+| 缺 manifest | 可报告实测差异；跨 run 波动和环境原因保持未归因 |
+| 同一 search 集既用于选点又用于验证 | 只能声明 search 里程碑，不能声明 holdout/OOD 泛化 |
 
 ## 7. 两阶段实施顺序
 
@@ -565,10 +799,10 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 - [x] 最新用户消息是 scene 匹配唯一自然语言输入；
 - [x] 每个可路由 scene 在 `SCENES` 中同时具有匹配证据和预算；
 - [x] 英文证据使用边界匹配，真实产品样本覆盖命中、拒识和负例；
-- [x] run_05 的 633 条请求已离线全量回放：6 个冻结场景 282/282 命中目标 scene，
-      其余 351/351 未误入这 6 个产品 scene；
-- [x] scene 命中时四维预算、置信度阈值和 hard limit 均能恢复 frozen v2，且字段来源
-      可由 decision telemetry 还原；
+- [x] run_07 的 13 场景 633/633 个仅开开关请求命中目标 scene，未进入 fixed、default、
+      reject 或 history；
+- [x] scene 命中时四维预算、置信度阈值和 hard limit 均能恢复质量优先选中的
+      fixed_v1/v2/v3 候选，且字段来源可由 decision telemetry 还原；
 - [x] 第一阶段默认关闭 difficulty/history；拒识 telemetry 明确记录
       `history_disabled`、`default_budget` 和拒识原因；
 - [x] `BudgetPlan` 不存 RouteResult、难度分解、history 统计或可推导
@@ -584,16 +818,23 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 ### 8.2 阶段一算法结果
 
 - [x] 13 场景均有可配对的 Vanilla、DTB default、fixed 数据；
-- [x] run_04、fixed_v1 和 fixed_v2 的 `RESULT.md` 已完成裁决审计，覆盖率、分支和配置计数全部闭合；
-- [x] fixed_v1/fixed_v2 请求均命中 fixed 分支，且有效字段来源和值与候选文件一致；
+- [x] run_04、fixed_v1/v2/v3 和 run_07 的 `RESULT.md` 已完成裁决审计，覆盖率、分支和配置计数闭合；
+- [x] fixed_v1/v2/v3 请求均命中 fixed 分支，且有效字段来源和值与候选文件一致；
 - [x] search 数据按“严格质量层优先、无严格候选才允许少一题、层内最低 E2E”完成
       13 场景选点：9 个严格层、4 个一题容差层；
 - [x] search 数据组合已报告 13 场景等权宏平均 paired E2E gain；
-- [ ] 每个场景及宏平均质量均通过预声明非劣界；
+- [x] run_07 在 search 集只传开关：633/633 命中预期 scene，13/13 场景平均 E2E 与
+      P95 改善，请求加权 E2E 改善 44.58%，场景等权相对改善 50.65%；
+- [x] run_07 通过当前预声明质量门：7 场景严格非劣，6 场景少 1 题，0 场景少 2 题，
+      人工裁决后微平均与 Vanilla 同为 558/633；
 - [ ] 不新增解析错误、工具错误、关键事实错误等 hard failure；
 - [ ] 收益近似时已选择 profile 数更少的方案；
-- [ ] hidden probe 已计入总模型生成 token 和 phase 时间；
+- [x] run_07 hidden probe 已计入总模型生成 token 和 phase 时间，phase 与客户端 E2E
+      缺口已报告；
 - [ ] 最终自动模式在产品 holdout 保持正宏平均收益，并完成一次通用/OOD 校验。
+
+阶段状态：**search 集核心产品里程碑通过；完整阶段一仍因 hard failure、profile
+复杂度、产品 holdout 和通用/OOD 四项未完成而保持未通过。**
 
 ### 8.3 阶段二 history
 
@@ -614,3 +855,5 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-07 | 根据 fixed_v2 结果允许局部 fixed 搜索与离线聚类/分类调试并行；自动配置收口仍要求质量合格策略或已验证的 native reject，详见 [`run_05_fixed_v2/RESULT.md`](../log/perf/run_05_fixed_v2/RESULT.md) |
 | 2026-08-07 | 实现 run_06 第一阶段：6 个 frozen v2 产品模板直达精确 scene 预算，增加 scene hard limit、required gate 和拒识回退 telemetry；633 条历史请求完成正负全量回放，聚类中心合并等待 fixed_v3 与交叉回放。 |
 | 2026-08-10 | 澄清逐场景质量优先级：严格非劣候选优先于一题容差候选，只在同一质量层比较 E2E；按 fixed_v1/v2/v3 重新选点并更新运行时配置。 |
+| 2026-08-12 | 纳入 run_07：633/633 个仅开开关请求命中 13 个预期 scene，search 集核心里程碑通过；完整阶段一仍等待 hard failure、profile 复杂度、产品 holdout 与通用/OOD。 |
+| 2026-08-12 | 固化新 run 的端到端分析接口：实验身份、单参数提取、覆盖/配置审计、QA_ID 配对、Judge 人工覆盖、宏微指标、hidden probe 账本、RESULT 模板与降级条件；修正章节编号和 `test_result` 层级。 |

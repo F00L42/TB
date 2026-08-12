@@ -16,26 +16,85 @@
 
 - `deer/`：简化版 DEER，侵入 vLLM Server，通过 `CoTController` 驱动“思考—试答—置信度—回答”状态机。先读 `deer/AGENTS.md`。
 - `think_budget_vllm_adapter/`：基于 DEER 控制接口的服务内 Think Budget 实现，加入任务分类、难度、历史预算、Value Min Confidence 等逻辑。
-- `think_budget/`：通过 API 转发运行的离线参考实现。算法入口和配置关系见 `think_budget_refactored_final/CLAUDE.md`。
+- `think_budget/`：通过 API 转发运行的离线参考实现。范围和与生产 adapter 的边界见
+  `think_budget/README.md`；历史重构说明见 `think_budget_refactored_final/docs/README.md`。
 - `dtb.patch`：对 vLLM Chat Completion 协议和 serving 入口的侵入式修改。生产环境应用方式为`cd vllm-workspace/vllm/ && git apply --reject --whitespace=fix /path/to/dtb.patch`
 - `docs/log/`：端到端汇总、vLLM/vLLM-Ascend 服务日志和人工 profiling 结果。
 - `docs/debug/deer_performance_analysis.md`：当前性能诊断、优化优先级和服务器 profiling runbook。
+- `docs/design/think_budget_generalization_plan.md`：13 场景实验、数据提取、自动路由审计、
+  候选选择和阶段验收的权威流程。
+- `tools/extract_tb_phase_metrics.py`：按结果 CSV 中的 `request_id` 从共享
+  `server.log` 隔离请求和 phase；接口只接收一个 run 目录。
+- `docs/report/chart/`：可选的请求级配对复算、表格和图表生成层，不替代 telemetry
+  裁决审计。
 - `docs/design/`：迁移与模块设计文档。
 
 ## 推荐阅读顺序
 
-1. 本文件与 `deer/AGENTS.md`。
-2. `docs/log/test_results/_SUMMARY.csv`、`docs/log/deer_confidence.txt`。
-3. `deer/cot_controller.py`、`deer/state.py`、`deer/context.py`。
-4. `dtb.patch`。
-5. `think_budget_vllm_adapter/budget_controller.py`、`think_budget_vllm_adapter/deer_think_budget/state.py`、两个 `context.py`。
-6. `think_budget/CLAUDE.md` 及其算法模块，用于核对服务内迁移是否保留语义。
+1. 本文件；分析 Think Budget 产品实验时继续读
+   `docs/design/think_budget_generalization_plan.md`，分析 DEER 内部实现时再读
+   `deer/AGENTS.md`。
+2. 目标 `docs/log/perf/<run_id>/` 的 `manifest.json`、`extraction_manifest.json`、
+   `_SUMMARY.csv`、具体结果 CSV 和已有 `RESULT.md`；当前 13 场景自动模式闭环参考
+   `docs/log/perf/run_07/RESULT.md`。
+3. 需要重新提取共享日志时读 `tools/extract_tb_phase_metrics.py`；需要生成请求级配对表
+   或图时读 `docs/report/chart/report_chart_workflow.md`。
+4. 需要解释服务内算法时读 `think_budget_vllm_adapter/budget_controller.py`、
+   `think_budget_vllm_adapter/deer_think_budget/state.py`、两个 `context.py` 和
+   `dtb.patch`。
+5. `deer/cot_controller.py`、`deer/state.py`、`deer/context.py` 以及
+   `think_budget/CLAUDE.md` 只用于核对历史实现或迁移语义。
+
+`docs/log/test_results/_SUMMARY.csv` 和 `docs/log/deer_confidence.txt` 是早期证据，不再是
+新性能 run 的默认入口。
+
+## 新性能结果的固定处理顺序
+
+收到一个新的 `docs/log/perf/<run_id>/` 后，按以下顺序处理；不要从 `_SUMMARY.csv` 的
+平均值直接跳到算法结论：
+
+1. **确定实验身份和基线。** 从用户说明和 `manifest.json` 确认模型/量化或后训练版本、
+   服务与 adapter commit、请求参数、sampling/seed、并发、到达节奏和 cache 状态。
+   优先使用同一实验身份、同一数据集的 Vanilla；模型或训练状态变化时，不得沿用旧
+   run 的 Vanilla。文件名前缀（如 `vanilla_`、`qp_vanilla_`、`dtb_`）是 variant，
+   不是 scene。
+2. **提取并验证归属。** 若 run 内有根目录 `server.log`、唯一 `_SUMMARY.csv` 和其引用的
+   具体结果 CSV，执行：
+
+   ```bash
+   python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
+   ```
+
+   提取器以具体结果 CSV 的非空 `request_id` 为白名单，生成
+   `extraction_manifest.json`、`request_index.csv` 和每个结果独立的 `extracted/`
+   子目录。若仓库只上传了已提取产物而缺少原始大日志，不要假装可在本地重新提取。
+3. **先做完整性和裁决审计。** 对账 summary 行、具体结果行、唯一 request ID、日志覆盖、
+   `decision_branch`、scene、reject、有效 `BudgetPlan`、配置签名和 `source_by_field`。
+   任何请求归属不闭合或 variant 分支断言失败时，该 run 只能用于排障，不能参与性能
+   排名。Vanilla 没有 TB phase 是合法状态。
+4. **再做请求级配对。** 使用规范化数据集标识和 `QA_ID` 配对 Vanilla/候选；拒绝缺失、
+   重复或样本集合不同的静默比较，并核对相同 ID 的问题与参考答案或 manifest 数据集
+   哈希。优先报告逐场景 paired E2E、13 场景等权宏平均、请求加权结果、P50/P95、
+   响应 completion token 和更快请求数。
+5. **独立处理质量。** 只有字面量 `True` 计为自动 Judge 正确；`judge_invalid` 不得静默
+   当成正确或错误。取得人工结论后，在 `RESULT.md` 记录样本、结论和理由；生成报表时
+   通过可审计的 `judge_overrides` 应用。客户端 `错误`、Judge 错误和 hard failure 是
+   三个概念，必须分开统计。
+6. **闭合模型工作量。** 分别汇总 visible thinking、hidden probe、final answer token
+   及各 phase wall/queue/prefill/decode；比较 phase wall 总和与客户端 E2E 总和并解释
+   缺口。响应 completion token 不含 hidden probe，不得称为总生成量。
+7. **写入同 run 的 `RESULT.md`。** 至少包含结论、输入与证据边界、完整性、实际分支和
+   配置、逐场景与总体比较、质量转移、phase 账本、异常项、阶段验收和下一轮决策。
+   所有结论标注为实测、源码确定或假设。
+
+精确定义、公式、质量分层、目录契约和验收清单以
+`docs/design/think_budget_generalization_plan.md` 第 6 节为准。
 
 ## 性能分析口径
 
 每个外部请求用一个 `parent_request_id` 关联所有内部 phase。至少区分：
 
-- `decision`：预算、任务类型、难度和历史决策的 CPU 时间。
+- `decision`：scene 匹配、预算、难度和历史决策的 CPU 时间。
 - `initial_think` / `iterative_think`：对外可见的思考生成。
 - `confidence_probe`：不对外可见、但真实消耗算力的试答分支。
 - `final_answer`：最终答案生成。
@@ -86,5 +145,9 @@
 ## 文档维护
 
 - 文档和结构化日志使用 UTF-8。
-- 性能实验产物放在 `docs/log/perf/<run_id>/`，包含 `manifest.json`、请求级 JSONL、phase JSONL、metrics 前后快照和摘要 CSV/Markdown。
+- 性能实验产物放在 `docs/log/perf/<run_id>/`。完整服务器归档包含 `manifest.json`、
+  `server.log`、客户端 summary/明细、请求级 JSONL、phase JSONL、metrics 前后快照和
+  `RESULT.md`；因体积不能完整上传时，至少回传客户端 summary/明细、
+  `extraction_manifest.json`、`request_index.csv`、每个结果的 `requests.jsonl` 与
+  `phase_summary.csv`。缺失 manifest 时只能报告实测差异，不能归因跨 run 波动。
 - 当实现、默认参数或实测结论变化时，同步更新性能分析文档末尾的变更记录。

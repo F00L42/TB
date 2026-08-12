@@ -34,6 +34,7 @@ COMPLETION_TOKENS_COLUMN = "Token数"
 THINK_END_MARKER = "</think>"
 TIMESTAMP_SUFFIX = re.compile(
     r"_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$")
+VARIANT_PREFIX = re.compile(r"^(?:qp_)?(?:vanilla|dtb)_")
 CANDIDATE_HEADER = re.compile(r"(?m)^===== ([^=\r\n]+) =====\r?$")
 
 
@@ -304,7 +305,7 @@ def fit_linear_model(
 
 
 def scene_key(path: Path) -> str:
-    stem = re.sub(r"^(?:vanilla|dtb)_", "", path.stem)
+    stem = VARIANT_PREFIX.sub("", path.stem)
     return TIMESTAMP_SUFFIX.sub("", stem)
 
 
@@ -327,9 +328,17 @@ def resolve_result(run_dir: Path, value: str) -> Path:
 
 def matching_dtb_result(run_dir: Path, vanilla_result: Path) -> Path:
     key = scene_key(vanilla_result)
+    dtb_prefix = (
+        "qp_dtb_" if vanilla_result.name.startswith("qp_vanilla_")
+        else "dtb_"
+    )
     matches = [
-        path for path in run_dir.rglob("dtb_*.csv")
-        if "extracted" not in path.parts and scene_key(path) == key
+        path for path in run_dir.rglob("*.csv")
+        if (
+            "extracted" not in path.parts
+            and path.name.startswith(dtb_prefix)
+            and scene_key(path) == key
+        )
     ]
     if len(matches) != 1:
         raise ValueError(
