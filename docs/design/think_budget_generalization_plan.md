@@ -291,7 +291,9 @@ decision module timings
 ```
 
 probe 继续记录置信度方法、原始值、pair count、是否接受及原因。日志不记录 prompt 或
-回答正文。
+回答正文。final answer 额外记录 `final_answer_reason`，取值为
+`confidence_accepted` 或 `budget_exhausted`；提取后的 `requests.jsonl` 保留该字段，
+用于审计最终生成使用了自由回答后缀还是限时回答后缀。
 
 提取器兼容 schema 1 和 2，命令行只接收一个 `run_<id>` 目录。该目录根部必须有
 `server.log`，目录内必须恰有一个 `_SUMMARY.csv`，summary 引用的每个具体结果文件名
@@ -490,6 +492,7 @@ extracted/<具体结果名>/requests.jsonl
 decision_branch / scene / scene_matched / reject_reason
 effective BudgetPlan / confidence_threshold / percentile_step
 hard_think_token_limit / source_by_field / policy_version
+final_answer_reason
 ```
 
 生效配置签名固定为：
@@ -857,3 +860,4 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-10 | 澄清逐场景质量优先级：严格非劣候选优先于一题容差候选，只在同一质量层比较 E2E；按 fixed_v1/v2/v3 重新选点并更新运行时配置。 |
 | 2026-08-12 | 纳入 run_07：633/633 个仅开开关请求命中 13 个预期 scene，search 集核心里程碑通过；完整阶段一仍等待 hard failure、profile 复杂度、产品 holdout 与通用/OOD。 |
 | 2026-08-12 | 固化新 run 的端到端分析接口：实验身份、单参数提取、覆盖/配置审计、QA_ID 配对、Judge 人工覆盖、宏微指标、hidden probe 账本、RESULT 模板与降级条件；修正章节编号和 `test_result` 层级。 |
+| 2026-08-13 | final phase 与请求级提取增加 `final_answer_reason`，区分置信度接受和预算耗尽的模型 prompt 后缀。 |

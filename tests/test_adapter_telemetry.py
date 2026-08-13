@@ -94,6 +94,24 @@ class TimingCollectorTests(unittest.TestCase):
         self.assertIsNone(record["decode_ms"])
         self.assertIsNone(record["cached_prompt_tokens"])
 
+    def test_final_phase_records_answer_reason(self) -> None:
+        record = TimingCollector(
+            emit_phase_metrics=False,
+        ).record_phase(
+            parent_request_id="p",
+            child_request_id="p_final_1",
+            phase="final_answer",
+            round_id=1,
+            wall_ms=3.0,
+            controller_cpu_ms=0.2,
+            prompt_tokens=20,
+            generated_tokens=4,
+            visible=True,
+            final_answer_reason="budget_exhausted",
+        )
+        self.assertEqual(
+            record["final_answer_reason"], "budget_exhausted")
+
     def test_emitted_phase_is_single_parseable_json_line(self) -> None:
         collector = TimingCollector(emit_phase_metrics=True)
         stream = io.StringIO()
@@ -255,22 +273,44 @@ class PhaseLogExtractionTests(unittest.TestCase):
                 "value_pair_count": 6,
                 "accept_reason": "average_fallback",
             },
+            {
+                "schema": 2,
+                "parent_request_id": "p",
+                "child_request_id": "p_final_3",
+                "phase": "final_answer",
+                "round": 1,
+                "wall_ms": 5.0,
+                "queue_ms": None,
+                "prefill_ms": None,
+                "decode_ms": None,
+                "prompt_tokens": 120,
+                "cached_prompt_tokens": 96,
+                "generated_tokens": 3,
+                "visible": True,
+                "final_answer_reason": "confidence_accepted",
+            },
         ]
         lines = [
             "ignored\n",
             "2026-07-21 INFO TB_PHASE " + json.dumps(records[0]) + "\n",
             "TB_PHASE " + json.dumps(records[1]) + "\n",
             "TB_PHASE " + json.dumps(records[2]) + "\n",
+            "TB_PHASE " + json.dumps(records[3]) + "\n",
         ]
 
         parsed = parse_phase_records(lines)
         requests = summarize_requests(parsed)
         phases = {row["phase"]: row for row in summarize_phases(parsed)}
 
-        self.assertEqual(len(parsed), 3)
+        self.assertEqual(len(parsed), 4)
         self.assertEqual(requests[0]["visible_think_tokens"], 4)
         self.assertEqual(requests[0]["hidden_probe_tokens"], 8)
         self.assertEqual(requests[0]["accepted_probe_round"], 1)
+        self.assertEqual(
+            requests[0]["final_answer_reason"],
+            "confidence_accepted",
+        )
+        self.assertEqual(requests[0]["final_answer_tokens"], 3)
         self.assertEqual(requests[0]["scene"], "planning")
         self.assertTrue(requests[0]["scene_matched"])
         self.assertEqual(requests[0]["decision_branch"], "fixed")

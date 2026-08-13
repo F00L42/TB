@@ -28,6 +28,13 @@ class ReasoningState(str, Enum):
     CLOSED = "closed"
 
 
+class FinalAnswerReason(str, Enum):
+    """Select the prompt suffix used to enter fresh final generation."""
+
+    CONFIDENCE_ACCEPTED = "confidence_accepted"
+    BUDGET_EXHAUSTED = "budget_exhausted"
+
+
 @dataclass
 class TrialObservation:
     """Complete hidden trial output, independent of external stream mode."""
@@ -57,6 +64,7 @@ class RequestAlgorithmState:
     hidden_probe_tokens: int = 0
     final_answer_tokens: int = 0
     thinking_segments: int = 0
+    final_answer_reason: FinalAnswerReason | None = None
 
 
 @dataclass
@@ -190,11 +198,14 @@ class RequestStateContext:
         self.algorithm_state.thinking_tokens += len(token_ids)
         self.algorithm_state.thinking_segments += 1
 
-    def close_reasoning(self) -> bool:
-        """Perform the only allowed OPEN -> CLOSED transition."""
+    def close_reasoning(self, prompt_suffix: str = "</think>") -> bool:
+        """Close once using the FinalAnswer-selected model prompt suffix."""
         if self.algorithm_state.reasoning_state is ReasoningState.CLOSED:
             return False
-        self.append_prompt_suffix("</think>")
+        if prompt_suffix.count("</think>") != 1:
+            raise ValueError(
+                "reasoning close suffix must contain exactly one </think>")
+        self.append_prompt_suffix(prompt_suffix)
         self.algorithm_state.reasoning_state = ReasoningState.CLOSED
         return True
 

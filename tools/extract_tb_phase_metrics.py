@@ -209,6 +209,10 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
             for record in request_records
             if record.get("phase") == "confidence_probe"
         ]
+        final_answer = next((
+            record for record in request_records
+            if record.get("phase") == "final_answer"
+        ), {})
         result.append({
             "schema": decision.get("schema", 1),
             "parent_request_id": request_id,
@@ -246,6 +250,8 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
                 if record.get("phase") == "confidence_probe"
                 and record.get("accepted") is True
             ), None),
+            "final_answer_reason": final_answer.get(
+                "final_answer_reason"),
             "probe_assessments": probe_assessments,
         })
     return result

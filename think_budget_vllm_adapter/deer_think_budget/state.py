@@ -12,6 +12,7 @@ from think_budget_vllm_adapter.deer_think_budget.confidence_gates import (
     assess_trial_confidence,
 )
 from think_budget_vllm_adapter.deer_think_budget.context import (
+    FinalAnswerReason,
     ReasoningState,
     RequestStateContext,
     TrialObservation,
@@ -25,6 +26,10 @@ if TYPE_CHECKING:
 
 
 THINK_END_TAG = "</think>"
+BUDGET_EXHAUSTED_FINAL_PROMPT = (
+    "Considering the limited time by the user, I have to give the solution "
+    "based on the thinking directly now.\n</think>\n\n"
+)
 TRIAL_PROMPT = (
     "I have to give the answer based on the thinking directly "
     "without explanation now.\n**Final Answer**\n"
@@ -158,6 +163,15 @@ class _BaseState(ABC):
             context.algorithm_state.api_call_count + required_calls
             <= maximum
         )
+
+    @staticmethod
+    def enter_final_answer(
+        context: RequestStateContext,
+        reason: FinalAnswerReason,
+    ) -> Type["_FinalAnswerState"]:
+        """Record why FinalAnswer was selected before changing state."""
+        context.algorithm_state.final_answer_reason = reason
+        return _FinalAnswerState
 
     @staticmethod
     def remaining_think_budget(context: RequestStateContext) -> int:
@@ -306,16 +320,19 @@ class _ThinkingState(_BaseState):
             context.config.baseline_time_limit,
             context.config.enable_safety_gate,
         ):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         remaining_budget = _BaseState.remaining_think_budget(context)
         remaining_context = _BaseState.remaining_context(context)
-        close_reserve = len(
-            context.encode_prompt_suffix(THINK_END_TAG)) + 1
-        available_think_context = remaining_context - close_reserve
+        forced_final_reserve = len(context.encode_prompt_suffix(
+            BUDGET_EXHAUSTED_FINAL_PROMPT)) + 1
+        available_think_context = remaining_context - forced_final_reserve
         if remaining_budget <= 0 or available_think_context <= 0:
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         if not _BaseState.has_call_room(context, 2):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
 
         first_segment = state.thinking_segments == 0
         requested_tokens = (
@@ -329,7 +346,8 @@ class _ThinkingState(_BaseState):
             available_think_context,
         )
         if maximum <= 0:
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
 
         phase = "initial_think" if first_segment else "iterative_think"
         phase_started = perf_counter()
@@ -390,7 +408,8 @@ class _ThinkingState(_BaseState):
         )
 
         if generated_tokens <= 0:
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         if stop_reason == THINK_END_TAG:
             state.attempted_early_stop = True
         if (
@@ -401,18 +420,21 @@ class _ThinkingState(_BaseState):
             return _ThinkingState
         if (
             _BaseState.remaining_think_budget(context) <= 0
-            or _BaseState.remaining_context(context) <= close_reserve
+            or _BaseState.remaining_context(context) <= forced_final_reserve
         ):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         # After the final failed probe, the required stride is generated and
         # then the fresh final answer starts without another probe.
         if (
             state.probe_round
             >= context.budget_plan.budget.num_thinking
         ):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         if not _BaseState.has_call_room(context, 2):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         return _ConfidenceProbeState
 
 
@@ -431,15 +453,18 @@ class _ConfidenceProbeState(_BaseState):
             state.probe_round
             >= context.budget_plan.budget.num_thinking
         ):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         if not _BaseState.has_call_room(context, 2):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         if safety_gate_check(
             context.elapsed,
             context.config.baseline_time_limit,
             context.config.enable_safety_gate,
         ):
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
 
         phase_started = perf_counter()
         controller_started = perf_counter()
@@ -461,7 +486,8 @@ class _ConfidenceProbeState(_BaseState):
         if isinstance(requested_limit, int) and requested_limit > 0:
             trial_limit = min(trial_limit, requested_limit)
         if trial_limit <= 0:
-            return _FinalAnswerState
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.BUDGET_EXHAUSTED)
         state.probe_round += 1
         params = context.request.to_sampling_params(
             trial_limit, context.default_sampling_params)
@@ -555,11 +581,14 @@ class _ConfidenceProbeState(_BaseState):
             accepted=accepted,
             accept_reason=accept_reason,
         )
-        return _FinalAnswerState if accepted else _ThinkingState
+        if accepted:
+            return _BaseState.enter_final_answer(
+                context, FinalAnswerReason.CONFIDENCE_ACCEPTED)
+        return _ThinkingState
 
 
 class _FinalAnswerState(_BaseState):
-    """Close reasoning once and generate a fresh answer from the main prompt."""
+    """Select the reviewed close suffix and generate a fresh final answer."""
 
     @staticmethod
     async def handle(
@@ -568,9 +597,18 @@ class _FinalAnswerState(_BaseState):
         state = context.algorithm_state
         phase_started = perf_counter()
         controller_started = perf_counter()
+        reason = state.final_answer_reason
+        if reason is None:
+            raise RuntimeError(
+                "FinalAnswerState requires an explicit final_answer_reason")
+        prompt_suffix = (
+            THINK_END_TAG
+            if reason is FinalAnswerReason.CONFIDENCE_ACCEPTED
+            else BUDGET_EXHAUSTED_FINAL_PROMPT
+        )
         if state.reasoning_state is ReasoningState.OPEN:
             await _emit_think_end_once(context)
-            context.close_reasoning()
+            context.close_reasoning(prompt_suffix)
 
         remaining_context = _BaseState.remaining_context(context)
         requested_limit = (
@@ -638,6 +676,7 @@ class _FinalAnswerState(_BaseState):
             generated_tokens=generated_tokens,
             visible=True,
             output=last_output,
+            final_answer_reason=reason.value,
         )
         return None
 

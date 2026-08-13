@@ -12,6 +12,7 @@ from think_budget_vllm_adapter.context import (
     PerformancePolicy,
 )
 from think_budget_vllm_adapter.deer_think_budget.context import (
+    FinalAnswerReason,
     RequestAlgorithmState,
     RequestStateContext,
     ThinkBudgetConfig,
@@ -101,6 +102,16 @@ class PromptCopyTests(unittest.TestCase):
             kwargs["reasoning_parser_kwargs"],
             {"chat_template_kwargs": {"x": 1}},
         )
+
+    def test_close_reasoning_accepts_one_explicit_close_suffix(self) -> None:
+        context = make_context()
+        context.algorithm_state.final_answer_reason = (
+            FinalAnswerReason.BUDGET_EXHAUSTED)
+        suffix = "limited\n</think>\n\n"
+
+        self.assertTrue(context.close_reasoning(suffix))
+        self.assertTrue(context.prompt_text.endswith(suffix))
+        self.assertFalse(context.close_reasoning("</think>"))
 
 
 class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):

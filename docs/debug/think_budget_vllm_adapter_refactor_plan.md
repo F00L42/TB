@@ -165,10 +165,10 @@ stateDiagram-v2
     [*] --> Thinking
     Thinking --> ConfidenceProbe: "首段 check_length 完成，或非末轮 stride 完成"
     Thinking --> Thinking: "模型尝试早停但尚未达到 min_think_budget"
-    ConfidenceProbe --> FinalAnswer: "当前 trial 置信度通过"
+    ConfidenceProbe --> FinalAnswer: "当前 trial 被接受；只追加 </think>"
     ConfidenceProbe --> Thinking: "当前 trial 未通过，包括最后一轮"
-    Thinking --> FinalAnswer: "最后一次失败 probe 后的 stride 完成"
-    Thinking --> FinalAnswer: "达到硬预算、context 或简单 safety 限制"
+    Thinking --> FinalAnswer: "最后一次失败 probe 后的 stride 完成；追加限时回答 prompt"
+    Thinking --> FinalAnswer: "达到硬预算、context 或简单 safety 限制；追加限时回答 prompt"
     FinalAnswer --> [*]
 ```
 
@@ -194,7 +194,12 @@ stateDiagram-v2
 
 #### FinalAnswerState
 
-- 只负责把主思考轨迹关闭一次，并从主 prompt 新鲜生成最终答案。
+- 通过 `final_answer_reason` 区分两条路径：
+  - `confidence_accepted`：丢弃 trial，只向主 prompt 追加 `</think>`；
+  - `budget_exhausted`：追加
+    `Considering the limited time by the user, I have to give the solution based on the thinking directly now.\n</think>\n\n`。
+- 两条路径都只向外部输出一次 `</think>`，然后从各自主 prompt 新鲜生成最终答案；
+  限时提示不对用户可见。
 - 不选择或复用 trial 候选。
 - 简单 safety 条件只会提前进入该状态；不做时间上限放大或候选 fallback。
 
@@ -212,8 +217,9 @@ reasoning_state = OPEN | CLOSED
 2. 思考子请求把 `</think>` 配置为 stop；停止字符串不写入主 prompt。
 3. 模型在达到 `min_think_budget` 前尝试停止，只记录
    `attempted_early_stop=true`，主轨迹仍为 `OPEN`，继续下一段思考。
-4. 只有 `FinalAnswerState` 可以执行 `OPEN -> CLOSED`，并向可见输出和主
-   prompt 各写入一次 `</think>`。
+4. 只有 `FinalAnswerState` 可以执行 `OPEN -> CLOSED`。可见输出只写入一次
+   `</think>`；主 prompt 的关闭后缀由 `final_answer_reason` 决定且恰含一个
+   `</think>`。
 5. `CLOSED` 后禁止回到 Thinking 或 ConfidenceProbe。
 
 因此一条推理轨迹始终只有一组标签和一次闭合，不需要 paired/unpaired
@@ -363,6 +369,7 @@ RequestAlgorithmState
   api_call_count
   budget_plan
   completion_status
+  final_answer_reason: CONFIDENCE_ACCEPTED | BUDGET_EXHAUSTED
 ```
 
 不再包含：
@@ -537,12 +544,12 @@ HistoryOutcome
 
 | 场景 | 期望 phase |
 | --- | --- |
-| 首个 trial 通过 | think(check) → probe(50) → final |
+| 首个 trial 通过 | think(check) → probe(50) → 仅追加 `</think>` → final |
 | 第 2 个 trial 通过 | think(check) → probe → think(stride) → probe → final |
-| probe 全失败 | think(check) → probe → … → 最后一次 think(stride) → final |
+| probe 全失败 | think(check) → probe → … → 最后一次 think(stride) → 追加限时 prompt → final |
 | min-think 前尝试 `</think>` | think → think，主轨迹仍只有一个开放标签 |
-| context/预算耗尽 | 直接关闭一次标签 → final |
-| safety 简单停止 | 不放大、不选候选 → final |
+| context/预算耗尽 | 追加完整限时 prompt，外部只关闭一次标签 → final |
+| safety 简单停止 | 追加完整限时 prompt，不放大、不选候选 → final |
 
 ### 7.3 Trial collector
 
@@ -667,3 +674,4 @@ cache 状态，MTP 保持生产默认。至少比较：
 | 2026-07-23 | 引入 BudgetVector、单调标签状态和完整 TrialObservation | 消除 DEER 配置投影、标签扫描和流式 trial 不完整问题 |
 | 2026-07-23 | 历史闭环参考 `6f2de8c0`，补充在线写入及未评分语义 | 原提交只有 evaluation runner 写入，在线请求不能直接照搬质量统计 |
 | 2026-07-23 | 按计划完成 adapter 重构并增加 39 项无模型测试 | 落地独立配置、三状态、trial collector、fail-open、历史闭环和文档同步；目标 NPU 验证仍待服务器执行 |
+| 2026-08-13 | 澄清 FinalAnswer 的置信度接受与预算耗尽路径 | 对齐 DEER AnswerState：前者只闭合标签，后者用固定限时指令诱导立即回答 |

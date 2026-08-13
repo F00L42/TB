@@ -12,12 +12,14 @@ from think_budget_vllm_adapter.context import (
     PerformancePolicy,
 )
 from think_budget_vllm_adapter.deer_think_budget.context import (
+    FinalAnswerReason,
     ReasoningState,
     RequestAlgorithmState,
     RequestStateContext,
 )
 from think_budget_vllm_adapter.deer_think_budget.state import (
     AsyncReasoningOrchestrator,
+    BUDGET_EXHAUSTED_FINAL_PROMPT,
 )
 from think_budget_vllm_adapter.telemetry import TimingCollector
 
@@ -217,6 +219,21 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(20, engine.calls[2]["prompt_token_ids"])
         self.assertEqual(visible.count("</think>"), 1)
         self.assertNotIn("trial", visible)
+        self.assertNotIn(
+            "Considering the limited time by the user",
+            context.prompt_text,
+        )
+        self.assertTrue(context.prompt_text.endswith("</think>"))
+        close_tokens = context.tokenizer.encode(
+            "</think>", add_special_tokens=False)
+        self.assertEqual(
+            engine.calls[-1]["prompt_token_ids"][-len(close_tokens):],
+            close_tokens,
+        )
+        self.assertEqual(
+            context.algorithm_state.final_answer_reason,
+            FinalAnswerReason.CONFIDENCE_ACCEPTED,
+        )
         self.assertEqual(
             context.algorithm_state.reasoning_state,
             ReasoningState.CLOSED,
@@ -234,6 +251,12 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(probe["pair_count"], 1)
         self.assertEqual(probe["value_pair_count"], 1)
         self.assertEqual(probe["accept_reason"], "value_min")
+        final = next(
+            phase for phase in recorded_phases
+            if phase["phase"] == "final_answer"
+        )
+        self.assertEqual(
+            final["final_answer_reason"], "confidence_accepted")
 
     async def test_second_probe_accepts_after_one_stride(self):
         context, engine = make_context([
@@ -275,6 +298,51 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             phases[-2:], ["iterative_think", "final_answer"])
         self.assertIn(12, engine.calls[-1]["prompt_token_ids"])
+        self.assertEqual(
+            context.algorithm_state.final_answer_reason,
+            FinalAnswerReason.BUDGET_EXHAUSTED,
+        )
+        self.assertTrue(
+            context.prompt_text.endswith(BUDGET_EXHAUSTED_FINAL_PROMPT))
+        expected_suffix = context.tokenizer.encode(
+            BUDGET_EXHAUSTED_FINAL_PROMPT,
+            add_special_tokens=False,
+        )
+        self.assertEqual(
+            engine.calls[-1]["prompt_token_ids"][-len(expected_suffix):],
+            expected_suffix,
+        )
+
+    async def test_hard_think_budget_exhaustion_uses_limited_time_prompt(
+        self,
+    ):
+        expected_prompt = (
+            "Considering the limited time by the user, I have to give the "
+            "solution based on the thinking directly now.\n</think>\n\n"
+        )
+        self.assertEqual(BUDGET_EXHAUSTED_FINAL_PROMPT, expected_prompt)
+        context, engine = make_context(
+            [
+                [result("check", [10])],
+                [result("answer", [30], finish_reason="stop")],
+            ],
+            hard_limit=1,
+        )
+        visible = await run_and_drain(context)
+
+        self.assertEqual(
+            call_phases(engine), ["initial_think", "final_answer"])
+        self.assertEqual(
+            context.algorithm_state.final_answer_reason,
+            FinalAnswerReason.BUDGET_EXHAUSTED,
+        )
+        self.assertTrue(
+            context.prompt_text.endswith(expected_prompt))
+        self.assertEqual(visible.count("</think>"), 1)
+        self.assertNotIn(
+            "Considering the limited time by the user",
+            "".join(visible),
+        )
 
     async def test_early_stop_before_minimum_continues_without_reopening_tag(self):
         context, engine = make_context(

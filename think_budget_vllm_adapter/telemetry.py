@@ -116,6 +116,7 @@ class TimingCollector:
         pair_count: int | None = None,
         value_pair_count: int | None = None,
         accept_reason: str | None = None,
+        final_answer_reason: str | None = None,
         stop_reason: object = None,
     ) -> dict[str, object]:
         """Build and optionally emit one schema-stable phase record.
@@ -211,6 +212,8 @@ class TimingCollector:
                 ),
                 "accept_reason": accept_reason,
             })
+        if phase == "final_answer":
+            record["final_answer_reason"] = final_answer_reason
         self.ledger.record(phase, max(generated_tokens, 0))
         if self.emit_phase_metrics:
             print(

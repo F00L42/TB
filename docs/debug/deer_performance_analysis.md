@@ -685,6 +685,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-13 | FinalAnswer 增加显式 `confidence_accepted` / `budget_exhausted` 原因；前者只补 `</think>`，后者追加固定限时提示；phase/request 提取保留该字段 | 对齐 DEER AnswerState 的两类最终生成 prompt，避免 trial 清理后从 `last_chunk.stop_reason` 错判路径 |
 | 2026-08-03 | 按结果 CSV 的 `request_id` 隔离跨数据集 phase；提取命令收敛为单一 run 目录参数，固定读取根部 `server.log` 并递归发现唯一 summary 与全部结果 CSV | 适配数据集后复用同一服务做 Judge 的现有流程；一次实验的日志和客户端结果已同属一个 run，无需依赖 10 秒空档或重复传入可推导路径 |
 | 2026-07-31 | 泛化运行时统一为 `scene → budget/reject`，删除 task type 分类、预算和动态注册；配置合并为 `SCENES`；phase schema 2 增加路由证据、拒识原因、有效预算、难度/history 与决策模块耗时 | 修复完整 prompt 污染和双分类概念冲突，为 13 场景 Vanilla/DTB/fixed 数据回传建立可解释的自动策略入口 |
 | 2026-07-27 | 纳入 run_02 的 16 请求明细、98 条 phase、同进程 metrics 和完整 BudgetPlan/confidence 遥测；从模板生成 manifest；更新 Vanilla 与验收结论 | run_02 相对三次 Vanilla 均值平均/P95 改善 31.48%/14.74%，但主要来自无法归因于代码提交的更早接受，必须先重复并补语义质量门 |

@@ -88,10 +88,10 @@ stateDiagram-v2
     [*] --> Thinking
     Thinking --> ConfidenceProbe: "首段完成或非末轮 stride 完成"
     Thinking --> Thinking: "min_think_budget 前尝试早停"
-    ConfidenceProbe --> FinalAnswer: "达阈值或置信度不可用"
+    ConfidenceProbe --> FinalAnswer: "接受；reason=confidence_accepted"
     ConfidenceProbe --> Thinking: "未达阈值"
-    Thinking --> FinalAnswer: "最后失败 probe 后的 stride 完成"
-    Thinking --> FinalAnswer: "硬预算、context、调用数或 safety 限制"
+    Thinking --> FinalAnswer: "最后失败 probe 后的 stride 完成；reason=budget_exhausted"
+    Thinking --> FinalAnswer: "硬预算、context、调用数或 safety 限制；reason=budget_exhausted"
     FinalAnswer --> [*]
 ```
 
@@ -103,7 +103,8 @@ prompt，不做自然断点回切。
 思考期间 `reasoning_state=OPEN`。模型输出 `</think>` 被视为控制标记并从
 可见思考中剥离；如果还没达到 `min_think_budget`，只记录
 `attempted_early_stop` 并继续思考。只有 FinalAnswer 可以执行一次
-`OPEN -> CLOSED`，并向主 prompt 和外部输出各补一次 `</think>`。
+`OPEN -> CLOSED`。外部输出只补一次 `</think>`；主 prompt 根据明确的
+`final_answer_reason` 选择关闭后缀。
 
 ConfidenceProbe 使用统一 induced prompt，最多生成 50 token。collector
 依据明确的 `RequestOutputKind` 聚合：
@@ -113,7 +114,16 @@ ConfidenceProbe 使用统一 induced prompt，最多生成 50 token。collector
 - 缺失 logprob 不影响完整文本和真实 generated token 计数。
 
 FinalAnswer 丢弃当前 trial，从单调主思考 prompt 新鲜生成答案，不选候选、
-不复用 trial，也不做 safety candidate fallback。
+不复用 trial，也不做 safety candidate fallback。其模型 prompt 分为两条：
+
+- `confidence_accepted`：只追加 `</think>`，让模型自由生成；
+- `budget_exhausted`：追加
+  `Considering the limited time by the user, I have to give the solution based on the thinking directly now.\n</think>\n\n`
+  后生成。probe 轮次耗尽、硬预算、context、内部调用数或 safety 限制都属于
+  强制回答路径。
+
+限时提示仅进入模型 prompt，不进入外部可见思考；状态机提前为该后缀和至少
+一个答案 token 预留 context。
 
 ### 2.4 置信度降级链
 
@@ -190,7 +200,7 @@ snapshot、policy 版本和思考硬上限。状态机不再读取动态配置�
 ### 3.4 `RequestAlgorithmState`
 
 保存单调标签状态、early-stop 标志、思考 token、probe 轮次、当前 trial、
-最后置信度、内部调用数、完成状态和 token 账本。不存在 `answer_list`、
+最后置信度、`final_answer_reason`、内部调用数、完成状态和 token 账本。不存在 `answer_list`、
 历史 trial 累积、soft-truncated tail 或 DEER 算法字段。
 
 ### 3.5 `TrialObservation`
@@ -221,6 +231,13 @@ assess_trial_confidence(observation, ...) -> ConfidenceAssessment
 只接受当前 trial，返回 Value Min、平均降级或不可用 fail-open 结果。
 
 ```python
+RequestStateContext.close_reasoning(prompt_suffix) -> bool
+```
+
+只执行一次 `OPEN -> CLOSED`；`FinalAnswerState` 根据显式原因传入单标签后缀或
+带限时指令的关闭后缀。
+
+```python
 AsyncHistoryRecorder.record_outcome(outcome) -> bool
 AsyncHistoryRecorder.flush(timeout_s) -> bool
 ```
@@ -246,6 +263,8 @@ priority、LoRA、trace headers、DP rank、prompt text 和 reasoning/parser
   history，fixed 跳过两者。
 - **本地单测**：首个/第二个 probe 接受、全失败最后 stride、
   min-think early-stop 和空 logprob fail-open 的 phase 轨迹。
+- **本地单测**：置信度接受只向模型 prompt 追加 `</think>`；预算耗尽追加
+  完整限时提示，外部仍只看到一次关闭标签。
 - **本地单测**：DELTA、FINAL_ONLY、CUMULATIVE 得到一致的完整 trial。
 - **本地单测**：未评分历史不计失败，error/cancel 不进入 token 分位数，
   重复 parent id 只写一次。
@@ -281,3 +300,4 @@ priority、LoRA、trace headers、DP rank、prompt text 和 reasoning/parser
 | 2026-07-10 | 初版迁移设计 | 建立 Think Budget 服务内迁移范围 |
 | 2026-07-23 | 按裁决重写为独立算法配置、三状态、当前 trial 置信度和在线历史闭环 | 原四状态与 answer-list/soft-truncation 设计已被性能优先裁决废弃 |
 | 2026-07-23 | 增加实现接口、一致性校验和服务器未验证项 | 使设计、实现和证据强度保持一致 |
+| 2026-08-13 | 明确 FinalAnswer 两种关闭后缀及显式触发原因 | 对齐 `deer/state.py:218-233`，避免从 trial 或最后可见 chunk 的 stop reason 推断 |
