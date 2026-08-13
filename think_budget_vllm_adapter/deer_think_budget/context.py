@@ -2,6 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import copy
+import hashlib
+import json
+import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -94,6 +98,13 @@ class RequestStateContext:
     think_end_emitted: bool = False
     prompt_suffix_token_cache: dict[str, tuple[int, ...]] = field(
         default_factory=dict)
+    parser_structural_token_ids: dict[int, str] | None = None
+    stream_debug_sequence: int = 0
+    stream_debug_enabled: bool = field(
+        default_factory=lambda: os.getenv(
+            "TB_TOOL_STREAM_DEBUG", ""
+        ).strip().lower() in {"1", "true", "yes", "on"}
+    )
 
     model_name: Optional[str] = None
     session_id: Optional[str] = None
@@ -152,7 +163,165 @@ class RequestStateContext:
             "reasoning_parser_kwargs": self.reasoning_parser_kwargs,
         }
 
-    async def stream_output(self, result: Any) -> None:
+    def _get_parser_structural_token_ids(self) -> dict[int, str]:
+        cached = self.parser_structural_token_ids
+        if cached is not None:
+            return cached
+        try:
+            vocab = self.tokenizer.get_vocab()
+        except (AttributeError, TypeError):
+            vocab = {}
+        cached = {
+            token_id: tag
+            for tag in ("<tool_call>", "</tool_call>")
+            if isinstance((token_id := vocab.get(tag)), int)
+        }
+        self.parser_structural_token_ids = cached
+        return cached
+
+    def _restore_parser_visible_tool_text(
+        self,
+        text: str,
+        token_ids: list[int],
+    ) -> tuple[str, list[str], str | None]:
+        """Restore a structural tag omitted from parser-facing delta text.
+
+        Qwen tool parsers use token IDs to detect the start marker and the
+        accumulated text to parse the following XML.  A speculative batch may
+        contain a structural token while incremental detokenization exposes
+        only a suffix such as ``"f"``.  In that case the parser can enter its
+        tool state and immediately lose it again on the next empty-text reset.
+
+        The repair is deliberately conservative: it is attempted only when a
+        known structural token ID occurs, its literal tag is absent from the
+        supplied text, and decoding the same token batch with special tokens
+        retained produces a string ending in the original text.
+        """
+        structural_ids = self._get_parser_structural_token_ids()
+        missing_tags = [
+            structural_ids[token_id]
+            for token_id in token_ids
+            if token_id in structural_ids
+            and structural_ids[token_id] not in text
+        ]
+        if not missing_tags:
+            return text, [], None
+        try:
+            decoded = self.tokenizer.decode(
+                token_ids, skip_special_tokens=False)
+        except (AttributeError, TypeError, ValueError):
+            return text, [], None
+        if not isinstance(decoded, str):
+            return text, [], None
+        if not all(tag in decoded for tag in missing_tags):
+            return text, [], decoded
+        if text and not decoded.endswith(text):
+            return text, [], decoded
+        return decoded, list(dict.fromkeys(missing_tags)), decoded
+
+    @staticmethod
+    def _stream_text_digest(text: str) -> str:
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    def _log_stream_delta(
+        self,
+        *,
+        result: Any,
+        phase: str,
+        child_request_id: str,
+        raw_text: str,
+        parser_text: str,
+        token_ids: list[int],
+        decoded_text: str | None,
+        repaired_tags: list[str],
+    ) -> None:
+        if not self.stream_debug_enabled:
+            return
+        self.stream_debug_sequence += 1
+        try:
+            output = result.outputs[0]
+        except (AttributeError, IndexError, TypeError):
+            output = None
+        record = {
+            "schema": 1,
+            "source": "controller_pre_parser",
+            "parent_request_id": self.request_id,
+            "child_request_id": child_request_id,
+            "phase": phase,
+            "sequence": self.stream_debug_sequence,
+            "raw_text": raw_text,
+            "parser_text": parser_text,
+            "decoded_token_text": decoded_text,
+            "raw_text_sha256": self._stream_text_digest(raw_text),
+            "parser_text_sha256": self._stream_text_digest(parser_text),
+            "token_ids": token_ids,
+            "repaired_tags": repaired_tags,
+            "finish_reason": getattr(output, "finish_reason", None),
+            "stop_reason": getattr(output, "stop_reason", None),
+        }
+        print(
+            "TB_TOOL_STREAM "
+            + json.dumps(record, ensure_ascii=False, separators=(",", ":")),
+            flush=True,
+        )
+
+    async def stream_output(
+        self,
+        result: Any,
+        *,
+        phase: str = "controller",
+        child_request_id: str = "",
+    ) -> None:
+        if result is None:
+            if self.stream_debug_enabled:
+                self._log_stream_delta(
+                    result=result,
+                    phase=phase,
+                    child_request_id=child_request_id,
+                    raw_text="",
+                    parser_text="",
+                    token_ids=[],
+                    decoded_text=None,
+                    repaired_tags=[],
+                )
+            await self.result_queue.put(None)
+            return
+
+        try:
+            output = result.outputs[0]
+            raw_text = output.text or ""
+            token_ids = list(output.token_ids or [])
+        except (AttributeError, IndexError, TypeError):
+            raw_text = ""
+            token_ids = []
+
+        parser_text = raw_text
+        repaired_tags: list[str] = []
+        decoded_text: str | None = None
+        if phase == "final_answer" and getattr(self.request, "tools", None):
+            parser_text, repaired_tags, decoded_text = (
+                self._restore_parser_visible_tool_text(raw_text, token_ids)
+            )
+            if repaired_tags:
+                prepared_result = copy.copy(result)
+                prepared_output = copy.copy(output)
+                prepared_result.outputs = [
+                    prepared_output,
+                    *result.outputs[1:],
+                ]
+                prepared_output.text = parser_text
+                result = prepared_result
+
+        self._log_stream_delta(
+            result=result,
+            phase=phase,
+            child_request_id=child_request_id,
+            raw_text=raw_text,
+            parser_text=parser_text,
+            token_ids=token_ids,
+            decoded_text=decoded_text,
+            repaired_tags=repaired_tags,
+        )
         await self.result_queue.put(result)
 
     def encode_prompt_suffix(self, text: str) -> tuple[int, ...]:

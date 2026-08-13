@@ -108,7 +108,7 @@ async def _emit_think_end_once(context: RequestStateContext) -> bool:
     output.token_ids = list(context.encode_prompt_suffix(THINK_END_TAG))
     output.finish_reason = None
     output.stop_reason = None
-    await context.stream_output(result)
+    await context.stream_output(result, phase="reasoning_boundary")
     context.think_end_emitted = True
     return True
 
@@ -194,6 +194,8 @@ class _BaseState(ABC):
         gen: AsyncGenerator,
         context: RequestStateContext,
         *,
+        phase: str,
+        child_request_id: str,
         output_kind: Any = None,
         collect_reasoning_logprobs: bool = False,
     ) -> tuple[list[int], Optional[RequestOutput], str, object]:
@@ -244,7 +246,11 @@ class _BaseState(ABC):
             visible_output.finish_reason = None
             visible_output.stop_reason = None
             if chunk_text or chunk_token_ids:
-                await context.stream_output(visible_result)
+                await context.stream_output(
+                    visible_result,
+                    phase=phase,
+                    child_request_id=child_request_id,
+                )
                 context.last_chunk = visible_result
             last_output = result
 
@@ -378,6 +384,8 @@ class _ThinkingState(_BaseState):
             ) = await _BaseState.consume_output(
                 generator,
                 context,
+                phase=phase,
+                child_request_id=child_request_id,
                 output_kind=output_kind,
             )
         if last_output is None:
@@ -657,7 +665,11 @@ class _FinalAnswerState(_BaseState):
                 else:
                     generated_tokens = chunk_tokens
                 last_output = result
-                await context.stream_output(result)
+                await context.stream_output(
+                    result,
+                    phase="final_answer",
+                    child_request_id=child_request_id,
+                )
         if last_output is None:
             raise RuntimeError(
                 "final_answer completed without a vLLM output")
@@ -727,7 +739,7 @@ class AsyncReasoningOrchestrator:
                 f"profile={self.context.timing.snapshot()}",
                 flush=True,
             )
-            await self.context.stream_output(None)
+            await self.context.stream_output(None, phase="controller_end")
 
 
 # Rolling-upgrade aliases.  They do not add states; both names refer to the

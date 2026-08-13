@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import json
 import unittest
+from contextlib import redirect_stdout
 from types import SimpleNamespace
 
 from think_budget_vllm_adapter.budget_controller import BudgetController
@@ -33,6 +36,21 @@ class FakeTokenizer:
 
     def decode(self, token_ids, skip_special_tokens: bool = False) -> str:
         return "".join(chr(token_id) for token_id in token_ids)
+
+    def get_vocab(self) -> dict[str, int]:
+        return {
+            "<tool_call>": 1000,
+            "</tool_call>": 1001,
+        }
+
+
+class StructuralTokenizer(FakeTokenizer):
+    def decode(self, token_ids, skip_special_tokens: bool = False) -> str:
+        pieces = {
+            1000: "" if skip_special_tokens else "<tool_call>",
+            1001: "" if skip_special_tokens else "</tool_call>",
+        }
+        return "".join(pieces.get(token_id, chr(token_id)) for token_id in token_ids)
 
 
 def make_context() -> RequestStateContext:
@@ -137,7 +155,9 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(queued.outputs[0].text, "</think>")
         self.assertEqual(original_output.text, "reasoning")
 
-    async def test_consumer_preserves_terminal_reason_without_mutating_source(self) -> None:
+    async def test_consumer_preserves_terminal_reason_without_mutating_source(
+        self,
+    ) -> None:
         context = make_context()
         completion = SimpleNamespace(
             text="delta",
@@ -152,7 +172,11 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
             yield chunk
 
         token_ids, last_chunk, text, stop_reason = await _BaseState.consume_output(
-            outputs(), context)
+            outputs(),
+            context,
+            phase="initial_think",
+            child_request_id="child",
+        )
 
         self.assertEqual(token_ids, [10])
         self.assertIs(last_chunk, chunk)
@@ -161,6 +185,74 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(completion.finish_reason, "length")
         visible = await context.result_queue.get()
         self.assertIsNone(visible.outputs[0].finish_reason)
+
+    async def test_final_answer_restores_missing_tool_marker_text(self) -> None:
+        context = make_context()
+        context.tokenizer = StructuralTokenizer()
+        context.request.tools = [{"type": "function"}]
+        source_output = SimpleNamespace(
+            text="f",
+            token_ids=[1000, ord("\n"), ord("<"), ord("f")],
+            finish_reason=None,
+            stop_reason=None,
+        )
+        source = SimpleNamespace(outputs=[source_output])
+
+        await context.stream_output(
+            source,
+            phase="final_answer",
+            child_request_id="final-1",
+        )
+        queued = await context.result_queue.get()
+
+        self.assertIsNot(queued, source)
+        self.assertIsNot(queued.outputs[0], source_output)
+        self.assertEqual(queued.outputs[0].text, "<tool_call>\n<f")
+        self.assertEqual(queued.outputs[0].token_ids, source_output.token_ids)
+        self.assertEqual(source_output.text, "f")
+
+    async def test_regular_final_answer_delta_is_not_rewritten(self) -> None:
+        context = make_context()
+        context.tokenizer = StructuralTokenizer()
+        context.request.tools = [{"type": "function"}]
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="ordinary answer",
+            token_ids=[ord(character) for character in "ordinary answer"],
+            finish_reason="stop",
+            stop_reason=None,
+        )])
+
+        await context.stream_output(source, phase="final_answer")
+
+        self.assertIs(await context.result_queue.get(), source)
+
+    async def test_stream_debug_logs_raw_and_parser_text(self) -> None:
+        context = make_context()
+        context.tokenizer = StructuralTokenizer()
+        context.request.tools = [{"type": "function"}]
+        context.stream_debug_enabled = True
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="f",
+            token_ids=[1000, ord("\n"), ord("<"), ord("f")],
+            finish_reason=None,
+            stop_reason=None,
+        )])
+        stdout = io.StringIO()
+
+        with redirect_stdout(stdout):
+            await context.stream_output(
+                source,
+                phase="final_answer",
+                child_request_id="final-1",
+            )
+
+        line = stdout.getvalue().strip()
+        self.assertTrue(line.startswith("TB_TOOL_STREAM "))
+        record = json.loads(line.split(" ", 1)[1])
+        self.assertEqual(record["source"], "controller_pre_parser")
+        self.assertEqual(record["raw_text"], "f")
+        self.assertEqual(record["parser_text"], "<tool_call>\n<f")
+        self.assertEqual(record["repaired_tags"], ["<tool_call>"])
 
 
 class ResponseContextTests(unittest.IsolatedAsyncioTestCase):
