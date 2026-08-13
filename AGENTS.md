@@ -122,6 +122,13 @@
 
 ## vLLM 集成约束
 
+- DTB 的输出契约是**原生 parser-facing 等价**：控制器只允许缩短思考内容，交给原生
+  reasoning/tool parser 的逻辑 token 序列、结构标记、增量顺序、结束语义和多轮消息语义
+  必须与同一模型完成一次原生生成时一致。流式响应必须同时保持 `text` 与 `token_ids`
+  的可解析连续性；子请求边界、合成 `</think>`、空文本 delta 和 speculative batch 不得
+  使 `<tool_call>` 等结构 token 丢失、重复或进入 `content`。非流式响应必须继续使用
+  原生完整响应 parser。任何工具调用 XML 泄漏、参数 JSON 不完整、tool 后 role 尾流或
+  `finish_reason` 偏离都属于 hard failure，不能用“可见思考更短”解释或接受。
 - 最终目标集成版本为 vLLM `v0.23.0`。`v0.20.2` 只用于解释既有日志和历史实现，不再作为优化目标或性能基线。
 - 目标运行环境使用 vLLM-Ascend。提交性能结论时记录实际 `vllm`、`vllm-ascend`、PyTorch、torch-npu、CANN、模型版本以及两个源码仓库的 commit SHA；不要仅凭版本号推断服务器代码。
 - Controller 劫持原生 serving 后，所有内部 `generate()` 必须透传原生调用上下文，包括 priority、LoRA、trace headers、data-parallel rank、reasoning/parser 参数等；尤其要保持同一外部请求的 DP 亲和性。
