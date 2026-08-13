@@ -1,0 +1,1915 @@
+﻿编号,QA_ID,问题,参考答案,request_id,模型回答,TTFT(s),耗时(s),错误,Token数,裁判评分,裁判正确,裁判方法,裁判原因
+2,MAECOM00002,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""AM--WSMC--Waqas Junaid--wjunaid--NOC Follow-up--Call Hijack case--Seeking your support to investigate and take the necessary action as there is a calls generated from stc customer towards his friend’s Saudi number roaming in Tunisia,
+and the calls kept routed to an unethical call center, which confirms that we have middle carrier hijacking the calls to the B number.""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-The call routing policy is incorrect,chatcmpl-97bb1b1122a4478a,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""AM--WSMC--Waqas Junaid--wjunaid--NOC Follow-up--Call Hijack case--Seeking your support to investigate and take the necessary action as there is a calls generated from stc customer towards his friend’s Saudi number roaming in Tunisia,
+and the calls kept routed to an unethical call center, which confirms that we have middle carrier hijacking the calls to the B number.""
+
+Step 1: Dimension 1 classification.
+The complaint is about calls being routed to an unethical call center instead of the intended destination. This is a voice service issue.
+Dimension 1: Voice service complaints
+
+Step 2: Dimension 2 classification.
+The issue is that calls are routed to an unintended destination.
+Looking at Dimension 2 options for Voice service complaints:
+10. The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+This matches perfectly.
+Dimension 2: The call routing policy is incorrect
+
+Step 3: Dimension 3 classification.
+Does Dimension 2 ""The call routing policy is incorrect"" have a Dimension 3 breakdown in the prompt?
+The prompt only lists Dimension 3 breakdowns for:
+- Call cannot be connected
+- Value-added voice service experience problems
+There is no Dimension 3 breakdown for ""The call routing policy is incorrect"".
+So Dimension 3 is empty.
+
+Final format: result: Dimension1-Dimension2
+result: Voice service complaints-The call routing policy is incorrect
+
+Let's double check the exact wording in the prompt.
+Dimension 1: Voice service complaints
+Dimension 2: The call routing policy is incorrect
+Format: result: Voice service complaints-The call routing policy is incorrect
+
+Check constraints:
+""If any dimension is empty, only output the previous dimension.""
+""Do not include the serial numbers or examples</think>
+result: Voice service complaints-The call routing policy is incorrect",1.7419,27.7201,,413,10.0,True,llm_judge,候选答案与参考答案完全一致，准确将投诉归类为语音服务投诉中的呼叫路由策略不正确，且输出格式完全符合要求。
+4,MAECOM00004,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--ENOC_Fixed--Hassan Almashgri--halmashgri--NOC Communication--Dear SNOC , --as per customer (911 Makkah) he is receiving calls from caller number 012EEE as attached . we checked in empirix & we didn't found this calls . please check samples provided by customer . ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Check call records or sources,chatcmpl-b0fc1acc9b0af081,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--ENOC_Fixed--Hassan Almashgri--halmashgri--NOC Communication--Dear SNOC , --as per customer (911 Makkah) he is receiving calls from caller number 012EEE as attached . we checked in empirix & we didn't found this calls . please check samples provided by customer . ""
+
+Analysis of the complaint:
+- The customer is receiving calls from a specific caller number (012EEE).
+- The NOC checked Empirix (a network monitoring/analysis tool) and didn't find these calls.
+- They are asking to check the samples provided by the customer.
+- This relates to checking call records or sources, specifically investigating calls from a specific number.
+
+Dimension 1: Voice service complaints (since it's about receiving calls).
+Dimension 2: Check call records or sources (The user receives a call from a specific source, and the network team is checking records/logs to verify the calls).
+Dimension 3: Not specified for this Dimension 2 category in the prompt. The prompt only specifies Dimension 3 for ""Call cannot be connected"" and ""Value-added voice service experience problems"".
+
+Let's verify Dimension 2 options for Voice service complaints:
+1.Call cannot be connected
+2.Call interrupted
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+Matches perfectly.
+
+So Dimension 1: Voice service complaints
+Dimension 2: Check call records or sources
+Dimension 3: (None specified)
+
+Format: result: Dimension1-Dimension2-Dimension3
+Output: result: Voice service complaints-Check call records or sources
+
+Check constraints:
+- ""If any dimension is empty</think>
+result: Voice service complaints-Check call records or sources",1.9537,30.6541,,413,10.0,True,llm_judge,候选答案与参考答案完全一致，准确识别投诉属于语音服务中的检查通话记录或来源类别，分类逻辑正确。
+1,MAECOM00001,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""AM--WSMC--Atiullah Khan--atmkhan--NOC Communication--Plz check this issue--Trouble Ticket Report						International Gateways
+Monitoring & Planning Dept.	
+
+	
+Trouble Ticket No.	TE20250515407								
+Carrier Name	STC - KSA								
+												
+Dear Partner, 
+We seek your kindly assistance and prompt action to log a ticket for our below issue & share your findings with your investigation details.
+Kindly find fresh samples with traces.
+Problem Description	Fast Busy via your route.
+Destination Country	KSA
+Start Time	16/05/2025 10:22:16:316
+												
+
+
+Could you confirm that calls reached customers and he rejected.  That CV 486 is not kind of blockade from your side and we can see User Busy is too fast after ringing (180ms).""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-The call routing policy is incorrect,chatcmpl-9e230367e70fea1b,"Here's a thinking process:
+
+1.  **Analyze Input Complaint Content:**
+   - The input is a technical trouble ticket from a carrier (STC - KSA) to a partner/operator.
+   - Key phrases: ""Fast Busy via your route."", ""Destination Country KSA"", ""Could you confirm that calls reached customers and he rejected. That CV 486 is not kind of blockade from your side and we can see User Busy is too fast after ringing (180ms).""
+   - This is clearly about call routing. The caller is getting a ""Fast Busy"" signal, and they suspect incorrect routing or a blockade, asking to confirm if calls reached the customer.
+   - It relates to voice services, specifically how calls are routed.
+
+2.  **Apply Dimension 1 Classification:**
+   - Options: Data service complaints, Voice service complaints, SMS service complaints, Other.
+   - The issue is about call routing, fast busy signals, and call delivery. This falls under **Voice service complaints**.
+
+3.  **Apply Dimension 2 Classification:**
+   - Options for Voice service complaints: Call cannot be connected, Call interrupted, Check call records or sources, Voice and Call Detail Record Billing Issues, Long connection delay, The call quality is poor, Announcement issue, Business handling problems, Value-added voice service experience problems, The call routing policy is incorrect, China Mobile's Non-compliant Calling Line Identification Issue, Other categories.
+   - The complaint explicitly mentions ""Fast Busy via your route"", ""calls reached customers"", ""blockade from your side"", ""User Busy is too fast after ringing"". This points directly to routing issues.
+   - Matches: **The call routing policy is incorrect**.
+
+4.  **Apply Dimension 3 Classification:**
+   - Check if Dimension 2 category has Dimension 3 subcategories.
+   - Dimension 2: ""The call routing policy is incorrect"" -> Does</think>
+result: Voice service complaints-The call routing policy is incorrect",1.1881,31.8857,,413,10.0,True,llm_judge,候选答案与参考答案完全一致，准确匹配了投诉内容中关于语音服务路由策略问题的分类。
+3,MAECOM00003,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""AM--WSMC--Atiullah Khan--atmkhan--NOC Communication--Plz check this issue--Dear STC Team,
+
+Greetings from Mobily,
+
+Kindly check as our VIP National roaming under STC and could not receive OTP from Mobily Application, As per trace we received UDTS from STC for MT-SMS
+. Attached trace .For your urgent checking.
+ 
+MSISDN : 966563900900
+IMSI: 420034141047458
+
+Please do not hesitate to contact us for any further inquiry as we looking forward to assist you always.
+
+
+M Khurram
+email:-core.fo.erc@mobily.com.sa""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",SMS service complaints-Unable to receive text messages,chatcmpl-a7e7adc6df151c27,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content:
+""AM--WSMC--Atiullah Khan--atmkhan--NOC Communication--Plz check this issue--Dear STC Team,
+
+Greetings from Mobily,
+
+Kindly check as our VIP National roaming under STC and could not receive OTP from Mobily Application, As per trace we received UDTS from STC for MT-SMS
+. Attached trace .For your urgent checking.
+ 
+MSISDN : 966563900900
+IMSI: 420034141047458
+
+Please do not hesitate to contact us for any further inquiry as we looking forward to assist you always.
+
+
+M Khurram
+email:-core.fo.erc@mobily.com.sa""
+
+Key points from the complaint:
+- User/VIP National roaming under STC.
+- Could not receive OTP from Mobily Application.
+- Trace shows UDTS from STC for MT-SMS (Mobile Terminated SMS).
+- Issue is about not receiving SMS (OTP).
+
+Dimension 1: SMS service complaints (since it's about receiving OTP via SMS).
+Dimension 2: Unable to receive text messages (matches ""could not receive OTP"", MT-SMS issue).
+Dimension 3: Not specified for this subcategory in the prompt. The prompt says for SMS service complaints, Dimension 2 can be: 1.Text message cannot be sent; 2.Unable to receive text messages; 3.Other.
+So Dimension 2 is ""Unable to receive text messages"".
+
+Check format: result: Dimension1-Dimension2-Dimension3
+Dimension 1: SMS service complaints
+Dimension 2: Unable to receive text messages
+Dimension 3: (empty)
+
+Output format: result: SMS service complaints-Unable to receive text messages
+
+Let's double check the classification logic.
+Dimension 1: SMS service complaints
+Dimension 2: Unable to receive text messages
+Matches exactly.
+The prompt says: ""If any dimension is empty, only output the previous dimension.""
+So: result: SMS service complaints-Unable to receive text messages
+
+Check exact wording in prompt:
+""SMS service complaints""
+""Unable to receive text messages""
+
+Everything matches.
+Final output: result: SMS service complaints-Unable to receive text messages
+Done. 
+I will generate the response accordingly. 
+One minor point: The prompt says ""result: Dimension1-Dimension2-Dimension3"".
+So ""result: SMS service complaints-Unable to receive text messages"" is correct.
+No extra text.
+Proceed. 
+Self-Correction/Verification during thought:
+Is OTP considered SMS? Yes, MT-SMS is explicitly mentioned.
+Classification matches perfectly.
+Output matches requirement.
+Ready. 
+Output Generation. 
+[result: SMS service complaints-Unable to receive text messages] -> matches exactly. 
+Proceeds. 
+Final Answer Generation. 
+(Note: I will strictly follow the format requested.) 
+Output: result: SMS service complaints-Unable to receive text messages
+Done. 
+[Output Generation] -> *Proceeds*
+</think>
+result: SMS service complaints-Unable to receive text messages",1.9543,53.9347,,679,10.0,True,llm_judge,候选答案准确识别了投诉内容为无法接收短信，分类维度与参考答案完全一致，符合分类逻辑和输出格式要求。
+5,MAECOM00005,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--GB-MS-IPX-FM1-NOC--Bara Siddiq--bsiddiq--NOC Communication--Dear TAC please for your support--Dear STC,
+
+Greetings.
+
+The mobile number 576888002 was reported to be receiving a high volume of incoming calls from users claiming they received calls from this number. However, the number was roaming abroad and had not initiated any calls. 
+
+This suggests that the number was being spoofed.
+
+Based on captured traces the calls for calling number 0576888002 were received from STC""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Check call records or sources,chatcmpl-ad27285e4a7dea43,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content:
+""PM--GB-MS-IPX-FM1-NOC--Bara Siddiq--bsiddiq--NOC Communication--Dear TAC please for your support--Dear STC,
+
+Greetings.
+
+The mobile number 576888002 was reported to be receiving a high volume of incoming calls from users claiming they received calls from this number. However, the number was roaming abroad and had not initiated any calls. 
+
+This suggests that the number was being spoofed.
+
+Based on captured traces the calls for calling number 0576888002 were received from STC""
+
+Step 1: Dimension 1 classification.
+The complaint is about a high volume of incoming calls, suspected spoofing, checking call records/sources.
+This falls under ""Voice service complaints"".
+
+Step 2: Dimension 2 classification.
+Looking at the subcategories for Voice service complaints:
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+This matches perfectly. The complaint mentions checking traces, spoofing, high volume of incoming calls.
+
+Step 3: Dimension 3 classification.
+Does ""Check call records or sources"" have a Dimension 3?
+Looking at the prompt:
+""For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into: ...
+as toValue-added voice service experience problemsCan be divided into: ...""
+There is no Dimension 3 defined for ""Check call records or sources"".
+So Dimension 3 is empty.
+
+Result format: result: Dimension1-Dimension2-Dimension3
+Dimension 1: Voice service complaints</think>
+result: Voice service complaints-Check call records or sources",1.9264,30.7849,,413,10.0,True,llm_judge,候选答案与参考答案完全一致，准确对应了投诉内容中核查呼叫记录与来源的需求，分类逻辑正确。
+6,MAECOM00006,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""AM--WSMC--Zubair Mukri--zmukri--NOC Follow-up--Please check..--Dear STC,
+
+Pls check and feedback wrong CLI. As shown below.
+
+A-	966920015437 
+B-	0599010637
+CLI- 92015437
+Time-05/17/2025 13:18:09""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Value-added voice service experience problems-Number display service,chatcmpl-b4a90d5ed5a8dacd,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""AM--WSMC--Zubair Mukri--zmukri--NOC Follow-up--Please check..--Dear STC,
+
+Pls check and feedback wrong CLI. As shown below.
+
+A-	966920015437 
+B-	0599010637
+CLI- 92015437
+Time-05/17/2025 13:18:09""
+
+Step 1: Dimension 1 classification.
+The complaint is about ""wrong CLI"" (Calling Line Identification). This relates to voice services.
+Dimension 1: Voice service complaints
+
+Step 2: Dimension 2 classification.
+Looking at the subcategories for Voice service complaints:
+""Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;""
+CLI (Calling Line Identification) is a number display service.
+So Dimension 2: Value-added voice service experience problems
+
+Step 3: Dimension 3 classification.
+Subcategories for ""Value-added voice service experience problems"":
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+The complaint is about ""wrong CLI"", which matches ""Number display service"".
+So Dimension 3: Number display service
+
+Final format: result: Dimension1-Dimension2-Dimension3
+result: Voice service complaints-Value-added voice service experience problems-Number display service
+
+Check constraints:
+- Format: result: Dimension1-Dimension2-D</think>
+result: Voice service complaints-Value-added voice service experience problems-Number display service",1.2301,28.2989,,418,10.0,True,llm_judge,候选答案与参考答案完全一致，准确识别了投诉中的'wrong CLI'（主叫号码显示错误）问题，并严格按照分类逻辑正确归类。
+7,MAECOM00007,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--WSMC--Qamrul Abdlurhman--qabdlurhman--NOC Communication--Dear Team--Please check and share your feedback as for below CLI complain that Called_B_Party (STC num) is receiving CLI as 019990 instead of 19990. we are already sending the CLI as ‘19990’ as sample traces are attached.
+
+Date & time : 16-MAR 2:12 
+Calling_A_num: 19990 (Mobily num)
+Called_B_num: 0540045955 (STC num)""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Value-added voice service experience problems-Number display service,chatcmpl-856e9f7df1faa752,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--WSMC--Qamrul Abdlurhman--qabdlurhman--NOC Communication--Dear Team--Please check and share your feedback as for below CLI complain that Called_B_Party (STC num) is receiving CLI as 019990 instead of 19990. we are already sending the CLI as ‘19990’ as sample traces are attached.
+
+Date & time : 16-MAR 2:12 
+Calling_A_num: 19990 (Mobily num)
+Called_B_num: 0540045955 (STC num)""
+
+Step 1: Dimension 1 classification.
+The complaint is about CLI (Calling Line Identification) display issue. The called party is receiving CLI as ""019990"" instead of ""19990"".
+This relates to voice service complaints.
+Dimension 1: Voice service complaints
+
+Step 2: Dimension 2 classification.
+The issue is about number display (CLI).
+Looking at Dimension 2 for Voice service complaints:
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+So Dimension 2: Value-added voice service experience problems
+
+Step 3: Dimension 3 classification.
+For ""Value-added voice service experience problems"", the subcategories are:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+The issue is clearly about CLI/number display.</think>
+result: Voice service complaints-Value-added voice service experience problems-Number display service",1.2373,30.0838,,418,10.0,True,llm_judge,候选答案与参考答案完全一致，准确将CLI主叫号码显示异常问题归类为语音服务-增值语音服务体验问题-号码显示服务。
+8,MAECOM00008,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--SOC-SURV-VIP--Hafiz Bhatti--hbhatti--NOC Communication--Please refer to BO--GCTO faced MO & MT call Failures ( 505475427 ) while Calling to B # 555490396 please check attached CDRs & Traces and update ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call cannot be connected-Neither the caller nor the callee can be reached,chatcmpl-891a120bc1ab4764,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--SOC-SURV-VIP--Hafiz Bhatti--hbhatti--NOC Communication--Please refer to BO--GCTO faced MO & MT call Failures ( 505475427 ) while Calling to B # 555490396 please check attached CDRs & Traces and update ""
+
+Step 1: Dimension 1 classification.
+Keywords: ""MO & MT call Failures"", ""Calling to B #"".
+This is clearly about voice service complaints.
+Dimension 1: Voice service complaints
+
+Step 2: Dimension 2 classification.
+Keywords: ""MO & MT call Failures"" (MO = Mobile Originated, MT = Mobile Terminated).
+This means both calling and receiving calls are failing.
+Matches Dimension 2: Call cannot be connected.
+
+Step 3: Dimension 3 classification.
+Dimension 2 is ""Call cannot be connected"".
+Subcategories:
+1. Calling party cannot be reached;
+2. The call cannot be connected when the called party is called;
+3. Neither the caller nor the callee can be reached;
+The complaint says ""MO & MT call Failures"", which means both Mobile Originated (calling) and Mobile Terminated (receiving) are failing.
+So it matches ""Neither the caller nor the callee can be reached"".
+
+Let's verify the exact wording for Dimension 3:
+""Neither the caller nor the callee can be reached""
+
+Format: result: Dimension1-Dimension2-Dimension3
+result: Voice service complaints-Call cannot be connected-Neither the caller nor the callee can be reached
+
+Check constraints:
+- ""If any dimension is empty, only output the previous dimension."" -> Not empty.
+- ""Do not include the serial numbers or examples before</think>
+result: Voice service complaints-Call cannot be connected-Neither the caller nor the callee can be reached",1.5803,31.341,,422,10.0,True,llm_judge,候选答案与参考答案完全一致，准确根据MO & MT call Failures判定为语音服务-呼叫无法接通-主叫和被叫均无法接通，且输出格式完全符合要求。
+9,MAECOM00009,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--CITC-CRM-CC--ahmad alobaid--ahmalobaid--Working Log--please check : 530161989--It is not possible to make an international call to the package
+When you call Yemen it gives that Matalawi can not be contacted currently 00967773432094 ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call cannot be connected-Calling party cannot be reached,chatcmpl-9a513972e0bfd41e,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--CITC-CRM-CC--ahmad alobaid--ahmalobaid--Working Log--please check : 530161989--It is not possible to make an international call to the package
+When you call Yemen it gives that Matalawi can not be contacted currently 00967773432094 ""
+
+Step 1: Dimension 1 classification.
+The complaint is about making an international call. It says ""It is not possible to make an international call to the package"". This falls under ""Voice service complaints"".
+
+Step 2: Dimension 2 classification.
+The issue is ""not possible to make an international call"". This matches ""Call cannot be connected"" (unable to make calls to other numbers as the caller).
+
+Step 3: Dimension 3 classification.
+Since the user is the one making the call and cannot connect, it matches ""Calling party cannot be reached"".
+
+Let's verify the categories:
+Dimension 1: Voice service complaints
+Dimension 2: Call cannot be connected
+Dimension 3: Calling party cannot be reached
+
+Check the exact wording in the prompt:
+Dimension 1: Voice service complaints
+Dimension 2: Call cannot be connected
+Dimension 3: Calling party cannot be reached
+
+Format: result: Dimension1-Dimension2-Dimension3
+Output: result: Voice service complaints-Call cannot be connected-Calling party cannot be reached
+
+Let's double check the input: ""It is not possible to make an international call to the package When you call Yemen it gives that Matalawi can not be contacted currently""
+This clearly indicates the caller cannot connect.
+Matches Dimension 1: Voice service complaints
+Dimension 2: Call cannot be connected
+Dimension 3: Calling party cannot be reached
+
+Everything</think>
+result: Voice service complaints-Call cannot be connected-Calling party cannot be reached",1.2354,30.3309,,418,10.0,True,llm_judge,候选答案与参考答案完全一致，准确遵循了分类逻辑和指定的输出格式。
+11,MAECOM00011,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--WSMC--Mehboob Islam--muislam--NOC Communication--Please check --Please check and share your feedback for below complaint as below B numbers are unable to receive calls from STC. 
+Kindly check the routing from STC side as below calls didn’t land on Mobily network.
+
+B : 966553988580
+A : 966530608976
+Call time: 5:40 PM / 28-Apr""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call cannot be connected-The call cannot be connected when the called party is called,chatcmpl-92199564a6a8ce0d,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--WSMC--Mehboob Islam--muislam--NOC Communication--Please check --Please check and share your feedback for below complaint as below B numbers are unable to receive calls from STC. 
+Kindly check the routing from STC side as below calls didn’t land on Mobily network.
+
+B : 966553988580
+A : 966530608976
+Call time: 5:40 PM / 28-Apr""
+
+Step 1: Dimension 1 classification.
+The complaint is about ""unable to receive calls from STC"". This clearly falls under ""Voice service complaints"".
+Dimension 1: Voice service complaints
+
+Step 2: Dimension 2 classification.
+The issue is that the called party (B number) is unable to receive calls from the caller (A number/STC).
+Looking at the options for Voice service complaints:
+1. Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+This matches perfectly.
+Dimension 2: Call cannot be connected
+
+Step 3: Dimension 3 classification.
+For ""Call cannot be connected"", the options are:
+1. Calling party cannot be reached;
+2. The call cannot be connected when the called party is called;
+3. Neither the caller nor the callee can be reached;
+The complaint says ""B numbers are unable to receive calls from STC."" This means the called party cannot be reached.
+Dimension 3: The call cannot be connected when the called party is called
+
+Format: result: Dimension1-Dimension2-Dimension3
+Result: result: Voice service complaints-Call cannot be connected-The call cannot be connected when the</think>
+result: Voice service complaints-Call cannot be connected-The call cannot be connected-The call cannot be connected when the called party is called",1.2322,30.9583,,428,6.0,False,llm_judge,"The candidate answer incorrectly repeats the Dimension 2 label ('The call cannot be connected') within Dimension 3, resulting in a malformed four-part string instead of the required three-part hierarc"
+10,MAECOM00010,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--CITC-CRM-CC--ahmad alobaid--ahmalobaid--Working Log--please check : 577698933--He does not accept the call to Yemen and the problem is repeated with many agents 
+0096770679991  .. 20/12 .. 4:25 PM ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call cannot be connected-The call cannot be connected when the called party is called,chatcmpl-b68a2fb15da2b577,"The user wants to classify the complaint content: ""PM--CITC-CRM-CC--ahmad alobaid--ahmalobaid--Working Log--please check : 577698933--He does not accept the call to Yemen and the problem is repeated with many agents 0096770679991 .. 20/12 .. 4:25 PM ""
+
+Dimension 1:
+The user says ""He does not accept the call to Yemen"". This is about voice service.
+So Dimension 1: Voice service complaints
+
+Dimension 2:
+The user cannot receive calls. ""He does not accept the call to Yemen"".
+Matches ""Call cannot be connected"" -> specifically, the called party cannot be reached.
+So Dimension 2: Call cannot be connected
+
+Dimension 3:
+For ""Call cannot be connected"", the subcategories are:
+1. Calling party cannot be reached
+2. The call cannot be connected when the called party is called
+3. Neither the caller nor the callee can be reached
+The complaint says ""He does not accept the call to Yemen"", meaning the user (called party) is not receiving/accepting the call.
+So Dimension 3: The call cannot be connected when the called party is called
+
+Let's double check the exact wording for Dimension 3: ""The call cannot be connected when the called party is called""
+Format: result: Dimension1-Dimension2-Dimension3
+result: Voice service complaints-Call cannot be connected-The call cannot be connected when the called party is called
+
+Check against constraints:
+- ""If any dimension is empty, only output the previous dimension."" -> Not empty.
+- ""Do not include the serial numbers or examples before each classification type in the output; only output the classification type.""
+- Format: result: Voice service complaints-Call cannot be connected</think>
+result: Voice service complaints-Call cannot be connected-The call cannot be connected when the called party is called",1.5698,34.4173,,423,10.0,True,llm_judge,候选答案与参考答案完全一致，准确遵循了分类逻辑和输出格式要求。
+12,MAECOM00012,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--CITC-CRM-CC--Ahmed Al Zahrani--ahkzahrani--Working Log--966537365406--CF, the customer has 220.5 available minutes.
+
+The customer experienced issues when attempting to make calls, as the voice quality was poor.
+And he shared the samples below:
+
+0566151275 (5/5/2025 3:41 PM)
+0502272854 (5/4/2025 10:28 AM)
+0593431190 (5/4/2025 5:10 PM)""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-The call quality is poor,chatcmpl-b87194423c4cf8bf,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--CITC-CRM-CC--Ahmed Al Zahrani--ahkzahrani--Working Log--966537365406--CF, the customer has 220.5 available minutes.
+
+The customer experienced issues when attempting to make calls, as the voice quality was poor.
+And he shared the samples below:
+
+0566151275 (5/5/2025 3:41 PM)
+0502272854 (5/4/2025 10:28 AM)
+0593431190 (5/4/2025 5:10 PM)""
+
+Step 1: Dimension 1 classification.
+The complaint is about ""voice quality was poor"" when making calls.
+This falls under ""Voice service complaints"".
+
+Step 2: Dimension 2 classification.
+Under ""Voice service complaints"", the issue is ""voice quality was poor"".
+This matches: ""6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;""
+
+Step 3: Dimension 3 classification.
+Does ""The call quality is poor"" have a Dimension 3 breakdown in the prompt?
+Looking at the prompt:
+""For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into: ...
+as toValue-added voice service experience problemsCan be divided into: ...""
+There is no Dimension 3 specified for ""The call quality is poor"".
+So Dimension 3 is empty.</think>
+
+result: Voice service complaints-The call quality is poor",1.3509,27.6073,,412,10.0,True,llm_judge,候选答案准确识别了投诉内容中的语音质量差问题，分类维度及输出格式与参考答案完全一致。
+13,MAECOM00013,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--SOC-SURV-VIP--Akber Ali--akakali--Working Log--Check--VOLTE MO Call Failure for GCTO (505475427) while he was calling B party(505424824) (Mobily Users) with fail cause (10 RESOURCE_ALLOCATION_FAILURE) at 2024-12-21 17:16:.Kindly check & update. Unable to attached trace. Trace will be shared via email ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call cannot be connected-Calling party cannot be reached,chatcmpl-85d6d5bee716a097,"The user wants to classify the input complaint content according to the provided classification logic.
+
+Input complaint content: ""PM--SOC-SURV-VIP--Akber Ali--akakali--Working Log--Check--VOLTE MO Call Failure for GCTO (505475427) while he was calling B party(505424824) (Mobily Users) with fail cause (10 RESOURCE_ALLOCATION_FAILURE) at 2024-12-21 17:16:.Kindly check & update. Unable to attached trace. Trace will be shared via email ""
+
+Step 1: Dimension 1 classification.
+The complaint mentions ""VOLTE MO Call Failure for GCTO ... while he was calling B party"". This is clearly about voice service.
+So, Dimension 1: Voice service complaints.
+
+Step 2: Dimension 2 classification.
+The issue is ""Call Failure ... while he was calling B party"". This matches ""Call cannot be connected"".
+So, Dimension 2: Call cannot be connected.
+
+Step 3: Dimension 3 classification.
+The user was the caller (""while he was calling B party"").
+So, Dimension 3: Calling party cannot be reached.
+
+Let's verify against the classification logic.
+Dimension 1: Voice service complaints
+Dimension 2: Call cannot be connected
+Dimension 3: Calling party cannot be reached
+
+Format: result: Dimension1-Dimension2-Dimension3
+Output: result: Voice service complaints-Call cannot be connected-Calling party cannot be reached
+
+Check constraints:
+- ""If any dimension is empty, only output the previous dimension."" -> Not empty.
+- ""Do not include the serial numbers or examples before each classification type in the output; only output the classification type."" -> Checked.
+- ""If both a fault phenomenon and a fault description exist in the</think>
+result: Voice service complaints-Call cannot be connected-Calling party cannot be reached",1.6487,28.269,,418,10.0,True,llm_judge,候选答案与参考答案完全一致，准确识别了语音服务投诉中主叫方无法接通的问题。
+15,MAECOM00015,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--SOC-SURV-VIP--Ezzeldin ElSamahy--eelsamahy--Working Log--please refer to BO--GCTO #505475427 Faced multiple SMS MT failure  @2024-12-17 11:04 ,please check attached traces 
+Cell:MRY821B ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",SMS service complaints-Unable to receive text messages,chatcmpl-b99a35ece0e4629b,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--SOC-SURV-VIP--Ezzeldin ElSamahy--eelsamahy--Working Log--please refer to BO--GCTO #505475427 Faced multiple SMS MT failure  @2024-12-17 11:04 ,please check attached traces 
+Cell:MRY821B ""
+
+Step 1: Dimension 1 classification.
+Keywords: ""SMS MT failure"" (MT = Mobile Terminated, meaning receiving SMS).
+This clearly falls under ""SMS service complaints"".
+Dimension 1: SMS service complaints
+
+Step 2: Dimension 2 classification.
+Options for SMS service complaints:
+1. Text message cannot be sent;
+2. Unable to receive text messages;
+3. Other;
+""SMS MT failure"" means Mobile Terminated SMS failure, which translates to the user being unable to receive text messages.
+Dimension 2: Unable to receive text messages
+
+Step 3: Dimension 3 classification.
+The prompt says: ""For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3"".
+Looking at the prompt, Dimension 3 is only defined for:
+- Call cannot be connected
+- Value-added voice service experience problems
+There is no Dimension 3 defined for SMS service complaints.
+So, Dimension 3 is empty.
+
+Final format: result: Dimension1-Dimension2
+result: SMS service complaints-Unable to receive text messages
+
+Check constraints:
+- Format: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension.
+- Do not include serial numbers or examples.
+- Output only the classification type.
+
+Let's verify:
+Dimension 1: SMS service complaints</think>
+result: SMS service complaints-Unable to receive text messages",1.5514,28.7507,,413,10.0,True,llm_judge,候选答案与参考答案完全一致，准确根据投诉内容中的'SMS MT failure'（短信接收失败）进行了正确分类。
+14,MAECOM00014,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--CITC-CRM-CC--Fawaz Alzahrani--fawyalzahrani--Working Log--please check 556044252--The customer cannot make the call  ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call cannot be connected-Calling party cannot be reached,chatcmpl-9c10c9c3548828dc,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--CITC-CRM-CC--Fawaz Alzahrani--fawyalzahrani--Working Log--please check 556044252--The customer cannot make the call  ""
+
+Step 1: Dimension 1 classification.
+The complaint says ""The customer cannot make the call"". This clearly falls under ""Voice service complaints"".
+
+Step 2: Dimension 2 classification.
+Under ""Voice service complaints"", the issue is ""cannot make the call"". This matches ""Call cannot be connected"".
+
+Step 3: Dimension 3 classification.
+Under ""Call cannot be connected"", the complaint specifies ""cannot make the call"", which means the user is the caller. This matches ""Calling party cannot be reached"".
+
+Let's verify the exact wording in the prompt:
+Dimension 1: Voice service complaints
+Dimension 2: Call cannot be connected
+Dimension 3: Calling party cannot be reached
+
+Format: result: Dimension1-Dimension2-Dimension3
+Output: result: Voice service complaints-Call cannot be connected-Calling party cannot be reached
+
+Check constraints:
+- ""If any dimension is empty, only output the previous dimension."" -> Not empty.
+- ""Do not include the serial numbers or examples before each classification type in the output; only output the classification type."" -> Checked.
+- Format matches exactly.
+
+Input text: ""The customer cannot make the call""
+Matches Dimension 1: Voice service complaints
+Matches Dimension 2: Call cannot be connected
+Matches Dimension 3: Calling party cannot be reached
+
+Everything aligns perfectly.
+Output generation. 
+One minor point: The prompt says ""result: Dimension1-Dimension2-Dimension3"".
+So: result: Voice service complaints-Call cannot be connected-Calling party cannot be reached
+Done. 
+Self-Correction/Verification:
+Dimension 1: Voice service complaints
+Dimension 2: Call cannot be connected
+Dimension 3: Calling party cannot be reached
+Matches exactly.
+Ready. 
+Output matches requirement.✅
+Proceeds. 
+Output Generation. 
+""result: Voice service complaints-Call cannot be connected-Calling party cannot be reached"" -> Correct. 
+All steps verified. 
+Final Answer Generation. 
+(Note: I will strictly follow the format requested.) 
+Done. 
+[Output Generation] -> result: Voice service complaints-Call cannot be connected-Calling party cannot be reached
+Matches exactly. 
+Proceeds. 
+(Self-Correction/Refinement during thought: The prompt says ""result: Dimension1-Dimension2-Dimension3"". I will output exactly that.)
+Final string: result: Voice service complaints-Call cannot be connected-Calling party cannot be reached
+Done. 
+Output Generation. 
+[Done] 
+*Self-Correction</think>
+result: Voice service complaints-Call cannot be connected-Calling party cannot be reached",1.2189,44.5809,,618,10.0,True,llm_judge,候选答案与参考答案完全一致，准确匹配了分类逻辑（语音服务-无法接通-主叫方无法拨出）及指定输出格式。
+16,MAECOM00016,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--WSMC--Mehboob Islam--muislam--NOC Communication--Please check --Please check and share your feedback for below complaint as below B numbers are unable to receive calls from STC. 
+Kindly check the routing from STC side as below calls didn t land on Mobily network.
+
+B : 966553988580
+A : 966530608976
+Call time: 5:40 PM / 28-Apr""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call cannot be connected-Calling party cannot be reached,chatcmpl-a412213ec22becf1,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--WSMC--Mehboob Islam--muislam--NOC Communication--Please check --Please check and share your feedback for below complaint as below B numbers are unable to receive calls from STC. 
+Kindly check the routing from STC side as below calls didn t land on Mobily network.
+
+B : 966553988580
+A : 966530608976
+Call time: 5:40 PM / 28-Apr""
+
+Step 1: Dimension 1 classification.
+The complaint is about ""unable to receive calls from STC"". This falls under ""Voice service complaints"".
+
+Step 2: Dimension 2 classification.
+The issue is ""unable to receive calls"". This matches ""Call cannot be connected"" (Dimension 2 category 1 for Voice service complaints).
+Let's check the exact wording: ""Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;""
+
+Step 3: Dimension 3 classification.
+Dimension 3 for ""Call cannot be connected"" has:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+The complaint says ""B numbers are unable to receive calls from STC."" So the called party (B) cannot be reached. This matches ""The call cannot be connected when the called party is called"".
+
+Let's verify the exact output format: ""result: Dimension1-Dimension2-Dimension3""
+Dimension 1: Voice service complaints
+Dimension 2: Call cannot be connected
+Dimension 3: The call cannot be connected when the called party is called
+
+Check</think>
+result: Voice service complaints-Call cannot be connected-The call cannot be connected when the called party is called",1.3945,30.2492,,423,10.0,True,llm_judge,候选答案准确根据投诉内容中'B numbers are unable to receive calls'判定为被叫方无法接通，维度分类逻辑正确，格式符合要求。
+18,MAECOM00018,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""AM--WSMC--Atiullah Khan--atmkhan--NOC Communication--Plz check this issue--Dear STC Team,
+ 
+Please check and share your feedback for drop call towards 0569961663 with immediate release “BYE” from STC and Reason: Q.850;cause=127;text=""Interworking, unspecified"". Sample trace attached.""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call interrupted,chatcmpl-a5d56bfcfe6dac8e,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""AM--WSMC--Atiullah Khan--atmkhan--NOC Communication--Plz check this issue--Dear STC Team,
+ 
+Please check and share your feedback for drop call towards 0569961663 with immediate release “BYE” from STC and Reason: Q.850;cause=127;text=""Interworking, unspecified"". Sample trace attached.""
+
+Key phrases: ""drop call towards 0569961663"", ""immediate release 'BYE' from STC"", ""Reason: Q.850;cause=127;text='Interworking, unspecified'"".
+This clearly indicates a call being dropped/interrupted.
+Dimension 1: Voice service complaints.
+Dimension 2: Call interrupted. (The call is abnormally interrupted during the conversation due to non-human factors).
+Dimension 3: Not specified for ""Call interrupted"" in the prompt. The prompt only specifies Dimension 3 for ""Call cannot be connected"" and ""Value-added voice service experience problems"".
+So Dimension 3 is empty.
+
+Let's verify:
+Dimension 1: Voice service complaints
+Dimension 2: Call interrupted
+Dimension 3: (empty)
+
+Format: result: Dimension1-Dimension2-Dimension3
+Output: result: Voice service complaints-Call interrupted
+
+Check against classification logic:
+Dimension 1: Voice service complaints
+Dimension 2: Call interrupted (matches ""drop call"")
+Dimension 3: Not applicable for this subcategory.
+
+Final string: result: Voice service complaints-Call interrupted
+Matches exactly.
+I will generate the output accordingly.
+One minor point: The prompt says ""If any dimension is empty, only output the previous dimension.""
+So ""result: Voice service complaints-Call interrupted""</think>
+result: Voice service complaints-Call interrupted",1.0536,28.1577,,410,10.0,True,llm_judge,候选答案与参考答案完全一致，准确根据投诉内容中的“drop call”（通话中断/掉线）判定为语音服务投诉-通话中断，分类准确且格式符合要求。
+19,MAECOM00019,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""AM--ENOC_Fixed--Mohammed Arif--moarif--NOC Communication--Dear SNOC , as we have discussed over the phone we have received multiple cases related  announcent--The announcement plays in NGN is different and in IMS the behavior of announcement is different , please investigate and provide solution to resolve this issue .
+
+All error code like 404 or 603 have same announcement as don't have the service and contact mystc etc ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Announcement issue,chatcmpl-89ef05258382de42,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""AM--ENOC_Fixed--Mohammed Arif--moarif--NOC Communication--Dear SNOC , as we have discussed over the phone we have received multiple cases related  announcent--The announcement plays in NGN is different and in IMS the behavior of announcement is different , please investigate and provide solution to resolve this issue .
+
+All error code like 404 or 603 have same announcement as don't have the service and contact mystc etc ""
+
+Step 1: Dimension 1 classification.
+Keywords: ""announcement"", ""NGN"", ""IMS"", ""error code like 404 or 603 have same announcement"".
+This relates to voice service announcements.
+Dimension 1: Voice service complaints.
+
+Step 2: Dimension 2 classification.
+Looking at the subcategories for Voice service complaints:
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+Matches perfectly.
+Dimension 2: Announcement issue.
+
+Step 3: Dimension 3 classification.
+Does ""Announcement issue"" have a Dimension 3 in the prompt?
+The prompt says:
+""For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into...
+as toValue-added voice service experience problemsCan be divided into...""
+There is no Dimension 3 defined for ""Announcement issue"".
+So Dimension 3 is empty.
+
+Final format: result: Dimension1-Dimension2
+result: Voice service complaints-Announcement issue
+
+Let's double check.
+Input: ""The announcement plays in NGN is different and in IMS the behavior of announcement is different... All error code like </think>
+result: Voice service complaints-Announcement issue",1.2316,27.4193,,411,10.0,True,llm_judge,候选答案与参考答案完全一致，准确识别出投诉属于语音服务中的公告提示音问题，分类逻辑正确。
+20,MAECOM00020,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""AM--WSMC--Atiullah Khan--atmkhan--NOC Communication--Plz check this issue--Dear STC,
+
+Please open ticket as many calls from STC numbers to 920033499 connect without media and no RTP traffic reaches Go NW from STC.
+
+CDRs in below 
+
+ A#0550895090
+B#920033499
+Call Date: 08-May-2024
+Call Time: Between:14:13:03 TO 15:49:38""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-The call quality is poor,chatcmpl-9c8b0f124ae29654,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""AM--WSMC--Atiullah Khan--atmkhan--NOC Communication--Plz check this issue--Dear STC,
+
+Please open ticket as many calls from STC numbers to 920033499 connect without media and no RTP traffic reaches Go NW from STC.
+
+CDRs in below 
+
+ A#0550895090
+B#920033499
+Call Date: 08-May-2024
+Call Time: Between:14:13:03 TO 15:49:38""
+
+Step 1: Dimension 1 classification.
+The complaint is about calls connecting without media and no RTP traffic. This is clearly a voice service issue.
+Dimension 1: Voice service complaints
+
+Step 2: Dimension 2 classification.
+The issue is ""calls ... connect without media and no RTP traffic"". This means the call connects but there is no audio/media. This matches ""The call quality is poor"" (poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering). One-way audio or no audio fits here.
+Dimension 2: The call quality is poor
+
+Step 3: Dimension 3 classification.
+Does ""The call quality is poor"" have a Dimension 3 breakdown in the prompt?
+Looking at the prompt:
+""as toCall cannot be connectedCan be divided into: ...""
+""as toValue-added voice service experience problemsCan be divided into: ...""
+There is no Dimension 3 breakdown provided for ""The call quality is poor"".
+So Dimension 3 is empty.
+
+Final format: result: Dimension1-Dimension2
+result: Voice service complaints-The call quality</think>
+
+result: Voice service complaints-The call quality is poor",1.5616,24.4071,,412,10.0,True,llm_judge,候选答案与参考答案完全一致，准确根据投诉中'无媒体流/RTP流量'的现象归类为语音服务质量问题，符合分类逻辑与格式要求。
+17,MAECOM00017,"You are an expert in the core network department of a telecom operator, responsible for handling complaints from individual users. Now, you need to classify the received user complaints according to the following classification logic.
+Classification Logic:
+First, classify according to Dimension 1:
+1.Data service complaints; For example: Users are unable to access the internet normally, experiencing network lag, disconnections, etc.;
+2.Voice service complaints; For example: Users are unable to make or receive calls normally, experience poor call quality, etc.;
+3.SMS service complaints; For example: Users are unable to send or receive text messages properly.;
+4.Other; Complaints related to non-data services, voice services, or SMS services, or other complaints.;
+
+Then, based on the classification results of Dimension 1, further classify into more detailed subcategories according to Dimension 2:
+as toData service complaintsCan be divided into:
+1.Abnormal Offline; For example: frequent offline, disconnection, or interruption of data services;
+2.Specific IP or domain name cannot be accessed; For example: unable to access an IP address, unable to access a domain name, unable to access a website, unable to access an application, or unable to access addresses within the whitelist;
+3.Data service experience issues; For example: network lag, high latency, slow internet speed, data transmission interruption;
+4.Poor signal; For example: The user clearly indicates that the signal is poor and needs to check the signal issue;
+5.No signal; For example: The user terminal device displays no signal, unknown signal, or no network;
+6.Users are unable to access the internet normally.; For example: Users are unable to access the internet normally and the issue does not fall under any of the aforementioned data-related complaints;
+7.User-specific requirements; For example: requests that require cooperation from the operator, such as querying access records or consulting about package services;
+8.Mobile Data Call Billing Issue; For example: Data usage concerns;
+9.Other categories; Other data-related complaints not falling under the above categories;
+as toVoice service complaintsCan be divided into:
+1.Call cannot be connected; For example: unable to make calls to other numbers as the caller, or receive calls from other numbers as the recipient;
+2.Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+3.Check call records or sources; For example: A user receives a call from an unknown source that is suspected to be harassing, and needs to check the call records and the source;
+4.Voice and Call Detail Record Billing Issues; For example: call records do not meet user expectations, video call charges do not meet user expectations, inter-office settlement and reconciliation issues;
+5.Long connection delay; For example: The time from making a call to hearing the ringback tone or call being connected is long;
+6.The call quality is poor; For example: poor voice quality issues such as unclear sound, intermittent transmission, one-way audio, echo, muting, crosstalk, noise, and stuttering;
+7.Announcement issue; For example: The prompt tone heard by the user does not match the expected one, or the user does not hear any prompt tone;
+8.Business handling problems; For example: Business transaction failed, the transaction does not take effect after completion;
+9.Value-added voice service experience problems; For example: Call forwarding, call transfer, call hold, call waiting, number display, and other voice-related supplementary services provided by IMS/CS do not meet customer expectations;
+10.The call routing policy is incorrect.; For example: The call is routed to an unintended destination;
+11.China Mobile\'s Non-compliant Calling Line Identification Issue; This type can only be identified when the user complaint content includes ""China Mobile\'s non-compliant calling number identification."";
+12.Other categories; Other voice-related complaints not falling under the above categories;
+as toSMS service complaintsCan be divided into:
+1.Text message cannot be sent;
+2.Unable to receive text messages;
+3.Other; Other SMS-related complaints that do not fall under the above categories;
+
+
+For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into:
+1.Calling party cannot be reached;
+2.The call cannot be connected when the called party is called;
+3.Neither the caller nor the callee can be reached;
+as toValue-added voice service experience problemsCan be divided into:
+1.Call Forwarding Services;
+2.Call hold, waiting services;
+3.Video Ringback Tone Service;
+4.Number display service;
+5.Connection failure SMS notification service;
+6.Ringback tone, ringtone services;
+7.Other;
+
+Input complaint content: ""PM--ENOC_Fixed--Abdelrahman Haroun--aaharoun--NOC Communication--Dear VAS--please check as when calling from Jeddah Region LL to customer 9200 when customer answering the call, call getting disconnected as below sample:
+
+A# 126532383
+B# 920023235 
+Time #  today around 12.00 pm ""
+
+The final classification result format is: result: Dimension1-Dimension2-Dimension3. If any dimension is empty, only output the previous dimension. Do not include the serial numbers or examples before each classification type in the output; only output the classification type.
+Please classify the input complaint content according to the above classification logic and output the classification result in the required format. If both a fault phenomenon and a fault description exist in the complaint content, prioritize using the fault description for classification judgment.",Voice service complaints-Call interrupted,chatcmpl-b39f1ba262aa768c,"The user wants to classify a complaint based on a specific classification logic.
+Input complaint content: ""PM--ENOC_Fixed--Abdelrahman Haroun--aaharoun--NOC Communication--Dear VAS--please check as when calling from Jeddah Region LL to customer 9200 when customer answering the call, call getting disconnected as below sample:
+
+A# 126532383
+B# 920023235 
+Time #  today around 12.00 pm ""
+
+Step 1: Dimension 1 classification.
+The complaint is about a call getting disconnected when the customer answers. This is clearly a ""Voice service complaints"".
+
+Step 2: Dimension 2 classification.
+The issue is ""call getting disconnected"" when the customer answers.
+Looking at the options for Voice service complaints:
+1. Call cannot be connected
+2. Call interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;
+The complaint says ""when customer answering the call, call getting disconnected"". This matches ""Call interrupted"".
+
+Step 3: Dimension 3 classification.
+Does ""Call interrupted"" have Dimension 3 subcategories in the prompt?
+Let's check the prompt:
+""For some of the classification results under Dimension 2, further classify into even more detailed subcategories according to Dimension 3:
+as toCall cannot be connectedCan be divided into: ...
+as toValue-added voice service experience problemsCan be divided into: ...""
+""Call interrupted"" does not have a specified Dimension 3 in the prompt. So Dimension 3 is empty.
+
+Therefore, the classification should be:
+Dimension 1: Voice service complaints
+Dimension 2: Call interrupted
+Dimension 3: (empty)
+
+Format: result: Dimension1-Dimension2
+So: result: Voice service complaints-Call interrupted
+
+Let's double check the exact wording.
+Dimension 1: Voice service complaints
+Dimension 2: Call interrupted
+Output format: result: Voice service complaints-Call interrupted
+
+Check against constraints:
+- ""If any dimension is empty, only output the previous dimension.""
+- ""Do not include the serial numbers or examples before each classification type in the output; only output the classification type.""
+- Input: ""call getting disconnected"" -> matches ""Call interrupted"".
+
+Everything aligns.
+Final output: result: Voice service complaints-Call interrupted
+I will generate exactly this.
+One minor point: The prompt says ""as toCall interrupted; For example: Call is abnormally interrupted during the conversation due to non-human factors;""
+The text matches perfectly.
+Output matches requirement.
+Done. 
+Let's construct the response. 
+""result: Voice service complaints-Call interrupted""
+No extra text.
+Done. 
+Self-Correction/Verification during thought:
+Could it be ""Call cannot be connected""? The prompt says ""when customer answering the call, call getting disconnected"". This implies the call was connected but then dropped. So ""Call interrupted"" is correct.
+Dimension 3 is not defined for ""Call interrupted"", so we stop at Dimension 2.
+Format: result: Voice service complaints-Call interrupted
+Matches exactly.
+Proceed. 
+Output Generation. 
+[Done] 
+Output matches the required format.✅
+Final Answer Generation. 
+""result: Voice service complaints-Call interrupted"" (as requested)
+All steps verified. 
+Proceeds. 
+[Output Generation] -> ""result: Voice service complaints-Call interrupted""
+(Note: I will strictly follow the format ""result: Dimension1-Dimension2"")
+Done. 
+[Output Generation] (Proceeds)
+
+result: Voice service complaints-Call interrupted</think>",1.2422,52.6829,,781,10.0,True,llm_judge,分类结果与参考答案一致，准确匹配了语音服务投诉及通话中断子类。
