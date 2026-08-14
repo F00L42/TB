@@ -32,12 +32,25 @@ class BudgetLedger:
     final_answer_tokens: int = 0
     generate_calls: int = 0
 
-    def record(self, phase: str, generated_tokens: int) -> None:
+    def record(
+        self,
+        phase: str,
+        generated_tokens: int,
+        *,
+        visible_think_tokens: int | None = None,
+        final_answer_tokens: int | None = None,
+    ) -> None:
         if phase == "decision":
             return
         self.generate_calls += 1
         if phase in {"initial_think", "iterative_think"}:
-            self.visible_think_tokens += generated_tokens
+            self.visible_think_tokens += (
+                generated_tokens
+                if visible_think_tokens is None
+                else max(visible_think_tokens, 0)
+            )
+            if final_answer_tokens is not None:
+                self.final_answer_tokens += max(final_answer_tokens, 0)
         elif phase == "confidence_probe":
             self.hidden_probe_tokens += generated_tokens
         elif phase == "final_answer":
@@ -118,6 +131,8 @@ class TimingCollector:
         accept_reason: str | None = None,
         final_answer_reason: str | None = None,
         stop_reason: object = None,
+        ledger_visible_think_tokens: int | None = None,
+        ledger_final_answer_tokens: int | None = None,
     ) -> dict[str, object]:
         """Build and optionally emit one schema-stable phase record.
 
@@ -214,7 +229,12 @@ class TimingCollector:
             })
         if phase == "final_answer":
             record["final_answer_reason"] = final_answer_reason
-        self.ledger.record(phase, max(generated_tokens, 0))
+        self.ledger.record(
+            phase,
+            max(generated_tokens, 0),
+            visible_think_tokens=ledger_visible_think_tokens,
+            final_answer_tokens=ledger_final_answer_tokens,
+        )
         if self.emit_phase_metrics:
             print(
                 "TB_PHASE "

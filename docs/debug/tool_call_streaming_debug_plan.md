@@ -245,8 +245,8 @@ export TB_TOOL_STREAM_DEBUG=1
 TB_TOOL_STREAM {json}
 ```
 
-取消保守恢复后，调试 schema 应聚焦“原始 child 输出、状态转换、queue 透传和最终 SSE”的
-对应关系。建议升级为 schema 2：
+取消保守恢复后，调试 schema 聚焦“原始 child 输出、状态转换、queue 透传和最终 SSE”的
+对应关系，当前实现已升级为 schema 2：
 
 ```text
 source=controller_pre_parser
@@ -292,7 +292,7 @@ finish reason 或非法多轮历史。此外原脚本引用了未定义的 `args
 - 请求前验证多轮 assistant tool-call ID 与 tool result ID 的对应关系；
 - 输出 `manifest.json`、`chunks.jsonl`、`summary.jsonl`，异常时返回非零退出码。
 
-为本修复验收还需要补充：
+当前实现已补充：
 
 - 统计结构化 tool call 数量、tool index、terminal chunk 数量及其事件顺序；
 - 允许一次 assistant completion 内存在 0～N 个 tool calls，不能把 `tool_calls.Count > 1`
@@ -306,17 +306,18 @@ finish reason 或非法多轮历史。此外原脚本引用了未定义的 `args
 ### 5.3 服务日志关联
 
 [`analyze_tool_call_run.py`](tool_call/analyze_tool_call_run.py) 按 response request ID
-从共享 `server.log` 提取 `TB_TOOL_STREAM`，将控制器 raw/parser 文本与 SSE 结果关联，
+从共享 `server.log` 提取 `TB_TOOL_STREAM`，将控制器 raw/forwarded 摘要与 SSE 结果关联，
 输出 `analysis.json` 和终止语义/增量层裁决。它不是性能 telemetry 提取器，也不应接入
 `tools/extract_tb_phase_metrics.py`。
 
-当前实现只拼接 `phase=final_answer`，会漏掉第一个工具调用所在的 `initial_think` 或
-`iterative_think`，并把两个跨 child 的 tool calls 误报为通过。应修改为：
+旧实现只拼接 `phase=final_answer`，会漏掉第一个工具调用所在的 `initial_think` 或
+`iterative_think`，并把两个跨 child 的 tool calls 误报为通过。当前实现已经：
 
 - 按 sequence 保留所有可见 phase 的原始记录，而不是只保留 final-answer；
 - 输出每个 child 的 raw text/token 摘要、原始终止原因、reasoning boundary 和 next state；
 - 计算 `completion_epoch_count`、`terminal_flush_count`、`fresh_final_after_tool_boundary`、
   `thinking_or_probe_after_tool_boundary`；
+- 在 `analysis.json.summary.dtb_acceptance` 汇总上述逐请求门槛，便于直接核对 100 次发布门；
 - 把“同一 completion 内多个 tool calls”和“跨 fresh generation 重复 tool call”分开；
 - 关联第一个泄漏 XML 的 raw `text/token_ids`，裁决增量缺失发生在 controller 前还是 parser
   内。
@@ -460,8 +461,10 @@ forwarded 已缺标记时回到 child generation、detokenizer 和 queue；只�
 - 100/100 final-answer parser-facing 文本完整，保守恢复 0 次命中，已决定取消该方案；
 - 已确认主要修复方向是终止语义和 completion 生命周期；第一个工具调用的增量缺失层仍需
   保留全 phase 原始 telemetry 后裁决；
-- reasoning boundary、自由生成最终答案、空 terminal flush、脚本增强和删除保守恢复仍是
-  待实现设计，尚未在目标服务器验证；
+- 已删除保守恢复，实现 `ReasoningBoundary`、模型边界后的 continuation final、单次空
+  terminal flush、schema 2 `TB_TOOL_STREAM`、replay 生命周期审计和全 phase 分析；
+- 无模型完整测试共运行 93 项，其中 92 项通过、1 项因 bundled runtime 缺少 PyYAML 按既有
+  条件跳过；该 YAML 一致性测试已在默认 runtime 单独通过，尚未在目标服务器验证；
 - 本机没有目标模型和 NPU，不能把设计更新描述为运行时修复已通过。
 
 ## 9. 变更历史
@@ -470,3 +473,4 @@ forwarded 已缺标记时回到 child generation、detokenizer 和 queue；只�
 | --- | --- | --- |
 | 2026-08-13 | 建立 parser-facing 等价契约、保守结构文本恢复、独立日志、paired replay 和服务器验收矩阵 | 修复压缩模式概率性工具调用 XML 泄漏 |
 | 2026-08-14 | 根据 `run_after_fix` 取消保守恢复方案；将根因拆分为终止语义错误和增量交接问题，设计 `</think>/<tool_call>` 统一边界、自由生成最终答案、空 delta flush、单 completion 生命周期与分阶段 parser 决策 | 100 次实验显示恢复 0 次命中，DTB 在第一次工具调用后继续状态机并生成第二个 fresh tool call |
+| 2026-08-14 | 落地双 reasoning boundary、continuation final、terminal-only flush、schema 2 debug telemetry，并升级 replay/analyzer 与无模型回归测试 | 先修复终止语义和 completion 生命周期，再由服务器 telemetry 裁决是否仍存在 parser 增量交接缺陷 |

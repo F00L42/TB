@@ -32,11 +32,27 @@ class ReasoningState(str, Enum):
     CLOSED = "closed"
 
 
+class ReasoningBoundary(str, Enum):
+    """Model protocol markers that end the reasoning phase."""
+
+    THINK_END = "think_end"
+    TOOL_CALL = "tool_call"
+
+    @property
+    def marker(self) -> str:
+        return {
+            ReasoningBoundary.THINK_END: "</think>",
+            ReasoningBoundary.TOOL_CALL: "<tool_call>",
+        }[self]
+
+
 class FinalAnswerReason(str, Enum):
-    """Select the prompt suffix used to enter fresh final generation."""
+    """Explain whether final generation is synthesized or model-selected."""
 
     CONFIDENCE_ACCEPTED = "confidence_accepted"
     BUDGET_EXHAUSTED = "budget_exhausted"
+    MODEL_THINK_END = "model_think_end"
+    MODEL_TOOL_CALL = "model_tool_call"
 
 
 @dataclass
@@ -57,7 +73,7 @@ class TrialObservation:
 @dataclass
 class RequestAlgorithmState:
     reasoning_state: ReasoningState = ReasoningState.OPEN
-    attempted_early_stop: bool = False
+    reasoning_boundary: ReasoningBoundary | None = None
     thinking_tokens: int = 0
     probe_round: int = 0
     current_trial: TrialObservation | None = None
@@ -69,6 +85,8 @@ class RequestAlgorithmState:
     final_answer_tokens: int = 0
     thinking_segments: int = 0
     final_answer_reason: FinalAnswerReason | None = None
+    assistant_completion_epoch: int = 1
+    terminal_flush_count: int = 0
 
 
 @dataclass
@@ -95,10 +113,9 @@ class RequestStateContext:
 
     result_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     last_chunk: Optional[RequestOutput] = None
-    think_end_emitted: bool = False
+    reasoning_boundary_emitted: bool = False
     prompt_suffix_token_cache: dict[str, tuple[int, ...]] = field(
         default_factory=dict)
-    parser_structural_token_ids: dict[int, str] | None = None
     stream_debug_sequence: int = 0
     stream_debug_enabled: bool = field(
         default_factory=lambda: os.getenv(
@@ -163,101 +180,79 @@ class RequestStateContext:
             "reasoning_parser_kwargs": self.reasoning_parser_kwargs,
         }
 
-    def _get_parser_structural_token_ids(self) -> dict[int, str]:
-        cached = self.parser_structural_token_ids
-        if cached is not None:
-            return cached
-        try:
-            vocab = self.tokenizer.get_vocab()
-        except (AttributeError, TypeError):
-            vocab = {}
-        cached = {
-            token_id: tag
-            for tag in ("<tool_call>", "</tool_call>")
-            if isinstance((token_id := vocab.get(tag)), int)
-        }
-        self.parser_structural_token_ids = cached
-        return cached
-
-    def _restore_parser_visible_tool_text(
-        self,
-        text: str,
-        token_ids: list[int],
-    ) -> tuple[str, list[str], str | None]:
-        """Restore a structural tag omitted from parser-facing delta text.
-
-        Qwen tool parsers use token IDs to detect the start marker and the
-        accumulated text to parse the following XML.  A speculative batch may
-        contain a structural token while incremental detokenization exposes
-        only a suffix such as ``"f"``.  In that case the parser can enter its
-        tool state and immediately lose it again on the next empty-text reset.
-
-        The repair is deliberately conservative: it is attempted only when a
-        known structural token ID occurs, its literal tag is absent from the
-        supplied text, and decoding the same token batch with special tokens
-        retained produces a string ending in the original text.
-        """
-        structural_ids = self._get_parser_structural_token_ids()
-        missing_tags = [
-            structural_ids[token_id]
-            for token_id in token_ids
-            if token_id in structural_ids
-            and structural_ids[token_id] not in text
-        ]
-        if not missing_tags:
-            return text, [], None
-        try:
-            decoded = self.tokenizer.decode(
-                token_ids, skip_special_tokens=False)
-        except (AttributeError, TypeError, ValueError):
-            return text, [], None
-        if not isinstance(decoded, str):
-            return text, [], None
-        if not all(tag in decoded for tag in missing_tags):
-            return text, [], decoded
-        if text and not decoded.endswith(text):
-            return text, [], decoded
-        return decoded, list(dict.fromkeys(missing_tags)), decoded
-
     @staticmethod
     def _stream_text_digest(text: str) -> str:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _stream_token_digest(token_ids: list[int]) -> str:
+        payload = json.dumps(token_ids, separators=(",", ":")).encode("ascii")
+        return hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _first_output(result: Any) -> Any:
+        try:
+            return result.outputs[0]
+        except (AttributeError, IndexError, TypeError):
+            return None
 
     def _log_stream_delta(
         self,
         *,
         result: Any,
+        source_result: Any,
         phase: str,
         child_request_id: str,
-        raw_text: str,
-        parser_text: str,
-        token_ids: list[int],
-        decoded_text: str | None,
-        repaired_tags: list[str],
+        event: str,
+        controller_state: str,
+        next_state: str,
+        reasoning_boundary: ReasoningBoundary | None,
+        terminal_flush: bool,
     ) -> None:
         if not self.stream_debug_enabled:
             return
         self.stream_debug_sequence += 1
-        try:
-            output = result.outputs[0]
-        except (AttributeError, IndexError, TypeError):
-            output = None
+        source_output = self._first_output(source_result)
+        forwarded_output = self._first_output(result)
+        raw_text = getattr(source_output, "text", "") or ""
+        raw_token_ids = list(getattr(source_output, "token_ids", None) or [])
+        forwarded_text = getattr(forwarded_output, "text", "") or ""
+        forwarded_token_ids = list(
+            getattr(forwarded_output, "token_ids", None) or [])
         record = {
-            "schema": 1,
+            "schema": 2,
             "source": "controller_pre_parser",
+            "event": event,
             "parent_request_id": self.request_id,
             "child_request_id": child_request_id,
             "phase": phase,
             "sequence": self.stream_debug_sequence,
+            "completion_epoch": (
+                self.algorithm_state.assistant_completion_epoch),
+            "reasoning_boundary": (
+                reasoning_boundary.value if reasoning_boundary else "none"),
+            "controller_state": controller_state,
+            "next_state": next_state,
             "raw_text": raw_text,
-            "parser_text": parser_text,
-            "decoded_token_text": decoded_text,
             "raw_text_sha256": self._stream_text_digest(raw_text),
-            "parser_text_sha256": self._stream_text_digest(parser_text),
-            "token_ids": token_ids,
-            "repaired_tags": repaired_tags,
-            "finish_reason": getattr(output, "finish_reason", None),
-            "stop_reason": getattr(output, "stop_reason", None),
+            "token_ids": raw_token_ids,
+            "source_token_ids_sha256": self._stream_token_digest(
+                raw_token_ids),
+            "source_finish_reason": getattr(
+                source_output, "finish_reason", None),
+            "source_stop_reason": getattr(
+                source_output, "stop_reason", None),
+            "forwarded_text_sha256": self._stream_text_digest(
+                forwarded_text),
+            "forwarded_text_length": len(forwarded_text),
+            "forwarded_token_ids_sha256": self._stream_token_digest(
+                forwarded_token_ids),
+            "forwarded_token_count": len(forwarded_token_ids),
+            "forwarded_finish_reason": getattr(
+                forwarded_output, "finish_reason", None),
+            "forwarded_stop_reason": getattr(
+                forwarded_output, "stop_reason", None),
+            "terminal_flush": terminal_flush,
         }
         print(
             "TB_TOOL_STREAM "
@@ -271,58 +266,87 @@ class RequestStateContext:
         *,
         phase: str = "controller",
         child_request_id: str = "",
+        source_result: Any = None,
+        event: str = "delta",
+        controller_state: str = "",
+        next_state: str = "",
+        reasoning_boundary: ReasoningBoundary | None = None,
+        terminal_flush: bool = False,
     ) -> None:
-        if result is None:
-            if self.stream_debug_enabled:
-                self._log_stream_delta(
-                    result=result,
-                    phase=phase,
-                    child_request_id=child_request_id,
-                    raw_text="",
-                    parser_text="",
-                    token_ids=[],
-                    decoded_text=None,
-                    repaired_tags=[],
-                )
-            await self.result_queue.put(None)
-            return
-
-        try:
-            output = result.outputs[0]
-            raw_text = output.text or ""
-            token_ids = list(output.token_ids or [])
-        except (AttributeError, IndexError, TypeError):
-            raw_text = ""
-            token_ids = []
-
-        parser_text = raw_text
-        repaired_tags: list[str] = []
-        decoded_text: str | None = None
-        if phase == "final_answer" and getattr(self.request, "tools", None):
-            parser_text, repaired_tags, decoded_text = (
-                self._restore_parser_visible_tool_text(raw_text, token_ids)
-            )
-            if repaired_tags:
-                prepared_result = copy.copy(result)
-                prepared_output = copy.copy(output)
-                prepared_result.outputs = [
-                    prepared_output,
-                    *result.outputs[1:],
-                ]
-                prepared_output.text = parser_text
-                result = prepared_result
-
         self._log_stream_delta(
             result=result,
+            source_result=result if source_result is None else source_result,
             phase=phase,
             child_request_id=child_request_id,
-            raw_text=raw_text,
-            parser_text=parser_text,
-            token_ids=token_ids,
-            decoded_text=decoded_text,
-            repaired_tags=repaired_tags,
+            event=event,
+            controller_state=controller_state,
+            next_state=next_state,
+            reasoning_boundary=reasoning_boundary,
+            terminal_flush=terminal_flush,
         )
         await self.result_queue.put(result)
+
+    def log_stream_event(
+        self,
+        *,
+        event: str,
+        phase: str,
+        child_request_id: str = "",
+        controller_state: str = "",
+        next_state: str = "",
+        reasoning_boundary: ReasoningBoundary | None = None,
+    ) -> None:
+        self._log_stream_delta(
+            result=None,
+            source_result=None,
+            phase=phase,
+            child_request_id=child_request_id,
+            event=event,
+            controller_state=controller_state,
+            next_state=next_state,
+            reasoning_boundary=reasoning_boundary,
+            terminal_flush=False,
+        )
+
+    async def stream_terminal(
+        self,
+        source_result: Any,
+        *,
+        phase: str,
+        child_request_id: str,
+    ) -> None:
+        """Send one terminal-only delta after the final body was forwarded."""
+        state = self.algorithm_state
+        if state.terminal_flush_count:
+            raise RuntimeError("assistant completion already emitted terminal")
+        source_output = self._first_output(source_result)
+        if source_output is None or getattr(
+            source_output, "finish_reason", None
+        ) is None:
+            raise RuntimeError("terminal flush requires a finished child output")
+        terminal_result = copy.copy(source_result)
+        terminal_output = copy.copy(source_output)
+        terminal_result.outputs = [
+            terminal_output,
+            *source_result.outputs[1:],
+        ]
+        terminal_output.text = ""
+        terminal_output.token_ids = []
+        if hasattr(terminal_output, "logprobs"):
+            terminal_output.logprobs = None
+        terminal_result.finished = True
+        state.terminal_flush_count += 1
+        await self.stream_output(
+            terminal_result,
+            source_result=source_result,
+            phase=phase,
+            child_request_id=child_request_id,
+            event="terminal_flush",
+            controller_state="free_final_answer",
+            next_state="complete",
+            reasoning_boundary=state.reasoning_boundary,
+            terminal_flush=True,
+        )
 
     def encode_prompt_suffix(self, text: str) -> tuple[int, ...]:
         cached = self.prompt_suffix_token_cache.get(text)
@@ -357,15 +381,53 @@ class RequestStateContext:
         token_ids: list[int],
         text: str,
         last_output: RequestOutput,
-    ) -> None:
+        reasoning_boundary: ReasoningBoundary | None = None,
+    ) -> tuple[int, int]:
         if self.algorithm_state.reasoning_state is ReasoningState.CLOSED:
             raise RuntimeError("cannot append thinking after reasoning is closed")
         self.engine_prompt["prompt_token_ids"].extend(token_ids)
         if self.prompt_text is not None and text:
             self.prompt_text += text
             self.engine_prompt["prompt"] = self.prompt_text
-        self.algorithm_state.thinking_tokens += len(token_ids)
+        thinking_token_count = len(token_ids)
+        final_token_count = 0
+        if reasoning_boundary is not None:
+            marker_ids = list(self.encode_prompt_suffix(
+                reasoning_boundary.marker))
+            marker_index = self._find_token_subsequence(token_ids, marker_ids)
+            if marker_index is None:
+                text_index = text.find(reasoning_boundary.marker)
+                if text_index < 0:
+                    raise RuntimeError(
+                        "reasoning boundary was reported without parser-facing "
+                        f"text/token ids: {reasoning_boundary.marker}")
+                marker_index = min(
+                    len(token_ids),
+                    len(self.tokenizer.encode(
+                        text[:text_index], add_special_tokens=False)),
+                )
+            thinking_token_count = marker_index
+            final_token_count = len(token_ids) - marker_index
+            self.algorithm_state.reasoning_boundary = reasoning_boundary
+            self.algorithm_state.reasoning_state = ReasoningState.CLOSED
+            self.reasoning_boundary_emitted = True
+        self.algorithm_state.thinking_tokens += thinking_token_count
+        self.algorithm_state.final_answer_tokens += final_token_count
         self.algorithm_state.thinking_segments += 1
+        return thinking_token_count, final_token_count
+
+    @staticmethod
+    def _find_token_subsequence(
+        token_ids: list[int],
+        marker_ids: list[int],
+    ) -> int | None:
+        if not marker_ids or len(marker_ids) > len(token_ids):
+            return None
+        width = len(marker_ids)
+        for index in range(len(token_ids) - width + 1):
+            if token_ids[index:index + width] == marker_ids:
+                return index
+        return None
 
     def close_reasoning(self, prompt_suffix: str = "</think>") -> bool:
         """Close once using the FinalAnswer-selected model prompt suffix."""
@@ -376,6 +438,7 @@ class RequestStateContext:
                 "reasoning close suffix must contain exactly one </think>")
         self.append_prompt_suffix(prompt_suffix)
         self.algorithm_state.reasoning_state = ReasoningState.CLOSED
+        self.algorithm_state.reasoning_boundary = ReasoningBoundary.THINK_END
         return True
 
     def elapsed(self) -> float:

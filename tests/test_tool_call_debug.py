@@ -68,7 +68,64 @@ class ToolCallReplayTests(unittest.TestCase):
 
         self.assertTrue(observation.has_tool_call)
         self.assertEqual(observation.invalid_argument_indexes, [])
+        self.assertEqual(observation.terminal_count, 1)
+        self.assertTrue(observation.tool_call_indexes_contiguous)
         self.assertEqual(observation.anomaly_reasons, [])
+
+    def test_multiple_sibling_tool_calls_are_valid(self) -> None:
+        chunks = [
+            {"id": "r", "choices": [{"delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call-1",
+                "function": {"name": "bash", "arguments": "{}"},
+            }]}, "finish_reason": None}]},
+            {"id": "r", "choices": [{"delta": {"tool_calls": [{
+                "index": 1,
+                "id": "call-2",
+                "function": {"name": "bash", "arguments": "{}"},
+            }]}, "finish_reason": None}]},
+            {"id": "r", "choices": [{
+                "delta": {}, "finish_reason": "tool_calls",
+            }]},
+        ]
+
+        observation = assemble_observation(
+            line_no=1,
+            attempt=1,
+            variant="dtb",
+            client_request_id="client",
+            status_code=200,
+            elapsed_ms=1.0,
+            expected_tool_call=True,
+            chunks=chunks,
+        )
+
+        self.assertEqual(len(observation.tool_calls), 2)
+        self.assertTrue(observation.tool_call_indexes_contiguous)
+        self.assertEqual(observation.anomaly_reasons, [])
+
+    def test_content_after_terminal_is_rejected(self) -> None:
+        chunks = [
+            {"id": "r", "choices": [{
+                "delta": {}, "finish_reason": "stop",
+            }]},
+            {"id": "r", "choices": [{
+                "delta": {"content": "tail"}, "finish_reason": None,
+            }]},
+        ]
+        observation = assemble_observation(
+            line_no=1,
+            attempt=1,
+            variant="dtb",
+            client_request_id="client",
+            status_code=200,
+            elapsed_ms=1.0,
+            expected_tool_call=False,
+            chunks=chunks,
+        )
+
+        self.assertTrue(observation.chunk_after_terminal)
+        self.assertIn("chunk_after_terminal", observation.anomaly_reasons)
 
     def test_conversation_validator_matches_tool_results(self) -> None:
         valid = [
@@ -123,7 +180,7 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertTrue(dtb["enable_think_budget"])
         self.assertEqual(dtb["fixed_budget_tokens"], 10)
 
-    def test_analysis_identifies_repaired_controller_gap(self) -> None:
+    def test_analysis_accepts_one_completion_with_tool_continuation(self) -> None:
         summary = {
             "client_request_id": "r",
             "server_request_id": "r",
@@ -131,19 +188,164 @@ class ToolCallReplayTests(unittest.TestCase):
             "has_tool_call": True,
             "anomaly_reasons": [],
         }
-        records = [{
-            "phase": "final_answer",
-            "sequence": 1,
-            "raw_text": "f",
-            "parser_text": "<tool_call>\n<f",
-            "decoded_token_text": "<tool_call>\n<f",
-            "repaired_tags": ["<tool_call>"],
-        }]
+        records = [
+            {
+                "schema": 2,
+                "event": "state_enter",
+                "phase": "_ThinkingState",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "reasoning_boundary": "none",
+            },
+            {
+                "schema": 2,
+                "event": "delta",
+                "phase": "initial_think",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "controller_state": "thinking",
+                "next_state": "free_final_answer",
+                "reasoning_boundary": "tool_call",
+                "raw_text": "thought<tool_call>",
+                "raw_text_sha256": "text",
+                "forwarded_text_sha256": "text",
+                "source_token_ids_sha256": "ids",
+                "forwarded_token_ids_sha256": "ids",
+            },
+            {
+                "schema": 2,
+                "event": "state_enter",
+                "phase": "_FinalAnswerState",
+                "sequence": 3,
+                "completion_epoch": 1,
+                "reasoning_boundary": "tool_call",
+            },
+            {
+                "schema": 2,
+                "event": "terminal_flush",
+                "phase": "final_answer",
+                "sequence": 4,
+                "completion_epoch": 1,
+                "reasoning_boundary": "tool_call",
+                "terminal_flush": True,
+            },
+        ]
 
         analysis = classify(summary, records)
 
         self.assertEqual(analysis["diagnosis"], "pass")
-        self.assertEqual(analysis["repair_count"], 1)
+        self.assertEqual(analysis["completion_epoch_count"], 1)
+        self.assertEqual(analysis["terminal_flush_count"], 1)
+        self.assertEqual(analysis["fresh_final_after_tool_boundary"], 0)
+        self.assertEqual(analysis["thinking_or_probe_after_tool_boundary"], 0)
+
+    def test_analysis_rejects_thinking_after_tool_boundary(self) -> None:
+        summary = {
+            "client_request_id": "r",
+            "server_request_id": "r",
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": [],
+        }
+        records = [
+            {
+                "schema": 2,
+                "event": "delta",
+                "phase": "initial_think",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "controller_state": "thinking",
+                "next_state": "free_final_answer",
+                "reasoning_boundary": "tool_call",
+                "raw_text": "<tool_call>",
+                "raw_text_sha256": "text",
+                "forwarded_text_sha256": "text",
+                "source_token_ids_sha256": "ids",
+                "forwarded_token_ids_sha256": "ids",
+            },
+            {
+                "schema": 2,
+                "event": "state_enter",
+                "phase": "_ConfidenceProbeState",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "reasoning_boundary": "tool_call",
+            },
+            {
+                "schema": 2,
+                "event": "terminal_flush",
+                "phase": "final_answer",
+                "sequence": 3,
+                "completion_epoch": 1,
+                "terminal_flush": True,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(
+            analysis["diagnosis"],
+            "controller_completion_lifecycle_failure",
+        )
+        self.assertEqual(analysis["thinking_or_probe_after_tool_boundary"], 1)
+
+    def test_analysis_does_not_require_dtb_trace_for_vanilla(self) -> None:
+        analysis = classify({
+            "client_request_id": "r",
+            "server_request_id": "r",
+            "variant": "vanilla",
+            "has_tool_call": True,
+            "anomaly_reasons": [],
+        }, [])
+
+        self.assertEqual(analysis["diagnosis"], "vanilla_pass")
+
+    def test_analysis_identifies_controller_input_text_token_gap(self) -> None:
+        summary = {
+            "client_request_id": "r",
+            "server_request_id": "r",
+            "variant": "dtb",
+            "has_tool_call": False,
+            "anomaly_reasons": ["expected_tool_call_missing"],
+        }
+        records = [
+            {
+                "schema": 2,
+                "event": "delta",
+                "phase": "initial_think",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "controller_state": "thinking",
+                "next_state": "free_final_answer",
+                "reasoning_boundary": "tool_call",
+                "raw_text": "f",
+                "raw_text_sha256": "text",
+                "forwarded_text_sha256": "text",
+                "source_token_ids_sha256": "ids",
+                "forwarded_token_ids_sha256": "ids",
+            },
+            {
+                "schema": 2,
+                "event": "state_enter",
+                "phase": "_FinalAnswerState",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "reasoning_boundary": "tool_call",
+            },
+            {
+                "schema": 2,
+                "event": "terminal_flush",
+                "phase": "final_answer",
+                "sequence": 3,
+                "completion_epoch": 1,
+                "terminal_flush": True,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(
+            analysis["diagnosis"], "controller_input_text_token_gap")
 
 
 if __name__ == "__main__":

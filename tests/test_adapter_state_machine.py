@@ -101,6 +101,9 @@ class ScriptedEngine:
         self.calls.append({
             "request_id": request_id,
             "max_tokens": params.max_tokens,
+            "stop": list(params.stop or []),
+            "include_stop_str_in_output": (
+                params.include_stop_str_in_output),
             "prompt_token_ids": list(prompt["prompt_token_ids"]),
             "kwargs": kwargs,
         })
@@ -175,6 +178,17 @@ async def run_and_drain(context: RequestStateContext):
     return visible
 
 
+async def run_and_drain_outputs(context: RequestStateContext):
+    await AsyncReasoningOrchestrator(context).run()
+    outputs = []
+    while True:
+        value = await context.result_queue.get()
+        if value is None:
+            break
+        outputs.append(value.outputs[0])
+    return outputs
+
+
 def call_phases(engine: ScriptedEngine) -> list[str]:
     known = (
         "initial_think",
@@ -192,6 +206,29 @@ def call_phases(engine: ScriptedEngine) -> list[str]:
 
 
 class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_final_body_and_terminal_are_separate(self):
+        context, _ = make_context([
+            [result("thought", [10])],
+            [result("trial", [20], confidence=-0.01)],
+            [result(
+                "answer", [30], finish_reason="stop",
+                stop_reason="eos")],
+        ])
+
+        outputs = await run_and_drain_outputs(context)
+        terminals = [
+            output for output in outputs
+            if output.finish_reason is not None
+        ]
+        answer = next(output for output in outputs if output.text == "answer")
+
+        self.assertIsNone(answer.finish_reason)
+        self.assertEqual(len(terminals), 1)
+        self.assertEqual(terminals[0].text, "")
+        self.assertEqual(terminals[0].token_ids, [])
+        self.assertEqual(terminals[0].finish_reason, "stop")
+        self.assertEqual(terminals[0].stop_reason, "eos")
+
     async def test_first_probe_accepts_then_fresh_final(self):
         context, engine = make_context([
             [result("thought", [10])],
@@ -344,28 +381,80 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             "".join(visible),
         )
 
-    async def test_early_stop_before_minimum_continues_without_reopening_tag(self):
+    async def test_model_think_end_enters_free_final_even_before_minimum(self):
+        boundary = "</think>"
         context, engine = make_context(
             [
                 [result(
-                    "", [10], finish_reason="stop",
+                    boundary,
+                    [ord(character) for character in boundary],
+                    finish_reason="stop",
                     stop_reason="</think>")],
-                [result("more", [11])],
-                [result("trial", [20], confidence=-0.01)],
                 [result("answer", [30], finish_reason="stop")],
             ],
             min_think_budget=2,
         )
-        await run_and_drain(context)
+        visible = await run_and_drain(context)
 
         phases = call_phases(engine)
         self.assertEqual(
-            phases[:3],
-            ["initial_think", "iterative_think", "confidence_probe"],
+            phases,
+            ["initial_think", "final_answer"],
         )
-        self.assertTrue(context.algorithm_state.attempted_early_stop)
         self.assertEqual(context.prompt_text.count("<think>"), 1)
         self.assertEqual(context.prompt_text.count("</think>"), 1)
+        self.assertEqual(visible.count("</think>"), 1)
+        self.assertEqual(
+            context.algorithm_state.final_answer_reason,
+            FinalAnswerReason.MODEL_THINK_END,
+        )
+        self.assertIn("<tool_call>", engine.calls[0]["stop"])
+        self.assertIn("</think>", engine.calls[0]["stop"])
+        self.assertTrue(engine.calls[0]["include_stop_str_in_output"])
+
+    async def test_model_tool_boundary_continues_without_synthetic_think_end(
+        self,
+    ):
+        first = "thought<tool_call>\n<f"
+        context, engine = make_context([
+            [result(
+                first,
+                [ord(character) for character in first],
+                finish_reason="stop",
+                stop_reason="<tool_call>",
+            )],
+            [result(
+                "<function=bash></function></tool_call>",
+                [31, 32],
+                finish_reason="stop",
+                stop_reason="eos",
+            )],
+        ])
+
+        visible = await run_and_drain(context)
+
+        self.assertEqual(
+            call_phases(engine), ["initial_think", "final_answer"])
+        self.assertEqual("".join(visible).count("<tool_call>"), 1)
+        self.assertNotIn("</think>", "".join(visible))
+        self.assertEqual(context.prompt_text.count("<tool_call>"), 1)
+        self.assertEqual(
+            context.algorithm_state.final_answer_reason,
+            FinalAnswerReason.MODEL_TOOL_CALL,
+        )
+        self.assertEqual(context.algorithm_state.probe_round, 0)
+        self.assertEqual(context.algorithm_state.terminal_flush_count, 1)
+        self.assertTrue(engine.calls[-1]["kwargs"]["reasoning_ended"])
+        self.assertEqual(
+            engine.calls[-1]["prompt_token_ids"][-len(first):],
+            [ord(character) for character in first],
+        )
+        ledger = context.timing.snapshot()["ledger"]
+        self.assertEqual(ledger["visible_think_tokens"], len("thought"))
+        self.assertEqual(
+            ledger["final_answer_tokens"],
+            len("<tool_call>\n<f") + 2,
+        )
 
     async def test_empty_logprobs_fail_open_after_first_probe(self):
         context, engine = make_context([

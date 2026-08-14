@@ -63,10 +63,16 @@ class Observation:
     content: str
     reasoning: str
     tool_calls: list[dict[str, Any]]
+    tool_call_indexes_contiguous: bool
+    missing_tool_name_indexes: list[int]
     invalid_argument_indexes: list[int]
+    terminal_count: int
+    terminal_event_indexes: list[int]
+    tool_calls_finish_reason_count: int
     leaked_tool_xml: bool
     role_tail: bool
     content_after_tool_delta: bool
+    chunk_after_terminal: bool
     anomaly_reasons: list[str]
     error: str = ""
 
@@ -215,14 +221,21 @@ def assemble_observation(
     server_request_id = ""
     saw_tool_delta = False
     content_after_tool_delta = False
+    chunk_after_terminal = False
+    terminal_event_indexes: list[int] = []
+    terminal_seen = False
 
-    for chunk in chunks:
+    for event_index, chunk in enumerate(chunks, start=1):
         server_request_id = server_request_id or str(chunk.get("id") or "")
         for choice in chunk.get("choices") or []:
+            delta = choice.get("delta") or {}
             finish_reason = choice.get("finish_reason")
+            if terminal_seen and (finish_reason or delta):
+                chunk_after_terminal = True
             if finish_reason:
                 finish_reasons.append(str(finish_reason))
-            delta = choice.get("delta") or {}
+                terminal_event_indexes.append(event_index)
+                terminal_seen = True
             content = delta.get("content")
             if isinstance(content, str):
                 content_parts.append(content)
@@ -245,6 +258,11 @@ def assemble_observation(
                     state.arguments += arguments
 
     tool_calls = [asdict(calls[index]) for index in sorted(calls)]
+    tool_indexes = [int(call["index"]) for call in tool_calls]
+    tool_call_indexes_contiguous = tool_indexes == list(range(len(tool_calls)))
+    missing_tool_name_indexes = [
+        int(call["index"]) for call in tool_calls if not call["name"]
+    ]
     invalid_argument_indexes = []
     for call in tool_calls:
         try:
@@ -257,6 +275,8 @@ def assemble_observation(
     leaked_tool_xml = bool(LEAKED_XML_RE.search(content))
     role_tail = bool(ROLE_TAIL_RE.search(content))
     has_tool_call = bool(tool_calls)
+    terminal_count = len(terminal_event_indexes)
+    tool_calls_finish_reason_count = finish_reasons.count("tool_calls")
     anomaly_reasons: list[str] = []
     if error:
         anomaly_reasons.append("request_error")
@@ -270,8 +290,20 @@ def assemble_observation(
         anomaly_reasons.append("content_after_tool_delta")
     if invalid_argument_indexes:
         anomaly_reasons.append("invalid_tool_arguments_json")
-    if has_tool_call and "tool_calls" not in finish_reasons:
+    if missing_tool_name_indexes:
+        anomaly_reasons.append("missing_tool_name")
+    if not tool_call_indexes_contiguous:
+        anomaly_reasons.append("non_contiguous_tool_call_indexes")
+    if has_tool_call and tool_calls_finish_reason_count == 0:
         anomaly_reasons.append("tool_call_without_tool_calls_finish_reason")
+    if has_tool_call and tool_calls_finish_reason_count > 1:
+        anomaly_reasons.append("multiple_tool_calls_finish_reasons")
+    if not error and status_code == 200 and terminal_count != 1:
+        anomaly_reasons.append(
+            "missing_terminal" if terminal_count == 0 else "multiple_terminals"
+        )
+    if chunk_after_terminal:
+        anomaly_reasons.append("chunk_after_terminal")
 
     return Observation(
         line_no=line_no,
@@ -287,10 +319,16 @@ def assemble_observation(
         content=content,
         reasoning=reasoning,
         tool_calls=tool_calls,
+        tool_call_indexes_contiguous=tool_call_indexes_contiguous,
+        missing_tool_name_indexes=missing_tool_name_indexes,
         invalid_argument_indexes=invalid_argument_indexes,
+        terminal_count=terminal_count,
+        terminal_event_indexes=terminal_event_indexes,
+        tool_calls_finish_reason_count=tool_calls_finish_reason_count,
         leaked_tool_xml=leaked_tool_xml,
         role_tail=role_tail,
         content_after_tool_delta=content_after_tool_delta,
+        chunk_after_terminal=chunk_after_terminal,
         anomaly_reasons=anomaly_reasons,
         error=error,
     )

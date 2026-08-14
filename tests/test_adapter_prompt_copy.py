@@ -171,7 +171,13 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         async def outputs():
             yield chunk
 
-        token_ids, last_chunk, text, stop_reason = await _BaseState.consume_output(
+        (
+            token_ids,
+            last_chunk,
+            text,
+            stop_reason,
+            reasoning_boundary,
+        ) = await _BaseState.consume_output(
             outputs(),
             context,
             phase="initial_think",
@@ -182,11 +188,14 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(last_chunk, chunk)
         self.assertEqual(text, "delta")
         self.assertEqual(stop_reason, "length")
+        self.assertIsNone(reasoning_boundary)
         self.assertEqual(completion.finish_reason, "length")
         visible = await context.result_queue.get()
         self.assertIsNone(visible.outputs[0].finish_reason)
 
-    async def test_final_answer_restores_missing_tool_marker_text(self) -> None:
+    async def test_final_answer_does_not_restore_missing_tool_marker_text(
+        self,
+    ) -> None:
         context = make_context()
         context.tokenizer = StructuralTokenizer()
         context.request.tools = [{"type": "function"}]
@@ -205,9 +214,9 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         )
         queued = await context.result_queue.get()
 
-        self.assertIsNot(queued, source)
-        self.assertIsNot(queued.outputs[0], source_output)
-        self.assertEqual(queued.outputs[0].text, "<tool_call>\n<f")
+        self.assertIs(queued, source)
+        self.assertIs(queued.outputs[0], source_output)
+        self.assertEqual(queued.outputs[0].text, "f")
         self.assertEqual(queued.outputs[0].token_ids, source_output.token_ids)
         self.assertEqual(source_output.text, "f")
 
@@ -226,7 +235,7 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(await context.result_queue.get(), source)
 
-    async def test_stream_debug_logs_raw_and_parser_text(self) -> None:
+    async def test_stream_debug_logs_raw_and_forwarded_digests(self) -> None:
         context = make_context()
         context.tokenizer = StructuralTokenizer()
         context.request.tools = [{"type": "function"}]
@@ -249,10 +258,48 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         line = stdout.getvalue().strip()
         self.assertTrue(line.startswith("TB_TOOL_STREAM "))
         record = json.loads(line.split(" ", 1)[1])
+        self.assertEqual(record["schema"], 2)
         self.assertEqual(record["source"], "controller_pre_parser")
         self.assertEqual(record["raw_text"], "f")
-        self.assertEqual(record["parser_text"], "<tool_call>\n<f")
-        self.assertEqual(record["repaired_tags"], ["<tool_call>"])
+        self.assertEqual(
+            record["raw_text_sha256"], record["forwarded_text_sha256"])
+        self.assertEqual(
+            record["source_token_ids_sha256"],
+            record["forwarded_token_ids_sha256"],
+        )
+
+    async def test_terminal_flush_is_empty_and_emitted_once(self) -> None:
+        context = make_context()
+        source_output = SimpleNamespace(
+            text="answer",
+            token_ids=[10],
+            logprobs=["lp"],
+            finish_reason="stop",
+            stop_reason="eos",
+        )
+        source = SimpleNamespace(
+            outputs=[source_output],
+            finished=True,
+        )
+
+        await context.stream_terminal(
+            source,
+            phase="final_answer",
+            child_request_id="final-1",
+        )
+        terminal = await context.result_queue.get()
+
+        self.assertEqual(terminal.outputs[0].text, "")
+        self.assertEqual(terminal.outputs[0].token_ids, [])
+        self.assertEqual(terminal.outputs[0].finish_reason, "stop")
+        self.assertEqual(terminal.outputs[0].stop_reason, "eos")
+        self.assertEqual(context.algorithm_state.terminal_flush_count, 1)
+        with self.assertRaisesRegex(RuntimeError, "already emitted terminal"):
+            await context.stream_terminal(
+                source,
+                phase="final_answer",
+                child_request_id="final-1",
+            )
 
 
 class ResponseContextTests(unittest.IsolatedAsyncioTestCase):
@@ -280,10 +327,9 @@ class ResponseContextTests(unittest.IsolatedAsyncioTestCase):
 
         await queue.put(chunk("thought", [1]))
         await queue.put(chunk("</think>", [2]))
+        await queue.put(chunk("answer", [3]))
         await queue.put(chunk(
-            "answer", [3], finish_reason="length",
-            stop_reason="max_tokens",
-        ))
+            "", [], finish_reason="length", stop_reason="max_tokens"))
         await queue.put(None)
 
         items = [
