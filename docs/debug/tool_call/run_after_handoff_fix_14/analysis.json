@@ -1,0 +1,4269 @@
+{
+  "summary": {
+    "requests": 10,
+    "dtb_requests": 5,
+    "server_records": 211,
+    "invalid_server_records": 0,
+    "diagnoses": {
+      "downstream_parser_or_finish_failure": 5,
+      "vanilla_pass": 5
+    },
+    "dtb_acceptance": {
+      "pass": 0,
+      "completion_epoch_one": 5,
+      "terminal_flush_one": 5,
+      "no_fresh_final_after_tool_boundary": 5,
+      "no_thinking_or_probe_after_tool_boundary": 5,
+      "no_passthrough_violation": 5,
+      "no_invalid_stop_boundary_alignment": 5,
+      "stop_boundary_alignment_covered": 5,
+      "think_end_boundary_covered": 5,
+      "tool_call_boundary_covered": 0
+    }
+  },
+  "requests": [
+    {
+      "client_request_id": "tbtool-l14-a1-vanilla-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a1-vanilla-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 1,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l14-a1-dtb-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a1-dtb-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 1,
+      "variant": "dtb",
+      "anomaly_reasons": [
+        "invalid_tool_arguments_json"
+      ],
+      "diagnosis": "downstream_parser_or_finish_failure",
+      "server_record_count": 50,
+      "visible_record_count": 48,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>\n\n8个文件全部生成。执行编译验证：\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -am 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 8,
+      "reasoning_boundaries": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": "</think>",
+          "raw_token_ids": [
+            248069,
+            271,
+            23,
+            95840,
+            97380
+          ],
+          "forwarded_token_ids": [
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            23,
+            95840,
+            97380
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a1-dtb-20260814T085612Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "raw_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "All",
+              "raw_token_ids": [
+                2324
+              ],
+              "forwarded_token_ids": [
+                2324
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " 8 files are present",
+              "raw_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "forwarded_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": ": 6 modified +",
+              "raw_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "forwarded_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": " 2 new. Now",
+              "raw_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "forwarded_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " compile",
+              "raw_token_ids": [
+                18612
+              ],
+              "forwarded_token_ids": [
+                18612
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " the main code.\n",
+              "raw_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "forwarded_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": "</think>",
+              "raw_token_ids": [
+                248069,
+                271,
+                23,
+                95840,
+                97380
+              ],
+              "forwarded_token_ids": [
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a1-dtb-20260814T085612Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49
+          ],
+          "raw_text": "\n\n8个文件全部生成。执行编译验证：\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -am 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 10,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "final_answer",
+              "raw_text": "\n",
+              "raw_token_ids": [
+                23,
+                95840,
+                97380,
+                97893
+              ],
+              "forwarded_token_ids": [
+                23,
+                95840,
+                97380,
+                97893
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "final_answer",
+              "raw_text": "\n8个文件全部",
+              "raw_token_ids": [
+                103910,
+                1710,
+                97328,
+                104882
+              ],
+              "forwarded_token_ids": [
+                103910,
+                1710,
+                97328,
+                104882
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "final_answer",
+              "raw_text": "生成。",
+              "raw_token_ids": [
+                103838,
+                4960
+              ],
+              "forwarded_token_ids": [
+                103838,
+                4960
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "final_answer",
+              "raw_text": "执行编译验证：\n\n<tool_call>\n<f",
+              "raw_token_ids": [
+                271,
+                248058,
+                198,
+                27,
+                1628
+              ],
+              "forwarded_token_ids": [
+                271,
+                248058,
+                198,
+                27,
+                1628
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "final_answer",
+              "raw_text": "unction=",
+              "raw_token_ids": [
+                21402,
+                956,
+                29,
+                198,
+                27
+              ],
+              "forwarded_token_ids": [
+                21402,
+                956,
+                29,
+                198,
+                27
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "final_answer",
+              "raw_text": "bash>\n<parameter=co",
+              "raw_token_ids": [
+                15704,
+                28,
+                5454,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                15704,
+                28,
+                5454,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "final_answer",
+              "raw_text": "mmand>\nmvn clean co",
+              "raw_token_ids": [
+                25171,
+                77,
+                4101,
+                18612,
+                471
+              ],
+              "forwarded_token_ids": [
+                25171,
+                77,
+                4101,
+                18612,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "final_answer",
+              "raw_text": "mpile -s /app/code/s",
+              "raw_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "forwarded_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "final_answer",
+              "raw_text": "ettings.xml -Dsk",
+              "raw_token_ids": [
+                8756,
+                471,
+                35,
+                19974,
+                17659
+              ],
+              "forwarded_token_ids": [
+                8756,
+                471,
+                35,
+                19974,
+                17659
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "final_answer",
+              "raw_text": "ipTests -D",
+              "raw_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "final_answer",
+              "raw_text": "mave",
+              "raw_token_ids": [
+                5922
+              ],
+              "forwarded_token_ids": [
+                5922
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 22,
+              "phase": "final_answer",
+              "raw_text": "n.wagon.h",
+              "raw_token_ids": [
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl.insecu",
+              "raw_token_ids": [
+                1794,
+                24336,
+                10938
+              ],
+              "forwarded_token_ids": [
+                1794,
+                24336,
+                10938
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "re=true -D",
+              "raw_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "maven.wagon.http.ss",
+              "raw_token_ids": [
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "forwarded_token_ids": [
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "l.allowall",
+              "raw_token_ids": [
+                528,
+                10938,
+                471
+              ],
+              "forwarded_token_ids": [
+                528,
+                10938,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "=true -Dmave",
+              "raw_token_ids": [
+                35,
+                76,
+                5108,
+                1370,
+                5922
+              ],
+              "forwarded_token_ids": [
+                35,
+                76,
+                5108,
+                1370,
+                5922
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "n.wagon.http.ssl",
+              "raw_token_ids": [
+                6748,
+                55289,
+                46988
+              ],
+              "forwarded_token_ids": [
+                6748,
+                55289,
+                46988
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": ".ignore.v",
+              "raw_token_ids": [
+                19961,
+                477
+              ],
+              "forwarded_token_ids": [
+                19961,
+                477
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "alidit",
+              "raw_token_ids": [
+                920,
+                942
+              ],
+              "forwarded_token_ids": [
+                920,
+                942
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "y.dates",
+              "raw_token_ids": [
+                10938,
+                471
+              ],
+              "forwarded_token_ids": [
+                10938,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "=true -pl implements/ven",
+              "raw_token_ids": [
+                490,
+                5004,
+                14,
+                6917,
+                4589
+              ],
+              "forwarded_token_ids": [
+                490,
+                5004,
+                14,
+                6917,
+                4589
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "uealloc ",
+              "raw_token_ids": [
+                471,
+                308,
+                220,
+                17,
+                5608
+              ],
+              "forwarded_token_ids": [
+                471,
+                308,
+                220,
+                17,
+                5608
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "-am 2>&1 | ",
+              "raw_token_ids": [
+                16,
+                735,
+                9495,
+                471,
+                16
+              ],
+              "forwarded_token_ids": [
+                16,
+                735,
+                9495,
+                471,
+                16
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "tail -100\n</pa",
+              "raw_token_ids": [
+                15,
+                15,
+                198,
+                510,
+                15704
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                198,
+                510,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "rameter>\n<par",
+              "raw_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 37,
+              "phase": "final_answer",
+              "raw_text": "ameter=description>\nCompi",
+              "raw_token_ids": [
+                4532,
+                29,
+                198,
+                44587,
+                1822
+              ],
+              "forwarded_token_ids": [
+                4532,
+                29,
+                198,
+                44587,
+                1822
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 38,
+              "phase": "final_answer",
+              "raw_text": "le main code",
+              "raw_token_ids": [
+                1970,
+                440,
+                295
+              ],
+              "forwarded_token_ids": [
+                1970,
+                440,
+                295
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 39,
+              "phase": "final_answer",
+              "raw_text": " with maven\n</par",
+              "raw_token_ids": [
+                5108,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                5108,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 40,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 41,
+              "phase": "final_answer",
+              "raw_text": "tim",
+              "raw_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 42,
+              "phase": "final_answer",
+              "raw_text": "eout>",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 43,
+              "phase": "final_answer",
+              "raw_text": "\n600000\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 44,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 45,
+              "phase": "final_answer",
+              "raw_text": "workdir>\n/ap",
+              "raw_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 46,
+              "phase": "final_answer",
+              "raw_text": "p/code/ExperienceAssuranceS",
+              "raw_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "forwarded_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 47,
+              "phase": "final_answer",
+              "raw_text": "ervice\n</parame",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 48,
+              "phase": "final_answer",
+              "raw_text": "ter>\n</function>\n</tool_call>",
+              "raw_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l14-a2-vanilla-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a2-vanilla-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 2,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l14-a2-dtb-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a2-dtb-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 2,
+      "variant": "dtb",
+      "anomaly_reasons": [
+        "invalid_tool_arguments_json"
+      ],
+      "diagnosis": "downstream_parser_or_finish_failure",
+      "server_record_count": 37,
+      "visible_record_count": 35,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with Maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 8,
+      "reasoning_boundaries": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": "</think>",
+          "raw_token_ids": [
+            248069,
+            271,
+            23,
+            95840,
+            97380
+          ],
+          "forwarded_token_ids": [
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            23,
+            95840,
+            97380
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a2-dtb-20260814T085612Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "raw_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "All",
+              "raw_token_ids": [
+                2324
+              ],
+              "forwarded_token_ids": [
+                2324
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " 8 files are present",
+              "raw_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "forwarded_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": ": 6 modified +",
+              "raw_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "forwarded_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": " 2 new. Now",
+              "raw_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "forwarded_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " compile",
+              "raw_token_ids": [
+                18612
+              ],
+              "forwarded_token_ids": [
+                18612
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " the main code.\n",
+              "raw_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "forwarded_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": "</think>",
+              "raw_token_ids": [
+                248069,
+                271,
+                23,
+                95840,
+                97380
+              ],
+              "forwarded_token_ids": [
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a2-dtb-20260814T085612Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36
+          ],
+          "raw_text": "\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with Maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 10,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "final_answer",
+              "raw_text": "\n\n<tool_call>\n<fun",
+              "raw_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "forwarded_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "final_answer",
+              "raw_text": "ction=bash>\n<pa",
+              "raw_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "forwarded_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "final_answer",
+              "raw_text": "rameter=comm",
+              "raw_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "forwarded_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "final_answer",
+              "raw_text": "and>\nmvn clean com",
+              "raw_token_ids": [
+                77,
+                4101,
+                18612,
+                471,
+                82
+              ],
+              "forwarded_token_ids": [
+                77,
+                4101,
+                18612,
+                471,
+                82
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "final_answer",
+              "raw_text": "pile -s /app/code/setti",
+              "raw_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "forwarded_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "final_answer",
+              "raw_text": "ngs.xml -Dskip",
+              "raw_token_ids": [
+                471,
+                35,
+                19974,
+                17659,
+                471
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                19974,
+                17659,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "final_answer",
+              "raw_text": "Tests -D",
+              "raw_token_ids": [
+                35,
+                76,
+                5108,
+                1130
+              ],
+              "forwarded_token_ids": [
+                35,
+                76,
+                5108,
+                1130
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "final_answer",
+              "raw_text": "maven.javadoc.skip",
+              "raw_token_ids": [
+                41989,
+                35386,
+                10938,
+                471
+              ],
+              "forwarded_token_ids": [
+                41989,
+                35386,
+                10938,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "final_answer",
+              "raw_text": "=true ",
+              "raw_token_ids": [
+                35,
+                1960
+              ],
+              "forwarded_token_ids": [
+                35,
+                1960
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "final_answer",
+              "raw_text": "-Dcheckstyle.skip",
+              "raw_token_ids": [
+                3412,
+                35386,
+                10938,
+                220,
+                17
+              ],
+              "forwarded_token_ids": [
+                3412,
+                35386,
+                10938,
+                220,
+                17
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "final_answer",
+              "raw_text": "=true",
+              "raw_token_ids": [
+                5608,
+                16,
+                735
+              ],
+              "forwarded_token_ids": [
+                5608,
+                16,
+                735
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 22,
+              "phase": "final_answer",
+              "raw_text": " 2>&1 | ta",
+              "raw_token_ids": [
+                9495,
+                471,
+                16,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                9495,
+                471,
+                16,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "il -100\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=descr",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                4532,
+                29
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                4532,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "iption>\nCompile main co",
+              "raw_token_ids": [
+                198,
+                44587,
+                1822,
+                1970,
+                440
+              ],
+              "forwarded_token_ids": [
+                198,
+                44587,
+                1822,
+                1970,
+                440
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "de with Maven\n</par",
+              "raw_token_ids": [
+                95170,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                95170,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "tim",
+              "raw_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "eout>",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "\n600000\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "workdir>\n/ap",
+              "raw_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "p/code/ExperienceAssuranceS",
+              "raw_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "forwarded_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "ervice\n</parame",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "ter>\n</function>\n</tool_call>",
+              "raw_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l14-a3-vanilla-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a3-vanilla-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 3,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l14-a3-dtb-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a3-dtb-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 3,
+      "variant": "dtb",
+      "anomaly_reasons": [
+        "invalid_tool_arguments_json"
+      ],
+      "diagnosis": "downstream_parser_or_finish_failure",
+      "server_record_count": 38,
+      "visible_record_count": 36,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with Maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 8,
+      "reasoning_boundaries": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": "</think>",
+          "raw_token_ids": [
+            248069,
+            271,
+            23,
+            95840,
+            97380
+          ],
+          "forwarded_token_ids": [
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            23,
+            95840,
+            97380
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a3-dtb-20260814T085612Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "raw_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "All",
+              "raw_token_ids": [
+                2324
+              ],
+              "forwarded_token_ids": [
+                2324
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " 8 files are present",
+              "raw_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "forwarded_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": ": 6 modified +",
+              "raw_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "forwarded_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": " 2 new. Now",
+              "raw_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "forwarded_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " compile",
+              "raw_token_ids": [
+                18612
+              ],
+              "forwarded_token_ids": [
+                18612
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " the main code.\n",
+              "raw_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "forwarded_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": "</think>",
+              "raw_token_ids": [
+                248069,
+                271,
+                23,
+                95840,
+                97380
+              ],
+              "forwarded_token_ids": [
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a3-dtb-20260814T085612Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37
+          ],
+          "raw_text": "\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with Maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 10,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "final_answer",
+              "raw_text": "\n\n<too",
+              "raw_token_ids": [
+                248058
+              ],
+              "forwarded_token_ids": [
+                248058
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "final_answer",
+              "raw_text": "l_call>\n<functi",
+              "raw_token_ids": [
+                198,
+                27,
+                1628,
+                21402,
+                956
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                1628,
+                21402,
+                956
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "final_answer",
+              "raw_text": "on=bash>\n<par",
+              "raw_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "final_answer",
+              "raw_text": "ameter=comma",
+              "raw_token_ids": [
+                5454,
+                29,
+                198,
+                25171,
+                77
+              ],
+              "forwarded_token_ids": [
+                5454,
+                29,
+                198,
+                25171,
+                77
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "final_answer",
+              "raw_text": "nd>\nmvn clean com",
+              "raw_token_ids": [
+                4101,
+                18612,
+                471,
+                82
+              ],
+              "forwarded_token_ids": [
+                4101,
+                18612,
+                471,
+                82
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "final_answer",
+              "raw_text": "pile -s /app/code/setti",
+              "raw_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "forwarded_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "final_answer",
+              "raw_text": "ngs.xml -Dskip",
+              "raw_token_ids": [
+                471,
+                35,
+                19974,
+                17659,
+                471
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                19974,
+                17659,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "final_answer",
+              "raw_text": "Tests -D",
+              "raw_token_ids": [
+                35,
+                76,
+                5108,
+                1130
+              ],
+              "forwarded_token_ids": [
+                35,
+                76,
+                5108,
+                1130
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "final_answer",
+              "raw_text": "maven.javadoc.skip",
+              "raw_token_ids": [
+                41989,
+                35386,
+                10938,
+                471
+              ],
+              "forwarded_token_ids": [
+                41989,
+                35386,
+                10938,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "final_answer",
+              "raw_text": "=true ",
+              "raw_token_ids": [
+                35,
+                1960
+              ],
+              "forwarded_token_ids": [
+                35,
+                1960
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "final_answer",
+              "raw_text": "-Dcheckstyle.skip",
+              "raw_token_ids": [
+                3412,
+                35386,
+                10938,
+                220,
+                17
+              ],
+              "forwarded_token_ids": [
+                3412,
+                35386,
+                10938,
+                220,
+                17
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 22,
+              "phase": "final_answer",
+              "raw_text": "=true",
+              "raw_token_ids": [
+                5608,
+                16,
+                735
+              ],
+              "forwarded_token_ids": [
+                5608,
+                16,
+                735
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": " 2>&1 | ta",
+              "raw_token_ids": [
+                9495,
+                471,
+                16,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                9495,
+                471,
+                16,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "il -100\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=descr",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                4532,
+                29
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                4532,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "iption>\nCompile main co",
+              "raw_token_ids": [
+                198,
+                44587,
+                1822,
+                1970,
+                440
+              ],
+              "forwarded_token_ids": [
+                198,
+                44587,
+                1822,
+                1970,
+                440
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "de with Maven\n</par",
+              "raw_token_ids": [
+                95170,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                95170,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "tim",
+              "raw_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "eout>",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "\n600000\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "workdir>\n/ap",
+              "raw_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "p/code/ExperienceAssuranceS",
+              "raw_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "forwarded_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "ervice\n</parame",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "ter>\n</function>\n</tool_call>",
+              "raw_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l14-a4-vanilla-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a4-vanilla-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 4,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l14-a4-dtb-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a4-dtb-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 4,
+      "variant": "dtb",
+      "anomaly_reasons": [
+        "invalid_tool_arguments_json"
+      ],
+      "diagnosis": "downstream_parser_or_finish_failure",
+      "server_record_count": 37,
+      "visible_record_count": 35,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with Maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 8,
+      "reasoning_boundaries": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 8,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": "</think>",
+          "raw_token_ids": [
+            248069,
+            271,
+            23,
+            95840,
+            97380
+          ],
+          "forwarded_token_ids": [
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            23,
+            95840,
+            97380
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a4-dtb-20260814T085612Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "raw_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "All",
+              "raw_token_ids": [
+                2324
+              ],
+              "forwarded_token_ids": [
+                2324
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " 8 files are present",
+              "raw_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "forwarded_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": ": 6 modified +",
+              "raw_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "forwarded_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": " 2 new. Now",
+              "raw_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "forwarded_token_ids": [
+                220,
+                17,
+                491,
+                13,
+                4543
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " compile",
+              "raw_token_ids": [
+                18612
+              ],
+              "forwarded_token_ids": [
+                18612
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " the main code.\n",
+              "raw_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "forwarded_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": "</think>",
+              "raw_token_ids": [
+                248069,
+                271,
+                23,
+                95840,
+                97380
+              ],
+              "forwarded_token_ids": [
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a4-dtb-20260814T085612Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36
+          ],
+          "raw_text": "\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.javadoc.skip=true -Dcheckstyle.skip=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with Maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 10,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "final_answer",
+              "raw_text": "\n\n<tool_call>\n<fun",
+              "raw_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "forwarded_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "final_answer",
+              "raw_text": "ction=bash>\n<pa",
+              "raw_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "forwarded_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "final_answer",
+              "raw_text": "rameter=comm",
+              "raw_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "forwarded_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "final_answer",
+              "raw_text": "and>\nmvn clean com",
+              "raw_token_ids": [
+                77,
+                4101,
+                18612,
+                471,
+                82
+              ],
+              "forwarded_token_ids": [
+                77,
+                4101,
+                18612,
+                471,
+                82
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "final_answer",
+              "raw_text": "pile -s /app/code/setti",
+              "raw_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "forwarded_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "final_answer",
+              "raw_text": "ngs.xml -Dskip",
+              "raw_token_ids": [
+                471,
+                35,
+                19974,
+                17659,
+                471
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                19974,
+                17659,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "final_answer",
+              "raw_text": "Tests -D",
+              "raw_token_ids": [
+                35,
+                76,
+                5108,
+                1130
+              ],
+              "forwarded_token_ids": [
+                35,
+                76,
+                5108,
+                1130
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "final_answer",
+              "raw_text": "maven.javadoc.skip",
+              "raw_token_ids": [
+                41989,
+                35386,
+                10938,
+                471
+              ],
+              "forwarded_token_ids": [
+                41989,
+                35386,
+                10938,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "final_answer",
+              "raw_text": "=true ",
+              "raw_token_ids": [
+                35,
+                1960
+              ],
+              "forwarded_token_ids": [
+                35,
+                1960
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "final_answer",
+              "raw_text": "-Dcheckstyle.skip",
+              "raw_token_ids": [
+                3412,
+                35386,
+                10938,
+                220,
+                17
+              ],
+              "forwarded_token_ids": [
+                3412,
+                35386,
+                10938,
+                220,
+                17
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "final_answer",
+              "raw_text": "=true",
+              "raw_token_ids": [
+                5608,
+                16,
+                735
+              ],
+              "forwarded_token_ids": [
+                5608,
+                16,
+                735
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 22,
+              "phase": "final_answer",
+              "raw_text": " 2>&1 | ta",
+              "raw_token_ids": [
+                9495,
+                471,
+                16,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                9495,
+                471,
+                16,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "il -100\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=descr",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                4532,
+                29
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                4532,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "iption>\nCompile main co",
+              "raw_token_ids": [
+                198,
+                44587,
+                1822,
+                1970,
+                440
+              ],
+              "forwarded_token_ids": [
+                198,
+                44587,
+                1822,
+                1970,
+                440
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "de with Maven\n</par",
+              "raw_token_ids": [
+                95170,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                95170,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "tim",
+              "raw_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "eout>",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "\n600000\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "workdir>\n/ap",
+              "raw_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "p/code/ExperienceAssuranceS",
+              "raw_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "forwarded_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "ervice\n</parame",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "ter>\n</function>\n</tool_call>",
+              "raw_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l14-a5-vanilla-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a5-vanilla-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 5,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l14-a5-dtb-20260814T085612Z",
+      "server_request_id": "chatcmpl-tbtool-l14-a5-dtb-20260814T085612Z",
+      "line_no": 14,
+      "attempt": 5,
+      "variant": "dtb",
+      "anomaly_reasons": [
+        "invalid_tool_arguments_json"
+      ],
+      "diagnosis": "downstream_parser_or_finish_failure",
+      "server_record_count": 49,
+      "visible_record_count": 47,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>\n\n8个文件全部生成。执行编译验证：\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 9,
+      "reasoning_boundaries": [
+        {
+          "sequence": 9,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 9,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": "</think>",
+          "raw_token_ids": [
+            248069,
+            271,
+            23,
+            95840,
+            97380
+          ],
+          "forwarded_token_ids": [
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            23,
+            95840,
+            97380
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a5-dtb-20260814T085612Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "raw_text": "All 8 files are present: 6 modified + 2 new. Now compile the main code.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "All",
+              "raw_token_ids": [
+                2324
+              ],
+              "forwarded_token_ids": [
+                2324
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " 8 files are present",
+              "raw_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "forwarded_token_ids": [
+                220,
+                23,
+                3425,
+                513,
+                2945
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": ": 6 modified +",
+              "raw_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "forwarded_token_ids": [
+                25,
+                220,
+                21,
+                10490,
+                478
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": " 2 new.",
+              "raw_token_ids": [
+                220,
+                17,
+                491,
+                13
+              ],
+              "forwarded_token_ids": [
+                220,
+                17,
+                491,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " Now",
+              "raw_token_ids": [
+                4543
+              ],
+              "forwarded_token_ids": [
+                4543
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " compile",
+              "raw_token_ids": [
+                18612
+              ],
+              "forwarded_token_ids": [
+                18612
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": " the main code.\n",
+              "raw_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "forwarded_token_ids": [
+                279,
+                1822,
+                1970,
+                13,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 9,
+              "phase": "initial_think",
+              "raw_text": "</think>",
+              "raw_token_ids": [
+                248069,
+                271,
+                23,
+                95840,
+                97380
+              ],
+              "forwarded_token_ids": [
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l14-a5-dtb-20260814T085612Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48
+          ],
+          "raw_text": "\n\n8个文件全部生成。执行编译验证：\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true 2>&1 | tail -100\n</parameter>\n<parameter=description>\nCompile main code with maven\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 11,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "final_answer",
+              "raw_text": "\n",
+              "raw_token_ids": [
+                23,
+                95840,
+                97380,
+                97893
+              ],
+              "forwarded_token_ids": [
+                23,
+                95840,
+                97380,
+                97893
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "final_answer",
+              "raw_text": "\n8个文件全部",
+              "raw_token_ids": [
+                103910,
+                1710,
+                97328,
+                104882
+              ],
+              "forwarded_token_ids": [
+                103910,
+                1710,
+                97328,
+                104882
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "final_answer",
+              "raw_text": "生成。",
+              "raw_token_ids": [
+                103838,
+                4960
+              ],
+              "forwarded_token_ids": [
+                103838,
+                4960
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "final_answer",
+              "raw_text": "执行编译验证：\n\n<tool_call>\n<f",
+              "raw_token_ids": [
+                271,
+                248058,
+                198,
+                27,
+                1628
+              ],
+              "forwarded_token_ids": [
+                271,
+                248058,
+                198,
+                27,
+                1628
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "final_answer",
+              "raw_text": "unction=",
+              "raw_token_ids": [
+                21402,
+                956,
+                29,
+                198,
+                27
+              ],
+              "forwarded_token_ids": [
+                21402,
+                956,
+                29,
+                198,
+                27
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "final_answer",
+              "raw_text": "bash>\n<parameter=co",
+              "raw_token_ids": [
+                15704,
+                28,
+                5454,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                15704,
+                28,
+                5454,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "final_answer",
+              "raw_text": "mmand>\nmvn clean co",
+              "raw_token_ids": [
+                25171,
+                77,
+                4101,
+                18612,
+                471
+              ],
+              "forwarded_token_ids": [
+                25171,
+                77,
+                4101,
+                18612,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "final_answer",
+              "raw_text": "mpile -s /app/code/s",
+              "raw_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "forwarded_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "final_answer",
+              "raw_text": "ettings.xml -Dsk",
+              "raw_token_ids": [
+                8756,
+                471,
+                35,
+                19974,
+                17659
+              ],
+              "forwarded_token_ids": [
+                8756,
+                471,
+                35,
+                19974,
+                17659
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "final_answer",
+              "raw_text": "ipTests -D",
+              "raw_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 22,
+              "phase": "final_answer",
+              "raw_text": "mave",
+              "raw_token_ids": [
+                5922
+              ],
+              "forwarded_token_ids": [
+                5922
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "n.wagon.h",
+              "raw_token_ids": [
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl.insecu",
+              "raw_token_ids": [
+                1794,
+                24336,
+                10938
+              ],
+              "forwarded_token_ids": [
+                1794,
+                24336,
+                10938
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "re=true -D",
+              "raw_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "maven.wagon.http.ss",
+              "raw_token_ids": [
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "forwarded_token_ids": [
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "l.allowall=t",
+              "raw_token_ids": [
+                528,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "forwarded_token_ids": [
+                528,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "rue -Dmaven.wagon.h",
+              "raw_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl",
+              "raw_token_ids": [
+                46988
+              ],
+              "forwarded_token_ids": [
+                46988
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": ".ignore.v",
+              "raw_token_ids": [
+                19961,
+                477
+              ],
+              "forwarded_token_ids": [
+                19961,
+                477
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "alidit",
+              "raw_token_ids": [
+                920,
+                942
+              ],
+              "forwarded_token_ids": [
+                920,
+                942
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "y.dates=tr",
+              "raw_token_ids": [
+                10938,
+                220,
+                17,
+                5608,
+                16
+              ],
+              "forwarded_token_ids": [
+                10938,
+                220,
+                17,
+                5608,
+                16
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "ue 2>&1 | ",
+              "raw_token_ids": [
+                735,
+                9495,
+                471,
+                16
+              ],
+              "forwarded_token_ids": [
+                735,
+                9495,
+                471,
+                16
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "tail -100\n</pa",
+              "raw_token_ids": [
+                15,
+                15,
+                198,
+                510,
+                15704
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                198,
+                510,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "rameter>\n<par",
+              "raw_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "ameter=description>\nCompi",
+              "raw_token_ids": [
+                4532,
+                29,
+                198,
+                44587,
+                1822
+              ],
+              "forwarded_token_ids": [
+                4532,
+                29,
+                198,
+                44587,
+                1822
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 37,
+              "phase": "final_answer",
+              "raw_text": "le main code",
+              "raw_token_ids": [
+                1970,
+                440,
+                295
+              ],
+              "forwarded_token_ids": [
+                1970,
+                440,
+                295
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 38,
+              "phase": "final_answer",
+              "raw_text": " with maven\n</par",
+              "raw_token_ids": [
+                5108,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                5108,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 39,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 40,
+              "phase": "final_answer",
+              "raw_text": "tim",
+              "raw_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 41,
+              "phase": "final_answer",
+              "raw_text": "eout>",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 42,
+              "phase": "final_answer",
+              "raw_text": "\n600000\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 43,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 44,
+              "phase": "final_answer",
+              "raw_text": "workdir>\n/ap",
+              "raw_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 45,
+              "phase": "final_answer",
+              "raw_text": "p/code/ExperienceAssuranceS",
+              "raw_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "forwarded_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 46,
+              "phase": "final_answer",
+              "raw_text": "ervice\n</parame",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 47,
+              "phase": "final_answer",
+              "raw_text": "ter>\n</function>\n</tool_call>",
+              "raw_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    }
+  ]
+}

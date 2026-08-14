@@ -1,0 +1,6404 @@
+{
+  "summary": {
+    "requests": 10,
+    "dtb_requests": 5,
+    "server_records": 311,
+    "invalid_server_records": 0,
+    "diagnoses": {
+      "downstream_parser_or_finish_failure": 1,
+      "pass": 4,
+      "vanilla_pass": 5
+    },
+    "dtb_acceptance": {
+      "pass": 4,
+      "completion_epoch_one": 5,
+      "terminal_flush_one": 5,
+      "no_fresh_final_after_tool_boundary": 5,
+      "no_thinking_or_probe_after_tool_boundary": 5,
+      "no_passthrough_violation": 5,
+      "no_invalid_stop_boundary_alignment": 5,
+      "stop_boundary_alignment_covered": 5,
+      "think_end_boundary_covered": 5,
+      "tool_call_boundary_covered": 0
+    }
+  },
+  "requests": [
+    {
+      "client_request_id": "tbtool-l23-a1-vanilla-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a1-vanilla-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 1,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l23-a1-dtb-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a1-dtb-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 1,
+      "variant": "dtb",
+      "anomaly_reasons": [],
+      "diagnosis": "pass",
+      "server_record_count": 60,
+      "visible_record_count": 58,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=\"SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest\" 2>&1 | tail -100\n</parameter>\n<parameter=description>\nRun specific test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 21,
+      "reasoning_boundaries": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": ".\n</think>",
+          "raw_token_ids": [
+            13,
+            198,
+            248069,
+            271,
+            99449
+          ],
+          "forwarded_token_ids": [
+            13,
+            198,
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            99449
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a1-dtb-20260814T090047Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "raw_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "Test",
+              "raw_token_ids": [
+                2198
+              ],
+              "forwarded_token_ids": [
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " compilation",
+              "raw_token_ids": [
+                27734
+              ],
+              "forwarded_token_ids": [
+                27734
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": " successful. Now step ",
+              "raw_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "forwarded_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": "7: run the specific",
+              "raw_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "forwarded_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " test",
+              "raw_token_ids": [
+                1228
+              ],
+              "forwarded_token_ids": [
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " classes from the test",
+              "raw_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "forwarded_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": " patch. The",
+              "raw_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "forwarded_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 9,
+              "phase": "initial_think",
+              "raw_text": " test classes are:\n",
+              "raw_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 10,
+              "phase": "initial_think",
+              "raw_text": "1. SceneTaskLock",
+              "raw_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "initial_think",
+              "raw_text": "RecoverySchedulerTest\n",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "initial_think",
+              "raw_text": "2. SceneTaskLock",
+              "raw_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "initial_think",
+              "raw_text": "ServiceImplTest\n3.",
+              "raw_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "forwarded_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "initial_think",
+              "raw_text": " SceneTaskManageServiceImplTest",
+              "raw_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "initial_think",
+              "raw_text": " (only the new test",
+              "raw_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "forwarded_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "initial_think",
+              "raw_text": " method)\n4.",
+              "raw_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "forwarded_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "initial_think",
+              "raw_text": " ScenesMgrServiceImplTest (",
+              "raw_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "forwarded_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "initial_think",
+              "raw_text": "only the new test method",
+              "raw_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "forwarded_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "initial_think",
+              "raw_text": ")\n\nLet me run",
+              "raw_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "forwarded_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "initial_think",
+              "raw_text": " all 4 test classes",
+              "raw_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "forwarded_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "initial_think",
+              "raw_text": ".\n</think>",
+              "raw_token_ids": [
+                13,
+                198,
+                248069,
+                271,
+                99449
+              ],
+              "forwarded_token_ids": [
+                13,
+                198,
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a1-dtb-20260814T090047Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59
+          ],
+          "raw_text": "\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=\"SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest\" 2>&1 | tail -100\n</parameter>\n<parameter=description>\nRun specific test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "\n\n<tool_call>\n<fun",
+              "raw_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "forwarded_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "ction=bash>\n<pa",
+              "raw_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "forwarded_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "rameter=comm",
+              "raw_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "forwarded_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "and>\nmvn ",
+              "raw_token_ids": [
+                77,
+                1228,
+                471,
+                82
+              ],
+              "forwarded_token_ids": [
+                77,
+                1228,
+                471,
+                82
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "test -s /app/code/setti",
+              "raw_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "forwarded_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "ngs.xml -D",
+              "raw_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "maven.wagon.http.ssl.i",
+              "raw_token_ids": [
+                5922,
+                6748,
+                55289,
+                1794,
+                24336
+              ],
+              "forwarded_token_ids": [
+                5922,
+                6748,
+                55289,
+                1794,
+                24336
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "nsecure=true ",
+              "raw_token_ids": [
+                10938,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "forwarded_token_ids": [
+                10938,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "-Dmaven.wagon.http.ss",
+              "raw_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "forwarded_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "l.allowall=t",
+              "raw_token_ids": [
+                528,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "forwarded_token_ids": [
+                528,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "rue -Dmaven.wagon.h",
+              "raw_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl.ignore.validit",
+              "raw_token_ids": [
+                46988,
+                19961,
+                477,
+                920,
+                942
+              ],
+              "forwarded_token_ids": [
+                46988,
+                19961,
+                477,
+                920,
+                942
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "y.dates=true -pl impl",
+              "raw_token_ids": [
+                10938,
+                471,
+                490,
+                5004,
+                14
+              ],
+              "forwarded_token_ids": [
+                10938,
+                471,
+                490,
+                5004,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 37,
+              "phase": "final_answer",
+              "raw_text": "ements/venuealloc",
+              "raw_token_ids": [
+                6917,
+                4589,
+                471,
+                35,
+                1877
+              ],
+              "forwarded_token_ids": [
+                6917,
+                4589,
+                471,
+                35,
+                1877
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 38,
+              "phase": "final_answer",
+              "raw_text": " -",
+              "raw_token_ids": [
+                420
+              ],
+              "forwarded_token_ids": [
+                420
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 39,
+              "phase": "final_answer",
+              "raw_text": "Dtest=\"SceneTaskLockR",
+              "raw_token_ids": [
+                9723,
+                6065,
+                11648,
+                674,
+                7214
+              ],
+              "forwarded_token_ids": [
+                9723,
+                6065,
+                11648,
+                674,
+                7214
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 40,
+              "phase": "final_answer",
+              "raw_text": "ecoverySchedulerTest,Sc",
+              "raw_token_ids": [
+                37592,
+                2198,
+                11,
+                9723,
+                6065
+              ],
+              "forwarded_token_ids": [
+                37592,
+                2198,
+                11,
+                9723,
+                6065
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 41,
+              "phase": "final_answer",
+              "raw_text": "eneTaskLockServiceImplTes",
+              "raw_token_ids": [
+                11648,
+                48900,
+                2198,
+                11,
+                9723
+              ],
+              "forwarded_token_ids": [
+                11648,
+                48900,
+                2198,
+                11,
+                9723
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 42,
+              "phase": "final_answer",
+              "raw_text": "t,SceneTaskManageServiceIm",
+              "raw_token_ids": [
+                6065,
+                31980,
+                48900,
+                2198,
+                11
+              ],
+              "forwarded_token_ids": [
+                6065,
+                31980,
+                48900,
+                2198,
+                11
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 43,
+              "phase": "final_answer",
+              "raw_text": "plTest,ScenesMgrServiceI",
+              "raw_token_ids": [
+                3217,
+                20986,
+                24753,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                3217,
+                20986,
+                24753,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 44,
+              "phase": "final_answer",
+              "raw_text": "mplTes",
+              "raw_token_ids": [
+                1,
+                220,
+                17,
+                5608,
+                16
+              ],
+              "forwarded_token_ids": [
+                1,
+                220,
+                17,
+                5608,
+                16
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 45,
+              "phase": "final_answer",
+              "raw_text": "t\" 2>&1 | t",
+              "raw_token_ids": [
+                735,
+                9495,
+                471,
+                16,
+                15
+              ],
+              "forwarded_token_ids": [
+                735,
+                9495,
+                471,
+                16,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 46,
+              "phase": "final_answer",
+              "raw_text": "ail -100\n</par",
+              "raw_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 47,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=desc",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 48,
+              "phase": "final_answer",
+              "raw_text": "ription>\nRun s",
+              "raw_token_ids": [
+                29,
+                198,
+                6516,
+                3050
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                6516,
+                3050
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 49,
+              "phase": "final_answer",
+              "raw_text": "pecific test classes\n</pa",
+              "raw_token_ids": [
+                1228,
+                6632,
+                198,
+                510,
+                15704
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                198,
+                510,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 50,
+              "phase": "final_answer",
+              "raw_text": "rameter>\n<par",
+              "raw_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 51,
+              "phase": "final_answer",
+              "raw_text": "ameter=time",
+              "raw_token_ids": [
+                13745,
+                29,
+                198,
+                21,
+                15
+              ],
+              "forwarded_token_ids": [
+                13745,
+                29,
+                198,
+                21,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 52,
+              "phase": "final_answer",
+              "raw_text": "out>\n",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                198
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 53,
+              "phase": "final_answer",
+              "raw_text": "600000\n</param",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                27
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                27
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 54,
+              "phase": "final_answer",
+              "raw_text": "eter>\n<parameter=w",
+              "raw_token_ids": [
+                15704,
+                28,
+                1715,
+                3614,
+                29
+              ],
+              "forwarded_token_ids": [
+                15704,
+                28,
+                1715,
+                3614,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 55,
+              "phase": "final_answer",
+              "raw_text": "orkdir>\n/app/code/Exp",
+              "raw_token_ids": [
+                198,
+                10325,
+                45361,
+                14,
+                32986
+              ],
+              "forwarded_token_ids": [
+                198,
+                10325,
+                45361,
+                14,
+                32986
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 56,
+              "phase": "final_answer",
+              "raw_text": "erienceAssuranceSer",
+              "raw_token_ids": [
+                5439,
+                5592,
+                1796,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                5439,
+                5592,
+                1796,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 57,
+              "phase": "final_answer",
+              "raw_text": "vice\n</parameter>\n</f",
+              "raw_token_ids": [
+                15704,
+                29,
+                198,
+                510,
+                1628
+              ],
+              "forwarded_token_ids": [
+                15704,
+                29,
+                198,
+                510,
+                1628
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 58,
+              "phase": "final_answer",
+              "raw_text": "unction>\n</tool_call>",
+              "raw_token_ids": [
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l23-a2-vanilla-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a2-vanilla-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 2,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l23-a2-dtb-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a2-dtb-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 2,
+      "variant": "dtb",
+      "anomaly_reasons": [],
+      "diagnosis": "pass",
+      "server_record_count": 60,
+      "visible_record_count": 58,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=\"SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest\" 2>&1 | tail -100\n</parameter>\n<parameter=description>\nRun specific test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 21,
+      "reasoning_boundaries": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": ".\n</think>",
+          "raw_token_ids": [
+            13,
+            198,
+            248069,
+            271,
+            99449
+          ],
+          "forwarded_token_ids": [
+            13,
+            198,
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            99449
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a2-dtb-20260814T090047Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "raw_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "Test",
+              "raw_token_ids": [
+                2198
+              ],
+              "forwarded_token_ids": [
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " compilation",
+              "raw_token_ids": [
+                27734
+              ],
+              "forwarded_token_ids": [
+                27734
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": " successful. Now step ",
+              "raw_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "forwarded_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": "7: run the specific",
+              "raw_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "forwarded_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " test",
+              "raw_token_ids": [
+                1228
+              ],
+              "forwarded_token_ids": [
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " classes from the test",
+              "raw_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "forwarded_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": " patch. The",
+              "raw_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "forwarded_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 9,
+              "phase": "initial_think",
+              "raw_text": " test classes are:\n",
+              "raw_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 10,
+              "phase": "initial_think",
+              "raw_text": "1. SceneTaskLock",
+              "raw_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "initial_think",
+              "raw_text": "RecoverySchedulerTest\n",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "initial_think",
+              "raw_text": "2. SceneTaskLock",
+              "raw_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "initial_think",
+              "raw_text": "ServiceImplTest\n3.",
+              "raw_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "forwarded_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "initial_think",
+              "raw_text": " SceneTaskManageServiceImplTest",
+              "raw_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "initial_think",
+              "raw_text": " (only the new test",
+              "raw_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "forwarded_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "initial_think",
+              "raw_text": " method)\n4.",
+              "raw_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "forwarded_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "initial_think",
+              "raw_text": " ScenesMgrServiceImplTest (",
+              "raw_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "forwarded_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "initial_think",
+              "raw_text": "only the new test method",
+              "raw_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "forwarded_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "initial_think",
+              "raw_text": ")\n\nLet me run",
+              "raw_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "forwarded_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "initial_think",
+              "raw_text": " all 4 test classes",
+              "raw_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "forwarded_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "initial_think",
+              "raw_text": ".\n</think>",
+              "raw_token_ids": [
+                13,
+                198,
+                248069,
+                271,
+                99449
+              ],
+              "forwarded_token_ids": [
+                13,
+                198,
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a2-dtb-20260814T090047Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59
+          ],
+          "raw_text": "\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=\"SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest\" 2>&1 | tail -100\n</parameter>\n<parameter=description>\nRun specific test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "\n\n<tool_call>\n<fun",
+              "raw_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "forwarded_token_ids": [
+                248058,
+                198,
+                27,
+                1628,
+                21402
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "ction=bash>\n<pa",
+              "raw_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "forwarded_token_ids": [
+                956,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "rameter=comm",
+              "raw_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "forwarded_token_ids": [
+                28,
+                5454,
+                29,
+                198,
+                25171
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "and>\nmvn ",
+              "raw_token_ids": [
+                77,
+                1228,
+                471,
+                82
+              ],
+              "forwarded_token_ids": [
+                77,
+                1228,
+                471,
+                82
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "test -s /app/code/setti",
+              "raw_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "forwarded_token_ids": [
+                593,
+                658,
+                45361,
+                28889,
+                8756
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "ngs.xml -D",
+              "raw_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "forwarded_token_ids": [
+                471,
+                35,
+                76,
+                5108,
+                1370
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "maven.wagon.http.ssl.i",
+              "raw_token_ids": [
+                5922,
+                6748,
+                55289,
+                1794,
+                24336
+              ],
+              "forwarded_token_ids": [
+                5922,
+                6748,
+                55289,
+                1794,
+                24336
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "nsecure=true ",
+              "raw_token_ids": [
+                10938,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "forwarded_token_ids": [
+                10938,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "-Dmaven.wagon.http.ss",
+              "raw_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "forwarded_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                55531
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "l.allowall=t",
+              "raw_token_ids": [
+                528,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "forwarded_token_ids": [
+                528,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "rue -Dmaven.wagon.h",
+              "raw_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl.ignore.validit",
+              "raw_token_ids": [
+                46988,
+                19961,
+                477,
+                920,
+                942
+              ],
+              "forwarded_token_ids": [
+                46988,
+                19961,
+                477,
+                920,
+                942
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "y.dates=true -pl impl",
+              "raw_token_ids": [
+                10938,
+                471,
+                490,
+                5004,
+                14
+              ],
+              "forwarded_token_ids": [
+                10938,
+                471,
+                490,
+                5004,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 37,
+              "phase": "final_answer",
+              "raw_text": "ements/venuealloc",
+              "raw_token_ids": [
+                6917,
+                4589,
+                471,
+                35,
+                1877
+              ],
+              "forwarded_token_ids": [
+                6917,
+                4589,
+                471,
+                35,
+                1877
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 38,
+              "phase": "final_answer",
+              "raw_text": " -",
+              "raw_token_ids": [
+                420
+              ],
+              "forwarded_token_ids": [
+                420
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 39,
+              "phase": "final_answer",
+              "raw_text": "Dtest=\"SceneTaskLockR",
+              "raw_token_ids": [
+                9723,
+                6065,
+                11648,
+                674,
+                7214
+              ],
+              "forwarded_token_ids": [
+                9723,
+                6065,
+                11648,
+                674,
+                7214
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 40,
+              "phase": "final_answer",
+              "raw_text": "ecoverySchedulerTest,Sc",
+              "raw_token_ids": [
+                37592,
+                2198,
+                11,
+                9723,
+                6065
+              ],
+              "forwarded_token_ids": [
+                37592,
+                2198,
+                11,
+                9723,
+                6065
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 41,
+              "phase": "final_answer",
+              "raw_text": "eneTaskLockServiceImplTes",
+              "raw_token_ids": [
+                11648,
+                48900,
+                2198,
+                11,
+                9723
+              ],
+              "forwarded_token_ids": [
+                11648,
+                48900,
+                2198,
+                11,
+                9723
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 42,
+              "phase": "final_answer",
+              "raw_text": "t,SceneTaskManageServiceIm",
+              "raw_token_ids": [
+                6065,
+                31980,
+                48900,
+                2198,
+                11
+              ],
+              "forwarded_token_ids": [
+                6065,
+                31980,
+                48900,
+                2198,
+                11
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 43,
+              "phase": "final_answer",
+              "raw_text": "plTest,ScenesMgrServiceI",
+              "raw_token_ids": [
+                3217,
+                20986,
+                24753,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                3217,
+                20986,
+                24753,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 44,
+              "phase": "final_answer",
+              "raw_text": "mplTes",
+              "raw_token_ids": [
+                1,
+                220,
+                17,
+                5608,
+                16
+              ],
+              "forwarded_token_ids": [
+                1,
+                220,
+                17,
+                5608,
+                16
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 45,
+              "phase": "final_answer",
+              "raw_text": "t\" 2>&1 | t",
+              "raw_token_ids": [
+                735,
+                9495,
+                471,
+                16,
+                15
+              ],
+              "forwarded_token_ids": [
+                735,
+                9495,
+                471,
+                16,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 46,
+              "phase": "final_answer",
+              "raw_text": "ail -100\n</par",
+              "raw_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 47,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=desc",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 48,
+              "phase": "final_answer",
+              "raw_text": "ription>\nRun s",
+              "raw_token_ids": [
+                29,
+                198,
+                6516,
+                3050
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                6516,
+                3050
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 49,
+              "phase": "final_answer",
+              "raw_text": "pecific test classes\n</pa",
+              "raw_token_ids": [
+                1228,
+                6632,
+                198,
+                510,
+                15704
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                198,
+                510,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 50,
+              "phase": "final_answer",
+              "raw_text": "rameter>\n<par",
+              "raw_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                27,
+                15704,
+                28
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 51,
+              "phase": "final_answer",
+              "raw_text": "ameter=time",
+              "raw_token_ids": [
+                13745,
+                29,
+                198,
+                21,
+                15
+              ],
+              "forwarded_token_ids": [
+                13745,
+                29,
+                198,
+                21,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 52,
+              "phase": "final_answer",
+              "raw_text": "out>\n",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                198
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 53,
+              "phase": "final_answer",
+              "raw_text": "600000\n</param",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                27
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                27
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 54,
+              "phase": "final_answer",
+              "raw_text": "eter>\n<parameter=w",
+              "raw_token_ids": [
+                15704,
+                28,
+                1715,
+                3614,
+                29
+              ],
+              "forwarded_token_ids": [
+                15704,
+                28,
+                1715,
+                3614,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 55,
+              "phase": "final_answer",
+              "raw_text": "orkdir>\n/app/code/Exp",
+              "raw_token_ids": [
+                198,
+                10325,
+                45361,
+                14,
+                32986
+              ],
+              "forwarded_token_ids": [
+                198,
+                10325,
+                45361,
+                14,
+                32986
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 56,
+              "phase": "final_answer",
+              "raw_text": "erienceAssuranceSer",
+              "raw_token_ids": [
+                5439,
+                5592,
+                1796,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                5439,
+                5592,
+                1796,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 57,
+              "phase": "final_answer",
+              "raw_text": "vice\n</parameter>\n</f",
+              "raw_token_ids": [
+                15704,
+                29,
+                198,
+                510,
+                1628
+              ],
+              "forwarded_token_ids": [
+                15704,
+                29,
+                198,
+                510,
+                1628
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 58,
+              "phase": "final_answer",
+              "raw_text": "unction>\n</tool_call>",
+              "raw_token_ids": [
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l23-a3-vanilla-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a3-vanilla-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 3,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l23-a3-dtb-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a3-dtb-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 3,
+      "variant": "dtb",
+      "anomaly_reasons": [
+        "invalid_tool_arguments_json"
+      ],
+      "diagnosis": "downstream_parser_or_finish_failure",
+      "server_record_count": 63,
+      "visible_record_count": 61,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>\n\n测试编译成功。执行步骤7：运行DT测试。\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest 2>&1 | tail -120\n</parameter>\n<parameter=description>\nRun DT tests for test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 20,
+      "reasoning_boundaries": [
+        {
+          "sequence": 20,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 20,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": ".\n</think>",
+          "raw_token_ids": [
+            13,
+            198,
+            248069,
+            271,
+            99449
+          ],
+          "forwarded_token_ids": [
+            13,
+            198,
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            99449
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a3-dtb-20260814T090047Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20
+          ],
+          "raw_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "Test",
+              "raw_token_ids": [
+                2198
+              ],
+              "forwarded_token_ids": [
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " compilation successful. Now step",
+              "raw_token_ids": [
+                27734,
+                6635,
+                13,
+                4543,
+                2923
+              ],
+              "forwarded_token_ids": [
+                27734,
+                6635,
+                13,
+                4543,
+                2923
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": " 7: run the",
+              "raw_token_ids": [
+                220,
+                22,
+                25,
+                1542,
+                279
+              ],
+              "forwarded_token_ids": [
+                220,
+                22,
+                25,
+                1542,
+                279
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": " specific test",
+              "raw_token_ids": [
+                3050,
+                1228
+              ],
+              "forwarded_token_ids": [
+                3050,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " classes from the test",
+              "raw_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "forwarded_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " patch. The",
+              "raw_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "forwarded_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": " test classes are:\n",
+              "raw_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 9,
+              "phase": "initial_think",
+              "raw_text": "1. SceneTaskLock",
+              "raw_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 10,
+              "phase": "initial_think",
+              "raw_text": "RecoverySchedulerTest\n",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "initial_think",
+              "raw_text": "2. SceneTaskLock",
+              "raw_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "initial_think",
+              "raw_text": "ServiceImplTest\n3.",
+              "raw_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "forwarded_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "initial_think",
+              "raw_text": " SceneTaskManageServiceImplTest",
+              "raw_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "initial_think",
+              "raw_text": " (only the new test",
+              "raw_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "forwarded_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "initial_think",
+              "raw_text": " method)\n4.",
+              "raw_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "forwarded_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "initial_think",
+              "raw_text": " ScenesMgrServiceImplTest (",
+              "raw_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "forwarded_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "initial_think",
+              "raw_text": "only the new test method",
+              "raw_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "forwarded_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "initial_think",
+              "raw_text": ")\n\nLet me run",
+              "raw_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "forwarded_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "initial_think",
+              "raw_text": " all 4 test classes",
+              "raw_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "forwarded_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "initial_think",
+              "raw_text": ".\n</think>",
+              "raw_token_ids": [
+                13,
+                198,
+                248069,
+                271,
+                99449
+              ],
+              "forwarded_token_ids": [
+                13,
+                198,
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a3-dtb-20260814T090047Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62
+          ],
+          "raw_text": "\n\n测试编译成功。执行步骤7：运行DT测试。\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest 2>&1 | tail -120\n</parameter>\n<parameter=description>\nRun DT tests for test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 22,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                99449,
+                104882
+              ],
+              "forwarded_token_ids": [
+                99449,
+                104882
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "\n\n测试编译成",
+              "raw_token_ids": [
+                97378,
+                1710,
+                97328,
+                100661,
+                22
+              ],
+              "forwarded_token_ids": [
+                97378,
+                1710,
+                97328,
+                100661,
+                22
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "功。执行步骤7",
+              "raw_token_ids": [
+                4960,
+                98836,
+                10284,
+                99449
+              ],
+              "forwarded_token_ids": [
+                4960,
+                98836,
+                10284,
+                99449
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "：运行DT测试。\n\n<tool_",
+              "raw_token_ids": [
+                1710,
+                271,
+                248058,
+                198,
+                27
+              ],
+              "forwarded_token_ids": [
+                1710,
+                271,
+                248058,
+                198,
+                27
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "call>\n<function",
+              "raw_token_ids": [
+                1628,
+                21402,
+                956,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                1628,
+                21402,
+                956,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "=bash>\n<parameter=c",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                5454,
+                29
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                5454,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "ommand>\nmvn",
+              "raw_token_ids": [
+                198,
+                25171,
+                77,
+                1228,
+                471
+              ],
+              "forwarded_token_ids": [
+                198,
+                25171,
+                77,
+                1228,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": " test -s /app/code/s",
+              "raw_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "forwarded_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": "ettings.xml ",
+              "raw_token_ids": [
+                8756,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "forwarded_token_ids": [
+                8756,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "-Dmaven.wagon.http",
+              "raw_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                1794
+              ],
+              "forwarded_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                1794
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": ".ssl.insecure=t",
+              "raw_token_ids": [
+                24336,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "forwarded_token_ids": [
+                24336,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": "rue -Dmaven.wagon.h",
+              "raw_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl.allowall=",
+              "raw_token_ids": [
+                55531,
+                528,
+                10938,
+                471,
+                35
+              ],
+              "forwarded_token_ids": [
+                55531,
+                528,
+                10938,
+                471,
+                35
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "true -Dmaven.wag",
+              "raw_token_ids": [
+                76,
+                5108,
+                1370,
+                5922,
+                6748
+              ],
+              "forwarded_token_ids": [
+                76,
+                5108,
+                1370,
+                5922,
+                6748
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 37,
+              "phase": "final_answer",
+              "raw_text": "on.http.ssl.ignore.val",
+              "raw_token_ids": [
+                55289,
+                46988,
+                19961,
+                477,
+                920
+              ],
+              "forwarded_token_ids": [
+                55289,
+                46988,
+                19961,
+                477,
+                920
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 38,
+              "phase": "final_answer",
+              "raw_text": "idity.dates=true -pl imp",
+              "raw_token_ids": [
+                942,
+                10938,
+                471,
+                490,
+                5004
+              ],
+              "forwarded_token_ids": [
+                942,
+                10938,
+                471,
+                490,
+                5004
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 39,
+              "phase": "final_answer",
+              "raw_text": "lements/venuea",
+              "raw_token_ids": [
+                14,
+                6917,
+                4589,
+                471,
+                35
+              ],
+              "forwarded_token_ids": [
+                14,
+                6917,
+                4589,
+                471,
+                35
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 40,
+              "phase": "final_answer",
+              "raw_text": "lloc -Dtest=SceneT",
+              "raw_token_ids": [
+                1877,
+                28,
+                9723,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                1877,
+                28,
+                9723,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 41,
+              "phase": "final_answer",
+              "raw_text": "askLockRecoverySchedul",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                11
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                11
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 42,
+              "phase": "final_answer",
+              "raw_text": "erTest,SceneTaskLockServiceI",
+              "raw_token_ids": [
+                9723,
+                6065,
+                11648,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                9723,
+                6065,
+                11648,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 43,
+              "phase": "final_answer",
+              "raw_text": "mplTest,SceneTaskManageServ",
+              "raw_token_ids": [
+                11,
+                9723,
+                6065,
+                31980,
+                48900
+              ],
+              "forwarded_token_ids": [
+                11,
+                9723,
+                6065,
+                31980,
+                48900
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 44,
+              "phase": "final_answer",
+              "raw_text": "iceImpl",
+              "raw_token_ids": [
+                2198,
+                11,
+                3217
+              ],
+              "forwarded_token_ids": [
+                2198,
+                11,
+                3217
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 45,
+              "phase": "final_answer",
+              "raw_text": "Test,ScenesMgrServiceIm",
+              "raw_token_ids": [
+                20986,
+                24753,
+                48900,
+                2198,
+                220
+              ],
+              "forwarded_token_ids": [
+                20986,
+                24753,
+                48900,
+                2198,
+                220
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 46,
+              "phase": "final_answer",
+              "raw_text": "plTest 2>&1",
+              "raw_token_ids": [
+                17,
+                5608,
+                16,
+                735,
+                9495
+              ],
+              "forwarded_token_ids": [
+                17,
+                5608,
+                16,
+                735,
+                9495
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 47,
+              "phase": "final_answer",
+              "raw_text": " | t",
+              "raw_token_ids": [
+                471,
+                16,
+                17
+              ],
+              "forwarded_token_ids": [
+                471,
+                16,
+                17
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 48,
+              "phase": "final_answer",
+              "raw_text": "ail -120\n</par",
+              "raw_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 49,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=desc",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 50,
+              "phase": "final_answer",
+              "raw_text": "ription>\nRun D",
+              "raw_token_ids": [
+                29,
+                198,
+                6516,
+                24221,
+                6813
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                6516,
+                24221,
+                6813
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 51,
+              "phase": "final_answer",
+              "raw_text": "T tests f",
+              "raw_token_ids": [
+                364,
+                1228
+              ],
+              "forwarded_token_ids": [
+                364,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 52,
+              "phase": "final_answer",
+              "raw_text": "or test classes\n</par",
+              "raw_token_ids": [
+                6632,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                6632,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 53,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 54,
+              "phase": "final_answer",
+              "raw_text": "tim",
+              "raw_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 55,
+              "phase": "final_answer",
+              "raw_text": "eout>",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 56,
+              "phase": "final_answer",
+              "raw_text": "\n600000\n</para",
+              "raw_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                198,
+                510,
+                15704,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 57,
+              "phase": "final_answer",
+              "raw_text": "meter>\n<parameter=",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                1715,
+                3614
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 58,
+              "phase": "final_answer",
+              "raw_text": "workdir>\n/ap",
+              "raw_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                10325,
+                45361,
+                14
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 59,
+              "phase": "final_answer",
+              "raw_text": "p/code/ExperienceAssuranceS",
+              "raw_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "forwarded_token_ids": [
+                32986,
+                5439,
+                5592,
+                1796,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 60,
+              "phase": "final_answer",
+              "raw_text": "ervice\n</parame",
+              "raw_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                510,
+                15704,
+                29,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 61,
+              "phase": "final_answer",
+              "raw_text": "ter>\n</function>\n</tool_call>",
+              "raw_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                1628,
+                29,
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l23-a4-vanilla-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a4-vanilla-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 4,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l23-a4-dtb-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a4-dtb-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 4,
+      "variant": "dtb",
+      "anomaly_reasons": [],
+      "diagnosis": "pass",
+      "server_record_count": 64,
+      "visible_record_count": 62,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>\n\n测试编译成功。执行步骤7：运行DT测试。\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest 2>&1 | tail -120\n</parameter>\n<parameter=description>\nRun DT tests for test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 21,
+      "reasoning_boundaries": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": ".\n</think>",
+          "raw_token_ids": [
+            13,
+            198,
+            248069,
+            271,
+            99449
+          ],
+          "forwarded_token_ids": [
+            13,
+            198,
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            99449
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a4-dtb-20260814T090047Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "raw_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "Test",
+              "raw_token_ids": [
+                2198
+              ],
+              "forwarded_token_ids": [
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " compilation",
+              "raw_token_ids": [
+                27734
+              ],
+              "forwarded_token_ids": [
+                27734
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": " successful. Now step ",
+              "raw_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "forwarded_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": "7: run the specific",
+              "raw_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "forwarded_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " test classes from",
+              "raw_token_ids": [
+                1228,
+                6632,
+                494
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                494
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " the test",
+              "raw_token_ids": [
+                279,
+                1228
+              ],
+              "forwarded_token_ids": [
+                279,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": " patch. The",
+              "raw_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "forwarded_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 9,
+              "phase": "initial_think",
+              "raw_text": " test classes are:\n",
+              "raw_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 10,
+              "phase": "initial_think",
+              "raw_text": "1. SceneTaskLock",
+              "raw_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "initial_think",
+              "raw_text": "RecoverySchedulerTest\n",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "initial_think",
+              "raw_text": "2. SceneTaskLock",
+              "raw_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "initial_think",
+              "raw_text": "ServiceImplTest\n3.",
+              "raw_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "forwarded_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "initial_think",
+              "raw_text": " SceneTaskManageServiceImplTest",
+              "raw_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "initial_think",
+              "raw_text": " (only the new test",
+              "raw_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "forwarded_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "initial_think",
+              "raw_text": " method)\n4.",
+              "raw_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "forwarded_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "initial_think",
+              "raw_text": " ScenesMgrServiceImplTest (",
+              "raw_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "forwarded_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "initial_think",
+              "raw_text": "only the new test method",
+              "raw_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "forwarded_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "initial_think",
+              "raw_text": ")\n\nLet me run",
+              "raw_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "forwarded_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "initial_think",
+              "raw_text": " all 4 test classes",
+              "raw_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "forwarded_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "initial_think",
+              "raw_text": ".\n</think>",
+              "raw_token_ids": [
+                13,
+                198,
+                248069,
+                271,
+                99449
+              ],
+              "forwarded_token_ids": [
+                13,
+                198,
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a4-dtb-20260814T090047Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "raw_text": "\n\n测试编译成功。执行步骤7：运行DT测试。\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest 2>&1 | tail -120\n</parameter>\n<parameter=description>\nRun DT tests for test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                99449,
+                104882
+              ],
+              "forwarded_token_ids": [
+                99449,
+                104882
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "\n\n测试编译成",
+              "raw_token_ids": [
+                97378,
+                1710,
+                97328,
+                100661,
+                22
+              ],
+              "forwarded_token_ids": [
+                97378,
+                1710,
+                97328,
+                100661,
+                22
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "功。执行步骤7",
+              "raw_token_ids": [
+                4960,
+                98836,
+                10284,
+                99449
+              ],
+              "forwarded_token_ids": [
+                4960,
+                98836,
+                10284,
+                99449
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "：运行DT测试。\n\n<tool_",
+              "raw_token_ids": [
+                1710,
+                271,
+                248058,
+                198,
+                27
+              ],
+              "forwarded_token_ids": [
+                1710,
+                271,
+                248058,
+                198,
+                27
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "call>\n<function",
+              "raw_token_ids": [
+                1628,
+                21402,
+                956,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                1628,
+                21402,
+                956,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "=bash>\n<parameter=c",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                5454,
+                29
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                5454,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "ommand>\nmvn",
+              "raw_token_ids": [
+                198,
+                25171,
+                77,
+                1228,
+                471
+              ],
+              "forwarded_token_ids": [
+                198,
+                25171,
+                77,
+                1228,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": " test -s /app/code/s",
+              "raw_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "forwarded_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "ettings.xml ",
+              "raw_token_ids": [
+                8756,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "forwarded_token_ids": [
+                8756,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "-Dmaven.wagon.http",
+              "raw_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                1794
+              ],
+              "forwarded_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                1794
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": ".ssl.insecure=t",
+              "raw_token_ids": [
+                24336,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "forwarded_token_ids": [
+                24336,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "rue -Dmaven.wagon.h",
+              "raw_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl.allowall=",
+              "raw_token_ids": [
+                55531,
+                528,
+                10938,
+                471,
+                35
+              ],
+              "forwarded_token_ids": [
+                55531,
+                528,
+                10938,
+                471,
+                35
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 37,
+              "phase": "final_answer",
+              "raw_text": "true -Dmaven.wag",
+              "raw_token_ids": [
+                76,
+                5108,
+                1370,
+                5922,
+                6748
+              ],
+              "forwarded_token_ids": [
+                76,
+                5108,
+                1370,
+                5922,
+                6748
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 38,
+              "phase": "final_answer",
+              "raw_text": "on.http.ssl.ignore.val",
+              "raw_token_ids": [
+                55289,
+                46988,
+                19961,
+                477,
+                920
+              ],
+              "forwarded_token_ids": [
+                55289,
+                46988,
+                19961,
+                477,
+                920
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 39,
+              "phase": "final_answer",
+              "raw_text": "idity.dates=true -pl imp",
+              "raw_token_ids": [
+                942,
+                10938,
+                471,
+                490,
+                5004
+              ],
+              "forwarded_token_ids": [
+                942,
+                10938,
+                471,
+                490,
+                5004
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 40,
+              "phase": "final_answer",
+              "raw_text": "lements/venuea",
+              "raw_token_ids": [
+                14,
+                6917,
+                4589,
+                471,
+                35
+              ],
+              "forwarded_token_ids": [
+                14,
+                6917,
+                4589,
+                471,
+                35
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 41,
+              "phase": "final_answer",
+              "raw_text": "lloc -Dtest=SceneT",
+              "raw_token_ids": [
+                1877,
+                28,
+                9723,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                1877,
+                28,
+                9723,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 42,
+              "phase": "final_answer",
+              "raw_text": "askLockRecoverySchedul",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                11
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                11
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 43,
+              "phase": "final_answer",
+              "raw_text": "erTest,SceneTaskLockServiceI",
+              "raw_token_ids": [
+                9723,
+                6065,
+                11648,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                9723,
+                6065,
+                11648,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 44,
+              "phase": "final_answer",
+              "raw_text": "mplTest,SceneTaskManageServ",
+              "raw_token_ids": [
+                11,
+                9723,
+                6065,
+                31980,
+                48900
+              ],
+              "forwarded_token_ids": [
+                11,
+                9723,
+                6065,
+                31980,
+                48900
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 45,
+              "phase": "final_answer",
+              "raw_text": "iceImpl",
+              "raw_token_ids": [
+                2198,
+                11,
+                3217
+              ],
+              "forwarded_token_ids": [
+                2198,
+                11,
+                3217
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 46,
+              "phase": "final_answer",
+              "raw_text": "Test,ScenesMgrServiceIm",
+              "raw_token_ids": [
+                20986,
+                24753,
+                48900,
+                2198,
+                220
+              ],
+              "forwarded_token_ids": [
+                20986,
+                24753,
+                48900,
+                2198,
+                220
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 47,
+              "phase": "final_answer",
+              "raw_text": "plTest 2>&1",
+              "raw_token_ids": [
+                17,
+                5608,
+                16,
+                735,
+                9495
+              ],
+              "forwarded_token_ids": [
+                17,
+                5608,
+                16,
+                735,
+                9495
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 48,
+              "phase": "final_answer",
+              "raw_text": " | t",
+              "raw_token_ids": [
+                471,
+                16,
+                17
+              ],
+              "forwarded_token_ids": [
+                471,
+                16,
+                17
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 49,
+              "phase": "final_answer",
+              "raw_text": "ail -120\n</par",
+              "raw_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 50,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=desc",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 51,
+              "phase": "final_answer",
+              "raw_text": "ription>\nRun D",
+              "raw_token_ids": [
+                29,
+                198,
+                6516,
+                24221,
+                6813
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                6516,
+                24221,
+                6813
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 52,
+              "phase": "final_answer",
+              "raw_text": "T tests f",
+              "raw_token_ids": [
+                364,
+                1228
+              ],
+              "forwarded_token_ids": [
+                364,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 53,
+              "phase": "final_answer",
+              "raw_text": "or test classes\n</par",
+              "raw_token_ids": [
+                6632,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                6632,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 54,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 55,
+              "phase": "final_answer",
+              "raw_text": "timeo",
+              "raw_token_ids": [
+                29,
+                198,
+                21,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 56,
+              "phase": "final_answer",
+              "raw_text": "ut>\n60",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 57,
+              "phase": "final_answer",
+              "raw_text": "0000\n</parameter>\n<pa",
+              "raw_token_ids": [
+                15704,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "forwarded_token_ids": [
+                15704,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 58,
+              "phase": "final_answer",
+              "raw_text": "rameter=wo",
+              "raw_token_ids": [
+                28,
+                1715,
+                3614,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                28,
+                1715,
+                3614,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 59,
+              "phase": "final_answer",
+              "raw_text": "rkdir>\n/app/code/Experi",
+              "raw_token_ids": [
+                10325,
+                45361,
+                14,
+                32986,
+                5439
+              ],
+              "forwarded_token_ids": [
+                10325,
+                45361,
+                14,
+                32986,
+                5439
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 60,
+              "phase": "final_answer",
+              "raw_text": "enceAssuranceService\n</pa",
+              "raw_token_ids": [
+                5592,
+                1796,
+                198,
+                510,
+                15704
+              ],
+              "forwarded_token_ids": [
+                5592,
+                1796,
+                198,
+                510,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 61,
+              "phase": "final_answer",
+              "raw_text": "rameter>\n</fu",
+              "raw_token_ids": [
+                29,
+                198,
+                510,
+                1628,
+                29
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                510,
+                1628,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 62,
+              "phase": "final_answer",
+              "raw_text": "nction>\n</tool_call>",
+              "raw_token_ids": [
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    },
+    {
+      "client_request_id": "tbtool-l23-a5-vanilla-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a5-vanilla-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 5,
+      "variant": "vanilla",
+      "anomaly_reasons": [],
+      "diagnosis": "vanilla_pass",
+      "server_record_count": 0,
+      "visible_record_count": 0,
+      "raw_has_tool_call_start": false,
+      "raw_visible_text": "",
+      "first_boundary_sequence": 0,
+      "reasoning_boundaries": [],
+      "completion_epoch_count": 0,
+      "terminal_flush_count": 0,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [],
+      "children": []
+    },
+    {
+      "client_request_id": "tbtool-l23-a5-dtb-20260814T090047Z",
+      "server_request_id": "chatcmpl-tbtool-l23-a5-dtb-20260814T090047Z",
+      "line_no": 23,
+      "attempt": 5,
+      "variant": "dtb",
+      "anomaly_reasons": [],
+      "diagnosis": "pass",
+      "server_record_count": 64,
+      "visible_record_count": 62,
+      "raw_has_tool_call_start": true,
+      "raw_visible_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>\n\n测试编译成功。执行步骤7：运行DT测试。\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest 2>&1 | tail -120\n</parameter>\n<parameter=description>\nRun DT tests for test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+      "first_boundary_sequence": 21,
+      "reasoning_boundaries": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think"
+        }
+      ],
+      "completion_epoch_count": 1,
+      "terminal_flush_count": 1,
+      "duplicate_reasoning_boundary": 0,
+      "fresh_final_after_tool_boundary": 0,
+      "thinking_or_probe_after_tool_boundary": 0,
+      "controller_passthrough_violation_sequences": [],
+      "invalid_stop_boundary_alignment_sequences": [],
+      "stop_boundary_alignments": [
+        {
+          "sequence": 21,
+          "boundary": "think_end",
+          "phase": "initial_think",
+          "raw_text": ".\n</think>",
+          "raw_token_ids": [
+            13,
+            198,
+            248069,
+            271,
+            99449
+          ],
+          "forwarded_token_ids": [
+            13,
+            198,
+            248069
+          ],
+          "dropped_token_ids": [
+            271,
+            99449
+          ]
+        }
+      ],
+      "children": [
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a5-dtb-20260814T090047Z_initial_think_1",
+          "phases": [
+            "initial_think"
+          ],
+          "sequences": [
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21
+          ],
+          "raw_text": "Test compilation successful. Now step 7: run the specific test classes from the test patch. The test classes are:\n1. SceneTaskLockRecoverySchedulerTest\n2. SceneTaskLockServiceImplTest\n3. SceneTaskManageServiceImplTest (only the new test method)\n4. ScenesMgrServiceImplTest (only the new test method)\n\nLet me run all 4 test classes.\n</think>",
+          "stream_deltas": [
+            {
+              "sequence": 2,
+              "phase": "initial_think",
+              "raw_text": "Test",
+              "raw_token_ids": [
+                2198
+              ],
+              "forwarded_token_ids": [
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 3,
+              "phase": "initial_think",
+              "raw_text": " compilation",
+              "raw_token_ids": [
+                27734
+              ],
+              "forwarded_token_ids": [
+                27734
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 4,
+              "phase": "initial_think",
+              "raw_text": " successful. Now step ",
+              "raw_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "forwarded_token_ids": [
+                6635,
+                13,
+                4543,
+                2923,
+                220
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 5,
+              "phase": "initial_think",
+              "raw_text": "7: run the specific",
+              "raw_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "forwarded_token_ids": [
+                22,
+                25,
+                1542,
+                279,
+                3050
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 6,
+              "phase": "initial_think",
+              "raw_text": " test",
+              "raw_token_ids": [
+                1228
+              ],
+              "forwarded_token_ids": [
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 7,
+              "phase": "initial_think",
+              "raw_text": " classes from the test",
+              "raw_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "forwarded_token_ids": [
+                6632,
+                494,
+                279,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 8,
+              "phase": "initial_think",
+              "raw_text": " patch. The",
+              "raw_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "forwarded_token_ids": [
+                10582,
+                13,
+                561
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 9,
+              "phase": "initial_think",
+              "raw_text": " test classes are:\n",
+              "raw_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "forwarded_token_ids": [
+                1228,
+                6632,
+                513,
+                25,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 10,
+              "phase": "initial_think",
+              "raw_text": "1. SceneTaskLock",
+              "raw_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                16,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 11,
+              "phase": "initial_think",
+              "raw_text": "RecoverySchedulerTest\n",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 12,
+              "phase": "initial_think",
+              "raw_text": "2. SceneTaskLock",
+              "raw_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                17,
+                13,
+                16974,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 13,
+              "phase": "initial_think",
+              "raw_text": "ServiceImplTest\n3.",
+              "raw_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "forwarded_token_ids": [
+                48900,
+                2198,
+                198,
+                18,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 14,
+              "phase": "initial_think",
+              "raw_text": " SceneTaskManageServiceImplTest",
+              "raw_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                16974,
+                6065,
+                31980,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 15,
+              "phase": "initial_think",
+              "raw_text": " (only the new test",
+              "raw_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "forwarded_token_ids": [
+                318,
+                3138,
+                279,
+                491,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 16,
+              "phase": "initial_think",
+              "raw_text": " method)\n4.",
+              "raw_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "forwarded_token_ids": [
+                1654,
+                8,
+                198,
+                19,
+                13
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 17,
+              "phase": "initial_think",
+              "raw_text": " ScenesMgrServiceImplTest (",
+              "raw_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "forwarded_token_ids": [
+                80312,
+                24753,
+                48900,
+                2198,
+                318
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 18,
+              "phase": "initial_think",
+              "raw_text": "only the new test method",
+              "raw_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "forwarded_token_ids": [
+                3138,
+                279,
+                491,
+                1228,
+                1654
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 19,
+              "phase": "initial_think",
+              "raw_text": ")\n\nLet me run",
+              "raw_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "forwarded_token_ids": [
+                8,
+                271,
+                9764,
+                728,
+                1542
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 20,
+              "phase": "initial_think",
+              "raw_text": " all 4 test classes",
+              "raw_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "forwarded_token_ids": [
+                660,
+                220,
+                19,
+                1228,
+                6632
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 21,
+              "phase": "initial_think",
+              "raw_text": ".\n</think>",
+              "raw_token_ids": [
+                13,
+                198,
+                248069,
+                271,
+                99449
+              ],
+              "forwarded_token_ids": [
+                13,
+                198,
+                248069
+              ],
+              "stop_boundary_aligned": true
+            }
+          ],
+          "source_finish_reasons": [
+            "stop"
+          ],
+          "source_stop_reasons": [
+            "</think>"
+          ]
+        },
+        {
+          "child_request_id": "chatcmpl-tbtool-l23-a5-dtb-20260814T090047Z_final_answer_2",
+          "phases": [
+            "final_answer"
+          ],
+          "sequences": [
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63
+          ],
+          "raw_text": "\n\n测试编译成功。执行步骤7：运行DT测试。\n\n<tool_call>\n<function=bash>\n<parameter=command>\nmvn test -s /app/code/settings.xml -Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true -Dmaven.wagon.http.ssl.ignore.validity.dates=true -pl implements/venuealloc -Dtest=SceneTaskLockRecoverySchedulerTest,SceneTaskLockServiceImplTest,SceneTaskManageServiceImplTest,ScenesMgrServiceImplTest 2>&1 | tail -120\n</parameter>\n<parameter=description>\nRun DT tests for test classes\n</parameter>\n<parameter=timeout>\n600000\n</parameter>\n<parameter=workdir>\n/app/code/ExperienceAssuranceService\n</parameter>\n</function>\n</tool_call>",
+          "stream_deltas": [
+            {
+              "sequence": 23,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                271
+              ],
+              "forwarded_token_ids": [
+                271
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 24,
+              "phase": "final_answer",
+              "raw_text": "",
+              "raw_token_ids": [
+                99449,
+                104882
+              ],
+              "forwarded_token_ids": [
+                99449,
+                104882
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 25,
+              "phase": "final_answer",
+              "raw_text": "\n\n测试编译成",
+              "raw_token_ids": [
+                97378,
+                1710,
+                97328,
+                100661,
+                22
+              ],
+              "forwarded_token_ids": [
+                97378,
+                1710,
+                97328,
+                100661,
+                22
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 26,
+              "phase": "final_answer",
+              "raw_text": "功。执行步骤7",
+              "raw_token_ids": [
+                4960,
+                98836,
+                10284,
+                99449
+              ],
+              "forwarded_token_ids": [
+                4960,
+                98836,
+                10284,
+                99449
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 27,
+              "phase": "final_answer",
+              "raw_text": "：运行DT测试。\n\n<tool_",
+              "raw_token_ids": [
+                1710,
+                271,
+                248058,
+                198,
+                27
+              ],
+              "forwarded_token_ids": [
+                1710,
+                271,
+                248058,
+                198,
+                27
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 28,
+              "phase": "final_answer",
+              "raw_text": "call>\n<function",
+              "raw_token_ids": [
+                1628,
+                21402,
+                956,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                1628,
+                21402,
+                956,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 29,
+              "phase": "final_answer",
+              "raw_text": "=bash>\n<parameter=c",
+              "raw_token_ids": [
+                27,
+                15704,
+                28,
+                5454,
+                29
+              ],
+              "forwarded_token_ids": [
+                27,
+                15704,
+                28,
+                5454,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 30,
+              "phase": "final_answer",
+              "raw_text": "ommand>\nmvn",
+              "raw_token_ids": [
+                198,
+                25171,
+                77,
+                1228,
+                471
+              ],
+              "forwarded_token_ids": [
+                198,
+                25171,
+                77,
+                1228,
+                471
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 31,
+              "phase": "final_answer",
+              "raw_text": " test -s /app/code/s",
+              "raw_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "forwarded_token_ids": [
+                82,
+                593,
+                658,
+                45361,
+                28889
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 32,
+              "phase": "final_answer",
+              "raw_text": "ettings.xml ",
+              "raw_token_ids": [
+                8756,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "forwarded_token_ids": [
+                8756,
+                471,
+                35,
+                76,
+                5108
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 33,
+              "phase": "final_answer",
+              "raw_text": "-Dmaven.wagon.http",
+              "raw_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                1794
+              ],
+              "forwarded_token_ids": [
+                1370,
+                5922,
+                6748,
+                55289,
+                1794
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 34,
+              "phase": "final_answer",
+              "raw_text": ".ssl.insecure=t",
+              "raw_token_ids": [
+                24336,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "forwarded_token_ids": [
+                24336,
+                10938,
+                471,
+                35,
+                76
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 35,
+              "phase": "final_answer",
+              "raw_text": "rue -Dmaven.wagon.h",
+              "raw_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "forwarded_token_ids": [
+                5108,
+                1370,
+                5922,
+                6748,
+                55289
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 36,
+              "phase": "final_answer",
+              "raw_text": "ttp.ssl.allowall=",
+              "raw_token_ids": [
+                55531,
+                528,
+                10938,
+                471,
+                35
+              ],
+              "forwarded_token_ids": [
+                55531,
+                528,
+                10938,
+                471,
+                35
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 37,
+              "phase": "final_answer",
+              "raw_text": "true -Dmaven.wag",
+              "raw_token_ids": [
+                76,
+                5108,
+                1370,
+                5922,
+                6748
+              ],
+              "forwarded_token_ids": [
+                76,
+                5108,
+                1370,
+                5922,
+                6748
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 38,
+              "phase": "final_answer",
+              "raw_text": "on.http.ssl.ignore.val",
+              "raw_token_ids": [
+                55289,
+                46988,
+                19961,
+                477,
+                920
+              ],
+              "forwarded_token_ids": [
+                55289,
+                46988,
+                19961,
+                477,
+                920
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 39,
+              "phase": "final_answer",
+              "raw_text": "idity.dates=true -pl imp",
+              "raw_token_ids": [
+                942,
+                10938,
+                471,
+                490,
+                5004
+              ],
+              "forwarded_token_ids": [
+                942,
+                10938,
+                471,
+                490,
+                5004
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 40,
+              "phase": "final_answer",
+              "raw_text": "lements/venuea",
+              "raw_token_ids": [
+                14,
+                6917,
+                4589,
+                471,
+                35
+              ],
+              "forwarded_token_ids": [
+                14,
+                6917,
+                4589,
+                471,
+                35
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 41,
+              "phase": "final_answer",
+              "raw_text": "lloc -Dtest=SceneT",
+              "raw_token_ids": [
+                1877,
+                28,
+                9723,
+                6065,
+                11648
+              ],
+              "forwarded_token_ids": [
+                1877,
+                28,
+                9723,
+                6065,
+                11648
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 42,
+              "phase": "final_answer",
+              "raw_text": "askLockRecoverySchedul",
+              "raw_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                11
+              ],
+              "forwarded_token_ids": [
+                674,
+                7214,
+                37592,
+                2198,
+                11
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 43,
+              "phase": "final_answer",
+              "raw_text": "erTest,SceneTaskLockServiceI",
+              "raw_token_ids": [
+                9723,
+                6065,
+                11648,
+                48900,
+                2198
+              ],
+              "forwarded_token_ids": [
+                9723,
+                6065,
+                11648,
+                48900,
+                2198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 44,
+              "phase": "final_answer",
+              "raw_text": "mplTest,SceneTaskManageServ",
+              "raw_token_ids": [
+                11,
+                9723,
+                6065,
+                31980,
+                48900
+              ],
+              "forwarded_token_ids": [
+                11,
+                9723,
+                6065,
+                31980,
+                48900
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 45,
+              "phase": "final_answer",
+              "raw_text": "iceImpl",
+              "raw_token_ids": [
+                2198,
+                11,
+                3217
+              ],
+              "forwarded_token_ids": [
+                2198,
+                11,
+                3217
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 46,
+              "phase": "final_answer",
+              "raw_text": "Test,ScenesMgrServiceIm",
+              "raw_token_ids": [
+                20986,
+                24753,
+                48900,
+                2198,
+                220
+              ],
+              "forwarded_token_ids": [
+                20986,
+                24753,
+                48900,
+                2198,
+                220
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 47,
+              "phase": "final_answer",
+              "raw_text": "plTest 2>&1",
+              "raw_token_ids": [
+                17,
+                5608,
+                16,
+                735,
+                9495
+              ],
+              "forwarded_token_ids": [
+                17,
+                5608,
+                16,
+                735,
+                9495
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 48,
+              "phase": "final_answer",
+              "raw_text": " | t",
+              "raw_token_ids": [
+                471,
+                16,
+                17
+              ],
+              "forwarded_token_ids": [
+                471,
+                16,
+                17
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 49,
+              "phase": "final_answer",
+              "raw_text": "ail -120\n</par",
+              "raw_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                15,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 50,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=desc",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                4532
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 51,
+              "phase": "final_answer",
+              "raw_text": "ription>\nRun D",
+              "raw_token_ids": [
+                29,
+                198,
+                6516,
+                24221,
+                6813
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                6516,
+                24221,
+                6813
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 52,
+              "phase": "final_answer",
+              "raw_text": "T tests f",
+              "raw_token_ids": [
+                364,
+                1228
+              ],
+              "forwarded_token_ids": [
+                364,
+                1228
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 53,
+              "phase": "final_answer",
+              "raw_text": "or test classes\n</par",
+              "raw_token_ids": [
+                6632,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "forwarded_token_ids": [
+                6632,
+                198,
+                510,
+                15704,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 54,
+              "phase": "final_answer",
+              "raw_text": "ameter>\n<parameter=",
+              "raw_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "forwarded_token_ids": [
+                198,
+                27,
+                15704,
+                28,
+                13745
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 55,
+              "phase": "final_answer",
+              "raw_text": "timeo",
+              "raw_token_ids": [
+                29,
+                198,
+                21,
+                15,
+                15
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                21,
+                15,
+                15
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 56,
+              "phase": "final_answer",
+              "raw_text": "ut>\n60",
+              "raw_token_ids": [
+                15,
+                15,
+                15,
+                198,
+                510
+              ],
+              "forwarded_token_ids": [
+                15,
+                15,
+                15,
+                198,
+                510
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 57,
+              "phase": "final_answer",
+              "raw_text": "0000\n</parameter>\n<pa",
+              "raw_token_ids": [
+                15704,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "forwarded_token_ids": [
+                15704,
+                29,
+                198,
+                27,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 58,
+              "phase": "final_answer",
+              "raw_text": "rameter=wo",
+              "raw_token_ids": [
+                28,
+                1715,
+                3614,
+                29,
+                198
+              ],
+              "forwarded_token_ids": [
+                28,
+                1715,
+                3614,
+                29,
+                198
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 59,
+              "phase": "final_answer",
+              "raw_text": "rkdir>\n/app/code/Experi",
+              "raw_token_ids": [
+                10325,
+                45361,
+                14,
+                32986,
+                5439
+              ],
+              "forwarded_token_ids": [
+                10325,
+                45361,
+                14,
+                32986,
+                5439
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 60,
+              "phase": "final_answer",
+              "raw_text": "enceAssuranceService\n</pa",
+              "raw_token_ids": [
+                5592,
+                1796,
+                198,
+                510,
+                15704
+              ],
+              "forwarded_token_ids": [
+                5592,
+                1796,
+                198,
+                510,
+                15704
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 61,
+              "phase": "final_answer",
+              "raw_text": "rameter>\n</fu",
+              "raw_token_ids": [
+                29,
+                198,
+                510,
+                1628,
+                29
+              ],
+              "forwarded_token_ids": [
+                29,
+                198,
+                510,
+                1628,
+                29
+              ],
+              "stop_boundary_aligned": false
+            },
+            {
+              "sequence": 62,
+              "phase": "final_answer",
+              "raw_text": "nction>\n</tool_call>",
+              "raw_token_ids": [
+                198,
+                248059,
+                248046
+              ],
+              "forwarded_token_ids": [
+                198,
+                248059,
+                248046
+              ],
+              "stop_boundary_aligned": false
+            }
+          ],
+          "source_finish_reasons": [
+            "stop",
+            "stop"
+          ],
+          "source_stop_reasons": []
+        }
+      ]
+    }
+  ]
+}
