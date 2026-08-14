@@ -252,6 +252,7 @@ class ToolCallReplayTests(unittest.TestCase):
                 "schema": 2,
                 "event": "delta",
                 "phase": "initial_think",
+                "child_request_id": "r_initial_think_1",
                 "sequence": 1,
                 "completion_epoch": 1,
                 "controller_state": "thinking",
@@ -299,6 +300,62 @@ class ToolCallReplayTests(unittest.TestCase):
         }, [])
 
         self.assertEqual(analysis["diagnosis"], "vanilla_pass")
+
+    def test_analysis_accepts_audited_stop_boundary_alignment(self) -> None:
+        summary = {
+            "client_request_id": "r",
+            "server_request_id": "r",
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": [],
+        }
+        records = [
+            {
+                "schema": 3,
+                "event": "delta",
+                "phase": "initial_think",
+                "child_request_id": "r_initial_think_1",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "controller_state": "thinking",
+                "next_state": "free_final_answer",
+                "reasoning_boundary": "think_end",
+                "raw_text": "</think>",
+                "raw_text_sha256": "same-text",
+                "forwarded_text_sha256": "same-text",
+                "token_ids": [1, 2, 3],
+                "forwarded_token_ids": [1],
+                "alignment_dropped_token_ids": [2, 3],
+                "alignment_dropped_token_count": 2,
+                "source_token_ids_sha256": "raw-ids",
+                "forwarded_token_ids_sha256": "forwarded-ids",
+                "stop_boundary_aligned": True,
+            },
+            {
+                "schema": 3,
+                "event": "terminal_flush",
+                "phase": "final_answer",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "terminal_flush": True,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(analysis["diagnosis"], "pass")
+        self.assertEqual(
+            analysis["controller_passthrough_violation_sequences"], [])
+        self.assertEqual(
+            analysis["invalid_stop_boundary_alignment_sequences"], [])
+        self.assertEqual(
+            analysis["stop_boundary_alignments"][0]["dropped_token_ids"],
+            [2, 3],
+        )
+        self.assertEqual(
+            analysis["children"][0]["stream_deltas"][0]["raw_token_ids"],
+            [1, 2, 3],
+        )
 
     def test_analysis_identifies_controller_input_text_token_gap(self) -> None:
         summary = {

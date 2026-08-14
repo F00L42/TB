@@ -12,6 +12,29 @@ from typing import Any
 PREFIX = "TB_TOOL_STREAM "
 
 
+def is_valid_stop_boundary_alignment(record: dict[str, Any]) -> bool:
+    if not record.get("stop_boundary_aligned"):
+        return False
+    raw_token_ids = record.get("token_ids")
+    forwarded_token_ids = record.get("forwarded_token_ids")
+    dropped_token_ids = record.get("alignment_dropped_token_ids")
+    if not all(isinstance(value, list) for value in (
+        raw_token_ids, forwarded_token_ids, dropped_token_ids,
+    )):
+        return False
+    return (
+        record.get("reasoning_boundary") in {"think_end", "tool_call"}
+        and record.get("raw_text_sha256")
+        == record.get("forwarded_text_sha256")
+        and len(forwarded_token_ids) < len(raw_token_ids)
+        and raw_token_ids[:len(forwarded_token_ids)] == forwarded_token_ids
+        and raw_token_ids[len(forwarded_token_ids):] == dropped_token_ids
+        and len(dropped_token_ids) > 0
+        and int(record.get("alignment_dropped_token_count") or 0)
+        == len(dropped_token_ids)
+    )
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows = []
     with path.open("r", encoding="utf-8") as source:
@@ -119,10 +142,19 @@ def classify(
     }
     completion_epoch_count = len(completion_epochs)
     duplicate_reasoning_boundary = max(0, len(boundary_records) - 1)
+    boundary_alignment_records = [
+        row for row in records if row.get("stop_boundary_aligned")
+    ]
+    invalid_boundary_alignments = [
+        int(row.get("sequence") or 0)
+        for row in boundary_alignment_records
+        if not is_valid_stop_boundary_alignment(row)
+    ]
     passthrough_violations = [
         int(row.get("sequence") or 0)
         for row in records
-        if row.get("schema") == 2
+        if isinstance(row.get("schema"), int)
+        and row["schema"] >= 2
         and row.get("event") in {"delta", "terminal_body"}
         and not row.get("terminal_flush")
         and (
@@ -130,6 +162,7 @@ def classify(
             or row.get("source_token_ids_sha256")
             != row.get("forwarded_token_ids_sha256")
         )
+        and not is_valid_stop_boundary_alignment(row)
     ]
     lifecycle_failures = (
         terminal_flush_count != 1
@@ -145,6 +178,8 @@ def classify(
         )
     elif not records:
         diagnosis = "missing_server_trace"
+    elif invalid_boundary_alignments:
+        diagnosis = "controller_stop_boundary_alignment_failure"
     elif passthrough_violations:
         diagnosis = "controller_passthrough_violation"
     elif lifecycle_failures:
@@ -170,6 +205,7 @@ def classify(
             "phases": [],
             "sequences": [],
             "raw_text": "",
+            "stream_deltas": [],
             "source_finish_reasons": [],
             "source_stop_reasons": [],
         })
@@ -179,6 +215,15 @@ def classify(
         child["sequences"].append(row.get("sequence"))
         if not row.get("terminal_flush"):
             child["raw_text"] += str(row.get("raw_text") or "")
+            child["stream_deltas"].append({
+                "sequence": row.get("sequence"),
+                "phase": row.get("phase"),
+                "raw_text": row.get("raw_text"),
+                "raw_token_ids": row.get("token_ids"),
+                "forwarded_token_ids": row.get("forwarded_token_ids"),
+                "stop_boundary_aligned": row.get(
+                    "stop_boundary_aligned", False),
+            })
         if row.get("source_finish_reason") is not None:
             child["source_finish_reasons"].append(
                 row.get("source_finish_reason"))
@@ -213,6 +258,20 @@ def classify(
         "thinking_or_probe_after_tool_boundary": (
             thinking_or_probe_after_tool_boundary),
         "controller_passthrough_violation_sequences": passthrough_violations,
+        "invalid_stop_boundary_alignment_sequences": (
+            invalid_boundary_alignments),
+        "stop_boundary_alignments": [
+            {
+                "sequence": row.get("sequence"),
+                "boundary": row.get("reasoning_boundary"),
+                "phase": row.get("phase"),
+                "raw_text": row.get("raw_text"),
+                "raw_token_ids": row.get("token_ids"),
+                "forwarded_token_ids": row.get("forwarded_token_ids"),
+                "dropped_token_ids": row.get("alignment_dropped_token_ids"),
+            }
+            for row in boundary_alignment_records
+        ],
         "children": list(children.values()),
     }
 
@@ -285,6 +344,28 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "no_passthrough_violation": sum(
                     not row["controller_passthrough_violation_sequences"]
+                    for row in dtb_analyses
+                ),
+                "no_invalid_stop_boundary_alignment": sum(
+                    not row["invalid_stop_boundary_alignment_sequences"]
+                    for row in dtb_analyses
+                ),
+                "stop_boundary_alignment_covered": sum(
+                    bool(row["stop_boundary_alignments"])
+                    for row in dtb_analyses
+                ),
+                "think_end_boundary_covered": sum(
+                    any(
+                        boundary["boundary"] == "think_end"
+                        for boundary in row["reasoning_boundaries"]
+                    )
+                    for row in dtb_analyses
+                ),
+                "tool_call_boundary_covered": sum(
+                    any(
+                        boundary["boundary"] == "tool_call"
+                        for boundary in row["reasoning_boundaries"]
+                    )
                     for row in dtb_analyses
                 ),
             },

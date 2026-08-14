@@ -208,6 +208,7 @@ class RequestStateContext:
         next_state: str,
         reasoning_boundary: ReasoningBoundary | None,
         terminal_flush: bool,
+        stop_boundary_aligned: bool,
     ) -> None:
         if not self.stream_debug_enabled:
             return
@@ -219,8 +220,18 @@ class RequestStateContext:
         forwarded_text = getattr(forwarded_output, "text", "") or ""
         forwarded_token_ids = list(
             getattr(forwarded_output, "token_ids", None) or [])
+        alignment_prefix_valid = (
+            len(forwarded_token_ids) < len(raw_token_ids)
+            and raw_token_ids[:len(forwarded_token_ids)]
+            == forwarded_token_ids
+        )
+        dropped_token_ids = (
+            raw_token_ids[len(forwarded_token_ids):]
+            if stop_boundary_aligned and alignment_prefix_valid
+            else []
+        )
         record = {
-            "schema": 2,
+            "schema": 3,
             "source": "controller_pre_parser",
             "event": event,
             "parent_request_id": self.request_id,
@@ -247,12 +258,16 @@ class RequestStateContext:
             "forwarded_text_length": len(forwarded_text),
             "forwarded_token_ids_sha256": self._stream_token_digest(
                 forwarded_token_ids),
+            "forwarded_token_ids": forwarded_token_ids,
             "forwarded_token_count": len(forwarded_token_ids),
             "forwarded_finish_reason": getattr(
                 forwarded_output, "finish_reason", None),
             "forwarded_stop_reason": getattr(
                 forwarded_output, "stop_reason", None),
             "terminal_flush": terminal_flush,
+            "stop_boundary_aligned": stop_boundary_aligned,
+            "alignment_dropped_token_ids": dropped_token_ids,
+            "alignment_dropped_token_count": len(dropped_token_ids),
         }
         print(
             "TB_TOOL_STREAM "
@@ -272,6 +287,7 @@ class RequestStateContext:
         next_state: str = "",
         reasoning_boundary: ReasoningBoundary | None = None,
         terminal_flush: bool = False,
+        stop_boundary_aligned: bool = False,
     ) -> None:
         self._log_stream_delta(
             result=result,
@@ -283,6 +299,7 @@ class RequestStateContext:
             next_state=next_state,
             reasoning_boundary=reasoning_boundary,
             terminal_flush=terminal_flush,
+            stop_boundary_aligned=stop_boundary_aligned,
         )
         await self.result_queue.put(result)
 
@@ -306,6 +323,7 @@ class RequestStateContext:
             next_state=next_state,
             reasoning_boundary=reasoning_boundary,
             terminal_flush=False,
+            stop_boundary_aligned=False,
         )
 
     async def stream_terminal(
@@ -346,6 +364,7 @@ class RequestStateContext:
             next_state="complete",
             reasoning_boundary=state.reasoning_boundary,
             terminal_flush=True,
+            stop_boundary_aligned=False,
         )
 
     def encode_prompt_suffix(self, text: str) -> tuple[int, ...]:

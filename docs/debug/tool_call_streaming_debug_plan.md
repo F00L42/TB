@@ -53,6 +53,31 @@ DTB 的 52 个响应解析出了两个 tool call；另外 48 个响应把第一�
 parser 前缺少结构文本”已被本轮实验否定；需要分析的是 final-answer 之前的可见 thinking
 child，以及控制器为何在第一次工具调用之后继续运行。
 
+2026-08-14 的
+[`run_after_terminal_fix`](tool_call/run_after_terminal_fix) 在相同请求和环境上再次完成
+100 次 Vanilla/DTB paired replay：
+
+| 结果 | Vanilla | DTB |
+| --- | ---: | ---: |
+| 请求数 | 100 | 100 |
+| 完整通过 | 100 | 78 |
+| completion epoch 和 terminal flush 均为 1 | 100 | 100 |
+| 缺少 `<tool_call>\n<` 并把 XML 泄漏到 content | 0 | 13 |
+| 已识别 tool call，但 arguments JSON 缺最后一个 `}` | 0 | 9 |
+| role 尾流、tool 后 content、terminal 后 chunk | 0 | 0 |
+
+本轮 100 个 DTB 请求的 reasoning boundary 全部是 `think_end`，`tool_call` boundary 覆盖数
+为 0。因此，本轮实测已经证明 `</think> → FreeFinalAnswer → TerminalFlush` 生命周期闭合，
+但 `Thinking → <tool_call> boundary` 分支仍需独立服务器覆盖；分析器中
+`no_fresh_final_after_tool_boundary=100` 在该 run 是无覆盖条件下的真值，不能单独证明
+`<tool_call>` 分支通过。
+
+13 个 XML 泄漏请求的 final-answer child raw text 都直接从 `function=bash>` 开始，固定
+缺少 `<tool_call>\n<`；所有 controller raw/forwarded 哈希相同。9 个 JSON 异常的模型 raw
+XML 均包含完整的 `</parameter></function></tool_call>`，只有 parser 生成的 arguments 缺少
+闭合 `}`。前者属于本轮要解决的增量交接问题；后者属于独立的 parser finalization 问题，
+不能按模型 JSON 能力忽略。
+
 ### 2.2 源码确定
 
 数据路径如下：
@@ -83,7 +108,7 @@ sequenceDiagram
 
 1. Qwen3 reasoning parser 把 `</think>` 视为显式思考结束，把 `<tool_call>` 视为隐式
    思考结束；后者同时是最终工具调用正文的开始，而不是 thinking 内容；
-2. 当前 thinking child 的 sampling stop 只加入 `</think>`；`consume_output()` 清除所有
+2. 终止语义修复前，thinking child 的 sampling stop 只加入 `</think>`；`consume_output()` 清除所有
    可见 child delta 的 `finish_reason/stop_reason`，状态机也只对
    `stop_reason == </think>` 作特殊处理。因此，thinking child 已进入或完成工具调用后，
    控制器仍会把 tool XML 追加为 thinking，继续 confidence probe、iterative thinking，
@@ -104,25 +129,41 @@ sequenceDiagram
 8. 多轮 request 的 `messages` 由原生 `render_chat_request()` 生成一次
    `engine_inputs`，控制器没有重排消息；scene 分类会逆序寻找最新 user 消息，而不是把
    最后的 tool result 当 user。多轮本身没有发现静态丢失，但过去缺少协议级回归测试。
+9. vLLM v1 detokenizer 在一个 speculative batch 中依次把全部 `new_token_ids` 加入内部
+   token 序列，再检测 stop string；命中 stop 时只把 `output_text` 截断到 stop string 末尾，
+   不同步删除该批中 stop 后的 token IDs。`OutputProcessor` 随后可能构造出
+   `text="...</think>"`，但 `token_ids` 仍包含
+   `</think><tool_call>\n<` 的 `CompletionOutput`；
+10. DTB 的 `consume_output()` 过去原样转发这组不一致的 `text/token_ids`，
+    `append_thinking()` 又把全部 token IDs 追加到 continuation prompt。final-answer child
+    因而认为 `<tool_call>\n<` 已经存在，从 `function=bash>` 继续生成，但 parser-facing text
+    从未收到该前缀；
+11. `Qwen3CoderToolParser` 的 parameter 循环在同一 delta 内发现完整参数时立即返回参数
+    fragment，不能在同一次调用继续执行后面的 `</function>` 收尾分支。当前 terminal-only
+    空 delta 又在 parser 开头直接返回，因此 9 个 raw XML 完整的请求没有发出 JSON `}`。
 
 ### 2.3 根因结论与证据边界
 
-本问题由两个缺陷叠加：
+本问题由三个缺陷叠加：
 
-1. **终止语义错误（主因，实测 + 源码确定）。** `</think>` 和 `<tool_call>` 都是思考
-   结束边界；前者进入普通最终回答，后者进入工具调用形式的最终回答。当前 DTB 只接受
+1. **终止语义错误（修复前主因，实测 + 源码确定）。** `</think>` 和 `<tool_call>` 都是思考
+   结束边界；前者进入普通最终回答，后者进入工具调用形式的最终回答。修复前 DTB 只接受
    `</think>`，并在第一次工具调用后继续状态机，造成重复生成、role 尾流和第二个
    fresh tool call。
-2. **增量交接问题（实测现象，具体丢失层待补齐原始记录）。** 48 次请求中，第一个调用
-   从 `content="f"` 开始并泄漏至 `</tool_call>`，即客户端缺少
-   `<tool_call>\n<`；另外 52 次相同位置能被 parser 正常识别。现有 `analysis.json` 只保留
-   `final_answer` phase 的 raw/parser 文本，未保留第一个调用所在 phase 的逐条原始记录，
-   因而不能仅凭该归档断言标记是在 controller→queue 之前丢失，还是在
-   `DelegatingParser` 内的 reasoning→tool 交接时丢失。
+2. **增量交接问题（实测特征 + 源码确定机制，逐 ID 解码待服务器证实）。**
+   `run_after_terminal_fix` 的 13 次失败都在 final-answer child raw text 中固定缺少
+   `<tool_call>\n<`。vLLM 源码确定 stop string 可以只截断 text、不截断同批 token IDs；DTB
+   源码确定这些额外 token IDs 会同时进入 parser 和 continuation prompt。两者组合完整解释
+   “parser 没看到前缀、final child 却从前缀之后续写”的特征。当前归档没有保留失败 sequence
+   的实际 ID 列表，因此“这些具体 ID 解码后就是 `<tool_call>\n<`”仍需下一轮 telemetry 或
+   原始 `server.log` 证实。
+3. **参数 finalization 问题（实测 + 源码确定）。** 9 次失败的 raw XML 完整，arguments
+   只缺 parser 负责生成的最终 `}`；空 terminal delta 不能推动当前 Qwen parser 越过参数
+   fragment 的提前返回。该问题与增量前缀丢失相互独立，后续单独修复。
 
-修复顺序以主因优先：先恢复正确的思考边界和单一 completion 生命周期，并保持 raw
-`text/token_ids` 原样透传；随后重新实验判断增量交接现象是否仍存在。第一阶段不修改原生
-parser，不把 adapter 变成 Qwen tool parser 的补丁层。
+修复顺序为：先恢复正确的思考边界和单一 completion 生命周期；再对齐内部 stop boundary
+的 parser-facing `text/token_ids`；最后单独处理参数 finalization。boundary 对齐不修改原生
+parser，也不把 adapter 变成 Qwen tool parser 的补丁层。
 
 ## 3. 修复设计
 
@@ -139,7 +180,9 @@ parser，不把 adapter 变成 Qwen tool parser 的补丁层。
   缺失结构。
 
 `stream_output()` 仍可为清除中间 child 的终止字段而浅拷贝对象，但不得改写非空
-`text/token_ids`。
+`text/token_ids`。唯一例外是 3.3 定义的内部 stop boundary 对齐：它不补写或重解码文本，
+只丢弃已经被 vLLM stop string 从可见文本截掉、因 speculative batch 仍残留在 token IDs
+中的非逻辑后缀。
 
 ### 3.2 统一思考结束边界
 
@@ -176,12 +219,60 @@ boundary 或第二个 fresh final-answer child。自由生成阶段允许模型�
 这里的“自由生成”是从已累计 prompt 的 reasoning boundary 之后继续生成，使用剩余最终答案
 预算和原生 sampling/stop 语义，不再受 thinking stride、probe 或置信度决策控制。
 
-若 speculative delta 在同一批中包含 reasoning boundary 及其后缀，整批必须只透传一次；
-边界前 token 计入 visible thinking，边界及其后 token 计入 final answer，并将完全相同的
-token 序列作为 continuation prompt。若工具调用已开始但 child 因内部切片上限结束，下一
-child 只能从已有 `<tool_call>` 后原位续写，不得重新生成工具调用头。
+若 speculative delta 在同一批中包含 reasoning boundary 及其后缀，必须先区分两种情况：
 
-### 3.3 单次 terminal 与空 delta flush
+- 后缀同时存在于 text 和 token IDs，且 child 并非因该 boundary stop：它是逻辑输出，整批
+  只透传一次，boundary 及可见后缀计入 final answer，并原样进入 continuation prompt；
+- `source_stop_reason` 等于 boundary、text 恰好结束于 boundary，但 token IDs 在 boundary
+  后仍有后缀：后缀已被 vLLM stop 语义排除，不属于逻辑输出，必须在 queue 和 continuation
+  prompt 前丢弃。
+
+若工具调用已开始但 child 因内部切片上限结束，下一 child 只能从已进入逻辑输出的
+`<tool_call>` 后原位续写，不得重新生成工具调用头。
+
+### 3.3 stop boundary 的 text/token IDs 对齐
+
+引入 **stop boundary alignment**：只修正 vLLM 内部 string-stop 产生的可见 text 与
+生成 token IDs 不一致，不从 token IDs 猜测或恢复任何 parser-facing 文本。由于
+`include_stop_str_in_output=true` 时 boundary 文本可以横跨多个 DELTA，不能假设终止
+delta 自身包含完整 marker；实现必须同时维护 child 的累计 raw text/token IDs。
+
+对 thinking child 的每个 delta，按以下条件和顺序执行：
+
+```text
+raw_text_so_far += current_raw_text
+raw_token_ids_so_far += current_raw_token_ids
+boundary = detect(current_raw_text, current_raw_token_ids, source_stop_reason)
+if source_stop_reason == boundary.marker
+   and raw_text_so_far 恰好结束于 boundary.marker
+   and boundary.marker_ids 是 raw_token_ids_so_far 的最后一个精确子序列
+   and marker_ids 后仍有 token:
+       current_marker_end = cumulative_marker_end - previous_raw_token_count
+       forwarded_text = current_raw_text
+       forwarded_token_ids = current_raw_token_ids[: current_marker_end]
+       dropped_token_ids = current_raw_token_ids[current_marker_end:]
+else:
+       forwarded_text/token_ids = current_raw_text/current_raw_token_ids
+```
+
+约束如下：
+
+- 只作用于 DTB 新增的 `</think>`、`<tool_call>` thinking stop；不改写 final-answer delta、
+  普通 length/EOS、无 boundary delta 或带可见 boundary 后缀的 delta；
+- raw `RequestOutput` 不可原地修改；telemetry 必须同时保存 raw、forwarded 和 dropped IDs；
+- queue、thinking 账本、主 prompt 和 final child prompt 必须使用同一份 aligned token IDs；
+- boundary marker 在 text 中可见、却无法在 token IDs 中精确定位时立即报错，禁止静默猜测
+  token 长度；
+- marker 可以从前一个 delta 开始并在终止 delta 中结束；已经传给 parser 的前缀保持不变，
+  只允许裁掉终止 delta 内 marker 之后的 token。若定位结果要求撤回既有 token，立即报错；
+- 对齐后的 text 不变，forwarded IDs 必须是 raw IDs 的严格前缀，且丢弃数量必须大于 0；
+- 该实现不依赖 `transformers`，运行时使用服务已经持有的 tokenizer 对 boundary marker
+  编码。后续可在离线诊断环境用 `transformers.AutoTokenizer` 加载与服务端完全相同 revision
+  的 Qwen3.6-27B 词表，对 `raw/forwarded/dropped_token_ids` 执行
+  `convert_ids_to_tokens()` 和 `decode(skip_special_tokens=False)`，验证实际后缀文本；该验证
+  不能成为生产运行时依赖。
+
+### 3.4 单次 terminal 与空 delta flush
 
 中间 child 的 `finish_reason` 可以被控制器消费，但整个外部 assistant completion 只能结束
 一次。`FreeFinalAnswer` 获得原生终止后，控制器发送一个 terminal-only `RequestOutput`：
@@ -199,22 +290,23 @@ arguments flush，再由 serving 层根据是否已产生工具调用输出一�
 `finish_reason="tool_calls"`。terminal flush
 之后立即关闭 result queue；不得再发送 content、role 文本或第二个 terminal。
 
-### 3.4 增量交接与原生 parser 决策
+### 3.5 增量交接与原生 parser 决策
 
 第一阶段不修改 vLLM `DelegatingParser` 或 `Qwen3CoderToolParser`。DTB 侧只保证：
 
 - 同一逻辑 assistant completion 使用连续的 parser 状态；
-- reasoning boundary 的 `text/token_ids` 及同批后缀只进入 queue 一次；
+- reasoning boundary 的逻辑 `text/token_ids` 只进入 queue 一次；内部 stop 后不可见的
+  speculative token suffix 由 3.3 对齐并丢弃；
 - child 边界不产生伪造正文或中间 terminal；
 - 空 delta 只用于最终 flush，不作为 parser 重置提示；
-- telemetry 记录所有可见 phase，而不改写 parser-facing 数据。
+- telemetry 记录所有可见 phase 和显式 boundary alignment，不做其他 parser-facing 改写。
 
 修复后若仍出现 XML 泄漏，必须用同一 `parent/child/sequence` 的原始
 `text + token_ids → SSE` 证明：若 controller 前已缺标记，继续查 engine/detokenizer；若
 controller 前完整而 parser 后泄漏，再单独评审原生 parser 的最小修复。未取得这条证据前
 不修改上游 parser，也不采用 SSE 后处理、正则拼接或丢弃异常 content。
 
-### 3.5 多轮请求边界
+### 3.6 多轮请求边界
 
 多轮请求必须保持以下不变量：
 
@@ -245,8 +337,8 @@ export TB_TOOL_STREAM_DEBUG=1
 TB_TOOL_STREAM {json}
 ```
 
-取消保守恢复后，调试 schema 聚焦“原始 child 输出、状态转换、queue 透传和最终 SSE”的
-对应关系，当前实现已升级为 schema 2：
+取消保守恢复后，调试 schema 聚焦“原始 child 输出、stop boundary 对齐、状态转换、queue
+透传和最终 SSE”的对应关系，当前实现已升级为 schema 3：
 
 ```text
 source=controller_pre_parser
@@ -254,15 +346,26 @@ parent_request_id / child_request_id / phase / sequence
 completion_epoch / reasoning_boundary / controller_state
 raw_text / raw_text_sha256 / token_ids
 source_finish_reason / source_stop_reason
-forwarded_text_sha256 / forwarded_token_ids_sha256
+forwarded_text_sha256 / forwarded_token_ids_sha256 / forwarded_token_ids
+stop_boundary_aligned / alignment_dropped_token_ids / alignment_dropped_token_count
 terminal_flush / next_state
 ```
 
 `raw_text` 和 `token_ids` 必须取自清除中间终止字段之前的 child `RequestOutput`；
 `source_finish_reason/source_stop_reason` 也必须保存原值。非 terminal 的
-`forwarded_text/token_ids` 应与 raw 完全相同，可以只记录哈希和长度；若不同则直接判为
+`forwarded_text/token_ids` 默认应与 raw 完全相同；唯一允许的差异是
+`stop_boundary_aligned=true`，此时 text 哈希必须相同、forwarded IDs 必须是 raw IDs 的严格
+前缀、`alignment_dropped_token_ids` 必须精确等于剩余后缀。任何不满足这些条件的差异都判为
 controller 透传违约。`reasoning_boundary` 取 `none/think_end/tool_call`，用于证明模型首次
 跨过思考边界后，控制器没有重新进入 thinking/probe。
+
+schema 2 已经在 `server.log` 的 `token_ids` 字段保存 raw IDs；
+`run_after_terminal_fix/analysis.json` 看不到 ID，是因为该归档没有 `server.log`，且旧分析器
+只保存聚合文本，并非 schema 2 没有记录。schema 3 进一步显式保存 forwarded/dropped IDs；
+`analyze_tool_call_run.py` 会把所有可见 sequence 的 raw/forwarded IDs 写入
+`analysis.json.requests[].children[].stream_deltas`，并把 alignment sequence 的三组 IDs
+写入 `analysis.json.requests[].stop_boundary_alignments`。因此下一轮即使不回传完整
+`server.log`，也能重建跨 delta 的 token 序列并完成边界裁决。
 
 它与 `TB_PHASE` 完全独立，不改变
 [`think_budget_generalization_plan.md`](../design/think_budget_generalization_plan.md)
@@ -314,7 +417,11 @@ finish reason 或非法多轮历史。此外原脚本引用了未定义的 `args
 `iterative_think`，并把两个跨 child 的 tool calls 误报为通过。当前实现已经：
 
 - 按 sequence 保留所有可见 phase 的原始记录，而不是只保留 final-answer；
-- 输出每个 child 的 raw text/token 摘要、原始终止原因、reasoning boundary 和 next state；
+- 输出每个 child 的 raw text、原始终止原因、reasoning boundary 和 next state；
+- 在每个 child 的 `stream_deltas` 中逐 delta 保留 raw/forwarded token IDs，支持重建跨
+  delta boundary，并供后续 AutoTokenizer 离线解码；
+- 对 schema 3 校验 stop boundary alignment 的 raw/forwarded 前缀关系，并在
+  `stop_boundary_alignments` 保留 raw、forwarded 和 dropped IDs；
 - 计算 `completion_epoch_count`、`terminal_flush_count`、`fresh_final_after_tool_boundary`、
   `thinking_or_probe_after_tool_boundary`；
 - 在 `analysis.json.summary.dtb_acceptance` 汇总上述逐请求门槛，便于直接核对 100 次发布门；
@@ -348,14 +455,14 @@ python docs/debug/tool_call/replay_tool_calls.py \
   --mode both \
   --url http://127.0.0.1:9000/v1/chat/completions \
   --model qwen3.6-27b \
-  --output-dir docs/debug/tool_call/run_after_terminal_fix
+  --output-dir docs/debug/tool_call/run_after_handoff_fix
 ```
 
 随后关联服务日志：
 
 ```bash
 python docs/debug/tool_call/analyze_tool_call_run.py \
-  docs/debug/tool_call/run_after_terminal_fix \
+  docs/debug/tool_call/run_after_handoff_fix \
   server.log
 ```
 
@@ -370,10 +477,13 @@ ID 的 `TB_TOOL_STREAM`/`TB_ERROR`/`TB_ROUTE` 日志。不要上传无关请求�
 2. 建立“修复前 DTB / 修复后 DTB / Vanilla”三个独立服务 run；
 3. MTP 关闭只作为 parser 分片诊断对照，不作为 vLLM `v0.23.0` 性能变量或生产建议；
 4. 每个 cell 至少 100 次，分别统计 hard failure 率及 95% 置信区间；
-5. 对第一个 `<tool_call>` 所在 sequence 比较 child raw `text/token_ids`、forwarded 哈希和
-   SSE：raw 已缺前缀则查 engine/detokenizer；raw 完整、forwarded 相同而 SSE 泄漏，才把
-   原生 parser 列为候选；
-6. 若关闭 MTP 只改变分片或失败概率，结论仍是增量边界未闭合，不能归因为 vLLM
+5. 对每个 `stop_boundary_aligned=true` sequence 检查：raw text 结束于 boundary、raw IDs
+   是 `forwarded IDs + dropped IDs`、forwarded text 哈希不变、final child 从 boundary 后的
+   正确位置续写；对历史 13 次特征，`dropped IDs` 应离线解码为 `<tool_call>\n<` 或其前缀；
+6. 对第一个 `<tool_call>` 所在 sequence 比较 child raw、aligned forwarded 和 SSE：若对齐后
+   final child 仍从 `function=` 开始，继续查 prompt 构造；若 forwarded text/IDs 完整而 SSE
+   泄漏，才把原生 parser 列为候选；
+7. 若关闭 MTP 只改变分片或失败概率，结论仍是增量边界未闭合，不能归因为 vLLM
    `v0.20.2` 的历史 MTP 性能 bug，也不能以关闭生产 MTP 作为修复。
 
 ### 6.4 第三轮：协议矩阵
@@ -386,7 +496,7 @@ ID 的 `TB_TOOL_STREAM`/`TB_ERROR`/`TB_ROUTE` 日志。不要上传无关请求�
 | 对话 | 单轮 user、多轮 assistant tool call → tool result → 下一工具调用 |
 | 工具数 | 单工具、55 工具、连续/并行多个 tool call |
 | 输出 | 纯 content、reasoning + content、reasoning + tool call |
-| 边界 | `</think>`、`<tool_call>`、标记单独一批、标记 + `<f` 同批、完整 parameter 同批、空文本 delta |
+| 边界 | `</think>`、`<tool_call>`、标记单独一批、标记与不可见 speculative 后缀同批、标记与可见 `<f` 同批、完整 parameter 同批、空文本 delta |
 | 终止 | 正常 EOS、单/多 tool call、max_tokens、空 terminal flush、客户端取消 |
 
 非流式可使用同一 request body 将 `stream=false`，检查最终 `message.tool_calls`、content、
@@ -403,6 +513,24 @@ finish reason 和 arguments JSON。服务端尚无自动模型矩阵脚本时，
 child generate，但它们只能续写同一逻辑 completion，不能在工具调用已经开始后再创建
 fresh answer。
 
+增量交接修复可先按独立阶段门验收，不被尚未修复的 arguments finalization 混淆：
+
+```text
+expected_tool_call_missing = 0
+tool_xml_leaked_to_content = 0
+controller_passthrough_violation = 0
+invalid_stop_boundary_alignment = 0
+若 stop_boundary_alignment_covered > 0：
+  raw_token_ids = forwarded_token_ids + dropped_token_ids
+  raw_text_sha256 = forwarded_text_sha256
+  dropped_token_ids 数量 > 0
+  final child 不再从 function= 开始
+```
+
+若 100 次 run 没有任何 `stop_boundary_alignment_covered`，只能证明无回归，不能证明本修复
+命中实际 speculative suffix；需要继续重复，或使用受控无模型/模型边界用例覆盖。arguments
+JSON 不完整可以在这一阶段单列，但最终发布门仍要求为 0。
+
 100 次目标请求至少满足：
 
 ```text
@@ -412,6 +540,7 @@ terminal_flush_count = 1
 fresh_final_after_tool_boundary = 0
 thinking_or_probe_after_tool_boundary = 0
 duplicate_reasoning_boundary = 0
+invalid_stop_boundary_alignment = 0
 tool_xml_leaked_to_content = 0
 invalid_tool_arguments_json = 0
 content_after_tool_delta = 0
@@ -437,7 +566,7 @@ boundary 判断提前终止。phase 账本必须把 boundary 前 token 计为 vi
 ```text
 同一 parent/child/sequence 的原始 raw_text + token_ids + source finish/stop
 → reasoning boundary 分类和 next state
-→ forwarded 哈希与 raw 是否一致
+→ raw/forwarded/dropped token IDs 的 boundary 前缀关系
 → SSE reasoning/content/tool_calls/finish_reason
 → completion epoch、child phase 和单次 terminal flush
 → 修复前失败与修复后成功的重复统计
@@ -448,8 +577,9 @@ forwarded 已缺标记时回到 child generation、detokenizer 和 queue；只�
 一致、parser 后仍泄漏时，才为 vLLM `v0.23.0` 制作最小 parser 回归测试并重新评审是否
 修改上游。不得用吞掉异常 content、事后正则拼 tool call 或关闭 MTP 作为发布修复。
 
-实现回滚应同时撤销新增 reasoning boundary 状态转换和 terminal-only flush；保守恢复逻辑
-不恢复。`TB_TOOL_STREAM_DEBUG` 默认为关闭，可独立关闭，不影响 `TB_PHASE`。
+实现回滚应同时撤销新增 reasoning boundary 状态转换、stop boundary alignment 和
+terminal-only flush；保守恢复逻辑不恢复。`TB_TOOL_STREAM_DEBUG` 默认为关闭，可独立关闭，
+不影响 `TB_PHASE`。
 
 ## 8. 本地验证状态
 
@@ -459,11 +589,15 @@ forwarded 已缺标记时回到 child generation、detokenizer 和 queue；只�
 - `run_after_fix` 已完成 100 次 paired replay：Vanilla 100/100 正常，DTB 98/100 命中现有
   协议异常；另 2 次因分析器未审计跨 child generation 而假通过；
 - 100/100 final-answer parser-facing 文本完整，保守恢复 0 次命中，已决定取消该方案；
-- 已确认主要修复方向是终止语义和 completion 生命周期；第一个工具调用的增量缺失层仍需
-  保留全 phase 原始 telemetry 后裁决；
+- `run_after_terminal_fix` 已完成 100 次 paired replay：Vanilla 100/100 正常；DTB 78/100
+  完整通过、13 次固定缺 `<tool_call>\n<`、9 次 raw XML 完整但 arguments 缺 `}`；100/100
+  completion 生命周期闭合，但 `tool_call` reasoning boundary 覆盖为 0；
 - 已删除保守恢复，实现 `ReasoningBoundary`、模型边界后的 continuation final、单次空
-  terminal flush、schema 2 `TB_TOOL_STREAM`、replay 生命周期审计和全 phase 分析；
-- 无模型完整测试共运行 93 项，其中 92 项通过、1 项因 bundled runtime 缺少 PyYAML 按既有
+  terminal flush、stop boundary alignment、schema 3 `TB_TOOL_STREAM`、replay 生命周期审计
+  和全 phase 分析；
+- schema 3 保存 raw/forwarded/dropped IDs，分析器校验显式 alignment 而不把它误报为任意
+  parser-facing 篡改；
+- 无模型完整测试共运行 97 项，其中 96 项通过、1 项因 bundled runtime 缺少 PyYAML 按既有
   条件跳过；该 YAML 一致性测试已在默认 runtime 单独通过，尚未在目标服务器验证；
 - 本机没有目标模型和 NPU，不能把设计更新描述为运行时修复已通过。
 
@@ -474,3 +608,4 @@ forwarded 已缺标记时回到 child generation、detokenizer 和 queue；只�
 | 2026-08-13 | 建立 parser-facing 等价契约、保守结构文本恢复、独立日志、paired replay 和服务器验收矩阵 | 修复压缩模式概率性工具调用 XML 泄漏 |
 | 2026-08-14 | 根据 `run_after_fix` 取消保守恢复方案；将根因拆分为终止语义错误和增量交接问题，设计 `</think>/<tool_call>` 统一边界、自由生成最终答案、空 delta flush、单 completion 生命周期与分阶段 parser 决策 | 100 次实验显示恢复 0 次命中，DTB 在第一次工具调用后继续状态机并生成第二个 fresh tool call |
 | 2026-08-14 | 落地双 reasoning boundary、continuation final、terminal-only flush、schema 2 debug telemetry，并升级 replay/analyzer 与无模型回归测试 | 先修复终止语义和 completion 生命周期，再由服务器 telemetry 裁决是否仍存在 parser 增量交接缺陷 |
+| 2026-08-14 | 根据 `run_after_terminal_fix` 落地 stop boundary text/token IDs 对齐，将 debug telemetry 升级为 schema 3 并保留 raw/forwarded/dropped IDs | 13 次失败固定缺少 `<tool_call>\n<`；vLLM string stop 只截断 text，而 DTB 把同批 stop 后 token IDs 送入 parser 和 continuation prompt |

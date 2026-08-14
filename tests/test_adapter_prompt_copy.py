@@ -173,6 +173,7 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
 
         (
             token_ids,
+            raw_generated_tokens,
             last_chunk,
             text,
             stop_reason,
@@ -185,6 +186,7 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(token_ids, [10])
+        self.assertEqual(raw_generated_tokens, 1)
         self.assertIs(last_chunk, chunk)
         self.assertEqual(text, "delta")
         self.assertEqual(stop_reason, "length")
@@ -258,7 +260,7 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         line = stdout.getvalue().strip()
         self.assertTrue(line.startswith("TB_TOOL_STREAM "))
         record = json.loads(line.split(" ", 1)[1])
-        self.assertEqual(record["schema"], 2)
+        self.assertEqual(record["schema"], 3)
         self.assertEqual(record["source"], "controller_pre_parser")
         self.assertEqual(record["raw_text"], "f")
         self.assertEqual(
@@ -267,6 +269,146 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
             record["source_token_ids_sha256"],
             record["forwarded_token_ids_sha256"],
         )
+        self.assertEqual(
+            record["forwarded_token_ids"],
+            source.outputs[0].token_ids,
+        )
+        self.assertFalse(record["stop_boundary_aligned"])
+        self.assertEqual(record["alignment_dropped_token_ids"], [])
+
+    async def test_stream_debug_records_stop_boundary_token_alignment(
+        self,
+    ) -> None:
+        context = make_context()
+        context.stream_debug_enabled = True
+        boundary = "</think>"
+        boundary_ids = [ord(character) for character in boundary]
+        suffix_ids = [1000, ord("\n"), ord("<")]
+        source_output = SimpleNamespace(
+            text=boundary,
+            token_ids=[*boundary_ids, *suffix_ids],
+            logprobs=list(range(len(boundary_ids) + len(suffix_ids))),
+            finish_reason="stop",
+            stop_reason=boundary,
+        )
+        source = SimpleNamespace(outputs=[source_output])
+
+        async def outputs():
+            yield source
+
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            token_ids, raw_generated_tokens, _, text, _, reasoning_boundary = (
+                await _BaseState.consume_output(
+                    outputs(),
+                    context,
+                    phase="initial_think",
+                    child_request_id="think-1",
+                )
+            )
+
+        visible = await context.result_queue.get()
+        record = json.loads(
+            stdout.getvalue().strip().split(" ", 1)[1])
+        self.assertEqual(text, boundary)
+        self.assertEqual(token_ids, boundary_ids)
+        self.assertEqual(
+            raw_generated_tokens,
+            len(boundary_ids) + len(suffix_ids),
+        )
+        self.assertEqual(visible.outputs[0].token_ids, boundary_ids)
+        self.assertEqual(
+            visible.outputs[0].logprobs,
+            list(range(len(boundary_ids))),
+        )
+        self.assertEqual(reasoning_boundary.value, "think_end")
+        self.assertTrue(record["stop_boundary_aligned"])
+        self.assertEqual(record["token_ids"], [*boundary_ids, *suffix_ids])
+        self.assertEqual(record["forwarded_token_ids"], boundary_ids)
+        self.assertEqual(record["alignment_dropped_token_ids"], suffix_ids)
+        self.assertEqual(
+            record["alignment_dropped_token_count"],
+            len(suffix_ids),
+        )
+
+    async def test_stop_boundary_alignment_rejects_unlocatable_marker_ids(
+        self,
+    ) -> None:
+        context = make_context()
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="</think>",
+            token_ids=[10, 11, 12],
+            logprobs=None,
+            finish_reason="stop",
+            stop_reason="</think>",
+        )])
+
+        async def outputs():
+            yield source
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "visible in text but absent from token ids",
+        ):
+            await _BaseState.consume_output(
+                outputs(),
+                context,
+                phase="initial_think",
+                child_request_id="think-1",
+            )
+
+    async def test_stop_boundary_alignment_handles_marker_across_deltas(
+        self,
+    ) -> None:
+        context = make_context()
+        first_text = "thought</thi"
+        second_text = "nk>"
+        first_ids = [ord(character) for character in first_text]
+        second_ids = [ord(character) for character in second_text]
+        hidden_suffix_ids = [1000, 1001]
+        chunks = [
+            SimpleNamespace(outputs=[SimpleNamespace(
+                text=first_text,
+                token_ids=first_ids,
+                logprobs=None,
+                finish_reason=None,
+                stop_reason=None,
+            )]),
+            SimpleNamespace(outputs=[SimpleNamespace(
+                text=second_text,
+                token_ids=[*second_ids, *hidden_suffix_ids],
+                logprobs=None,
+                finish_reason="stop",
+                stop_reason="</think>",
+            )]),
+        ]
+
+        async def outputs():
+            for chunk in chunks:
+                yield chunk
+
+        token_ids, raw_generated_tokens, _, text, _, reasoning_boundary = (
+            await _BaseState.consume_output(
+                outputs(),
+                context,
+                phase="initial_think",
+                child_request_id="think-1",
+                output_kind="DELTA",
+            )
+        )
+
+        first_visible = await context.result_queue.get()
+        second_visible = await context.result_queue.get()
+        self.assertEqual(text, "thought</think>")
+        self.assertEqual(token_ids, [*first_ids, *second_ids])
+        self.assertEqual(
+            raw_generated_tokens,
+            len(first_ids) + len(second_ids) + len(hidden_suffix_ids),
+        )
+        self.assertEqual(first_visible.outputs[0].token_ids, first_ids)
+        self.assertEqual(second_visible.outputs[0].text, second_text)
+        self.assertEqual(second_visible.outputs[0].token_ids, second_ids)
+        self.assertEqual(reasoning_boundary.value, "think_end")
 
     async def test_terminal_flush_is_empty_and_emitted_once(self) -> None:
         context = make_context()

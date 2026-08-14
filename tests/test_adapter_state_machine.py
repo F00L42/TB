@@ -383,11 +383,15 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_model_think_end_enters_free_final_even_before_minimum(self):
         boundary = "</think>"
+        boundary_ids = [ord(character) for character in boundary]
+        speculative_suffix_ids = [
+            ord(character) for character in "<tool_call>\n<"
+        ]
         context, engine = make_context(
             [
                 [result(
                     boundary,
-                    [ord(character) for character in boundary],
+                    [*boundary_ids, *speculative_suffix_ids],
                     finish_reason="stop",
                     stop_reason="</think>")],
                 [result("answer", [30], finish_reason="stop")],
@@ -411,15 +415,24 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<tool_call>", engine.calls[0]["stop"])
         self.assertIn("</think>", engine.calls[0]["stop"])
         self.assertTrue(engine.calls[0]["include_stop_str_in_output"])
+        self.assertEqual(
+            engine.calls[1]["prompt_token_ids"],
+            [60, *boundary_ids],
+        )
 
     async def test_model_tool_boundary_continues_without_synthetic_think_end(
         self,
     ):
-        first = "thought<tool_call>\n<f"
+        first = "thought<tool_call>"
+        speculative_suffix = "\n<f"
+        first_ids = [ord(character) for character in first]
+        speculative_suffix_ids = [
+            ord(character) for character in speculative_suffix
+        ]
         context, engine = make_context([
             [result(
                 first,
-                [ord(character) for character in first],
+                [*first_ids, *speculative_suffix_ids],
                 finish_reason="stop",
                 stop_reason="<tool_call>",
             )],
@@ -446,14 +459,14 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.algorithm_state.terminal_flush_count, 1)
         self.assertTrue(engine.calls[-1]["kwargs"]["reasoning_ended"])
         self.assertEqual(
-            engine.calls[-1]["prompt_token_ids"][-len(first):],
-            [ord(character) for character in first],
+            engine.calls[-1]["prompt_token_ids"],
+            [60, *first_ids],
         )
         ledger = context.timing.snapshot()["ledger"]
         self.assertEqual(ledger["visible_think_tokens"], len("thought"))
         self.assertEqual(
             ledger["final_answer_tokens"],
-            len("<tool_call>\n<f") + 2,
+            len("<tool_call>") + 2,
         )
 
     async def test_empty_logprobs_fail_open_after_first_probe(self):

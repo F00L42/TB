@@ -125,11 +125,67 @@ def _detect_reasoning_boundary(
             token_candidates.append((token_index, boundary))
         if stop_reason == boundary.marker:
             stop_candidate = boundary
+    if stop_candidate is not None:
+        return stop_candidate
     if text_candidates:
         return min(text_candidates, key=lambda item: item[0])[1]
     if token_candidates:
         return min(token_candidates, key=lambda item: item[0])[1]
     return stop_candidate
+
+
+def _align_stop_boundary_delta(
+    context: RequestStateContext,
+    text: str,
+    token_ids: list[int],
+    boundary: ReasoningBoundary | None,
+    stop_reason: object,
+    *,
+    prior_text: str = "",
+    prior_token_ids: tuple[int, ...] | list[int] = (),
+) -> tuple[str, list[int], bool]:
+    """Drop speculative token suffixes hidden by a string stop boundary."""
+    if boundary is None or stop_reason != boundary.marker:
+        return text, token_ids, False
+    cumulative_text = prior_text + text
+    if not cumulative_text.endswith(boundary.marker):
+        return text, token_ids, False
+
+    prior_token_count = len(prior_token_ids)
+    cumulative_token_ids = [*prior_token_ids, *token_ids]
+    marker_ids = list(context.encode_prompt_suffix(boundary.marker))
+    if not marker_ids:
+        raise RuntimeError(
+            f"reasoning stop boundary encoded to no token ids: "
+            f"{boundary.marker}"
+        )
+    marker_token_start = next(
+        (
+            index
+            for index in range(
+                len(cumulative_token_ids) - len(marker_ids),
+                -1,
+                -1,
+            )
+            if cumulative_token_ids[index:index + len(marker_ids)]
+            == marker_ids
+        ),
+        None,
+    )
+    if marker_token_start is None:
+        raise RuntimeError(
+            "reasoning stop boundary is visible in text but absent from "
+            f"token ids: {boundary.marker}"
+        )
+    marker_token_end = marker_token_start + len(marker_ids) - prior_token_count
+    if marker_token_end <= 0:
+        raise RuntimeError(
+            "reasoning stop boundary token ids ended outside the terminal "
+            "delta; already-forwarded token ids cannot be retracted"
+        )
+    if marker_token_end >= len(token_ids):
+        return text, token_ids, False
+    return text, token_ids[:marker_token_end], True
 
 
 async def _emit_reasoning_boundary_once(
@@ -260,12 +316,13 @@ class _BaseState(ABC):
         collect_reasoning_logprobs: bool = False,
     ) -> tuple[
         list[int],
+        int,
         Optional[RequestOutput],
         str,
         object,
         ReasoningBoundary | None,
     ]:
-        """Collect and forward a visible thought without post-hoc truncation."""
+        """Collect a visible thought and align internal string-stop output."""
         del collect_reasoning_logprobs
         kind = _output_kind_name(
             output_kind
@@ -275,6 +332,9 @@ class _BaseState(ABC):
         )
         full_text = ""
         all_token_ids: list[int] = []
+        raw_full_text = ""
+        raw_all_token_ids: list[int] = []
+        raw_generated_tokens = 0
         last_output = None
         terminal_reason = None
         detected_boundary: ReasoningBoundary | None = None
@@ -282,6 +342,41 @@ class _BaseState(ABC):
             source_output = result.outputs[0]
             chunk_text = source_output.text or ""
             chunk_token_ids = list(source_output.token_ids or [])
+            prior_raw_text = raw_full_text if kind == "DELTA" else ""
+            prior_raw_token_ids = (
+                raw_all_token_ids if kind == "DELTA" else []
+            )
+            raw_full_text, raw_all_token_ids = _replace_or_append(
+                kind,
+                raw_full_text,
+                raw_all_token_ids,
+                chunk_text,
+                chunk_token_ids,
+            )
+            if kind == "DELTA":
+                raw_generated_tokens += len(chunk_token_ids)
+            else:
+                raw_generated_tokens = len(chunk_token_ids)
+
+            chunk_boundary = _detect_reasoning_boundary(
+                context,
+                chunk_text,
+                chunk_token_ids,
+                source_output.stop_reason,
+            )
+            (
+                chunk_text,
+                chunk_token_ids,
+                stop_boundary_aligned,
+            ) = _align_stop_boundary_delta(
+                context,
+                chunk_text,
+                chunk_token_ids,
+                chunk_boundary,
+                source_output.stop_reason,
+                prior_text=prior_raw_text,
+                prior_token_ids=prior_raw_token_ids,
+            )
 
             full_text, all_token_ids = _replace_or_append(
                 kind,
@@ -296,12 +391,6 @@ class _BaseState(ABC):
                     or source_output.finish_reason
                 )
 
-            chunk_boundary = _detect_reasoning_boundary(
-                context,
-                chunk_text,
-                chunk_token_ids,
-                source_output.stop_reason,
-            )
             if chunk_boundary is not None:
                 if (
                     detected_boundary is not None
@@ -320,6 +409,14 @@ class _BaseState(ABC):
             ]
             visible_output.text = chunk_text
             visible_output.token_ids = chunk_token_ids
+            if (
+                stop_boundary_aligned
+                and getattr(source_output, "logprobs", None) is not None
+            ):
+                visible_output.logprobs = _aligned_logprobs(
+                    source_output.logprobs,
+                    len(chunk_token_ids),
+                )
             visible_output.finish_reason = None
             visible_output.stop_reason = None
             visible_result.finished = False
@@ -336,6 +433,7 @@ class _BaseState(ABC):
                         else "thinking"
                     ),
                     reasoning_boundary=chunk_boundary,
+                    stop_boundary_aligned=stop_boundary_aligned,
                 )
                 context.last_chunk = visible_result
             last_output = result
@@ -349,6 +447,7 @@ class _BaseState(ABC):
             )
         return (
             all_token_ids,
+            raw_generated_tokens,
             last_output,
             full_text,
             terminal_reason,
@@ -474,6 +573,7 @@ class _ThinkingState(_BaseState):
             )
             (
                 generated_token_ids,
+                raw_generated_tokens,
                 last_output,
                 generated_text,
                 stop_reason,
@@ -498,7 +598,7 @@ class _ThinkingState(_BaseState):
             last_output,
             reasoning_boundary,
         )
-        generated_tokens = len(generated_token_ids)
+        generated_tokens = raw_generated_tokens
         controller_cpu_ms += (
             perf_counter() - controller_started) * 1000
         wall_ms = (perf_counter() - phase_started) * 1000
