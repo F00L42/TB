@@ -876,6 +876,11 @@ class _FinalAnswerState(_BaseState):
                     generated_tokens = chunk_tokens
                 last_output = result
                 output = result.outputs[0]
+                if terminal_output is not None:
+                    raise RuntimeError(
+                        "final answer child emitted multiple terminals"
+                        if output.finish_reason is not None
+                        else "final answer child emitted output after terminal")
                 if output.finish_reason is None:
                     await context.stream_output(
                         result,
@@ -899,30 +904,7 @@ class _FinalAnswerState(_BaseState):
                     )
                     propagated_error = True
                     break
-                if terminal_output is not None:
-                    raise RuntimeError(
-                        "final answer child emitted multiple terminals")
                 terminal_output = result
-                if output.text or output.token_ids:
-                    body_result = copy.copy(result)
-                    body_output = copy.copy(output)
-                    body_result.outputs = [
-                        body_output,
-                        *result.outputs[1:],
-                    ]
-                    body_output.finish_reason = None
-                    body_output.stop_reason = None
-                    body_result.finished = False
-                    await context.stream_output(
-                        body_result,
-                        source_result=result,
-                        phase="final_answer",
-                        child_request_id=child_request_id,
-                        event="terminal_body",
-                        controller_state="free_final_answer",
-                        next_state="terminal_flush",
-                        reasoning_boundary=state.reasoning_boundary,
-                    )
         if last_output is None:
             raise RuntimeError(
                 "final_answer completed without a vLLM output")
@@ -933,7 +915,7 @@ class _FinalAnswerState(_BaseState):
             raise RuntimeError(
                 "final_answer completed without a terminal output")
 
-        await context.stream_terminal(
+        await context.stream_final_terminal(
             terminal_output,
             phase="final_answer",
             child_request_id=child_request_id,

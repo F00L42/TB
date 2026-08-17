@@ -85,7 +85,7 @@ def classify(
         row for row in records
         if row.get("event") in {
             "delta", "terminal_body", "synthetic_boundary",
-            "terminal_flush", "error_terminal",
+            "terminal_flush", "final_terminal_passthrough", "error_terminal",
         }
         or (row.get("schema") == 1 and row.get("phase") != "controller_end")
     ]
@@ -135,6 +135,15 @@ def classify(
         for row in state_entries
     )
     terminal_flush_count = sum(bool(row.get("terminal_flush")) for row in records)
+    final_source_terminal_count = sum(
+        row.get("event") == "final_terminal_passthrough"
+        and row.get("terminal_origin") == "source"
+        for row in records
+    )
+    final_terminal_passthrough_count = sum(
+        bool(row.get("final_terminal_passthrough")) for row in records)
+    synthetic_terminal_count = sum(
+        bool(row.get("synthetic_terminal")) for row in records)
     completion_epochs = {
         int(row["completion_epoch"])
         for row in records
@@ -155,7 +164,9 @@ def classify(
         for row in records
         if isinstance(row.get("schema"), int)
         and row["schema"] >= 2
-        and row.get("event") in {"delta", "terminal_body"}
+        and row.get("event") in {
+            "delta", "terminal_body", "final_terminal_passthrough",
+        }
         and not row.get("terminal_flush")
         and (
             row.get("raw_text_sha256") != row.get("forwarded_text_sha256")
@@ -164,8 +175,36 @@ def classify(
         )
         and not is_valid_stop_boundary_alignment(row)
     ]
+    terminal_passthrough_violations = [
+        int(row.get("sequence") or 0)
+        for row in records
+        if row.get("event") == "final_terminal_passthrough"
+        and (
+            row.get("terminal_origin") != "source"
+            or not row.get("final_terminal_passthrough")
+            or row.get("synthetic_terminal")
+            or row.get("raw_text_sha256") != row.get("forwarded_text_sha256")
+            or row.get("source_token_ids_sha256")
+            != row.get("forwarded_token_ids_sha256")
+            or row.get("source_finish_reason")
+            != row.get("forwarded_finish_reason")
+            or row.get("source_stop_reason")
+            != row.get("forwarded_stop_reason")
+            or row.get("raw_finished") != row.get("forwarded_finished")
+        )
+    ]
+    has_schema_four = any(
+        isinstance(row.get("schema"), int) and row["schema"] >= 4
+        for row in records
+    )
+    terminal_contract_failure = (
+        final_source_terminal_count != 1
+        or final_terminal_passthrough_count != 1
+        or synthetic_terminal_count != 0
+        or bool(terminal_passthrough_violations)
+    ) if has_schema_four else terminal_flush_count != 1
     lifecycle_failures = (
-        terminal_flush_count != 1
+        terminal_contract_failure
         or completion_epoch_count != 1
         or duplicate_reasoning_boundary > 0
         or fresh_final_after_tool_boundary > 0
@@ -180,6 +219,8 @@ def classify(
         diagnosis = "missing_server_trace"
     elif invalid_boundary_alignments:
         diagnosis = "controller_stop_boundary_alignment_failure"
+    elif terminal_passthrough_violations:
+        diagnosis = "controller_terminal_binding_failure"
     elif passthrough_violations:
         diagnosis = "controller_passthrough_violation"
     elif lifecycle_failures:
@@ -253,6 +294,12 @@ def classify(
         ],
         "completion_epoch_count": completion_epoch_count,
         "terminal_flush_count": terminal_flush_count,
+        "final_source_terminal_count": final_source_terminal_count,
+        "final_terminal_passthrough_count": final_terminal_passthrough_count,
+        "synthetic_terminal_count": synthetic_terminal_count,
+        "terminal_contract_valid": not terminal_contract_failure,
+        "terminal_passthrough_violation_sequences": (
+            terminal_passthrough_violations),
         "duplicate_reasoning_boundary": duplicate_reasoning_boundary,
         "fresh_final_after_tool_boundary": fresh_final_after_tool_boundary,
         "thinking_or_probe_after_tool_boundary": (
@@ -306,7 +353,11 @@ def main(argv: list[str] | None = None) -> int:
             f"request_id={request_id} variant={analysis['variant']} "
             f"diagnosis={analysis['diagnosis']} "
             f"epochs={analysis['completion_epoch_count']} "
-            f"terminal_flushes={analysis['terminal_flush_count']}"
+            f"terminal_flushes={analysis['terminal_flush_count']} "
+            f"source_terminals={analysis['final_source_terminal_count']} "
+            "terminal_passthroughs="
+            f"{analysis['final_terminal_passthrough_count']} "
+            f"synthetic_terminals={analysis['synthetic_terminal_count']}"
         )
 
     output_path = args.output or args.run_dir / "analysis.json"
@@ -333,6 +384,25 @@ def main(argv: list[str] | None = None) -> int:
                 "terminal_flush_one": sum(
                     row["terminal_flush_count"] == 1
                     for row in dtb_analyses
+                ),
+                "final_source_terminal_one": sum(
+                    row["final_source_terminal_count"] == 1
+                    for row in dtb_analyses
+                ),
+                "final_terminal_passthrough_one": sum(
+                    row["final_terminal_passthrough_count"] == 1
+                    for row in dtb_analyses
+                ),
+                "no_synthetic_terminal": sum(
+                    row["synthetic_terminal_count"] == 0
+                    for row in dtb_analyses
+                ),
+                "no_terminal_passthrough_violation": sum(
+                    not row["terminal_passthrough_violation_sequences"]
+                    for row in dtb_analyses
+                ),
+                "terminal_contract_valid": sum(
+                    row["terminal_contract_valid"] for row in dtb_analyses
                 ),
                 "no_fresh_final_after_tool_boundary": sum(
                     row["fresh_final_after_tool_boundary"] == 0

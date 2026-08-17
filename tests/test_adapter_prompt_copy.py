@@ -260,7 +260,7 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         line = stdout.getvalue().strip()
         self.assertTrue(line.startswith("TB_TOOL_STREAM "))
         record = json.loads(line.split(" ", 1)[1])
-        self.assertEqual(record["schema"], 3)
+        self.assertEqual(record["schema"], 4)
         self.assertEqual(record["source"], "controller_pre_parser")
         self.assertEqual(record["raw_text"], "f")
         self.assertEqual(
@@ -275,6 +275,9 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(record["stop_boundary_aligned"])
         self.assertEqual(record["alignment_dropped_token_ids"], [])
+        self.assertEqual(record["terminal_origin"], "none")
+        self.assertFalse(record["final_terminal_passthrough"])
+        self.assertFalse(record["synthetic_terminal"])
 
     async def test_stream_debug_records_stop_boundary_token_alignment(
         self,
@@ -410,8 +413,11 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(second_visible.outputs[0].token_ids, second_ids)
         self.assertEqual(reasoning_boundary.value, "think_end")
 
-    async def test_terminal_flush_is_empty_and_emitted_once(self) -> None:
+    async def test_final_source_terminal_is_forwarded_unchanged_once(
+        self,
+    ) -> None:
         context = make_context()
+        context.stream_debug_enabled = True
         source_output = SimpleNamespace(
             text="answer",
             token_ids=[10],
@@ -424,24 +430,67 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
             finished=True,
         )
 
-        await context.stream_terminal(
-            source,
-            phase="final_answer",
-            child_request_id="final-1",
-        )
-        terminal = await context.result_queue.get()
-
-        self.assertEqual(terminal.outputs[0].text, "")
-        self.assertEqual(terminal.outputs[0].token_ids, [])
-        self.assertEqual(terminal.outputs[0].finish_reason, "stop")
-        self.assertEqual(terminal.outputs[0].stop_reason, "eos")
-        self.assertEqual(context.algorithm_state.terminal_flush_count, 1)
-        with self.assertRaisesRegex(RuntimeError, "already emitted terminal"):
-            await context.stream_terminal(
+        stream = io.StringIO()
+        with redirect_stdout(stream):
+            await context.stream_final_terminal(
                 source,
                 phase="final_answer",
                 child_request_id="final-1",
             )
+        terminal = await context.result_queue.get()
+
+        self.assertIs(terminal, source)
+        self.assertIs(terminal.outputs[0], source_output)
+        self.assertEqual(terminal.outputs[0].text, "answer")
+        self.assertEqual(terminal.outputs[0].token_ids, [10])
+        self.assertEqual(terminal.outputs[0].logprobs, ["lp"])
+        self.assertEqual(terminal.outputs[0].finish_reason, "stop")
+        self.assertEqual(terminal.outputs[0].stop_reason, "eos")
+        self.assertTrue(terminal.finished)
+        self.assertEqual(context.algorithm_state.final_terminal_count, 1)
+        record = json.loads(
+            stream.getvalue().strip().removeprefix("TB_TOOL_STREAM "))
+        self.assertEqual(record["schema"], 4)
+        self.assertEqual(record["event"], "final_terminal_passthrough")
+        self.assertEqual(record["terminal_origin"], "source")
+        self.assertTrue(record["final_terminal_passthrough"])
+        self.assertFalse(record["synthetic_terminal"])
+        self.assertEqual(record["raw_text"], "answer")
+        self.assertEqual(record["forwarded_text_length"], len("answer"))
+        self.assertEqual(record["token_ids"], [10])
+        self.assertEqual(record["forwarded_token_ids"], [10])
+        self.assertEqual(record["source_finish_reason"], "stop")
+        self.assertEqual(record["forwarded_finish_reason"], "stop")
+        self.assertTrue(record["raw_finished"])
+        self.assertTrue(record["forwarded_finished"])
+        with self.assertRaisesRegex(RuntimeError, "already emitted terminal"):
+            await context.stream_final_terminal(
+                source,
+                phase="final_answer",
+                child_request_id="final-1",
+            )
+
+    async def test_natural_empty_source_terminal_is_forwarded_unchanged(
+        self,
+    ) -> None:
+        context = make_context()
+        source_output = SimpleNamespace(
+            text="",
+            token_ids=[],
+            logprobs=None,
+            finish_reason="stop",
+            stop_reason="eos",
+        )
+        source = SimpleNamespace(outputs=[source_output], finished=True)
+
+        await context.stream_final_terminal(
+            source,
+            phase="final_answer",
+            child_request_id="final-1",
+        )
+
+        self.assertIs(await context.result_queue.get(), source)
+        self.assertEqual(context.algorithm_state.final_terminal_count, 1)
 
 
 class ResponseContextTests(unittest.IsolatedAsyncioTestCase):

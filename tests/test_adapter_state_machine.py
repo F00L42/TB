@@ -206,13 +206,13 @@ def call_phases(engine: ScriptedEngine) -> list[str]:
 
 
 class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
-    async def test_final_body_and_terminal_are_separate(self):
+    async def test_final_body_and_terminal_remain_bound_together(self):
+        final_result = result(
+            "answer", [30], finish_reason="stop", stop_reason="eos")
         context, _ = make_context([
             [result("thought", [10])],
             [result("trial", [20], confidence=-0.01)],
-            [result(
-                "answer", [30], finish_reason="stop",
-                stop_reason="eos")],
+            [final_result],
         ])
 
         outputs = await run_and_drain_outputs(context)
@@ -222,10 +222,11 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         ]
         answer = next(output for output in outputs if output.text == "answer")
 
-        self.assertIsNone(answer.finish_reason)
+        self.assertIs(answer, final_result.outputs[0])
         self.assertEqual(len(terminals), 1)
-        self.assertEqual(terminals[0].text, "")
-        self.assertEqual(terminals[0].token_ids, [])
+        self.assertIs(terminals[0], answer)
+        self.assertEqual(terminals[0].text, "answer")
+        self.assertEqual(terminals[0].token_ids, [30])
         self.assertEqual(terminals[0].finish_reason, "stop")
         self.assertEqual(terminals[0].stop_reason, "eos")
 
@@ -456,7 +457,7 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             FinalAnswerReason.MODEL_TOOL_CALL,
         )
         self.assertEqual(context.algorithm_state.probe_round, 0)
-        self.assertEqual(context.algorithm_state.terminal_flush_count, 1)
+        self.assertEqual(context.algorithm_state.final_terminal_count, 1)
         self.assertTrue(engine.calls[-1]["kwargs"]["reasoning_ended"])
         self.assertEqual(
             engine.calls[-1]["prompt_token_ids"],

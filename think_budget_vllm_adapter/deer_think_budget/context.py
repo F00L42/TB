@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
 import hashlib
 import json
 import os
@@ -86,7 +85,7 @@ class RequestAlgorithmState:
     thinking_segments: int = 0
     final_answer_reason: FinalAnswerReason | None = None
     assistant_completion_epoch: int = 1
-    terminal_flush_count: int = 0
+    final_terminal_count: int = 0
 
 
 @dataclass
@@ -209,6 +208,8 @@ class RequestStateContext:
         reasoning_boundary: ReasoningBoundary | None,
         terminal_flush: bool,
         stop_boundary_aligned: bool,
+        terminal_origin: str,
+        final_terminal_passthrough: bool,
     ) -> None:
         if not self.stream_debug_enabled:
             return
@@ -231,7 +232,7 @@ class RequestStateContext:
             else []
         )
         record = {
-            "schema": 3,
+            "schema": 4,
             "source": "controller_pre_parser",
             "event": event,
             "parent_request_id": self.request_id,
@@ -253,6 +254,7 @@ class RequestStateContext:
                 source_output, "finish_reason", None),
             "source_stop_reason": getattr(
                 source_output, "stop_reason", None),
+            "raw_finished": getattr(source_result, "finished", None),
             "forwarded_text_sha256": self._stream_text_digest(
                 forwarded_text),
             "forwarded_text_length": len(forwarded_text),
@@ -264,7 +266,11 @@ class RequestStateContext:
                 forwarded_output, "finish_reason", None),
             "forwarded_stop_reason": getattr(
                 forwarded_output, "stop_reason", None),
+            "forwarded_finished": getattr(result, "finished", None),
             "terminal_flush": terminal_flush,
+            "terminal_origin": terminal_origin,
+            "final_terminal_passthrough": final_terminal_passthrough,
+            "synthetic_terminal": terminal_origin == "synthetic",
             "stop_boundary_aligned": stop_boundary_aligned,
             "alignment_dropped_token_ids": dropped_token_ids,
             "alignment_dropped_token_count": len(dropped_token_ids),
@@ -288,6 +294,8 @@ class RequestStateContext:
         reasoning_boundary: ReasoningBoundary | None = None,
         terminal_flush: bool = False,
         stop_boundary_aligned: bool = False,
+        terminal_origin: str = "none",
+        final_terminal_passthrough: bool = False,
     ) -> None:
         self._log_stream_delta(
             result=result,
@@ -300,6 +308,8 @@ class RequestStateContext:
             reasoning_boundary=reasoning_boundary,
             terminal_flush=terminal_flush,
             stop_boundary_aligned=stop_boundary_aligned,
+            terminal_origin=terminal_origin,
+            final_terminal_passthrough=final_terminal_passthrough,
         )
         await self.result_queue.put(result)
 
@@ -324,47 +334,44 @@ class RequestStateContext:
             reasoning_boundary=reasoning_boundary,
             terminal_flush=False,
             stop_boundary_aligned=False,
+            terminal_origin="none",
+            final_terminal_passthrough=False,
         )
 
-    async def stream_terminal(
+    async def stream_final_terminal(
         self,
         source_result: Any,
         *,
         phase: str,
         child_request_id: str,
     ) -> None:
-        """Send one terminal-only delta after the final body was forwarded."""
+        """Forward the final child's source terminal exactly once."""
         state = self.algorithm_state
-        if state.terminal_flush_count:
+        if state.final_terminal_count:
             raise RuntimeError("assistant completion already emitted terminal")
         source_output = self._first_output(source_result)
         if source_output is None or getattr(
             source_output, "finish_reason", None
         ) is None:
-            raise RuntimeError("terminal flush requires a finished child output")
-        terminal_result = copy.copy(source_result)
-        terminal_output = copy.copy(source_output)
-        terminal_result.outputs = [
-            terminal_output,
-            *source_result.outputs[1:],
-        ]
-        terminal_output.text = ""
-        terminal_output.token_ids = []
-        if hasattr(terminal_output, "logprobs"):
-            terminal_output.logprobs = None
-        terminal_result.finished = True
-        state.terminal_flush_count += 1
+            raise RuntimeError(
+                "final terminal passthrough requires a finished child output")
+        if getattr(source_result, "finished", None) is not True:
+            raise RuntimeError(
+                "final terminal passthrough requires source finished=True")
+        state.final_terminal_count += 1
         await self.stream_output(
-            terminal_result,
+            source_result,
             source_result=source_result,
             phase=phase,
             child_request_id=child_request_id,
-            event="terminal_flush",
+            event="final_terminal_passthrough",
             controller_state="free_final_answer",
             next_state="complete",
             reasoning_boundary=state.reasoning_boundary,
-            terminal_flush=True,
+            terminal_flush=False,
             stop_boundary_aligned=False,
+            terminal_origin="source",
+            final_terminal_passthrough=True,
         )
 
     def encode_prompt_suffix(self, text: str) -> tuple[int, ...]:
