@@ -454,6 +454,51 @@ tool call index/name 序列相同
 `synthetic_empty_terminal` 的结果只用于解释历史失败，不作为原生 parser 必须支持的输入契约。
 无论它是否通过，都不得恢复人工空 delta 方案。
 
+#### 3.5.1 2026-08-17 离线实测结果
+
+已使用固定 `third_party/vllm` `v0.23.0`（commit
+`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`）的未修改源码完成首轮测试。fixture 直接取自
+`run_after_handoff_fix_14` 第 14 条 attempt 1 DTB final-answer 的 sequence 14～48，并从首个
+`<tool_call>` 开始回放。归档中的 source terminal 为：
+
+```text
+text      = "ter>\n</function>\n</tool_call>"
+token_ids = [1628, 29, 198, 248059, 248046]
+```
+
+测试只在 token `[248059, 248046]` 前改变调用边界；三条轨迹的拼接 text、拼接 token IDs 完全
+相同，且各有且只有一次 `finished=True`。Qwen parser 源码及 `DelegatingParser` 源码均直接从
+固定 checkout 加载执行；本地只 stub OpenAI/vLLM protocol 数据类型和 tokenizer 接口，没有
+stub parser 逻辑，没有加载模型或 torch。源码 SHA-256 由工具写入每次输出，因此该结论属于
+**无模型实测**，不是目标服务器验收。
+
+| parser 层 | `separate_close` | `bundled_source_terminal` | `synthetic_empty_terminal` |
+| --- | --- | --- | --- |
+| 直接 `Qwen3CoderToolParser` | JSON 完整，末尾发出 `}` | 缺 `}`，JSON 无效 | 缺 `}`，JSON 无效 |
+| `DelegatingParser.parse_delta` | JSON 完整，末尾发出 `}` | 缺 `}`，JSON 无效 | 缺 `}`，JSON 无效 |
+| 上游 `run_tool_extraction_streaming` 字符串分片复核 | JSON 完整，末尾发出 `}` | 缺 `}`，JSON 无效 | 缺 `}`，JSON 无效 |
+
+另外直接执行上游测试文件中 `stream_delta_message_generator` 的原始函数定义，使用一 token 一次
+callback 的轨迹作为成功控制；该控制得到完整 JSON。这个结果与现有上游单元测试一致，但不能
+反证 bundled 失败：token-by-token 轨迹会在最后 parameter 完成后再用新的非空 callback 交付
+`</function>`，恰好绕开本次 speculative batch 的触发条件。
+
+第一处分歧发生在最后参数与关闭标签同批时。`Qwen3CoderToolParser` 先完成最后一个 parameter，
+在 `json_fragments` 非空分支立即返回参数 fragment；同一次调用中已经存在的 `</function>` 因此
+没有进入后续 function-close 分支。最终状态仍为 `in_function=true`、`json_closed=false`，
+`streamed_args_for_tool` 已包含完整成员但没有右花括号，`prev_tool_call_arr.arguments` 仍为初始
+`{}`。`DelegatingParser` 随后的 `finished=True` 兜底只能追加“已经解析但尚未发送”的差值；此时
+expected `{}` 并不是 actual `{...` 的前缀，所以追加为空，不能修复该状态。
+
+人工空 terminal 也不能推动状态机：下一次空 `delta_text` 在 tool parser 顶部直接返回 `None`，
+不会重新处理上一批累计文本中的 `</function>`。只有 `separate_close` 的下一次**非空**调用会
+到达 function-close 分支，发出 `}` 并将状态改为 `in_function=false/json_closed=true`。
+
+因此 3.5 的 parser 修改决策门已经成立：DTB 恢复 source terminal 原样透传是必要的层次修复，
+但当前原生 parser 对合法的 bundled source terminal 仍存在分片敏感性。下一阶段应另立最小
+single-delta drain/parser 修复设计，使一次调用内完成 parameter 后继续处理同批 close；本阶段
+保持 parser 不变，不恢复人工空 delta，也不在 DTB/SSE 层补写 `}`。
+
 ### 3.6 多轮请求边界
 
 多轮请求必须保持以下不变量：
@@ -649,7 +694,7 @@ reason/content/reasoning；更推荐直接让它调用 paired replay 的 observa
 
 ### 5.4 离线 parser 分片等价工具
 
-新增 `docs/debug/tool_call/test_parser_partition_equivalence.py`，只读取仓库内 fixture，不调用
+已新增 `docs/debug/tool_call/test_parser_partition_equivalence.py`，只读取仓库内 fixture，不调用
 HTTP 服务。fixture 至少保存：
 
 ```text
@@ -666,16 +711,41 @@ helper。输出逐步 trace 和机器可读 summary，至少包含每次返回�
 arguments、JSON 校验结果及第一处分歧。随机 tool-call ID 在比较前归一化，但 tool index、name
 和 arguments 不得归一化。
 
-同一 fixture 运行两层 harness：第一层直接调用 `Qwen3CoderToolParser`，用于定位 parameter、
-function-close 和内部 streamed/expected arguments 的状态；第二层调用原生
+同一 fixture 的主裁决运行两层 harness：第一层直接调用 `Qwen3CoderToolParser`，用于定位
+parameter、function-close 和内部 streamed/expected arguments 的状态；第二层调用原生
 `DelegatingParser.parse_delta(..., finished=...)`，用于覆盖 reasoning → tool handoff、
 `finished=True` 和 remaining-args 兜底。最终裁决以第二层的 parser-facing 完整行为为准，第一层
 只用于解释分歧位置，不能用直接 tool-parser 通过代替 DelegatingParser 通过。
 
-第一批 fixture 使用第 14 条 attempt 1 和第 23 条 attempt 3/4 的归档内容，覆盖
-`separate_close`、`bundled_source_terminal`、`synthetic_empty_terminal`。后续再增加同一
+在主裁决之外复用两种上游测试能力：
+
+- 从 `third_party/vllm/tests/tool_parsers/utils.py` 直接加载
+  `run_tool_extraction_streaming`/`StreamingToolReconstructor`，对三种字符串 delta 分片独立重组
+  tool call；该层复核 parser 与客户端重组结果，但不会传入真实 token IDs 或 `finished`，不能
+  代替 `DelegatingParser` 层；
+- 从 `test_qwen3coder_tool_parser.py` 直接执行 `stream_delta_message_generator` 的原始函数定义，
+  建立 token-by-token 成功控制。该控制用于证明 parser 的常规逐 token 路径正常，同时明确现有
+  上游用例没有覆盖“最后 parameter 与 close 同一 speculative delta”的缺口。
+
+上游完整 test module 会引入 pytest、xgrammar、真实 tokenizer 和完整 vLLM/torch 导入链；离线
+harness 只加载上述 helper 定义和 utils 源文件，并记录它们的 SHA-256。真实归档 text/token IDs
+及 terminal 语义仍由主裁决层保持，不能为了复用 helper 改成重新 tokenize 后作为最终证据。
+
+当前首个 fixture 从第 14 条 attempt 1 的 `analysis.json` 直接读取归档 text 和 token IDs，覆盖
+`separate_close`、`bundled_source_terminal`、`synthetic_empty_terminal`。第 23 条 attempt 3/4
+保留为下一批交叉验证 fixture；后续再增加同一
 speculative delta 内多个完整 parameter、多个 tool call，以及 raw XML 被 `length` 截断的
 负例；负例不得由测试工具或 parser 自动补齐。
+
+本地执行接口为：
+
+```bash
+python docs/debug/tool_call/test_parser_partition_equivalence.py --summary-only
+python docs/debug/tool_call/test_parser_partition_equivalence.py --summary-only --require-equivalence
+```
+
+第一条输出完整机器可读裁决和重组 arguments；去掉 `--summary-only` 可查看逐 delta trace。第二条
+在任一 parser 层不满足分片等价时返回非零，本轮未修改 parser 的预期退出码为 `1`。
 
 ## 6. 服务器执行方案
 
@@ -897,12 +967,17 @@ reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随
   alignment；2026-08-17 已进一步删除“非空 terminal body + 合成空 terminal”的拆分，final
   source terminal 现在以同一对象、同一 `text/token_ids/finish_reason/stop_reason/finished` 原样
   进入 result queue；中间 child terminal 仍由控制器消费；
-- “人工空 delta 触发 remaining arguments flush”的假设已由服务器结果和源码路径共同否定；
-  schema 4 `TB_TOOL_STREAM` 已增加 source/forwarded finished、terminal origin、原样透传和
-  synthetic terminal 字段，分析器兼容旧 schema 并增加相应计数；离线无模型分片等价工具仍是
-  下一步待实现项；
-- 当前没有批准修改 `Qwen3CoderToolParser`；是否需要 single-delta drain，必须等待 DTB 终止
-  契约恢复后的离线 `separate_close/bundled_source_terminal` 对比结果；
+- “人工空 delta 触发 remaining arguments flush”的假设已由服务器结果、源码路径和离线原生
+  parser 回放共同否定；schema 4 `TB_TOOL_STREAM` 已增加 source/forwarded finished、terminal
+  origin、原样透传和 synthetic terminal 字段，分析器兼容旧 schema 并增加相应计数；
+- 离线工具已直接执行固定 vLLM `v0.23.0` 的未修改 `Qwen3CoderToolParser` 和
+  `DelegatingParser`，并复用上游 `run_tool_extraction_streaming`/`StreamingToolReconstructor`：
+  `separate_close` 三层均生成合法 JSON，`bundled_source_terminal` 与
+  `synthetic_empty_terminal` 三层均只缺最终 `}`，`--require-equivalence` 按预期退出 `1`；上游
+  `stream_delta_message_generator` token-by-token 控制生成合法 JSON，确认现有逐 token 测试未覆盖
+  speculative bundled close；
+- parser 修改决策门已成立，但当前仍没有修改 `Qwen3CoderToolParser`；下一阶段需先设计并评审
+  single-delta drain 的最小上游修复，不能把补丁放回 DTB 或 SSE 层；
 - schema 3 保存 raw/forwarded/dropped IDs，分析器校验显式 alignment 而不把它误报为任意
   parser-facing 篡改；
 - 本轮无模型完整测试共运行 100 项，其中 99 项通过、1 项因 bundled runtime 缺少 PyYAML 按
@@ -921,3 +996,5 @@ reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随
 | 2026-08-14 | 根据 `run_after_handoff_fix` 和 commit `821ded` 将增量交接标记为已实测修复；撤销“空 terminal 可完成参数 flush”的假设，设计原生 parser single-delta drain、外部 completion 剩余额度和真实 finish reason | 主实验 100/100 不再缺 tool 前缀，但 12 次 raw XML 完整而 JSON 缺 `}`；第 11 条 5/5 被默认 2048 final cap 截断并把 `length` 误报为 `tool_calls` |
 | 2026-08-17 | 将参数 finalization 拆为“DTB 终止绑定违约”和“原生 parser 分片等价待裁决”；取消人工空 terminal 方案，先只恢复 final source terminal 原样透传，再用未修改 parser 做离线无模型分片等价测试 | Vanilla 的空 SSE finish 位于 parser 之后，不能作为 parser 输入 flush 协议；当前 DTB 把非空 source terminal 拆成未结束正文与人工空 terminal，已经违反 parser-facing 等价原则 |
 | 2026-08-17 | 落地 DTB final source terminal 原样透传和 schema 4 terminal 对账，保持原生 parser 不变 | 先消除已确定的 DTB 终止绑定违约，再由下一阶段离线分片等价测试裁决 parser 行为 |
+| 2026-08-17 | 使用第 14 条 attempt 1 归档 text/token IDs 完成原生 parser 无模型分片等价测试，直接覆盖 `Qwen3CoderToolParser` 与 `DelegatingParser` 两层 | 三条轨迹逻辑输入相同，但 bundled source terminal 和人工空 terminal 均缺最终 `}`；确认原生 parser 对合法同批 parameter/close 分片敏感，parser 最小修复决策门成立 |
+| 2026-08-17 | 离线工具复用上游 `stream_delta_message_generator`、`run_tool_extraction_streaming` 和 `StreamingToolReconstructor` | token-by-token 控制正常，而上游字符串分片重组再次确认 bundled close 缺 `}`；明确现有上游逐 token 测试与 speculative batch 回归测试的覆盖边界 |
