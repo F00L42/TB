@@ -3,8 +3,9 @@
 
 The target vLLM checkout cannot be imported as a complete package on the local
 Windows host because its package initializer requires torch.  This harness
-stubs only protocol/data dependencies, then loads and executes the unmodified
-parser source files from ``third_party/vllm``.
+stubs only protocol/data dependencies, then loads and executes parser source
+files.  By default all sources come from ``third_party/vllm``; an experimental
+Qwen parser source can be supplied without modifying that fixed checkout.
 """
 
 from __future__ import annotations
@@ -624,6 +625,13 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(ROOT.resolve()))
+    except ValueError:
+        return str(path.resolve())
+
+
 def _detokenize_incrementally_stub(
     *,
     tokenizer: FakeTokenizer,
@@ -639,10 +647,16 @@ def _detokenize_incrementally_stub(
     return [delta_text], delta_text, 0, len(decoded)
 
 
-def run() -> dict[str, Any]:
+def run(qwen_parser_source: Path | None = None) -> dict[str, Any]:
     _install_import_boundary()
     base_path = VLLM_ROOT / "tool_parsers" / "abstract_tool_parser.py"
-    qwen_path = VLLM_ROOT / "tool_parsers" / "qwen3coder_tool_parser.py"
+    qwen_path = (
+        qwen_parser_source.resolve()
+        if qwen_parser_source is not None
+        else VLLM_ROOT / "tool_parsers" / "qwen3coder_tool_parser.py"
+    )
+    if not qwen_path.is_file():
+        raise FileNotFoundError(f"Qwen parser source does not exist: {qwen_path}")
     delegating_path = VLLM_ROOT / "parser" / "abstract_parser.py"
     test_utils_path = VLLM_TESTS_ROOT / "tool_parsers" / "utils.py"
     qwen_test_path = VLLM_TESTS_ROOT / "tool_parsers" / "test_qwen3coder_tool_parser.py"
@@ -794,7 +808,7 @@ def run() -> dict[str, Any]:
                 "sha256": _sha256(base_path),
             },
             "qwen3coder_tool_parser": {
-                "path": str(qwen_path.relative_to(ROOT)),
+                "path": _display_path(qwen_path),
                 "sha256": _sha256(qwen_path),
             },
             "delegating_parser": {
@@ -851,12 +865,20 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="exit non-zero when either native parser layer is partition-sensitive",
     )
+    parser.add_argument(
+        "--qwen-parser-source",
+        type=Path,
+        help=(
+            "load Qwen3CoderToolParser from this source file while keeping "
+            "the remaining vLLM sources fixed"
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    result = run()
+    result = run(args.qwen_parser_source)
     if args.summary_only:
         layers = result["layers"]
         result = {

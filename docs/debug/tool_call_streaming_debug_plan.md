@@ -499,6 +499,88 @@ expected `{}` 并不是 actual `{...` 的前缀，所以追加为空，不能修
 single-delta drain/parser 修复设计，使一次调用内完成 parameter 后继续处理同批 close；本阶段
 保持 parser 不变，不恢复人工空 delta，也不在 DTB/SSE 层补写 `}`。
 
+#### 3.5.2 缺失 `}` 的修复层次决策
+
+**Vanilla 没有机制上的逐 token 保证。** `v0.23.0` 的 engine output processor 按 engine step
+接收 `new_token_ids: list[int]`，并把整组 IDs 形成一个 `CompletionOutput`；`stream_interval=1` 只
+保证每个可发送 step 都输出，不把一组 accepted speculative tokens 拆成单 token。当前
+`start.sh` 又启用了 MTP `num_speculative_tokens=4`，所以 Vanilla 和 DTB 都可能向 parser 提交
+multi-token delta。
+
+归档中第 14 条 attempt 1 Vanilla 的 SSE 依次发出最后 `workdir` fragment 和单独的 `}`。按当前
+parser 源码，这只能说明该次 Vanilla 在最后 parameter 后又获得了一次非空 parser callback；
+它不能证明所有 Vanilla 都采用该分片。现有 Vanilla 样本均未失败是实测事实，但没有 Vanilla
+parser-input telemetry，无法区分“触发概率较低”与“当前 prompt/MTP acceptance 恰好稳定形成有利
+分片”。DTB final answer 是带压缩后 prompt 的新 child request，其 speculative acceptance 和
+Vanilla 可以不同，即使最后生成文本相同也不要求 delta 边界相同。后续若要量化 Vanilla 风险，
+必须在 `serving.py` 调用 `DelegatingParser.parse_delta` 之前对两种 variant 统一记录
+`delta_text/delta_token_ids/finished`；客户端 SSE 只能观察 parser 输出，不能替代该证据。
+
+要在保持 DTB parser-facing 原样透传的前提下保证修复，**必须改变 parser 层行为**。问题的本质是
+parser 把同一逻辑输入按不同合法分片解析成不同结果；如果既不改变 parser，又不改变输入分片，
+则没有第三个位置能够生成结构化 JSON 中的 `}`。
+
+当前决策是先做直接修改原生 parser 的服务器实验，以最少的运行时变量验证这条因果链。本仓库
+不修改只读的 `third_party/vllm` checkout，而是基于固定 `v0.23.0` 生成可审计 patch；服务器将
+patch 应用于实际 vLLM workspace，使 Vanilla 和 DTB 同时使用相同的修改后 parser。该 patch
+**不会合入项目主干，也不是发布方案**；实验结束后必须保存实际 diff、记录结果并 reverse。
+只有服务器结果确认有效且没有协议回归后，才另行决定提交上游，或用 server-wide plugin 承载
+下游版本；本轮不同时引入 plugin，避免把注册、加载路径和 parser 逻辑混成一个实验变量。
+
+最小 parser 行为不是无条件补写字符。它应在 parameter loop 后、返回 `json_fragments` 前检查
+同一 `tool_text` 中已存在的真实 `</function>`：若存在，则在一次状态迁移中完成原 close 分支
+对 `prev_tool_call_arr`、`streamed_args_for_tool`、`in_function/json_closed` 的更新，并把本次参数
+fragment 与 parser 负责生成的 `}` 合并进同一个 `DeltaFunctionCall.arguments`。若 close 不存在，
+保持当前增量行为；若 close 在后续 delta 到达，继续由原分支处理。回归测试应放在上游既有
+`test_streaming_multi_param_single_chunk` 附近，把“全部参数一批、close 下一批”的现有成功用例
+扩展为“最后参数与 `</function></tool_call>` 同一批”，并使用
+`run_tool_extraction_streaming`/`StreamingToolReconstructor` 裁决完整 JSON。
+
+可选方案及边界如下：
+
+| 方案 | 是否保证 | 契约与维护代价 | 决策 |
+| --- | --- | --- | --- |
+| 基于固定上游源码的原生 parser patch | 是，覆盖 Vanilla/DTB | 临时修改服务器 vLLM workspace，必须记录基线并可逆 | 本轮实验采用；不合入主干 |
+| server-wide parser plugin 或上游修复 | 是，覆盖 Vanilla/DTB | plugin 需锁定 vLLM 版本；上游修复需独立评审 | 实验有效后再决定 |
+| 直接修改 `third_party/vllm` 子模块 | 是 | 污染只读上游 checkout，升级和复现困难 | 不采用 |
+| DTB 将一个 source terminal 拆成两个真实非空子 delta | 可规避当前分片 | 改变原生 delta 顺序/terminal 绑定，引入 tokenizer 与 Qwen XML 知识 | 仅可做证伪实验，不作为发布修复 |
+| DTB 注入空白/重复 close/人工 `}` | 样本级规避 | 生成模型未输出的 parser 输入，可能重复调用或污染 content | 禁止 |
+| 工具请求禁用 DTB、回退 Vanilla | 不保证，只降低当前观察风险 | 放弃工具场景压缩；Vanilla 本身无分片保证 | 仅应急开关 |
+| 全局关闭 MTP | 大概率降低合批 | 破坏生产默认和性能目标，且其他聚合机制仍可能多 token | 只作诊断 |
+
+DTB 内部仍应做三件事，但都不负责合成 `}`：继续原样透传 final source terminal；记录
+raw/forwarded 五项一致性并对风险形态报警；在 parser 修复未产品化时保留“工具请求禁用 DTB”
+的显式应急策略。若实现 terminal 重分片实验，必须同时证明 text/IDs 拼接恒等、没有 synthetic
+token、只有一次真实 terminal，并在实验结束后删除；它不能改变本文的最终层次决策。
+
+#### 3.5.3 原生 parser 实验补丁
+
+实验产物为仓库根目录的
+[`qwen3coder_tool_parser_partition_fix.patch`](../../qwen3coder_tool_parser_partition_fix.patch)，
+基线严格固定为 vLLM `v0.23.0` commit
+`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。补丁只包含两处：
+
+1. `Qwen3CoderToolParser.extract_tool_calls_streaming()` 不再在发现 parameter fragments 后立即
+   返回；它先检查同一 `tool_text` 是否已经包含真实 `</function>`。若包含，则执行原有 close
+   状态迁移，并在本次 arguments delta 中返回 `combined + "}"`；若不包含，仍按原行为只返回
+   `combined`。补丁不注入 parser input、不修改 text/token IDs，也不依赖 `finished` 或空 delta；
+2. 在上游 `test_streaming_multi_param_single_chunk` 附近新增回归用例，把最后一个 parameter、
+   `</function>` 和 `</tool_call>` 放在同一个 delta，并由
+   `run_tool_extraction_streaming` 重组、`json.loads` 裁决。
+
+离线工具新增 `--qwen-parser-source PATH`，因此可以保持 `third_party/vllm` 干净，同时加载 patch
+后的临时 parser 源码做 A/B。2026-08-17 本地无模型实测结果为：
+
+| parser 层 | 原版 all partitions equal / bundled JSON | 补丁版 all partitions equal / bundled JSON |
+| --- | --- | --- |
+| 直接 `Qwen3CoderToolParser` | false / false | true / true |
+| `DelegatingParser` | false / false | true / true |
+| 上游 streaming test utility | false / false | true / true |
+
+`git -C third_party/vllm apply --check ../../qwen3coder_tool_parser_partition_fix.patch` 已通过，且
+`third_party/vllm` 工作树未被修改。这只是无模型因果验证；服务器上的真实 tokenizer、MTP、
+serving 和多工具行为仍必须按 6.4 验收。
+
 ### 3.6 多轮请求边界
 
 多轮请求必须保持以下不变量：
@@ -742,10 +824,14 @@ speculative delta 内多个完整 parameter、多个 tool call，以及 raw XML 
 ```bash
 python docs/debug/tool_call/test_parser_partition_equivalence.py --summary-only
 python docs/debug/tool_call/test_parser_partition_equivalence.py --summary-only --require-equivalence
+python docs/debug/tool_call/test_parser_partition_equivalence.py \
+  --qwen-parser-source /path/to/patched/qwen3coder_tool_parser.py \
+  --summary-only --require-equivalence
 ```
 
 第一条输出完整机器可读裁决和重组 arguments；去掉 `--summary-only` 可查看逐 delta trace。第二条
-在任一 parser 层不满足分片等价时返回非零，本轮未修改 parser 的预期退出码为 `1`。
+在任一 parser 层不满足分片等价时返回非零，未修改 parser 的预期退出码为 `1`。第三条保持其余
+固定上游源码不变，只替换 Qwen parser source；3.5.3 实验补丁的预期退出码为 `0`。
 
 ## 6. 服务器执行方案
 
@@ -817,7 +903,134 @@ completion-budget 修复混入实验：
 设计 single-delta drain 的最小上游补丁；若无需 parser 修改，则继续单独处理 completion
 budget 与真实 finish reason。
 
-### 6.4 第三轮：协议矩阵
+### 6.4 原生 parser patch 服务器实验
+
+本实验只验证 parser 分片敏感性是否是剩余缺 `}` 的充分原因，不改变 DTB，不混入 final-answer
+budget 修复，也不把结果直接当作主干发布批准。
+
+#### 6.4.1 记录基线并应用
+
+在服务器实际运行的 vLLM workspace 中执行；`/opt/p00906181/TB-main` 和 vLLM 路径按实际部署
+替换。应用前保存 commit、包版本和工作树状态。服务 workspace 可能已有 `dtb.patch`，所以不要求
+全树为空，但以下两个 parser/test 目标文件必须没有未记录的本地修改：
+
+```bash
+cd /path/to/vllm-workspace/vllm
+git rev-parse HEAD
+git describe --tags --always --dirty
+git status --short
+python -c 'import vllm.tool_parsers.qwen3coder_tool_parser as p; print(p.__file__)'
+git diff --exit-code -- \
+  vllm/tool_parsers/qwen3coder_tool_parser.py \
+  tests/tool_parsers/test_qwen3coder_tool_parser.py
+git apply --check \
+  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+git apply --whitespace=fix \
+  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+git diff --check
+git diff -- \
+  vllm/tool_parsers/qwen3coder_tool_parser.py \
+  tests/tool_parsers/test_qwen3coder_tool_parser.py
+```
+
+`python -c` 打印的模块路径必须指向即将修改的 workspace，或指向由该 workspace 建立的 editable
+安装；否则 patch 虽然成功，`start.sh` 启动的服务仍会加载另一份 parser。若路径不一致，使用
+服务器既有的 vLLM 构建/安装流程部署该 workspace，并在启动后再次记录模块路径和文件 SHA；
+不要临时修改一份来源不明的 site-packages 后省略部署记录。
+
+`git apply --check` 失败时不得用 `--reject` 继续。先确认实际 vLLM commit 是否为
+`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`，以及目标方法是否已有服务器私改；将失败输出和
+目标方法 diff 回传后再重制 patch。
+
+立即把服务器实际应用后的 diff 保存到实验目录；它是服务器事实，优先级高于本地预制 patch：
+
+```bash
+mkdir -p /opt/p00906181/TB-main/docs/debug/tool_call/run_after_parser_fix
+cd /path/to/vllm-workspace/vllm
+git diff --binary -- \
+  vllm/tool_parsers/qwen3coder_tool_parser.py \
+  tests/tool_parsers/test_qwen3coder_tool_parser.py \
+  > /opt/p00906181/TB-main/docs/debug/tool_call/run_after_parser_fix/applied_parser.patch
+sha256sum \
+  /opt/p00906181/TB-main/docs/debug/tool_call/run_after_parser_fix/applied_parser.patch
+```
+
+如果选择在服务器手工替换方法，也必须只实现 3.5.3 的 same-call drain，并执行上述 `git diff`
+保存步骤；不要顺带改 DTB、`DelegatingParser` 或 SSE serving。
+
+#### 6.4.2 无模型和上游定向测试
+
+先从 TB 仓库运行无模型裁决，直接加载服务器中已修改的源码：
+
+```bash
+cd /opt/p00906181/TB-main
+python docs/debug/tool_call/test_parser_partition_equivalence.py \
+  --qwen-parser-source \
+  /path/to/vllm-workspace/vllm/vllm/tool_parsers/qwen3coder_tool_parser.py \
+  --summary-only --require-equivalence
+```
+
+退出码必须为 `0`，三层 `all_partitions_equal` 和三种轨迹的 `valid_json` 必须全部为 true。然后在
+vLLM 测试环境运行补丁新增用例和相邻旧用例：
+
+```bash
+cd /path/to/vllm-workspace/vllm
+python -m pytest tests/tool_parsers/test_qwen3coder_tool_parser.py \
+  -k 'streaming_multi_param_single_chunk or streaming_last_param_and_close_single_chunk'
+```
+
+若完整 vLLM pytest 依赖或 tokenizer 缓存不可用，应记录为“上游测试未执行”并保留错误；无模型
+harness 通过不能伪装成该 pytest 已通过，但不阻塞先做服务器 smoke。
+
+#### 6.4.3 服务端 A/B 与裁决
+
+用与 `run_after_handoff_fix` 相同的模型、sampling、MTP、并发和 `start.sh` 参数重启服务。先对
+第 4 条做 20 次 smoke，再做 100 次 paired replay，输出目录分别使用
+`run_after_parser_fix_smoke` 和 `run_after_parser_fix`；随后第 14、23 条各 20 次，第 21 条做
+多工具无回归对照。命令形式沿用 6.2，只改变 `--start/--end`、`--repetitions` 和
+`--output-dir`。每一组都运行 `analyze_tool_call_run.py` 并回收关联 request ID 的 telemetry。
+
+实验通过条件为：
+
+```text
+离线 parser 三层 all_partitions_equal = true
+第 4 条 100 次 DTB invalid_arguments_json = 0
+expected_tool_call_missing = 0
+tool_xml_leaked_to_content = 0
+tool_after_content / terminal_after_output = 0
+controller_passthrough_violation = 0
+synthetic_terminal_count = 0
+final source terminal 五项仍与 forwarded terminal 完全相同
+Vanilla 不新增 parser、finish_reason 或多工具序列回归
+第 14、23 条不再因最后 parameter/close 同批而缺 `}`
+```
+
+只要 raw XML 本身完整而 arguments 仍缺 `}`，就必须保存对应 parser-input telemetry，不能归为
+模型 JSON 能力。若补丁消除缺 `}` 但引入重复 `}`、重复 tool call、错误 index/name 或 tool 后
+content，同样判实验失败。
+
+#### 6.4.4 保存结果并撤销
+
+该修改明确不合入主干。停止实验服务后只反向应用本 patch，不使用 `git reset` 或 checkout，
+以免覆盖服务器上其他 DTB 修改：
+
+```bash
+cd /path/to/vllm-workspace/vllm
+git apply --reverse --check \
+  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+git apply --reverse \
+  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+git diff --exit-code -- \
+  vllm/tool_parsers/qwen3coder_tool_parser.py \
+  tests/tool_parsers/test_qwen3coder_tool_parser.py
+git status --short
+```
+
+最后一个 `git diff --exit-code` 应恢复为应用前状态；若应用前目标文件本来就有修改，应改为对比
+应用前保存的 diff，而不是强行清理。实验目录至少保留预制 patch SHA、`applied_parser.patch`
+SHA、vLLM commit、pytest 输出、replay 产物、分析结果和对应 telemetry。
+
+### 6.5 第三轮：协议矩阵
 
 修复候选必须覆盖：
 
@@ -936,10 +1149,10 @@ boundary 判断提前终止。phase 账本必须把 boundary 前 token 计为 vi
 → 修复前失败与修复后成功的重复统计
 ```
 
-若终止语义修复后仍有 XML 泄漏：保留本次诊断产物，暂不宣称 adapter 修复完成；raw 或
-forwarded 已缺标记时回到 child generation、detokenizer 和 queue；只有 raw 完整、forwarded
-一致、parser 后仍泄漏时，才为 vLLM `v0.23.0` 制作最小 parser 回归测试并重新评审是否
-修改上游。不得用吞掉异常 content、事后正则拼 tool call 或关闭 MTP 作为发布修复。
+若后续仍有 XML 泄漏：保留本次诊断产物，暂不宣称 adapter 修复完成；raw 或 forwarded 已缺
+标记时回到 child generation、detokenizer 和 queue。当前缺 `}` 样本已经满足“raw 完整、
+forwarded 一致、parser 后失败”，因此按 6.4 用最小原生 parser patch 做因果实验。无论实验
+结果如何，都不得用吞掉异常 content、事后正则拼 tool call 或关闭 MTP 作为发布修复。
 
 本轮 DTB terminal 修复可以独立回滚，但不得恢复“人工空 delta 用于 parser flush”的设计；
 reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随本轮回滚。保守恢复逻辑
@@ -976,8 +1189,10 @@ reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随
   `synthetic_empty_terminal` 三层均只缺最终 `}`，`--require-equivalence` 按预期退出 `1`；上游
   `stream_delta_message_generator` token-by-token 控制生成合法 JSON，确认现有逐 token 测试未覆盖
   speculative bundled close；
-- parser 修改决策门已成立，但当前仍没有修改 `Qwen3CoderToolParser`；下一阶段需先设计并评审
-  single-delta drain 的最小上游修复，不能把补丁放回 DTB 或 SSE 层；
+- parser 修改决策门已成立；已基于固定 vLLM `v0.23.0` 生成实验 patch 和上游风格回归用例，
+  `git apply --check` 通过且 `third_party/vllm` 保持干净。离线 A/B 中原版三层均不等价、bundled
+  JSON 无效，补丁版三层均等价且 JSON 有效；该 patch 只用于服务器因果实验，不合入主干，
+  不能把补丁放回 DTB 或 SSE 层；
 - schema 3 保存 raw/forwarded/dropped IDs，分析器校验显式 alignment 而不把它误报为任意
   parser-facing 篡改；
 - 本轮无模型完整测试共运行 100 项，其中 99 项通过、1 项因 bundled runtime 缺少 PyYAML 按
@@ -998,3 +1213,5 @@ reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随
 | 2026-08-17 | 落地 DTB final source terminal 原样透传和 schema 4 terminal 对账，保持原生 parser 不变 | 先消除已确定的 DTB 终止绑定违约，再由下一阶段离线分片等价测试裁决 parser 行为 |
 | 2026-08-17 | 使用第 14 条 attempt 1 归档 text/token IDs 完成原生 parser 无模型分片等价测试，直接覆盖 `Qwen3CoderToolParser` 与 `DelegatingParser` 两层 | 三条轨迹逻辑输入相同，但 bundled source terminal 和人工空 terminal 均缺最终 `}`；确认原生 parser 对合法同批 parameter/close 分片敏感，parser 最小修复决策门成立 |
 | 2026-08-17 | 离线工具复用上游 `stream_delta_message_generator`、`run_tool_extraction_streaming` 和 `StreamingToolReconstructor` | token-by-token 控制正常，而上游字符串分片重组再次确认 bundled close 缺 `}`；明确现有上游逐 token 测试与 speculative batch 回归测试的覆盖边界 |
+| 2026-08-17 | 明确缺 `}` 的修复层次：Vanilla 无逐 token 保证，推荐 server-wide parser plugin 承载下游修复并同步提交上游，DTB 只保留原样透传、telemetry 和应急禁用 | 若不改变 parser 又不改变合法输入分片，就无法保证结构化结果；DTB 重分片或注入字符都会重新违反 parser-facing 等价原则 |
+| 2026-08-17 | 决定先用可逆 patch 直接修改服务器原生 parser 做因果实验，不引入 plugin、不修改 `third_party/vllm`，实验结果与实际 diff 保存后 reverse，且不合入主干 | 直接修改让 Vanilla/DTB 共用同一修复并减少实验变量；离线 A/B 已把三层 bundled JSON 从无效变为有效，仍需目标服务器验证真实 MTP 与协议矩阵 |
