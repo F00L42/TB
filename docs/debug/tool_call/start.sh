@@ -2,6 +2,8 @@ export PYTORCH_NPU_ALLOC_CONF=expandable_segments:True
 export MODEL="/opt/w00618058/Qwen3.6-27B"
 export PORT=9000
 export PYTHONPATH=/opt/p00906181/TB-main:$PYTHONPATH
+# 仅在工具流排障窗口显式设为 1；日志会包含模型输出和工具参数正文。
+export TB_TOOL_STREAM_DEBUG=${TB_TOOL_STREAM_DEBUG:-0}
 
 nohup python -m vllm.entrypoints.openai.api_server \
   --model $MODEL \

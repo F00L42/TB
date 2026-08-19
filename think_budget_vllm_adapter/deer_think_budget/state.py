@@ -13,6 +13,7 @@ from think_budget_vllm_adapter.deer_think_budget.confidence_gates import (
 )
 from think_budget_vllm_adapter.deer_think_budget.context import (
     FinalAnswerReason,
+    ReasoningBoundary,
     ReasoningState,
     RequestStateContext,
     TrialObservation,
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 
 
 THINK_END_TAG = "</think>"
+TOOL_CALL_START_TAG = "<tool_call>"
 BUDGET_EXHAUSTED_FINAL_PROMPT = (
     "Considering the limited time by the user, I have to give the solution "
     "based on the thinking directly now.\n</think>\n\n"
@@ -70,47 +72,161 @@ def _aligned_logprobs(
     return values[:token_count]
 
 
-def _configure_final_answer_stop(params: Any) -> None:
+def _append_stops(params: Any, *required_stops: str) -> None:
     current_stop = getattr(params, "stop", None)
     stops = [current_stop] if isinstance(current_stop, str) else list(
         current_stop or [])
-    if THINK_END_TAG not in stops:
-        stops.append(THINK_END_TAG)
+    for stop in required_stops:
+        if stop not in stops:
+            stops.append(stop)
     params.stop = stops
+
+
+def _configure_thinking_stop(params: Any) -> None:
+    _append_stops(params, THINK_END_TAG, TOOL_CALL_START_TAG)
+    # These two internal stops are also parser-visible protocol boundaries.
+    # Keeping them in the child output prevents a token-id/text mismatch at
+    # the DelegatingParser handoff.
+    params.include_stop_str_in_output = True
+
+
+def _configure_final_answer_stop(params: Any) -> None:
+    _append_stops(params, THINK_END_TAG)
     params.include_stop_str_in_output = False
 
 
-def _last_chunk_ends_with_think_tag(last_chunk: object) -> bool:
+def _last_chunk_contains_boundary(
+    last_chunk: object,
+    boundary: ReasoningBoundary,
+) -> bool:
     try:
-        return (
-            (getattr(last_chunk.outputs[0], "text", "") or "")
-            .rstrip()
-            .endswith(THINK_END_TAG)
-        )
+        output = last_chunk.outputs[0]
+        return boundary.marker in (getattr(output, "text", "") or "")
     except (AttributeError, IndexError, TypeError):
         return False
 
 
-async def _emit_think_end_once(context: RequestStateContext) -> bool:
-    """Emit the one visible close marker without deep-copying request metrics."""
-    if context.think_end_emitted:
+def _detect_reasoning_boundary(
+    context: RequestStateContext,
+    text: str,
+    token_ids: list[int],
+    stop_reason: object = None,
+) -> ReasoningBoundary | None:
+    text_candidates: list[tuple[int, ReasoningBoundary]] = []
+    token_candidates: list[tuple[int, ReasoningBoundary]] = []
+    stop_candidate: ReasoningBoundary | None = None
+    for boundary in ReasoningBoundary:
+        text_index = text.find(boundary.marker)
+        marker_ids = list(context.encode_prompt_suffix(boundary.marker))
+        token_index = context._find_token_subsequence(token_ids, marker_ids)
+        if text_index >= 0:
+            text_candidates.append((text_index, boundary))
+        if token_index is not None:
+            token_candidates.append((token_index, boundary))
+        if stop_reason == boundary.marker:
+            stop_candidate = boundary
+    if stop_candidate is not None:
+        return stop_candidate
+    if text_candidates:
+        return min(text_candidates, key=lambda item: item[0])[1]
+    if token_candidates:
+        return min(token_candidates, key=lambda item: item[0])[1]
+    return stop_candidate
+
+
+def _align_stop_boundary_delta(
+    context: RequestStateContext,
+    text: str,
+    token_ids: list[int],
+    boundary: ReasoningBoundary | None,
+    stop_reason: object,
+    *,
+    prior_text: str = "",
+    prior_token_ids: tuple[int, ...] | list[int] = (),
+) -> tuple[str, list[int], bool]:
+    """Drop speculative token suffixes hidden by a string stop boundary."""
+    if boundary is None or stop_reason != boundary.marker:
+        return text, token_ids, False
+    cumulative_text = prior_text + text
+    if not cumulative_text.endswith(boundary.marker):
+        return text, token_ids, False
+
+    prior_token_count = len(prior_token_ids)
+    cumulative_token_ids = [*prior_token_ids, *token_ids]
+    marker_ids = list(context.encode_prompt_suffix(boundary.marker))
+    if not marker_ids:
+        raise RuntimeError(
+            f"reasoning stop boundary encoded to no token ids: "
+            f"{boundary.marker}"
+        )
+    marker_token_start = next(
+        (
+            index
+            for index in range(
+                len(cumulative_token_ids) - len(marker_ids),
+                -1,
+                -1,
+            )
+            if cumulative_token_ids[index:index + len(marker_ids)]
+            == marker_ids
+        ),
+        None,
+    )
+    if marker_token_start is None:
+        raise RuntimeError(
+            "reasoning stop boundary is visible in text but absent from "
+            f"token ids: {boundary.marker}"
+        )
+    marker_token_end = marker_token_start + len(marker_ids) - prior_token_count
+    if marker_token_end <= 0:
+        raise RuntimeError(
+            "reasoning stop boundary token ids ended outside the terminal "
+            "delta; already-forwarded token ids cannot be retracted"
+        )
+    if marker_token_end >= len(token_ids):
+        return text, token_ids, False
+    return text, token_ids[:marker_token_end], True
+
+
+async def _emit_reasoning_boundary_once(
+    context: RequestStateContext,
+    boundary: ReasoningBoundary = ReasoningBoundary.THINK_END,
+) -> bool:
+    """Emit one controller-selected boundary without copying request metrics."""
+    if boundary is not ReasoningBoundary.THINK_END:
+        raise ValueError("only </think> may be synthesized by the controller")
+    if context.reasoning_boundary_emitted:
         return False
     last_chunk = context.last_chunk
     if last_chunk is None:
         return False
-    if _last_chunk_ends_with_think_tag(last_chunk):
-        context.think_end_emitted = True
+    if _last_chunk_contains_boundary(last_chunk, boundary):
+        context.reasoning_boundary_emitted = True
         return False
     result = copy.copy(last_chunk)
     output = copy.copy(last_chunk.outputs[0])
     result.outputs = [output, *last_chunk.outputs[1:]]
-    output.text = THINK_END_TAG
-    output.token_ids = list(context.encode_prompt_suffix(THINK_END_TAG))
+    output.text = boundary.marker
+    output.token_ids = list(context.encode_prompt_suffix(boundary.marker))
     output.finish_reason = None
     output.stop_reason = None
-    await context.stream_output(result)
-    context.think_end_emitted = True
+    result.finished = False
+    await context.stream_output(
+        result,
+        phase="reasoning_boundary",
+        child_request_id=f"{context.request_id}_reasoning_boundary",
+        event="synthetic_boundary",
+        controller_state="thinking",
+        next_state="free_final_answer",
+        reasoning_boundary=boundary,
+    )
+    context.reasoning_boundary_emitted = True
     return True
+
+
+async def _emit_think_end_once(context: RequestStateContext) -> bool:
+    """Compatibility wrapper for the reviewed reasoning-boundary helper."""
+    return await _emit_reasoning_boundary_once(context)
 
 
 class _BaseState(ABC):
@@ -194,10 +310,19 @@ class _BaseState(ABC):
         gen: AsyncGenerator,
         context: RequestStateContext,
         *,
+        phase: str,
+        child_request_id: str,
         output_kind: Any = None,
         collect_reasoning_logprobs: bool = False,
-    ) -> tuple[list[int], Optional[RequestOutput], str, object]:
-        """Collect and forward a visible thought without post-hoc truncation."""
+    ) -> tuple[
+        list[int],
+        int,
+        Optional[RequestOutput],
+        str,
+        object,
+        ReasoningBoundary | None,
+    ]:
+        """Collect a visible thought and align internal string-stop output."""
         del collect_reasoning_logprobs
         kind = _output_kind_name(
             output_kind
@@ -207,18 +332,51 @@ class _BaseState(ABC):
         )
         full_text = ""
         all_token_ids: list[int] = []
+        raw_full_text = ""
+        raw_all_token_ids: list[int] = []
+        raw_generated_tokens = 0
         last_output = None
         terminal_reason = None
+        detected_boundary: ReasoningBoundary | None = None
         async for result in gen:
             source_output = result.outputs[0]
             chunk_text = source_output.text or ""
             chunk_token_ids = list(source_output.token_ids or [])
-            if THINK_END_TAG in chunk_text:
-                context.algorithm_state.attempted_early_stop = True
-                chunk_text = chunk_text.split(THINK_END_TAG, 1)[0]
-                chunk_token_ids = list(
-                    context.tokenizer.encode(
-                        chunk_text, add_special_tokens=False))
+            prior_raw_text = raw_full_text if kind == "DELTA" else ""
+            prior_raw_token_ids = (
+                raw_all_token_ids if kind == "DELTA" else []
+            )
+            raw_full_text, raw_all_token_ids = _replace_or_append(
+                kind,
+                raw_full_text,
+                raw_all_token_ids,
+                chunk_text,
+                chunk_token_ids,
+            )
+            if kind == "DELTA":
+                raw_generated_tokens += len(chunk_token_ids)
+            else:
+                raw_generated_tokens = len(chunk_token_ids)
+
+            chunk_boundary = _detect_reasoning_boundary(
+                context,
+                chunk_text,
+                chunk_token_ids,
+                source_output.stop_reason,
+            )
+            (
+                chunk_text,
+                chunk_token_ids,
+                stop_boundary_aligned,
+            ) = _align_stop_boundary_delta(
+                context,
+                chunk_text,
+                chunk_token_ids,
+                chunk_boundary,
+                source_output.stop_reason,
+                prior_text=prior_raw_text,
+                prior_token_ids=prior_raw_token_ids,
+            )
 
             full_text, all_token_ids = _replace_or_append(
                 kind,
@@ -227,11 +385,21 @@ class _BaseState(ABC):
                 chunk_text,
                 chunk_token_ids,
             )
-            if source_output.finish_reason:
+            if source_output.finish_reason is not None:
                 terminal_reason = (
                     source_output.stop_reason
                     or source_output.finish_reason
                 )
+
+            if chunk_boundary is not None:
+                if (
+                    detected_boundary is not None
+                    and detected_boundary is not chunk_boundary
+                ):
+                    raise RuntimeError(
+                        "one thinking child emitted multiple reasoning "
+                        "boundary types")
+                detected_boundary = chunk_boundary
 
             visible_result = copy.copy(result)
             visible_output = copy.copy(source_output)
@@ -241,16 +409,50 @@ class _BaseState(ABC):
             ]
             visible_output.text = chunk_text
             visible_output.token_ids = chunk_token_ids
+            if (
+                stop_boundary_aligned
+                and getattr(source_output, "logprobs", None) is not None
+            ):
+                visible_output.logprobs = _aligned_logprobs(
+                    source_output.logprobs,
+                    len(chunk_token_ids),
+                )
             visible_output.finish_reason = None
             visible_output.stop_reason = None
+            visible_result.finished = False
             if chunk_text or chunk_token_ids:
-                await context.stream_output(visible_result)
+                await context.stream_output(
+                    visible_result,
+                    source_result=result,
+                    phase=phase,
+                    child_request_id=child_request_id,
+                    controller_state="thinking",
+                    next_state=(
+                        "free_final_answer"
+                        if chunk_boundary is not None
+                        else "thinking"
+                    ),
+                    reasoning_boundary=chunk_boundary,
+                    stop_boundary_aligned=stop_boundary_aligned,
+                )
                 context.last_chunk = visible_result
             last_output = result
 
-        if terminal_reason == THINK_END_TAG:
-            context.algorithm_state.attempted_early_stop = True
-        return all_token_ids, last_output, full_text, terminal_reason
+        if detected_boundary is None:
+            detected_boundary = _detect_reasoning_boundary(
+                context,
+                full_text,
+                all_token_ids,
+                terminal_reason,
+            )
+        return (
+            all_token_ids,
+            raw_generated_tokens,
+            last_output,
+            full_text,
+            terminal_reason,
+            detected_boundary,
+        )
 
     @staticmethod
     async def consume_trial_output(
@@ -355,8 +557,7 @@ class _ThinkingState(_BaseState):
         prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
         params = context.request.to_sampling_params(
             maximum, context.default_sampling_params)
-        params.stop = [THINK_END_TAG]
-        params.include_stop_str_in_output = False
+        _configure_thinking_stop(params)
         output_kind = getattr(params, "output_kind", None)
         child_request_id = _BaseState.next_engine_request_id(
             context, phase)
@@ -372,24 +573,32 @@ class _ThinkingState(_BaseState):
             )
             (
                 generated_token_ids,
+                raw_generated_tokens,
                 last_output,
                 generated_text,
                 stop_reason,
+                reasoning_boundary,
             ) = await _BaseState.consume_output(
                 generator,
                 context,
+                phase=phase,
+                child_request_id=child_request_id,
                 output_kind=output_kind,
             )
         if last_output is None:
             raise RuntimeError(f"{phase} completed without a vLLM output")
 
         controller_started = perf_counter()
-        context.append_thinking(
+        (
+            visible_thinking_tokens,
+            boundary_final_tokens,
+        ) = context.append_thinking(
             generated_token_ids,
             generated_text,
             last_output,
+            reasoning_boundary,
         )
-        generated_tokens = len(generated_token_ids)
+        generated_tokens = raw_generated_tokens
         controller_cpu_ms += (
             perf_counter() - controller_started) * 1000
         wall_ms = (perf_counter() - phase_started) * 1000
@@ -405,19 +614,20 @@ class _ThinkingState(_BaseState):
             visible=True,
             output=last_output,
             stop_reason=stop_reason,
+            ledger_visible_think_tokens=visible_thinking_tokens,
+            ledger_final_answer_tokens=boundary_final_tokens,
         )
 
+        if reasoning_boundary is not None:
+            reason = (
+                FinalAnswerReason.MODEL_TOOL_CALL
+                if reasoning_boundary is ReasoningBoundary.TOOL_CALL
+                else FinalAnswerReason.MODEL_THINK_END
+            )
+            return _BaseState.enter_final_answer(context, reason)
         if generated_tokens <= 0:
             return _BaseState.enter_final_answer(
                 context, FinalAnswerReason.BUDGET_EXHAUSTED)
-        if stop_reason == THINK_END_TAG:
-            state.attempted_early_stop = True
-        if (
-            state.attempted_early_stop
-            and state.thinking_tokens
-            < context.budget_plan.budget.min_think_budget
-        ):
-            return _ThinkingState
         if (
             _BaseState.remaining_think_budget(context) <= 0
             or _BaseState.remaining_context(context) <= forced_final_reserve
@@ -588,7 +798,7 @@ class _ConfidenceProbeState(_BaseState):
 
 
 class _FinalAnswerState(_BaseState):
-    """Select the reviewed close suffix and generate a fresh final answer."""
+    """Continue freely after either a model or controller reasoning boundary."""
 
     @staticmethod
     async def handle(
@@ -601,14 +811,20 @@ class _FinalAnswerState(_BaseState):
         if reason is None:
             raise RuntimeError(
                 "FinalAnswerState requires an explicit final_answer_reason")
-        prompt_suffix = (
-            THINK_END_TAG
-            if reason is FinalAnswerReason.CONFIDENCE_ACCEPTED
-            else BUDGET_EXHAUSTED_FINAL_PROMPT
-        )
+        prompt_suffix = None
+        if reason is FinalAnswerReason.CONFIDENCE_ACCEPTED:
+            prompt_suffix = THINK_END_TAG
+        elif reason is FinalAnswerReason.BUDGET_EXHAUSTED:
+            prompt_suffix = BUDGET_EXHAUSTED_FINAL_PROMPT
         if state.reasoning_state is ReasoningState.OPEN:
-            await _emit_think_end_once(context)
+            if prompt_suffix is None:
+                raise RuntimeError(
+                    "model boundary final answer requires closed reasoning")
+            await _emit_reasoning_boundary_once(context)
             context.close_reasoning(prompt_suffix)
+        elif not context.reasoning_boundary_emitted:
+            raise RuntimeError(
+                "closed reasoning has no parser-visible boundary")
 
         remaining_context = _BaseState.remaining_context(context)
         requested_limit = (
@@ -637,6 +853,8 @@ class _FinalAnswerState(_BaseState):
             perf_counter() - controller_started) * 1000
         generated_tokens = 0
         last_output = None
+        terminal_output = None
+        propagated_error = False
 
         with context.timing.measure("engine.final_answer"):
             async for result in context.engine_client.generate(
@@ -645,24 +863,65 @@ class _FinalAnswerState(_BaseState):
                 child_request_id,
                 **context.engine_request_kwargs(reasoning_ended=True),
             ):
-                if not context.think_end_emitted:
+                if not context.reasoning_boundary_emitted:
                     # A hard limit can enter FinalAnswer before any visible
                     # thought chunk exists.  Use the first final output only as
                     # a shallow RequestOutput template for the close marker.
                     context.last_chunk = result
-                    await _emit_think_end_once(context)
+                    await _emit_reasoning_boundary_once(context)
                 chunk_tokens = len(result.outputs[0].token_ids or [])
                 if output_kind == "DELTA":
                     generated_tokens += chunk_tokens
                 else:
                     generated_tokens = chunk_tokens
                 last_output = result
-                await context.stream_output(result)
+                output = result.outputs[0]
+                if terminal_output is not None:
+                    raise RuntimeError(
+                        "final answer child emitted multiple terminals"
+                        if output.finish_reason is not None
+                        else "final answer child emitted output after terminal")
+                if output.finish_reason is None:
+                    await context.stream_output(
+                        result,
+                        phase="final_answer",
+                        child_request_id=child_request_id,
+                        controller_state="free_final_answer",
+                        next_state="free_final_answer",
+                        reasoning_boundary=state.reasoning_boundary,
+                    )
+                    continue
+
+                if str(output.finish_reason) == "error":
+                    await context.stream_output(
+                        result,
+                        phase="final_answer",
+                        child_request_id=child_request_id,
+                        event="error_terminal",
+                        controller_state="free_final_answer",
+                        next_state="error",
+                        reasoning_boundary=state.reasoning_boundary,
+                    )
+                    propagated_error = True
+                    break
+                terminal_output = result
         if last_output is None:
             raise RuntimeError(
                 "final_answer completed without a vLLM output")
+        if propagated_error:
+            state.completion_status = "error"
+            return None
+        if terminal_output is None:
+            raise RuntimeError(
+                "final_answer completed without a terminal output")
 
-        state.final_answer_tokens = generated_tokens
+        await context.stream_final_terminal(
+            terminal_output,
+            phase="final_answer",
+            child_request_id=child_request_id,
+        )
+
+        state.final_answer_tokens += generated_tokens
         state.completion_status = "success"
         wall_ms = (perf_counter() - phase_started) * 1000
         context.timing.record_phase(
@@ -692,6 +951,13 @@ class AsyncReasoningOrchestrator:
                 state_name = current.__name__
                 _BaseState.log_stage(
                     self.context, "state_enter", state_name)
+                self.context.log_stream_event(
+                    event="state_enter",
+                    phase=state_name,
+                    controller_state=state_name,
+                    reasoning_boundary=(
+                        self.context.algorithm_state.reasoning_boundary),
+                )
                 current = await current.handle(self.context)
         except asyncio.CancelledError:
             self.context.algorithm_state.completion_status = "cancelled"
@@ -707,19 +973,6 @@ class AsyncReasoningOrchestrator:
                 flush=True,
             )
             print(traceback.format_exc(), flush=True)
-            try:
-                if (
-                    self.context.algorithm_state.reasoning_state
-                    is ReasoningState.OPEN
-                ):
-                    await _emit_think_end_once(self.context)
-                    self.context.close_reasoning()
-            except Exception:
-                print(
-                    "TB_ERROR event=emit_think_end_failed "
-                    f"request_id={self.context.request_id}",
-                    flush=True,
-                )
         finally:
             print(
                 "TB_PROFILE "
@@ -727,7 +980,7 @@ class AsyncReasoningOrchestrator:
                 f"profile={self.context.timing.snapshot()}",
                 flush=True,
             )
-            await self.context.stream_output(None)
+            await self.context.stream_output(None, phase="controller_end")
 
 
 # Rolling-upgrade aliases.  They do not add states; both names refer to the
