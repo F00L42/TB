@@ -20,6 +20,11 @@ Qwen XML。
 （`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`）。本机没有目标模型和 NPU，本文的
 “本地通过”只指无模型单元测试；根因闭环和发布结论必须由服务器实验完成。
 
+截至 2026-08-19，`debug_tool_call` 分支已经完成从失败复现、分层修复、离线 parser 反事实到
+真实服务器大批量 paired replay 的闭环。本文所针对的流式工具调用损坏问题已通过验收，下一步
+进入主分支 MR 评审。MR 的交付单元不是单独的 DTB 改动，而是“DTB 原生流契约修复 + 固定版本
+parser patch + 回归工具和证据”；这不等于已经证明所有未覆盖协议分支或模型输出质量完全等价。
+
 ## 2. 现有证据与根因分层
 
 ### 2.1 已实测
@@ -520,12 +525,12 @@ Vanilla 可以不同，即使最后生成文本相同也不要求 delta 边界�
 parser 把同一逻辑输入按不同合法分片解析成不同结果；如果既不改变 parser，又不改变输入分片，
 则没有第三个位置能够生成结构化 JSON 中的 `}`。
 
-当前决策是先做直接修改原生 parser 的服务器实验，以最少的运行时变量验证这条因果链。本仓库
-不修改只读的 `third_party/vllm` checkout，而是基于固定 `v0.23.0` 生成可审计 patch；服务器将
-patch 应用于实际 vLLM workspace，使 Vanilla 和 DTB 同时使用相同的修改后 parser。该 patch
-**不会合入项目主干，也不是发布方案**；实验结束后必须保存实际 diff、记录结果并 reverse。
-只有服务器结果确认有效且没有协议回归后，才另行决定提交上游，或用 server-wide plugin 承载
-下游版本；本轮不同时引入 plugin，避免把注册、加载路径和 parser 逻辑混成一个实验变量。
+最终决策是使用固定上游版本的可审计 patch 承载 parser 修复。本仓库不修改只读的
+`third_party/vllm` checkout；服务器把 patch 应用于实际 vLLM workspace，使 Vanilla 和 DTB
+同时使用相同 parser。直接 patch 最初只用于隔离因果，commit `0b641fd` 的真实服务器结果确认
+有效后，patch 文件升级为主分支 MR 的**受版本约束集成资产**。这表示 TB 主干保存、测试并在
+部署时应用 patch，不表示把修改直接提交进 submodule。上游若合入等价修复，后续应删除本地
+patch；当前不再引入 plugin，避免额外注册和加载路径。
 
 最小 parser 行为不是无条件补写字符。它应在 parameter loop 后、返回 `json_fragments` 前检查
 同一 `tool_text` 中已存在的真实 `</function>`：若存在，则在一次状态迁移中完成原 close 分支
@@ -540,8 +545,8 @@ fragment 与 parser 负责生成的 `}` 合并进同一个 `DeltaFunctionCall.ar
 
 | 方案 | 是否保证 | 契约与维护代价 | 决策 |
 | --- | --- | --- | --- |
-| 基于固定上游源码的原生 parser patch | 是，覆盖 Vanilla/DTB | 临时修改服务器 vLLM workspace，必须记录基线并可逆 | 本轮实验采用；不合入主干 |
-| server-wide parser plugin 或上游修复 | 是，覆盖 Vanilla/DTB | plugin 需锁定 vLLM 版本；上游修复需独立评审 | 实验有效后再决定 |
+| 基于固定上游源码的原生 parser patch | 是，覆盖 Vanilla/DTB | 部署时修改服务器 vLLM workspace，必须锁定版本并可逆 | 当前 MR 采用；patch 文件进入 TB 主干 |
+| server-wide parser plugin 或上游修复 | 是，覆盖 Vanilla/DTB | plugin 需锁定 vLLM 版本；上游修复需独立评审 | 后续替换本地 patch 的候选 |
 | 直接修改 `third_party/vllm` 子模块 | 是 | 污染只读上游 checkout，升级和复现困难 | 不采用 |
 | DTB 将一个 source terminal 拆成两个真实非空子 delta | 可规避当前分片 | 改变原生 delta 顺序/terminal 绑定，引入 tokenizer 与 Qwen XML 知识 | 仅可做证伪实验，不作为发布修复 |
 | DTB 注入空白/重复 close/人工 `}` | 样本级规避 | 生成模型未输出的 parser 输入，可能重复调用或污染 content | 禁止 |
@@ -553,9 +558,9 @@ raw/forwarded 五项一致性并对风险形态报警；在 parser 修复未产�
 的显式应急策略。若实现 terminal 重分片实验，必须同时证明 text/IDs 拼接恒等、没有 synthetic
 token、只有一次真实 terminal，并在实验结束后删除；它不能改变本文的最终层次决策。
 
-#### 3.5.3 原生 parser 实验补丁
+#### 3.5.3 原生 parser 集成补丁
 
-实验产物为仓库根目录的
+集成产物为仓库根目录的
 [`qwen3coder_tool_parser_partition_fix.patch`](../../qwen3coder_tool_parser_partition_fix.patch)，
 基线严格固定为 vLLM `v0.23.0` commit
 `0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。补丁只包含两处：
@@ -831,7 +836,7 @@ python docs/debug/tool_call/test_parser_partition_equivalence.py \
 
 第一条输出完整机器可读裁决和重组 arguments；去掉 `--summary-only` 可查看逐 delta trace。第二条
 在任一 parser 层不满足分片等价时返回非零，未修改 parser 的预期退出码为 `1`。第三条保持其余
-固定上游源码不变，只替换 Qwen parser source；3.5.3 实验补丁的预期退出码为 `0`。
+固定上游源码不变，只替换 Qwen parser source；3.5.3 集成补丁的预期退出码为 `0`。
 
 ## 6. 服务器执行方案
 
@@ -995,7 +1000,9 @@ harness 通过不能伪装成该 pytest 已通过，但不阻塞先做服务器 
 ```text
 离线 parser 三层 all_partitions_equal = true
 第 4 条 100 次 DTB invalid_arguments_json = 0
-expected_tool_call_missing = 0
+raw_has_tool_call_start=true 的请求全部返回结构化 tool call
+raw_has_tool_call_start=false 的请求不计 parser failure
+缺少 parser 前 raw 证据的 no-tool 请求单列为 unclassified
 tool_xml_leaked_to_content = 0
 tool_after_content / terminal_after_output = 0
 controller_passthrough_violation = 0
@@ -1009,10 +1016,10 @@ Vanilla 不新增 parser、finish_reason 或多工具序列回归
 模型 JSON 能力。若补丁消除缺 `}` 但引入重复 `}`、重复 tool call、错误 index/name 或 tool 后
 content，同样判实验失败。
 
-#### 6.4.4 保存结果并撤销
+#### 6.4.4 保存结果、撤销实验部署与形成集成资产
 
-该修改明确不合入主干。停止实验服务后只反向应用本 patch，不使用 `git reset` 或 checkout，
-以免覆盖服务器上其他 DTB 修改：
+实验 workspace 在完成取证后只反向应用本 patch，不使用 `git reset` 或 checkout，以免覆盖
+服务器上其他 DTB 修改：
 
 ```bash
 cd /path/to/vllm-workspace/vllm
@@ -1028,7 +1035,9 @@ git status --short
 
 最后一个 `git diff --exit-code` 应恢复为应用前状态；若应用前目标文件本来就有修改，应改为对比
 应用前保存的 diff，而不是强行清理。实验目录至少保留预制 patch SHA、`applied_parser.patch`
-SHA、vLLM commit、pytest 输出、replay 产物、分析结果和对应 telemetry。
+SHA、vLLM commit、pytest 输出、replay 产物、分析结果和对应 telemetry。commit `0b641fd` 验证
+通过后，根目录 patch 文件作为 TB 主分支 MR 的集成资产保留；生产部署仍需显式执行
+`git apply --check` 和 apply，不能依赖某台实验服务器残留的工作树状态。
 
 ### 6.5 第三轮：协议矩阵
 
@@ -1060,7 +1069,8 @@ fresh answer。
 增量交接修复可先按独立阶段门验收，不被尚未修复的 arguments finalization 混淆：
 
 ```text
-expected_tool_call_missing = 0
+raw_has_tool_call_start=true 但 structured tool call 缺失 = 0
+no-tool 且 parser 前 raw 证据缺失 = 0 或明确标记 unclassified
 tool_xml_leaked_to_content = 0
 controller_passthrough_violation = 0
 invalid_stop_boundary_alignment = 0
@@ -1098,10 +1108,12 @@ terminal 后无任何 queue 或 SSE 输出
 在 parser 未修改的首轮测试中若不相同，应记录为“parser 修改决策成立”，而不是把本轮 DTB
 terminal 恢复判失败；最终发布门仍要求二者全部闭合。
 
-100 次目标请求至少满足：
+100 次目标请求至少满足；工具选择按 parser 前 raw 分层，不再要求模型 100/100 必须调用工具：
 
 ```text
-预期工具调用样本 100/100 返回至少一个完整 tool_call
+raw_has_tool_call_start=true 的样本 100% 返回至少一个完整 tool_call
+raw_has_tool_call_start=false 的样本允许正常 content/stop
+no-tool 样本必须有 parser 前 raw 证据，否则标记 unclassified
 assistant_completion_epoch_count = 1
 final_source_terminal_count = 1
 final_terminal_passthrough_count = 1
@@ -1160,7 +1172,7 @@ reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随
 
 ## 8. 本地验证状态
 
-截至 2026-08-17：
+截至 2026-08-19：
 
 - 已知失败 chunks 的离线分类测试通过；
 - `run_after_fix` 已完成 100 次 paired replay：Vanilla 100/100 正常，DTB 98/100 命中现有
@@ -1191,16 +1203,258 @@ reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随
   speculative bundled close；
 - parser 修改决策门已成立；已基于固定 vLLM `v0.23.0` 生成实验 patch 和上游风格回归用例，
   `git apply --check` 通过且 `third_party/vllm` 保持干净。离线 A/B 中原版三层均不等价、bundled
-  JSON 无效，补丁版三层均等价且 JSON 有效；该 patch 只用于服务器因果实验，不合入主干，
-  不能把补丁放回 DTB 或 SSE 层；
+  JSON 无效，补丁版三层均等价且 JSON 有效；不能把补丁放回 DTB 或 SSE 层；
+- commit `0b641fd` 归档了 parser patch 后 5 组真实服务器 paired replay，共 180 个 Vanilla 和
+  180 个 DTB 响应。Vanilla 180 个、DTB 170 个响应实际生成结构化 tool call；按“模型没有生成
+  `<tool_call>` 不算 parser 错误”的口径排除其余 10 个 DTB 响应后，共审计 265 个 DTB tool
+  calls，arguments JSON 语法错误、XML 泄漏、索引/名称缺失、错误 finish、tool 后 content 和
+  terminal 后 chunk 均为 0；其中 8 个 smoke no-tool 响应有 parser 前 raw 证据，完整 100 次的
+  2 个 no-tool 响应因缺 server analysis 保留为证据不足；
+- 新结果中至少 49 个 DTB 响应实际把最后 parameter fragment 与 `}` 合并在同一 arguments
+  delta，证明 patch 命中了原故障分片而非仅依赖本轮恰好错开 close。第 21 条 19 个 DTB 响应
+  各返回 6 个连续 `edit` tool calls，共 114 个多工具调用，无解析异常；
+- 4 组带 server telemetry 的 smoke 共覆盖 80 个 DTB 请求，`completion_epoch_one`、
+  `final_source_terminal_one`、`final_terminal_passthrough_one`、`no_synthetic_terminal`、
+  `terminal_contract_valid` 和 stop-boundary alignment 全部为 80/80；仍未命中
+  `ReasoningBoundary.TOOL_CALL`，因此不能用这批数据关闭直接 `<tool_call>` boundary 覆盖风险；
+- 第 4 条 attempt 13 返回的 arguments 虽能 `json.loads`，但键为 `" command"` 和
+  `" Description"`，不满足工具 schema 的必需字段。这不属于本次缺 `}`/流式解析故障，但暴露
+  现有 replay 只检查 JSON 语法、不检查 schema 的假阴性；完整 100 次目录缺 server analysis，
+  在取得 parser 前 raw XML 前不得武断归因于模型或控制器；
 - schema 3 保存 raw/forwarded/dropped IDs，分析器校验显式 alignment 而不把它误报为任意
   parser-facing 篡改；
 - 本轮无模型完整测试共运行 100 项，其中 99 项通过、1 项因 bundled runtime 缺少 PyYAML 按
   既有条件跳过；覆盖非空 terminal 原对象透传、自然空 source terminal、单终止约束、schema 4
-  对账和旧 schema 分析兼容，尚未在目标服务器验证；
-- 本机没有目标模型和 NPU，不能把设计更新描述为运行时修复已通过。
+  对账和旧 schema 分析兼容；后续真实服务器 replay 已补足目标故障路径的运行时验证；
+- 本机没有目标模型和 NPU，不能在本地重跑服务器结果；本文的运行时结论只引用 commit
+  `0b641fd` 已归档的目标服务器产物。
 
-## 9. 变更历史
+## 9. 修复复盘与主分支 MR 方案
+
+### 9.1 最终结论与验收边界
+
+本次问题的目标故障已经闭环：在启用 DTB 思维链压缩、流式输出、Qwen3 reasoning parser、
+Qwen3Coder tool parser 和 MTP 的组合下，模型生成的工具调用不再因控制器边界处理或合法 delta
+分片而丢失 `<tool_call>`、泄漏 XML、缺失 arguments 闭合 `}`、产生重复 completion，或在 terminal
+后继续输出。修复经过逐层反事实和真实服务器大批量 paired replay，具备进入主分支 MR 的条件。
+
+验收结论必须带两个限定：
+
+1. **工具调用完整性已通过。** 当模型实际生成 `<tool_call>` 时，DTB + parser patch 应返回与
+   Vanilla 相同协议语义的结构化调用；同一 assistant completion 可以包含 0～N 个 tool calls，
+   不能把“只有一个调用”当作等价条件；
+2. **模型选择是否调用工具不属于 parser 正确性。** parser 前 raw text 本身没有
+   `<tool_call>` 时，不把“没有结构化 tool call”计为本问题失败；但 raw 已有 tool XML 而 SSE
+   缺失、arguments 不完整或 schema 被转换破坏，仍是失败。
+
+“通过本问题验收”不等于已经证明所有 DTB 行为与原生模型完全相同。直接 `<tool_call>` reasoning
+boundary、非流式路径、模型生成参数的 schema 质量和已知 final-answer token cap 仍按 9.6 单列。
+MR 标题、描述和发布说明不得扩大结论范围。
+
+### 9.2 完整根因链
+
+表面现象经历了 `<tool_call>` 前缀缺失、XML 进入 content、tool 后 role 尾流、重复 tool call 和
+arguments 缺少 `}` 等多种表现，最终被拆成四个彼此独立但串联的根因：
+
+| 层次 | 根因 | 为什么会破坏原生行为 | 最终修复位置 |
+| --- | --- | --- | --- |
+| DTB 状态机 | 终止语义只接受 `</think>`，没有把 `<tool_call>` 视为 reasoning 结束 | 工具调用开始后仍可能进入 probe、iterative think 或 fresh final answer，形成第二个 completion | `ReasoningBoundary` 与 final-answer 状态迁移 |
+| DTB 增量交接 | vLLM string stop 截断 text，但同一 speculative batch 的 token IDs 可能仍带 stop 后后缀 | 进入 parser 和 continuation prompt 的 text/token IDs 不连续，下一 child 可能从 `function=` 开始 | stop-boundary text/token ID 对齐 |
+| DTB 终止绑定 | final child 的非空 terminal 被拆成“无终止正文 + 合成空 terminal” | 改变 parser callback 边界和 `finished/finish_reason` 绑定，空 delta 也无法补回已错过的 close | final source terminal 原对象、原字段透传一次 |
+| 原生 parser | parameter loop 得到 fragments 后立即 return，没有在同一次 callback 继续消费已有 `</function>` | 最后 parameter 与 close 同批时，参数已发出但 parser 负责生成的 `}` 永远没有后续 callback 可发 | `Qwen3CoderToolParser` same-call drain patch |
+
+```mermaid
+flowchart LR
+    M["模型 child delta\ntext + token IDs + terminal"]
+    B["DTB reasoning boundary\n</think> 或 <tool_call>"]
+    A["stop-boundary alignment\n删除 IDs 中的 speculative 后缀"]
+    Q["result queue\nfinal source terminal 原样一次"]
+    D["DelegatingParser"]
+    P["patched Qwen3CoderToolParser\nparameter 后同次处理 close"]
+    S["SSE\n0..N tool calls + 单次 finish"]
+
+    M --> B --> A --> Q --> D --> P --> S
+```
+
+四层修复缺一不可。前三层恢复 DTB 对原生流的责任边界，第四层使原生 parser 对 engine 允许的
+delta 分片保持不变性。parser patch 是 server-wide 行为，Vanilla 和 DTB 必须共同使用，不能只
+对 DTB 输出做事后修补。
+
+以下候选方案已由证据否定并永久排除：
+
+- **保守恢复 `<tool_call>` 文本**：100 次失败 run 中恢复命中为 0，且 parser 前 final raw text
+  已经完整；在 DTB 层猜 XML 会掩盖真实边界错误；
+- **人工空 delta flush**：parser 依赖新的非空 `tool_text` 观察 `</function>`，空 delta 没有可
+  消费信息；Vanilla 的空 finish chunk 位于 parser 之后，不能反推为 parser 输入协议；
+- **拆分 source terminal 或注入空白/重复 close/人工 `}`**：都会改变模型生成的增量、token IDs
+  或结束绑定，重新违反 parser-facing 等价；
+- **关闭 MTP**：只能降低不利分片概率，不能提供分片等价保证，并破坏生产性能配置。
+
+### 9.3 最终实现方案
+
+#### 9.3.1 DTB 只维护原生流契约
+
+DTB 的实现职责收敛为：
+
+- 用 `ReasoningBoundary.THINK_END` 和 `ReasoningBoundary.TOOL_CALL` 统一表示模型选择的 reasoning
+  结束；模型已开始工具调用时直接进入同一逻辑 completion 的自由生成阶段，不再创建 fresh
+  answer；
+- 在 string stop 命中时以 marker 的实际 token 序列为界，对齐当前 delta 的 token IDs；只允许
+  `raw_ids = forwarded_ids + dropped_ids`，保持 forwarded text 与 raw text 相同；
+- 只允许控制器合成 `</think>`，不允许合成 `<tool_call>`、Qwen parameter 标签或 `}`；
+- 中间 child terminal 由控制器消费；final child terminal 通过 `stream_final_terminal()` 原对象
+  透传一次，保留 text、token IDs、`finished`、`finish_reason` 和 `stop_reason`；
+- 对 multiple terminal、terminal 后输出、已关闭 completion 再生成等状态直接报错，不静默恢复。
+
+#### 9.3.2 parser patch 消除分片敏感性
+
+[`qwen3coder_tool_parser_partition_fix.patch`](../../qwen3coder_tool_parser_partition_fix.patch) 固定
+应用到 vLLM `v0.23.0` commit
+`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。补丁不改变 XML 协议，也不无条件添加字符；它只把
+原方法中已有的 parameter 和 function-close 两段状态迁移在同一次 callback 内 drain 完：
+
+- 本批没有 `</function>`：继续只返回本批 parameter fragments；
+- 本批已有真实 `</function>`：先完成原 close 状态更新，再返回 `combined + "}"`；
+- close 在下一批：保持原来的单独 `"}"` delta；
+- malformed/incomplete XML：不由 patch 猜测或补全模型未生成的结构。
+
+patch 同时新增“最后 parameter、`</function>`、`</tool_call>` 同一 delta”的上游风格回归用例。
+TB 主分支保存 patch 文件、测试和应用说明，`third_party/vllm` submodule 继续保持只读。部署必须
+检查 vLLM commit、实际 import 路径、`git apply --check` 和应用后 diff；不能直接修改未知来源的
+site-packages。
+
+#### 9.3.3 telemetry 与验证工具
+
+`TB_TOOL_STREAM` schema 4 在原生 parser 前记录 raw/forwarded text hash、token IDs、finished、
+finish/stop reason、boundary、alignment dropped IDs 和 terminal origin。该 telemetry 用于证明
+控制器没有丢失或制造结构 token，不替代 `TB_PHASE` 性能账本，默认关闭。
+
+[`replay_tool_calls.py`](tool_call/replay_tool_calls.py) 负责唯一 request ID、Vanilla/DTB paired
+请求、完整 SSE chunk 和重组结果；[`analyze_tool_call_run.py`](tool_call/analyze_tool_call_run.py)
+关联服务器 telemetry，裁决 completion、boundary、terminal、XML 和 arguments。离线
+[`test_parser_partition_equivalence.py`](tool_call/test_parser_partition_equivalence.py) 在无模型条件
+下用相同逻辑 text/token IDs 的不同分片直接执行原生 parser、DelegatingParser 和上游 streaming
+test utility。
+
+### 9.4 证据演进与最终实测
+
+| 阶段 | 主要结果 | 被证实或排除的结论 |
+| --- | --- | --- |
+| `run_after_fix` | Vanilla 100/100 正常；DTB 98/100 协议异常；恢复逻辑 0 次命中 | 排除“final raw 缺 XML，可用保守恢复修好”；确认 completion 生命周期错误 |
+| `run_after_terminal_fix` | DTB 78/100 完整通过；13 次缺 tool 前缀；9 次 raw XML 完整但缺 `}` | 终止语义修复有效；增量交接和 parser finalization 是独立问题 |
+| `run_after_handoff_fix` | DTB 100/100 有结构化调用；XML 泄漏 0；仍有 12 次缺 `}` | stop-boundary text/IDs 对齐修复前缀交接；剩余问题落到 parser |
+| 离线分片反事实 | 未修改 parser 的 bundled close 三层均失败；patch 后三层均等价且 JSON 有效 | 证明缺 `}` 是 parser 合法分片敏感性，不是模型 JSON 内容缺失 |
+| `run_after_parser_fix*` | 180 对真实 Vanilla/DTB replay；已生成 tool call 的 DTB 流无 JSON 截断或协议异常 | DTB 契约修复与 parser patch 组合在真实 MTP 环境命中并解决原故障 |
+
+commit `0b641fd` 的最终批量结果包括：
+
+- 180 个 Vanilla 和 180 个 DTB 响应；Vanilla 180 个、DTB 170 个响应生成结构化 tool call。按
+  本文口径排除 10 个 no-tool 响应：其中 8 个 smoke 响应由 parser 前 raw 确认没有
+  `<tool_call>`，完整 100 次目录中的 2 个因缺 server analysis 只能标记为证据不足；
+- 170 个 DTB tool-call 响应共包含 265 个调用，arguments JSON 语法错误、XML 泄漏、缺失函数
+  名、非连续 index、tool 后 content、错误/重复 `tool_calls` finish 和 terminal 后 chunk 全为 0；
+- 当 Vanilla/DTB 都生成工具调用时，170/170 paired 响应的调用数量和函数名序列一致；arguments
+  的具体值不要求逐字相同，但必须保持完整 JSON、工具名称和 schema 语义；
+- 至少 49 个 DTB 响应实际命中“最后 parameter 与 close 同批”的 patched 分支并正确闭合；不是
+  因为新 run 偶然全部采用有利分片；
+- 第 21 条多工具场景中，19 个生成 tool call 的 DTB 响应各有 6 个连续 `edit` 调用，共 114 个，
+  验证“一个逻辑 tool-call 序列允许 N 个调用”；
+- 80 个带 server telemetry 的 DTB smoke 全部满足单 completion、单 final source terminal、原样
+  terminal 透传、无 synthetic terminal、无 passthrough violation 和有效 stop alignment。
+
+因此，目标问题的阶段裁决为：
+
+```text
+DTB termination semantics                 PASS
+DTB stop-boundary text/token ID handoff   PASS
+DTB final source terminal passthrough     PASS
+Qwen parser same-delta parameter close    PASS
+covered streaming tool-call protocol      PASS
+global DTB/native semantic equivalence    NOT CLAIMED
+```
+
+### 9.5 一致性口径与异常分类
+
+MR 和后续回归统一使用以下分类，避免再次用“有没有任意 tool call”掩盖错误：
+
+| 输入/输出事实 | 分类 |
+| --- | --- |
+| parser 前 raw 无 `<tool_call>`，最终返回普通 content 或 stop | 模型未选择工具，不是 parser failure |
+| parser 前 raw 有完整 tool XML，最终没有结构化调用 | hard failure |
+| raw 与 forwarded text/token IDs 不满足已声明 alignment 关系 | DTB passthrough failure |
+| raw XML 完整，但 arguments 缺 `}`、重复 `}` 或不能解析 JSON | parser failure |
+| arguments 是合法 JSON，但不满足目标工具 required/type/schema | tool-call semantic failure；需用 raw XML 区分模型生成与转换错误 |
+| 同一 completion 返回多个合法、连续 index 的 tool calls | 合法，不按数量判错 |
+| tool call 后又生成 content、role 尾流或第二个 fresh completion | hard failure |
+| source 以 `length` 结束却对外改写为 `tool_calls` | hard failure |
+
+第 4 条 attempt 13 的 `{" command": ..., " Description": ...}` 属于“JSON 合法但 schema 不满足”。
+当前完整 100 次归档缺少对应 server analysis，不能从 SSE 单独判断 raw XML 是否已经使用错误参数
+名。该样本不推翻 same-delta close 修复，但要求在 replay/analyzer 增加工具 schema 校验，并在
+后续 run 保存所有被排除样本的 parser 前 raw 证据。
+
+### 9.6 后续风险与处置
+
+| 风险 | 当前证据 | 影响 | MR/后续处置 |
+| --- | --- | --- | --- |
+| 直接 `<tool_call>` reasoning boundary 未命中 | 4 组 smoke 的 `tool_call_boundary_covered=0` | 新增状态分支只有无模型测试，没有真实模型覆盖 | MR 保留单元测试；发布前构造定向 prompt 或受控 engine fixture 覆盖 |
+| 非流式协议未做同批服务器矩阵 | 本轮归档均为 SSE | 不能从流式成功外推完整响应 parser | 增加 `stream=false` paired smoke，核对 message.tool_calls/content/finish |
+| parser patch 与上游版本耦合 | patch 固定 `v0.23.0` SHA | 升级或服务器私改会 apply 冲突或静默加载错误文件 | 部署强制 SHA、import path、apply-check、diff 和离线等价门；升级时重做 patch |
+| schema-validity 未纳入分析器 | attempt 13 被现有工具判为 pass | JSON 可解析但实际工具无法消费 | 后续增强 replay/analyzer，按 request tools 校验 required/type；保存 raw XML 定责 |
+| 模型不调用工具与 parser 丢调用可能混淆 | 8 个 smoke 有 raw 证据；完整 100 次的 2 个无 analysis | 错把 hard failure 当模型选择，或反向误报 | 只有 `raw_has_tool_call_start=false` 才能豁免；缺 telemetry 标记为证据不足 |
+| final-answer 默认 2048 cap | 第 11 条此前 5/5 `length` 截断 | 长多工具序列仍可能偏离原生 completion budget | 作为独立问题跟踪；是声明“全局原生等价”的 blocker，不把它归到 parser patch |
+| 真实 `length` 被改写为 `tool_calls` | 与 final cap 样本同时发现 | 客户端无法区分完成与截断 | 独立修复并加入 finish reason 回归；本 MR 不声称已解决 |
+| patch 是 server-wide | Vanilla 也使用修改后 parser；本轮无回归 | 影响所有 Qwen3Coder 工具请求 | 保留 Vanilla paired、上游定向测试和快速 reverse；长期优先推动上游修复 |
+| telemetry 含模型/工具正文 | debug 日志可含命令和参数 | 数据泄露与日志膨胀 | `TB_TOOL_STREAM_DEBUG` 默认 0，只在隔离窗口开启并按 request ID 回收 |
+| MR 包含大量原始 JSONL | 分支相对 main 约 36 万新增行，多数为调试证据 | 审阅噪声、仓库体积和后续维护成本 | MR 前明确保留策略；优先保留 summary、analysis、代表性 fixture 和可复现命令，原始 chunks 是否入主干单独评审 |
+
+这些风险不改变本次目标故障“已修复”的裁决，但限制对外表述。特别是 final-answer cap 和真实
+finish reason 是已知独立 hard failure；若本 MR 不包含修复，必须在 MR 描述中显式列为非目标并
+关联后续工作，不能写成 DTB 已全面满足原生行为。
+
+### 9.7 主分支 MR 交付范围与准入
+
+MR 应把以下内容作为一个可部署、可回滚的整体提交：
+
+1. **DTB 实现**：`ReasoningBoundary`、model boundary 后的 continuation final、stop-boundary
+   text/token ID alignment、final source terminal 原样透传和 fail-fast completion 约束；
+2. **vLLM 集成资产**：根目录 parser patch、固定 upstream SHA、apply/reverse 和 import-path
+   校验说明；不提交 `third_party/vllm` 工作树修改；
+3. **回归测试**：adapter 状态机、prompt copy、telemetry、tool debug、离线 parser 分片等价和
+   patch 内的上游风格 testcase；
+4. **调试工具**：paired replay、server telemetry analyzer、唯一 request ID 和原始 chunk 保存；
+5. **证据与文档**：各阶段 summary/analysis、最终真实服务器结果和本文复盘。
+
+MR 创建前至少完成：
+
+```text
+工作树只包含预期变更
+git diff --check 通过
+adapter 无模型测试通过或明确记录环境性 skip
+未修改 parser 的离线等价测试按预期失败
+应用 patch 后的离线等价测试退出 0
+patch 对固定 vLLM SHA 执行 git apply --check 成功
+third_party/vllm 工作树干净
+TB_TOOL_STREAM_DEBUG 默认关闭
+MR 描述列出已通过范围、未覆盖风险和服务器证据 commit 0b641fd
+```
+
+建议评审时把 36 万行测试归档与实现 diff 分开查看。大文件是否全部合入主干是仓库治理决策，
+不能通过删除证据来伪装精简；若选择不合入原始 chunks，应在可长期访问的调试归档保留 SHA、
+request IDs、summary/analysis 和复现入口。
+
+### 9.8 部署与回滚不变量
+
+生产部署必须同时包含兼容的 DTB 代码和 parser patch。只部署 DTB 会重新暴露合法分片缺 `}`；
+只部署 parser patch 不能修复历史终止语义、text/token IDs 交接和 terminal 绑定错误。
+
+部署顺序为：确认 vLLM SHA 和 import path → apply-check/parser patch → 应用 patch → 运行离线分片
+等价测试 → 启动服务 → Vanilla/DTB smoke → 检查 telemetry 默认关闭。回滚时先停止目标服务，
+用 `git apply --reverse --check` 精确撤销 parser patch，再回滚相匹配的 TB 版本；不得使用 reset
+覆盖服务器上的其他集成修改。若上线后出现工具协议 hard failure，可临时对工具请求禁用 DTB，
+但应保留原始日志和请求归属继续定位，不能重新引入保守 XML 恢复或空 delta flush。
+
+## 10. 变更历史
 
 | 日期 | 变更 | 原因 |
 | --- | --- | --- |
@@ -1215,3 +1469,4 @@ reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随
 | 2026-08-17 | 离线工具复用上游 `stream_delta_message_generator`、`run_tool_extraction_streaming` 和 `StreamingToolReconstructor` | token-by-token 控制正常，而上游字符串分片重组再次确认 bundled close 缺 `}`；明确现有上游逐 token 测试与 speculative batch 回归测试的覆盖边界 |
 | 2026-08-17 | 明确缺 `}` 的修复层次：Vanilla 无逐 token 保证，推荐 server-wide parser plugin 承载下游修复并同步提交上游，DTB 只保留原样透传、telemetry 和应急禁用 | 若不改变 parser 又不改变合法输入分片，就无法保证结构化结果；DTB 重分片或注入字符都会重新违反 parser-facing 等价原则 |
 | 2026-08-17 | 决定先用可逆 patch 直接修改服务器原生 parser 做因果实验，不引入 plugin、不修改 `third_party/vllm`，实验结果与实际 diff 保存后 reverse，且不合入主干 | 直接修改让 Vanilla/DTB 共用同一修复并减少实验变量；离线 A/B 已把三层 bundled JSON 从无效变为有效，仍需目标服务器验证真实 MTP 与协议矩阵 |
+| 2026-08-19 | 根据 commit `0b641fd` 完成最终复盘，将修复定义为“DTB 原生流契约 + 固定 vLLM parser patch”的成套交付，并把 patch 文件升级为主分支 MR 的受版本约束集成资产 | 180 对真实 replay 与 265 个 DTB tool calls 证明目标流式故障闭环；同时保留 direct tool boundary、非流式、schema 校验、final cap 和大体积证据治理等风险，避免把阶段通过扩大为全局等价 |
