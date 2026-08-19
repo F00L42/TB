@@ -27,8 +27,7 @@ DEFAULT_END = 4              # 结束行号
 DEFAULT_URL = "http://71.77.153.223:41016/v1/chat/completions"              # API 地址（必须提供，无默认值）
 DEFAULT_TIMEOUT = 600.0          # 请求超时秒数
 DEFAULT_MODEL = "qwen3.6-27b"            # 覆盖请求体中的 model 字段
-DEFAULT_SAVE_CHUNKS = "chunks.jsonl"      # 保存 chunk 的文件名，None 表示不保存
-DEFAULT_SAVE_CHUNKS_FLAG = False  # 当 --save-chunks 未指定路径时是否启用默认文件名 "chunks.jsonl"
+DEFAULT_SAVE_CHUNKS = None      # 保存 chunk 的文件名，None 表示不保存
 
 # --- 追加到 request_body 的固定参数 ---
 APPEND_BODY = {
@@ -139,6 +138,8 @@ async def main():
                         help=f"请求超时秒数（默认: {DEFAULT_TIMEOUT}）")
     parser.add_argument("--model", default=DEFAULT_MODEL,
                         help="覆盖请求体中的 model 字段")
+    parser.add_argument("--api-key", default=os.getenv("OPENAI_API_KEY", ""),
+                        help="可选 Bearer token；默认读取 OPENAI_API_KEY")
     parser.add_argument("--save-chunks", "-s", type=str, nargs="?", const="chunks.jsonl",
                         default=DEFAULT_SAVE_CHUNKS,
                         help="保存流式 chunk 到文件（默认文件: chunks.jsonl），不指定路径则使用默认名，不启用则不保存")
