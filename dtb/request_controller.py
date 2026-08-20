@@ -1,0 +1,389 @@
+"""DTB facade for one vLLM chat-completion request."""
+from __future__ import annotations
+
+import asyncio
+import time
+from collections.abc import AsyncGenerator
+from dataclasses import replace
+from typing import Any, TYPE_CHECKING
+
+from dtb.budgeting.budget_resolver import DtbBudgetResolver
+from dtb.config.loader import load_dtb_service_config
+from dtb.config.schema import (
+    DtbAlgorithmConfig,
+    DtbAlgorithmPolicy,
+    DtbServiceConfig,
+)
+from dtb.history.store import (
+    AsyncHistoryRecorder,
+    HistoryOutcome,
+    configure_history_store,
+)
+from dtb.integration.vllm.request_adapter import visible_user_text
+from dtb.integration.vllm.response_adapter import (
+    aggregate_queue,
+    native_chat_response,
+    stream_queue,
+)
+from dtb.observability.config import DtbObservabilityRuntime
+from dtb.reasoning.request_context import DtbRequestContext
+from dtb.reasoning.request_state import DtbRequestState
+from dtb.reasoning.state_machine import DtbStateMachine
+
+if TYPE_CHECKING:
+    from vllm.entrypoints.openai.chat_completion.protocol import (
+        ChatCompletionRequest,
+        RequestResponseMetadata,
+    )
+    from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
+    from vllm.outputs import RequestOutput
+    from vllm.tokenizers import TokenizerLike
+
+
+class DtbConfigError(ValueError):
+    pass
+
+
+_FIXED_REQUEST_FIELDS = frozenset({
+    "fixed_budget_tokens",
+    "fixed_num_thinking",
+    "fixed_think_stride",
+    "fixed_check_length",
+    "fixed_prob_th",
+    "fixed_min_think_tokens",
+})
+_RETIRED_REQUEST_FIELDS = frozenset({
+    "tb_check_length",
+    "tb_think_stride",
+    "tb_num_thinking",
+    "tb_check_answer_len",
+    "tb_prob_th",
+    "tb_min_think_tokens",
+    "tb_is_code",
+    "tb_enable_value_min_confidence",
+    "tb_value_min_bottom_k",
+    "tb_enable_clean_context",
+    "tb_enable_soft_truncation",
+    "tb_consecutive_same_stop",
+    "budget_token_limit",
+    "budget_disabled",
+    "budget_confidence_threshold",
+    "think_budget_config",
+    "think_budget_session_id",
+    "think_budget_resume",
+    "think_budget_session_ttl_s",
+})
+
+
+class DtbRequestController:
+    """Small lifecycle facade used by the versioned vLLM serving patch."""
+
+    ROUTING_CONTEXT_ATTR = "_dtb_route_identity"
+
+    def __init__(
+        self,
+        history_recorder: AsyncHistoryRecorder | None = None,
+        service_config: DtbServiceConfig | None = None,
+        observability: DtbObservabilityRuntime | None = None,
+    ) -> None:
+        self.service_config = service_config or load_dtb_service_config()
+        self.policy = DtbAlgorithmPolicy()
+        self.budget_resolver = DtbBudgetResolver(
+            self.service_config, self.policy
+        )
+        self.observability = observability or DtbObservabilityRuntime(
+            self.service_config.observability
+        )
+        self.history_recorder = history_recorder
+        if (
+            self.history_recorder is None
+            and self.service_config.algorithm.enable_history_budget
+        ):
+            history_store = self.service_config.history_store
+            configure_history_store(
+                path=history_store.path,
+                max_entries=history_store.max_entries,
+                max_age_days=history_store.max_age_days,
+            )
+            self.history_recorder = AsyncHistoryRecorder(
+                max_queue_size=history_store.queue_capacity
+            )
+
+    def is_enabled(self) -> bool:
+        return self.service_config.algorithm.budget_enabled
+
+    @staticmethod
+    def _validate_request_override(name: str, value: Any) -> None:
+        if name not in _FIXED_REQUEST_FIELDS:
+            raise DtbConfigError(f"unknown DTB config key: {name}")
+        if value is None:
+            raise DtbConfigError(f"DTB config {name} cannot be null")
+        if name == "fixed_prob_th":
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not 0 <= value <= 1
+            ):
+                raise DtbConfigError(f"DTB config {name} must be in [0, 1]")
+            return
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise DtbConfigError(
+                f"DTB config {name} must be a non-negative integer"
+            )
+
+    def _build_algorithm_config(
+        self, request: ChatCompletionRequest
+    ) -> DtbAlgorithmConfig:
+        config = self.service_config.algorithm
+        for name in _RETIRED_REQUEST_FIELDS:
+            value = getattr(request, name, None)
+            if value not in (None, False, 0, ""):
+                raise DtbConfigError(f"DTB request field is not supported: {name}")
+            if name == "think_budget_config" and value is not None:
+                raise DtbConfigError(
+                    "DTB request field is not supported: think_budget_config"
+                )
+        changes: dict[str, Any] = {}
+        for name in _FIXED_REQUEST_FIELDS:
+            value = getattr(request, name, None)
+            if value is None:
+                continue
+            self._validate_request_override(name, value)
+            if value > 0:
+                changes[name] = value
+        return replace(config, **changes) if changes else config
+
+    def _record_history(self, context: DtbRequestContext) -> None:
+        if self.history_recorder is None:
+            return
+        decision = context.budget_decision
+        state = context.request_state
+        self.history_recorder.record_outcome(HistoryOutcome.from_request(
+            parent_request_id=context.request_id,
+            question=context.question_text,
+            scene=decision.scene,
+            decision_branch=decision.decision_branch.value,
+            budget_decision=decision.to_telemetry(),
+            thinking_tokens=state.thinking_tokens,
+            hidden_probe_tokens=state.hidden_probe_tokens,
+            final_answer_tokens=state.final_answer_tokens,
+            elapsed_ms=context.elapsed() * 1000,
+            completion_status=state.completion_status,
+        ))
+
+    def _managed_generator(
+        self,
+        state_machine: DtbStateMachine,
+        context: DtbRequestContext,
+        request: ChatCompletionRequest,
+    ) -> AsyncGenerator[RequestOutput, None]:
+        async def generator() -> AsyncGenerator[RequestOutput, None]:
+            producer_task = asyncio.create_task(state_machine.run())
+            consumer = (
+                stream_queue(context.result_queue, context)
+                if request.stream
+                else aggregate_queue(context.result_queue, context)
+            )
+            try:
+                async for item in consumer:
+                    yield item
+            except asyncio.CancelledError:
+                context.request_state.completion_status = "cancelled"
+                raise
+            finally:
+                if not producer_task.done():
+                    context.request_state.completion_status = "cancelled"
+                    producer_task.cancel()
+                    try:
+                        await producer_task
+                    except asyncio.CancelledError:
+                        pass
+                if context.phase_recorder is not None:
+                    context.phase_recorder.record_request_summary(
+                        parent_request_id=context.request_id,
+                        state=context.request_state,
+                        error=context.orchestration_error,
+                    )
+                self._record_history(context)
+        return generator()
+
+    async def flush_history(self, timeout_s: float = 2.0) -> bool:
+        if self.history_recorder is None:
+            return True
+        return await self.history_recorder.flush(timeout_s)
+
+    def flush_telemetry(self, timeout_s: float = 2.0) -> bool:
+        return self.observability.flush(timeout_s)
+
+    async def handle_request(
+        self,
+        serving_chat: OpenAIServingChat,
+        conversation: list,
+        engine_inputs: list,
+        request: ChatCompletionRequest,
+        request_id: str,
+        tokenizer: TokenizerLike,
+        request_metadata: RequestResponseMetadata,
+        model_name: str | None = None,
+        lora_request: Any = None,
+        data_parallel_rank: int | None = None,
+    ) -> Any:
+        if getattr(request, "n", None) not in (None, 1):
+            return serving_chat.create_error_response("DTB currently supports only n=1")
+        try:
+            config = self._build_algorithm_config(request)
+        except (DtbConfigError, ValueError) as exc:
+            return serving_chat.create_error_response(str(exc))
+        if not config.budget_enabled:
+            return serving_chat.create_error_response(
+                "DTB is disabled by server configuration"
+            )
+
+        policy = self.policy
+        route_identity = getattr(request, self.ROUTING_CONTEXT_ATTR, None)
+        trace_headers = None
+        engine_prompt_text = None
+        reasoning_ended = None
+        reasoning_parser_kwargs = None
+        reasoning_parser = None
+        response_parser = None
+        chat_template_kwargs = None
+        if isinstance(route_identity, dict):
+            model_name = route_identity.get("model_name", model_name)
+            lora_request = route_identity.get("lora_request", lora_request)
+            data_parallel_rank = route_identity.get(
+                "data_parallel_rank", data_parallel_rank
+            )
+            trace_headers = route_identity.get("trace_headers")
+            engine_prompt_text = route_identity.get("prompt_text")
+            reasoning_ended = route_identity.get("reasoning_ended")
+            reasoning_parser_kwargs = route_identity.get(
+                "reasoning_parser_kwargs"
+            )
+            reasoning_parser = route_identity.get("reasoning_parser")
+            response_parser = route_identity.get("response_parser")
+            chat_template_kwargs = route_identity.get("chat_template_kwargs")
+        elif isinstance(route_identity, tuple) and len(route_identity) == 3:
+            routed_model, routed_lora, routed_rank = route_identity
+            model_name = model_name or routed_model
+            lora_request = lora_request or routed_lora
+            if data_parallel_rank is None:
+                data_parallel_rank = routed_rank
+        if lora_request is None:
+            lora_request = serving_chat._maybe_get_adapters(
+                request, supports_default_mm_loras=True
+            )
+        if model_name is None:
+            model_name = serving_chat.models.model_name(lora_request)
+
+        phase_recorder = self.observability.create_phase_recorder(policy.version)
+        prompt_token_ids = engine_inputs[0].get("prompt_token_ids", [])
+        try:
+            if phase_recorder is None:
+                prompt_text = tokenizer.decode(
+                    prompt_token_ids, skip_special_tokens=True
+                )
+            else:
+                with phase_recorder.measure("decision.decode_prompt"):
+                    prompt_text = tokenizer.decode(
+                        prompt_token_ids, skip_special_tokens=True
+                    )
+        except Exception:
+            prompt_text = ""
+        classification_text, classification_source = visible_user_text(
+            conversation, prompt_text
+        )
+        remaining_context = max(
+            1,
+            int(serving_chat.model_config.max_model_len) - len(prompt_token_ids),
+        )
+        requested_limit = (
+            getattr(request, "max_completion_tokens", None)
+            or getattr(request, "max_tokens", None)
+        )
+        hard_token_limit = remaining_context
+        if isinstance(requested_limit, int) and requested_limit > 0:
+            hard_token_limit = min(hard_token_limit, requested_limit)
+
+        if phase_recorder is None:
+            decision = self.budget_resolver.resolve(
+                classification_text,
+                config,
+                None,
+                hard_token_limit=hard_token_limit,
+            )
+        else:
+            decision_started_at = time.perf_counter()
+            decision_trace: dict[str, Any] = {
+                "classification_source": classification_source,
+                "classification_input_chars": len(classification_text),
+            }
+            with phase_recorder.measure("decision.total"):
+                decision = self.budget_resolver.resolve(
+                    classification_text,
+                    config,
+                    phase_recorder,
+                    hard_token_limit=hard_token_limit,
+                    decision_trace=decision_trace,
+                )
+            decision_wall_ms = (
+                time.perf_counter() - decision_started_at
+            ) * 1000
+            phase_recorder.record_phase(
+                parent_request_id=request_id,
+                child_request_id="",
+                phase="decision",
+                round_id=0,
+                wall_ms=decision_wall_ms,
+                controller_cpu_ms=decision_wall_ms,
+                prompt_tokens=len(prompt_token_ids),
+                generated_tokens=0,
+                visible=False,
+                budget_decision=decision.to_telemetry(),
+                decision_details=decision_trace,
+            )
+
+        request_state = DtbRequestState(budget_decision=decision)
+        context = DtbRequestContext(
+            request=request,
+            tokenizer=tokenizer,
+            config=config,
+            policy=policy,
+            serving_chat=serving_chat,
+            request_id=request_id,
+            engine_prompt=engine_inputs[0],
+            request_state=request_state,
+            lora_request=lora_request,
+            data_parallel_rank=data_parallel_rank,
+            trace_headers=trace_headers,
+            prompt_text=(
+                engine_prompt_text or engine_inputs[0].get("prompt") or prompt_text
+            ),
+            reasoning_ended=reasoning_ended,
+            reasoning_parser_kwargs=reasoning_parser_kwargs,
+            reasoning_parser=reasoning_parser,
+            chat_template_kwargs=chat_template_kwargs,
+            result_queue=asyncio.Queue(),
+            budget_start_time=time.time(),
+            model_name=model_name,
+            session_id=request_id,
+            phase_recorder=phase_recorder,
+            stream_audit=self.observability.create_stream_audit(request_id),
+            question_text=classification_text,
+        )
+        response_generator = self._managed_generator(
+            DtbStateMachine(context), context, request
+        )
+        return await native_chat_response(
+            serving_chat,
+            request,
+            response_generator,
+            request_id,
+            model_name,
+            conversation,
+            tokenizer,
+            request_metadata,
+            reasoning_parser,
+            response_parser,
+            chat_template_kwargs,
+        )
