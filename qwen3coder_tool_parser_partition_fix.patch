@@ -1,0 +1,108 @@
+diff --git a/vllm/tool_parsers/qwen3coder_tool_parser.py b/vllm/tool_parsers/qwen3coder_tool_parser.py
+index 7457590..b3ef635 100644
+--- a/vllm/tool_parsers/qwen3coder_tool_parser.py
++++ b/vllm/tool_parsers/qwen3coder_tool_parser.py
+@@ -511,8 +511,8 @@ class Qwen3CoderToolParser(ToolParser):
+                 self.param_count += 1
+                 json_fragments.append(json_fragment)
+ 
+-            if json_fragments:
+-                combined = "".join(json_fragments)
++            combined = "".join(json_fragments)
++            if combined:
+ 
+                 if self.current_tool_index < len(self.streamed_args_for_tool):
+                     self.streamed_args_for_tool[self.current_tool_index] += combined
+@@ -523,15 +523,6 @@ class Qwen3CoderToolParser(ToolParser):
+                         len(self.streamed_args_for_tool),
+                     )
+ 
+-                return DeltaMessage(
+-                    tool_calls=[
+-                        DeltaToolCall(
+-                            index=self.current_tool_index,
+-                            function=DeltaFunctionCall(arguments=combined),
+-                        )
+-                    ]
+-                )
+-
+             # Check for function end AFTER processing parameters.
+             # This ordering is critical: with speculative decoding a
+             # burst can deliver the final parameter value together with
+@@ -577,7 +568,9 @@ class Qwen3CoderToolParser(ToolParser):
+                     tool_calls=[
+                         DeltaToolCall(
+                             index=self.current_tool_index,
+-                            function=DeltaFunctionCall(arguments="}"),
++                            function=DeltaFunctionCall(
++                                arguments=combined + "}"
++                            ),
+                         )
+                     ]
+                 )
+@@ -588,6 +581,16 @@ class Qwen3CoderToolParser(ToolParser):
+ 
+                 return result
+ 
++            if combined:
++                return DeltaMessage(
++                    tool_calls=[
++                        DeltaToolCall(
++                            index=self.current_tool_index,
++                            function=DeltaFunctionCall(arguments=combined),
++                        )
++                    ]
++                )
++
+         return None
+ 
+     def get_structural_tag(self, request: ChatCompletionRequest):
+diff --git a/tests/tool_parsers/test_qwen3coder_tool_parser.py b/tests/tool_parsers/test_qwen3coder_tool_parser.py
+index cec531c..67fc96d 100644
+--- a/tests/tool_parsers/test_qwen3coder_tool_parser.py
++++ b/tests/tool_parsers/test_qwen3coder_tool_parser.py
+@@ -1381,6 +1381,44 @@ def test_streaming_multi_param_single_chunk(qwen3_tool_parser, qwen3_tokenizer):
+     assert args["unit"] == "fahrenheit"
+ 
+ 
++def test_streaming_last_param_and_close_single_chunk(
++    qwen3_tool_parser, qwen3_tokenizer
++):
++    """Regression: final parameter and function close can share one delta."""
++    request = ChatCompletionRequest(model=MODEL, messages=[])
++
++    deltas = [
++        "<tool_call>",
++        "\n<function=get_current_weather>",
++        "\n",  # triggers json_started -> sends "{"
++        "<parameter=city>\nDallas\n</parameter>",
++        "\n<parameter=state>\nTX\n</parameter>",
++        # A speculative batch can contain the final parameter and all closes.
++        "\n<parameter=unit>\nfahrenheit\n</parameter>"
++        "\n</function>"
++        "\n</tool_call>",
++    ]
++
++    from tests.tool_parsers.utils import (
++        run_tool_extraction_streaming,
++    )
++
++    reconstructor = run_tool_extraction_streaming(
++        qwen3_tool_parser,
++        deltas,
++        request,
++        assert_one_tool_per_delta=False,
++    )
++
++    assert len(reconstructor.tool_calls) == 1
++    args = json.loads(reconstructor.tool_calls[0].function.arguments)
++    assert args == {
++        "city": "Dallas",
++        "state": "TX",
++        "unit": "fahrenheit",
++    }
++
++
+ def test_no_double_serialization_string_args(qwen3_tool_parser):
+     """Regression: string arguments must not be double-serialized (PR #35615)."""
+     tools = [

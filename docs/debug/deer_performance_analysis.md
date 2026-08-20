@@ -685,6 +685,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-19 | 闭环 DTB 流式工具调用故障：修复 reasoning 终止语义、stop-boundary text/token ID 对齐和 final child terminal 原样透传，并为固定 vLLM 版本提供 parser 分片修复 patch；保留默认关闭且关闭态不进入构造/I/O路径的独立工具流 telemetry | 大批量真实 replay 已验证目标故障；不再使用保守 XML 恢复或人工空 delta，`TB_PHASE` 性能 schema 保持独立 |
 | 2026-08-13 | FinalAnswer 增加显式 `confidence_accepted` / `budget_exhausted` 原因；前者只补 `</think>`，后者追加固定限时提示；phase/request 提取保留该字段 | 对齐 DEER AnswerState 的两类最终生成 prompt，避免 trial 清理后从 `last_chunk.stop_reason` 错判路径 |
 | 2026-08-03 | 按结果 CSV 的 `request_id` 隔离跨数据集 phase；提取命令收敛为单一 run 目录参数，固定读取根部 `server.log` 并递归发现唯一 summary 与全部结果 CSV | 适配数据集后复用同一服务做 Judge 的现有流程；一次实验的日志和客户端结果已同属一个 run，无需依赖 10 秒空档或重复传入可推导路径 |
 | 2026-07-31 | 泛化运行时统一为 `scene → budget/reject`，删除 task type 分类、预算和动态注册；配置合并为 `SCENES`；phase schema 2 增加路由证据、拒识原因、有效预算、难度/history 与决策模块耗时 | 修复完整 prompt 污染和双分类概念冲突，为 13 场景 Vanilla/DTB/fixed 数据回传建立可解释的自动策略入口 |

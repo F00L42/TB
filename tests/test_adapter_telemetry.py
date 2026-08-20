@@ -112,6 +112,33 @@ class TimingCollectorTests(unittest.TestCase):
         self.assertEqual(
             record["final_answer_reason"], "budget_exhausted")
 
+    def test_boundary_tokens_are_accounted_as_final_answer(self) -> None:
+        collector = TimingCollector(emit_phase_metrics=False)
+        collector.record_phase(
+            parent_request_id="p",
+            child_request_id="p_think_1",
+            phase="initial_think",
+            round_id=0,
+            wall_ms=3.0,
+            controller_cpu_ms=0.2,
+            prompt_tokens=20,
+            generated_tokens=6,
+            visible=True,
+            ledger_visible_think_tokens=4,
+            ledger_final_answer_tokens=2,
+        )
+
+        self.assertEqual(
+            collector.snapshot()["ledger"],
+            {
+                "visible_think_tokens": 4,
+                "hidden_probe_tokens": 0,
+                "final_answer_tokens": 2,
+                "total_model_generated_tokens": 6,
+                "generate_calls": 1,
+            },
+        )
+
     def test_emitted_phase_is_single_parseable_json_line(self) -> None:
         collector = TimingCollector(emit_phase_metrics=True)
         stream = io.StringIO()

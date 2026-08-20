@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import json
+import os
 import unittest
+from contextlib import redirect_stdout
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from think_budget_vllm_adapter.budget_controller import BudgetController
 from think_budget_vllm_adapter.context import (
@@ -33,6 +38,21 @@ class FakeTokenizer:
 
     def decode(self, token_ids, skip_special_tokens: bool = False) -> str:
         return "".join(chr(token_id) for token_id in token_ids)
+
+    def get_vocab(self) -> dict[str, int]:
+        return {
+            "<tool_call>": 1000,
+            "</tool_call>": 1001,
+        }
+
+
+class StructuralTokenizer(FakeTokenizer):
+    def decode(self, token_ids, skip_special_tokens: bool = False) -> str:
+        pieces = {
+            1000: "" if skip_special_tokens else "<tool_call>",
+            1001: "" if skip_special_tokens else "</tool_call>",
+        }
+        return "".join(pieces.get(token_id, chr(token_id)) for token_id in token_ids)
 
 
 def make_context() -> RequestStateContext:
@@ -115,6 +135,12 @@ class PromptCopyTests(unittest.TestCase):
 
 
 class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
+    def test_stream_debug_defaults_disabled(self) -> None:
+        with patch.dict(os.environ, {"TB_TOOL_STREAM_DEBUG": ""}):
+            context = make_context()
+
+        self.assertFalse(context.stream_debug_enabled)
+
     async def test_emit_think_end_does_not_deepcopy_or_mutate_source(self) -> None:
         context = make_context()
         original_output = SimpleNamespace(text="reasoning", token_ids=[10, 11])
@@ -137,7 +163,9 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(queued.outputs[0].text, "</think>")
         self.assertEqual(original_output.text, "reasoning")
 
-    async def test_consumer_preserves_terminal_reason_without_mutating_source(self) -> None:
+    async def test_consumer_preserves_terminal_reason_without_mutating_source(
+        self,
+    ) -> None:
         context = make_context()
         completion = SimpleNamespace(
             text="delta",
@@ -151,16 +179,349 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         async def outputs():
             yield chunk
 
-        token_ids, last_chunk, text, stop_reason = await _BaseState.consume_output(
-            outputs(), context)
+        (
+            token_ids,
+            raw_generated_tokens,
+            last_chunk,
+            text,
+            stop_reason,
+            reasoning_boundary,
+        ) = await _BaseState.consume_output(
+            outputs(),
+            context,
+            phase="initial_think",
+            child_request_id="child",
+        )
 
         self.assertEqual(token_ids, [10])
+        self.assertEqual(raw_generated_tokens, 1)
         self.assertIs(last_chunk, chunk)
         self.assertEqual(text, "delta")
         self.assertEqual(stop_reason, "length")
+        self.assertIsNone(reasoning_boundary)
         self.assertEqual(completion.finish_reason, "length")
         visible = await context.result_queue.get()
         self.assertIsNone(visible.outputs[0].finish_reason)
+
+    async def test_final_answer_does_not_restore_missing_tool_marker_text(
+        self,
+    ) -> None:
+        context = make_context()
+        context.tokenizer = StructuralTokenizer()
+        context.request.tools = [{"type": "function"}]
+        source_output = SimpleNamespace(
+            text="f",
+            token_ids=[1000, ord("\n"), ord("<"), ord("f")],
+            finish_reason=None,
+            stop_reason=None,
+        )
+        source = SimpleNamespace(outputs=[source_output])
+
+        await context.stream_output(
+            source,
+            phase="final_answer",
+            child_request_id="final-1",
+        )
+        queued = await context.result_queue.get()
+
+        self.assertIs(queued, source)
+        self.assertIs(queued.outputs[0], source_output)
+        self.assertEqual(queued.outputs[0].text, "f")
+        self.assertEqual(queued.outputs[0].token_ids, source_output.token_ids)
+        self.assertEqual(source_output.text, "f")
+
+    async def test_regular_final_answer_delta_is_not_rewritten(self) -> None:
+        context = make_context()
+        context.tokenizer = StructuralTokenizer()
+        context.request.tools = [{"type": "function"}]
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="ordinary answer",
+            token_ids=[ord(character) for character in "ordinary answer"],
+            finish_reason="stop",
+            stop_reason=None,
+        )])
+
+        await context.stream_output(source, phase="final_answer")
+
+        self.assertIs(await context.result_queue.get(), source)
+
+    async def test_stream_debug_disabled_skips_telemetry_builder(self) -> None:
+        context = make_context()
+        context.stream_debug_enabled = False
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="ordinary answer",
+            token_ids=[10, 11],
+            finish_reason=None,
+            stop_reason=None,
+        )])
+        logger_called = False
+
+        def record_unexpected_call(**_kwargs) -> None:
+            nonlocal logger_called
+            logger_called = True
+
+        context._log_stream_delta = record_unexpected_call
+
+        await context.stream_output(source, phase="final_answer")
+        context.log_stream_event(event="state_transition", phase="controller")
+
+        self.assertFalse(logger_called)
+        self.assertIs(await context.result_queue.get(), source)
+
+    async def test_stream_debug_logs_raw_and_forwarded_digests(self) -> None:
+        context = make_context()
+        context.tokenizer = StructuralTokenizer()
+        context.request.tools = [{"type": "function"}]
+        context.stream_debug_enabled = True
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="f",
+            token_ids=[1000, ord("\n"), ord("<"), ord("f")],
+            finish_reason=None,
+            stop_reason=None,
+        )])
+        stdout = io.StringIO()
+
+        with redirect_stdout(stdout):
+            await context.stream_output(
+                source,
+                phase="final_answer",
+                child_request_id="final-1",
+            )
+
+        line = stdout.getvalue().strip()
+        self.assertTrue(line.startswith("TB_TOOL_STREAM "))
+        record = json.loads(line.split(" ", 1)[1])
+        self.assertEqual(record["schema"], 4)
+        self.assertEqual(record["source"], "controller_pre_parser")
+        self.assertEqual(record["raw_text"], "f")
+        self.assertEqual(
+            record["raw_text_sha256"], record["forwarded_text_sha256"])
+        self.assertEqual(
+            record["source_token_ids_sha256"],
+            record["forwarded_token_ids_sha256"],
+        )
+        self.assertEqual(
+            record["forwarded_token_ids"],
+            source.outputs[0].token_ids,
+        )
+        self.assertFalse(record["stop_boundary_aligned"])
+        self.assertEqual(record["alignment_dropped_token_ids"], [])
+        self.assertEqual(record["terminal_origin"], "none")
+        self.assertFalse(record["final_terminal_passthrough"])
+        self.assertFalse(record["synthetic_terminal"])
+
+    async def test_stream_debug_records_stop_boundary_token_alignment(
+        self,
+    ) -> None:
+        context = make_context()
+        context.stream_debug_enabled = True
+        boundary = "</think>"
+        boundary_ids = [ord(character) for character in boundary]
+        suffix_ids = [1000, ord("\n"), ord("<")]
+        source_output = SimpleNamespace(
+            text=boundary,
+            token_ids=[*boundary_ids, *suffix_ids],
+            logprobs=list(range(len(boundary_ids) + len(suffix_ids))),
+            finish_reason="stop",
+            stop_reason=boundary,
+        )
+        source = SimpleNamespace(outputs=[source_output])
+
+        async def outputs():
+            yield source
+
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            token_ids, raw_generated_tokens, _, text, _, reasoning_boundary = (
+                await _BaseState.consume_output(
+                    outputs(),
+                    context,
+                    phase="initial_think",
+                    child_request_id="think-1",
+                )
+            )
+
+        visible = await context.result_queue.get()
+        record = json.loads(
+            stdout.getvalue().strip().split(" ", 1)[1])
+        self.assertEqual(text, boundary)
+        self.assertEqual(token_ids, boundary_ids)
+        self.assertEqual(
+            raw_generated_tokens,
+            len(boundary_ids) + len(suffix_ids),
+        )
+        self.assertEqual(visible.outputs[0].token_ids, boundary_ids)
+        self.assertEqual(
+            visible.outputs[0].logprobs,
+            list(range(len(boundary_ids))),
+        )
+        self.assertEqual(reasoning_boundary.value, "think_end")
+        self.assertTrue(record["stop_boundary_aligned"])
+        self.assertEqual(record["token_ids"], [*boundary_ids, *suffix_ids])
+        self.assertEqual(record["forwarded_token_ids"], boundary_ids)
+        self.assertEqual(record["alignment_dropped_token_ids"], suffix_ids)
+        self.assertEqual(
+            record["alignment_dropped_token_count"],
+            len(suffix_ids),
+        )
+
+    async def test_stop_boundary_alignment_rejects_unlocatable_marker_ids(
+        self,
+    ) -> None:
+        context = make_context()
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="</think>",
+            token_ids=[10, 11, 12],
+            logprobs=None,
+            finish_reason="stop",
+            stop_reason="</think>",
+        )])
+
+        async def outputs():
+            yield source
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "visible in text but absent from token ids",
+        ):
+            await _BaseState.consume_output(
+                outputs(),
+                context,
+                phase="initial_think",
+                child_request_id="think-1",
+            )
+
+    async def test_stop_boundary_alignment_handles_marker_across_deltas(
+        self,
+    ) -> None:
+        context = make_context()
+        first_text = "thought</thi"
+        second_text = "nk>"
+        first_ids = [ord(character) for character in first_text]
+        second_ids = [ord(character) for character in second_text]
+        hidden_suffix_ids = [1000, 1001]
+        chunks = [
+            SimpleNamespace(outputs=[SimpleNamespace(
+                text=first_text,
+                token_ids=first_ids,
+                logprobs=None,
+                finish_reason=None,
+                stop_reason=None,
+            )]),
+            SimpleNamespace(outputs=[SimpleNamespace(
+                text=second_text,
+                token_ids=[*second_ids, *hidden_suffix_ids],
+                logprobs=None,
+                finish_reason="stop",
+                stop_reason="</think>",
+            )]),
+        ]
+
+        async def outputs():
+            for chunk in chunks:
+                yield chunk
+
+        token_ids, raw_generated_tokens, _, text, _, reasoning_boundary = (
+            await _BaseState.consume_output(
+                outputs(),
+                context,
+                phase="initial_think",
+                child_request_id="think-1",
+                output_kind="DELTA",
+            )
+        )
+
+        first_visible = await context.result_queue.get()
+        second_visible = await context.result_queue.get()
+        self.assertEqual(text, "thought</think>")
+        self.assertEqual(token_ids, [*first_ids, *second_ids])
+        self.assertEqual(
+            raw_generated_tokens,
+            len(first_ids) + len(second_ids) + len(hidden_suffix_ids),
+        )
+        self.assertEqual(first_visible.outputs[0].token_ids, first_ids)
+        self.assertEqual(second_visible.outputs[0].text, second_text)
+        self.assertEqual(second_visible.outputs[0].token_ids, second_ids)
+        self.assertEqual(reasoning_boundary.value, "think_end")
+
+    async def test_final_source_terminal_is_forwarded_unchanged_once(
+        self,
+    ) -> None:
+        context = make_context()
+        context.stream_debug_enabled = True
+        source_output = SimpleNamespace(
+            text="answer",
+            token_ids=[10],
+            logprobs=["lp"],
+            finish_reason="stop",
+            stop_reason="eos",
+        )
+        source = SimpleNamespace(
+            outputs=[source_output],
+            finished=True,
+        )
+
+        stream = io.StringIO()
+        with redirect_stdout(stream):
+            await context.stream_final_terminal(
+                source,
+                phase="final_answer",
+                child_request_id="final-1",
+            )
+        terminal = await context.result_queue.get()
+
+        self.assertIs(terminal, source)
+        self.assertIs(terminal.outputs[0], source_output)
+        self.assertEqual(terminal.outputs[0].text, "answer")
+        self.assertEqual(terminal.outputs[0].token_ids, [10])
+        self.assertEqual(terminal.outputs[0].logprobs, ["lp"])
+        self.assertEqual(terminal.outputs[0].finish_reason, "stop")
+        self.assertEqual(terminal.outputs[0].stop_reason, "eos")
+        self.assertTrue(terminal.finished)
+        self.assertEqual(context.algorithm_state.final_terminal_count, 1)
+        record = json.loads(
+            stream.getvalue().strip().removeprefix("TB_TOOL_STREAM "))
+        self.assertEqual(record["schema"], 4)
+        self.assertEqual(record["event"], "final_terminal_passthrough")
+        self.assertEqual(record["terminal_origin"], "source")
+        self.assertTrue(record["final_terminal_passthrough"])
+        self.assertFalse(record["synthetic_terminal"])
+        self.assertEqual(record["raw_text"], "answer")
+        self.assertEqual(record["forwarded_text_length"], len("answer"))
+        self.assertEqual(record["token_ids"], [10])
+        self.assertEqual(record["forwarded_token_ids"], [10])
+        self.assertEqual(record["source_finish_reason"], "stop")
+        self.assertEqual(record["forwarded_finish_reason"], "stop")
+        self.assertTrue(record["raw_finished"])
+        self.assertTrue(record["forwarded_finished"])
+        with self.assertRaisesRegex(RuntimeError, "already emitted terminal"):
+            await context.stream_final_terminal(
+                source,
+                phase="final_answer",
+                child_request_id="final-1",
+            )
+
+    async def test_natural_empty_source_terminal_is_forwarded_unchanged(
+        self,
+    ) -> None:
+        context = make_context()
+        source_output = SimpleNamespace(
+            text="",
+            token_ids=[],
+            logprobs=None,
+            finish_reason="stop",
+            stop_reason="eos",
+        )
+        source = SimpleNamespace(outputs=[source_output], finished=True)
+
+        await context.stream_final_terminal(
+            source,
+            phase="final_answer",
+            child_request_id="final-1",
+        )
+
+        self.assertIs(await context.result_queue.get(), source)
+        self.assertEqual(context.algorithm_state.final_terminal_count, 1)
 
 
 class ResponseContextTests(unittest.IsolatedAsyncioTestCase):
@@ -188,10 +549,9 @@ class ResponseContextTests(unittest.IsolatedAsyncioTestCase):
 
         await queue.put(chunk("thought", [1]))
         await queue.put(chunk("</think>", [2]))
+        await queue.put(chunk("answer", [3]))
         await queue.put(chunk(
-            "answer", [3], finish_reason="length",
-            stop_reason="max_tokens",
-        ))
+            "", [], finish_reason="length", stop_reason="max_tokens"))
         await queue.put(None)
 
         items = [
