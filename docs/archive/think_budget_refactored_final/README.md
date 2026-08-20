@@ -1,5 +1,9 @@
 # Think Budget Refactored — 项目完整说明
 
+> 归档说明（2026-08-20）：本目录只保留已删除源码镜像的历史研究说明，代码路径、配置和
+> 性能数字均不代表当前生产实现。当前 DTB 结构见 [`dtb/`](../../../dtb/README.md)，后续实验
+> 以 [`think_budget_generalization_plan.md`](../../design/think_budget_generalization_plan.md) 为准。
+
 ## 一、项目简介
 
 **Think Budget Refactored** 是一个 Python 研究框架，实现了 **BudgetForcing** — 一种自适应思考预算机制，用于控制大语言模型 (LLM) 在推理过程中消耗的 token 数量。
