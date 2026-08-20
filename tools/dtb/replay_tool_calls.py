@@ -30,11 +30,23 @@ FIXED_FIELDS = (
     "fixed_min_think_tokens",
     "fixed_prob_th",
 )
+REQUEST_ID_RUN_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 LEAKED_XML_RE = re.compile(
     r"(?:<\/?tool_call>|<\/?function(?:=|>)|<\/?parameter(?:=|>))"
     r"|(?:^|\n)function=[^\n>]+>",
     re.MULTILINE,
 )
+
+
+def build_request_id(
+    line_no: int,
+    attempt: int,
+    variant: str,
+    request_id_run: str,
+) -> str:
+    return f"dtbtool-l{line_no}-a{attempt}-{variant}-{request_id_run}"
+
+
 ROLE_TAIL_RE = re.compile(
     r"(?:^|\n)(?:system|user|assistant|tool)\s*(?:\n|$)|<\|im_(?:start|end)\|>"
 )
@@ -411,6 +423,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--end", type=int, default=0, help="0 means EOF")
     parser.add_argument("--repetitions", type=int, default=20)
     parser.add_argument(
+        "--request-id-run",
+        default="",
+        help="stable suffix used to pre-allowlist stream-audit request IDs",
+    )
+    parser.add_argument(
+        "--list-dtb-request-ids",
+        action="store_true",
+        help="print deterministic DTB request IDs and exit without sending",
+    )
+    parser.add_argument(
         "--mode", choices=("both", "dtb", "vanilla"), default="both"
     )
     parser.add_argument(
@@ -433,10 +455,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def async_main(args: argparse.Namespace) -> int:
-    if httpx is None:
-        raise RuntimeError(
-            "httpx is required to send requests: python -m pip install httpx"
-        )
     cases = load_cases(args.file, args.start, args.end)
     variants = (
         ("vanilla", "dtb")
@@ -444,6 +462,19 @@ async def async_main(args: argparse.Namespace) -> int:
         else (args.mode,)
     )
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    request_id_run = args.request_id_run or timestamp
+    if args.list_dtb_request_ids:
+        if "dtb" in variants:
+            for line_no, _, _ in cases:
+                for attempt in range(1, args.repetitions + 1):
+                    print(build_request_id(
+                        line_no, attempt, "dtb", request_id_run
+                    ))
+        return 0
+    if httpx is None:
+        raise RuntimeError(
+            "httpx is required to send requests: python -m pip install httpx"
+        )
     output_dir = args.output_dir or Path(__file__).parent / f"run_{timestamp}"
     output_dir.mkdir(parents=True, exist_ok=False)
     chunks_path = output_dir / "chunks.jsonl"
@@ -462,6 +493,7 @@ async def async_main(args: argparse.Namespace) -> int:
         "input_sha256": hashlib.sha256(args.file.read_bytes()).hexdigest(),
         "line_range": [args.start, args.end],
         "repetitions": args.repetitions,
+        "request_id_run": request_id_run,
         "variants": list(variants),
         "url": args.url,
         "model_override": args.model or None,
@@ -487,8 +519,8 @@ async def async_main(args: argparse.Namespace) -> int:
             for line_no, source_body, expected in cases:
                 for attempt in range(1, args.repetitions + 1):
                     for variant in variants:
-                        request_id = (
-                            f"tbtool-l{line_no}-a{attempt}-{variant}-{timestamp}"
+                        request_id = build_request_id(
+                            line_no, attempt, variant, request_id_run
                         )
                         body = build_body(
                             source_body,
@@ -546,6 +578,12 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("invalid --start/--end range")
     if args.repetitions < 1:
         raise ValueError("--repetitions must be positive")
+    if args.request_id_run and not REQUEST_ID_RUN_RE.fullmatch(
+        args.request_id_run
+    ):
+        raise ValueError(
+            "--request-id-run may contain only letters, digits, dot, dash, underscore"
+        )
     return asyncio.run(async_main(args))
 
 

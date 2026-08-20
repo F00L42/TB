@@ -22,23 +22,18 @@
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
 @@ -77,1 +77,4 @@
 +from deer.cot_controller import CoTController
-+from think_budget_vllm_adapter import BudgetController
++from dtb import DtbRequestController
 +
  if TYPE_CHECKING:
 @@ -169,1 +172,3 @@
 +        self.cot_controller = CoTController()
-+        self.think_budget_controller = BudgetController()
++        self.dtb_request_controller = DtbRequestController()
          self.python_tool = None
-@@ -271,1 +276,62 @@
+@@ -271,1 +276,57 @@
 +        # Server-side master switch: when disabled, continue through native
 +        # vLLM as a single generation without constructing controller state.
 +        if (request.enable_think_budget
-+                and self.think_budget_controller.is_enabled()):
-+            print(
-+                f"TB_ROUTE event=selected request_id={request_id} "
-+                "controller=think_budget",
-+                flush=True,
-+            )
++                and self.dtb_request_controller.is_enabled()):
 +            assert len(engine_inputs) == 1
 +            prompt_components = self._extract_prompt_components(engine_inputs[0])
 +            trace_headers = (
@@ -64,7 +59,7 @@
 +
 +            # Keep the controller's stable 7-argument ABI. This private
 +            # server-process object never enters the public request model.
-+            object.__setattr__(request, "_think_budget_route_identity", {
++            object.__setattr__(request, "_dtb_route_identity", {
 +                "model_name": model_name,
 +                "lora_request": lora_request,
 +                "data_parallel_rank": data_parallel_rank,
@@ -79,11 +74,11 @@
 +                "response_parser": response_parser,
 +                "chat_template_kwargs": chat_template_kwargs,
 +            })
-+            return await self.think_budget_controller.handle_request(
++            return await self.dtb_request_controller.handle_request(
 +                self, conversation, engine_inputs,
 +                request, request_id, tokenizer, request_metadata)
 +
-+        # Think Budget wins when both flags are true. If its server switch is
++        # DTB wins when both flags are true. If its server switch is
 +        # disabled, fall through to native vLLM rather than another controller.
 +        if request.enable_deer and not request.enable_think_budget:
 +            logger.info("Request %s is using DEER CoT Controller.", request_id)

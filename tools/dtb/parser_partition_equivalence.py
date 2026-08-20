@@ -26,7 +26,7 @@ from collections.abc import Generator
 from typing import Any
 
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 VLLM_ROOT = ROOT / "third_party" / "vllm" / "vllm"
 VLLM_TESTS_ROOT = ROOT / "third_party" / "vllm" / "tests"
 

@@ -5,10 +5,11 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from docs.debug.tool_call.analyze_tool_call_run import classify
-from docs.debug.tool_call.replay_tool_calls import (
+from tools.dtb.analyze_tool_call_run import classify
+from tools.dtb.replay_tool_calls import (
     assemble_observation,
     build_body,
+    build_request_id,
     validate_conversation,
 )
 
@@ -17,8 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ToolCallReplayTests(unittest.TestCase):
+    def test_request_id_is_deterministic_for_stream_audit_allowlist(self) -> None:
+        self.assertEqual(
+            build_request_id(4, 2, "dtb", "audit-01"),
+            "dtbtool-l4-a2-dtb-audit-01",
+        )
+
     def test_known_failure_is_classified_as_leaked_tool_xml(self) -> None:
-        path = ROOT / "docs" / "debug" / "tool_call" / "chunks-4-fail.jsonl"
+        path = ROOT / "tests" / "fixtures" / "tool_call" / "chunks-4-fail.jsonl"
         chunks = [
             json.loads(line)["chunk"]
             for line in path.read_text(encoding="utf-8").splitlines()

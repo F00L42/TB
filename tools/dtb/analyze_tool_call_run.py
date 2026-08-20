@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Correlate replay summaries with TB_TOOL_STREAM records from server.log."""
+"""Correlate replay summaries with DTB stream-audit records."""
 from __future__ import annotations
 
 import argparse
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-PREFIX = "TB_TOOL_STREAM "
+PREFIXES = ("DTB_STREAM_AUDIT ", "TB_TOOL_STREAM ")
 
 
 def is_valid_stop_boundary_alignment(record: dict[str, Any]) -> bool:
@@ -59,10 +59,11 @@ def extract_server_records(
     invalid = 0
     with server_log.open("r", encoding="utf-8", errors="replace") as source:
         for line_no, line in enumerate(source, start=1):
-            marker = line.find(PREFIX)
-            if marker < 0:
+            prefix = next((item for item in PREFIXES if item in line), None)
+            if prefix is None:
                 continue
-            payload = line[marker + len(PREFIX):].strip()
+            marker = line.find(prefix)
+            payload = line[marker + len(prefix):].strip()
             try:
                 record = json.loads(payload)
             except json.JSONDecodeError:
