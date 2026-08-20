@@ -1,5 +1,10 @@
 # Think Budget 服务内迁移设计
 
+> 历史设计说明（2026-08-20）：本文保留最初服务内迁移的算法背景。当前生产实现已迁入
+> `dtb/`，入口为 `dtb/request_controller.py`，当前模块和 telemetry 契约以
+> `dtb_cleanup_and_telemetry_refactor_plan.md` 与
+> `think_budget_generalization_plan.md` 为准；不得按本文旧 adapter 路径部署。
+
 ## 1. 设计目的
 
 本设计从仓库基线 `7e94e4a598dc49bbbe95a3f79d0b8055fcf10a5e`

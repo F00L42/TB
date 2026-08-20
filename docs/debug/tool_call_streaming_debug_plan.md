@@ -1,12 +1,12 @@
-# Think Budget 工具调用流式解析修复与服务器验证方案
+# DTB 工具调用流式解析修复与服务器验证方案
 
 ## 1. 设计目的
 
 本方案针对 vLLM `v0.23.0`、`qwen3` reasoning parser、`qwen3_coder` tool parser
-和 Think Budget 控制器组合下的概率性工具调用解析失败。目标不是让控制器重新实现
+和 DTB 控制器组合下的概率性工具调用解析失败。目标不是让控制器重新实现
 Qwen 工具协议，而是恢复以下边界契约：
 
-> Think Budget 只改变可见思考的长度；控制器提交给原生 reasoning/tool parser 的
+> DTB 只改变可见思考的长度；控制器提交给原生 reasoning/tool parser 的
 > 逻辑 token 序列、结构标记、增量顺序、结束状态和多轮消息语义，应与模型完成一次
 > 原生生成时一致。
 
@@ -31,6 +31,13 @@ MR 整理分支 `codex/tool-call-streaming-mr` 从 `main` 重新构造，不继�
 （最终复盘 HEAD `7789a43`，parser patch 后服务器结果 commit `0b641fd`），不进入主分支。
 主分支只保留可复现工具、自动化测试、聚合结论和本设计文档，避免日志中的模型正文、工具参数及
 36 万行实验明细扩大生产源码的安全面和维护成本。
+
+> **2026-08-20 重构说明：** 下文 2026-08-13～19 的 `TB_TOOL_STREAM` schema 2～4、
+> `TB_TOOL_STREAM_DEBUG` 和 `docs/debug/tool_call/*` 路径只描述历史实验。当前生产写端是
+> `DTB_STREAM_AUDIT` schema 1；通过 `dtb/config/budget_config.yaml` 的
+> `OBSERVABILITY.mode: "stream_audit"` 与 `stream_request_ids` allowlist 启用，重启后生效。
+> 当前工具位于 `tools/dtb/`，小型 fixture 位于 `tests/fixtures/tool_call/`，patch 位于
+> `patches/vllm/v0.23.0/`。后续 run 必须使用本说明中的新路径和事件名；历史证据不改写。
 
 ## 2. 现有证据与根因分层
 
@@ -427,7 +434,7 @@ streamed 的差值，不能推进 `Qwen3CoderToolParser` 尚未执行的 `</func
 ### 3.5 离线无模型分片等价测试与 parser 决策门
 
 完成 3.4 后，保持固定 vLLM `v0.23.0` 的原生 parser 源码不变，在
-`docs/debug/tool_call/` 增加离线无模型测试。测试不启动模型或推理服务，只构造 parser 所需
+`tools/dtb/parser_partition_equivalence.py` 增加离线无模型测试。测试不启动模型或推理服务，只构造 parser 所需
 的最小 tokenizer/tool schema/request，并回放已归档的逻辑 XML、token IDs、delta 边界和
 `finished` 标志。若最小 tokenizer stub 不能覆盖 token-id 分支，再使用与服务器相同 revision
 的 `AutoTokenizer` 作为可选增强；下载模型权重不是测试前提。
@@ -567,8 +574,8 @@ token、只有一次真实 terminal，并在实验结束后删除；它不能改
 
 #### 3.5.3 原生 parser 集成补丁
 
-集成产物为仓库根目录的
-[`qwen3coder_tool_parser_partition_fix.patch`](../../qwen3coder_tool_parser_partition_fix.patch)，
+集成产物为版本化的
+[`qwen3_coder_parser.patch`](../../patches/vllm/v0.23.0/qwen3_coder_parser.patch)，
 基线严格固定为 vLLM `v0.23.0` commit
 `0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。补丁只包含两处：
 
@@ -589,7 +596,7 @@ token、只有一次真实 terminal，并在实验结束后删除；它不能改
 | `DelegatingParser` | false / false | true / true |
 | 上游 streaming test utility | false / false | true / true |
 
-`git -C third_party/vllm apply --check ../../qwen3coder_tool_parser_partition_fix.patch` 已通过，且
+`git -C third_party/vllm apply --check ../../patches/vllm/v0.23.0/qwen3_coder_parser.patch` 已通过，且
 `third_party/vllm` 工作树未被修改。这只是无模型因果验证；服务器上的真实 tokenizer、MTP、
 serving 和多工具行为仍必须按 6.4 验收。
 
@@ -632,77 +639,49 @@ answer_limit = min(model_context_remaining, external_remaining)
 `finish_reason="tool_calls"`（named tool choice 继续遵循原生语义）。预算计算在 adapter
 实现；`length` 优先级修正在 vLLM chat serving 的最小 patch 中实现，二者不能互相替代。
 
-## 4. 独立 DEBUG 遥测
+## 4. 独立 stream audit
 
-启动服务前设置：
+编辑 `dtb/config/budget_config.yaml` 并重启服务：
 
-```bash
-export TB_TOOL_STREAM_DEBUG=1
+```yaml
+OBSERVABILITY:
+  mode: "stream_audit"
+  queue_capacity: 2048
+  stream_request_ids:
+    - "本轮预先生成的目标 request ID"
 ```
 
-控制器会在 result queue、也就是原生 `DelegatingParser` 消费之前打印一行：
+只有 allowlist 中的请求在原生 `DelegatingParser` 消费前异步写出：
 
 ```text
-TB_TOOL_STREAM {json}
+DTB_STREAM_AUDIT {"schema":1,...}
 ```
 
-取消保守恢复后，调试 schema 聚焦“原始 child 输出、stop boundary 对齐、状态转换、queue
-透传和最终 SSE”的对应关系，当前实现已升级为 schema 3：
+schema 1 收编历史 schema 4 的有效字段：
 
 ```text
 source=controller_pre_parser
 parent_request_id / child_request_id / phase / sequence
-completion_epoch / reasoning_boundary / controller_state
-raw_text / raw_text_sha256 / token_ids
-source_finish_reason / source_stop_reason
+completion_epoch / reasoning_boundary / controller_state / next_state
+raw_text / raw_text_sha256 / token_ids / source_token_ids_sha256
+source_finish_reason / source_stop_reason / raw_finished
 forwarded_text_sha256 / forwarded_token_ids_sha256 / forwarded_token_ids
-stop_boundary_aligned / alignment_dropped_token_ids / alignment_dropped_token_count
-terminal_flush / next_state
-```
-
-3.4 实现时将 debug schema 升级为 schema 4；既有 schema 3 字段保持兼容，新增：
-
-```text
-raw_finished
 forwarded_finish_reason / forwarded_stop_reason / forwarded_finished
-terminal_origin=none|source|synthetic
-final_terminal_passthrough
-synthetic_terminal
+stop_boundary_aligned / alignment_dropped_token_ids / alignment_dropped_token_count
+terminal_origin / final_terminal_passthrough / synthetic_terminal
 ```
 
-`raw_text` 和 `token_ids` 必须取自清除中间终止字段之前的 child `RequestOutput`；
-`source_finish_reason/source_stop_reason` 也必须保存原值。非 terminal 的
-`forwarded_text/token_ids` 默认应与 raw 完全相同；唯一允许的差异是
-`stop_boundary_aligned=true`，此时 text 哈希必须相同、forwarded IDs 必须是 raw IDs 的严格
-前缀、`alignment_dropped_token_ids` 必须精确等于剩余后缀。任何不满足这些条件的差异都判为
-controller 透传违约。`reasoning_boundary` 取 `none/think_end/tool_call`，用于证明模型首次
-跨过思考边界后，控制器没有重新进入 thinking/probe。
+`raw_text` 和 `token_ids` 必须取自清除中间终止字段之前的 child `RequestOutput`。非 terminal
+的 forwarded text/token 默认应与 raw 完全相同；唯一允许差异是 stop-boundary token ID
+对齐。final source terminal 的 text、token IDs、finish、stop 和 finished 必须原样透传，且
+`terminal_origin=source`、`final_terminal_passthrough=true`；任何 synthetic terminal 都是
+终止契约违约。
 
-final-answer source terminal 还必须满足 raw/forwarded 的 text、token IDs、finish、stop 和
-finished 五项完全相同，`terminal_origin=source`、`final_terminal_passthrough=true`。任何
-`terminal_origin=synthetic` 都是本轮 DTB 终止契约违约；引擎自然产生的空 source terminal
-仍标记为 `source`，不能因为正文为空而误报为 synthetic。历史 `terminal_flush` 只用于读取
-旧 run，不再作为新实现的成功指标。
-
-schema 2 已经在 `server.log` 的 `token_ids` 字段保存 raw IDs；
-`run_after_terminal_fix/analysis.json` 看不到 ID，是因为该归档没有 `server.log`，且旧分析器
-只保存聚合文本，并非 schema 2 没有记录。schema 3 进一步显式保存 forwarded/dropped IDs；
-`analyze_tool_call_run.py` 会把所有可见 sequence 的 raw/forwarded IDs 写入
-`analysis.json.requests[].children[].stream_deltas`，并把 alignment sequence 的三组 IDs
-写入 `analysis.json.requests[].stop_boundary_alignments`。因此下一轮即使不回传完整
-`server.log`，也能重建跨 delta 的 token 序列并完成边界裁决。
-
-它与 `TB_PHASE` 完全独立，不改变
-[`think_budget_generalization_plan.md`](../design/think_budget_generalization_plan.md)
-的性能 telemetry schema 和提取器。该日志含模型正文与工具参数，可能包含敏感信息；只在
-隔离排障窗口开启，限制日志访问，完成分析后按环境的数据保留规则删除，禁止进入常规
-性能归档。
-
-预算修复需要在同一独立 debug 流增加 `event=final_answer_budget`，至少记录
-`requested_completion_limit`、`emitted_completion_tokens`、`model_context_remaining`、
-`configured_final_cap`、`effective_answer_limit` 和 `limit_source`。terminal 记录继续保存底层
-`source_finish_reason`，分析器将其与最终 SSE finish reason 对账。字段只用于本问题裁决，
-不改变既有 `TB_PHASE` 性能口径。
+`tools/dtb/analyze_tool_call_run.py` 同时读取新 `DTB_STREAM_AUDIT` 和历史
+`TB_TOOL_STREAM`，但当前生产只写新事件。stream audit 不创建 phase recorder，也不改变
+[`think_budget_generalization_plan.md`](../design/think_budget_generalization_plan.md) 的
+`DTB_PHASE` schema 3。该事件含模型正文、工具参数和 token ID，属于高成本敏感诊断；只在
+隔离窗口、精确 allowlist 下启用，完成分析后按环境保留规则删除，禁止进入常规性能归档。
 
 ## 5. 专用复现和分析工具
 
@@ -721,7 +700,7 @@ reason/content/reasoning；更推荐直接让它调用 paired replay 的 observa
 
 ### 5.2 重复 paired replay
 
-[`replay_tool_calls.py`](tool_call/replay_tool_calls.py) 提供：
+[`replay_tool_calls.py`](../../tools/dtb/replay_tool_calls.py) 提供：
 
 - 同一 JSONL 行按 Vanilla/DTB 顺序重复回放；
 - 每次请求显式唯一 `request_id`；
@@ -748,10 +727,11 @@ reason/content/reasoning；更推荐直接让它调用 paired replay 的 observa
 
 ### 5.3 服务日志关联
 
-[`analyze_tool_call_run.py`](tool_call/analyze_tool_call_run.py) 按 response request ID
-从共享 `server.log` 提取 `TB_TOOL_STREAM`，将控制器 raw/forwarded 摘要与 SSE 结果关联，
+[`analyze_tool_call_run.py`](../../tools/dtb/analyze_tool_call_run.py) 按 response request ID
+从共享 `server.log` 提取 `DTB_STREAM_AUDIT`（并兼容历史 `TB_TOOL_STREAM`），将控制器
+raw/forwarded 摘要与 SSE 结果关联，
 输出 `analysis.json` 和终止语义/增量层裁决。它不是性能 telemetry 提取器，也不应接入
-`tools/extract_tb_phase_metrics.py`。
+`tools/extract_dtb_phase_metrics.py`。
 
 旧实现只拼接 `phase=final_answer`，会漏掉第一个工具调用所在的 `initial_think` 或
 `iterative_think`，并把两个跨 child 的 tool calls 误报为通过。当前实现已经：
@@ -788,7 +768,7 @@ reason/content/reasoning；更推荐直接让它调用 paired replay 的 observa
 
 ### 5.4 离线 parser 分片等价工具
 
-已新增 `docs/debug/tool_call/test_parser_partition_equivalence.py`，只读取仓库内 fixture，不调用
+已新增 `tools/dtb/parser_partition_equivalence.py`，只读取仓库内 fixture，不调用
 HTTP 服务。fixture 至少保存：
 
 ```text
@@ -837,9 +817,9 @@ speculative delta 内多个完整 parameter、多个 tool call，以及 raw XML 
 本地执行接口为：
 
 ```bash
-python docs/debug/tool_call/test_parser_partition_equivalence.py --summary-only
-python docs/debug/tool_call/test_parser_partition_equivalence.py --summary-only --require-equivalence
-python docs/debug/tool_call/test_parser_partition_equivalence.py \
+python tools/dtb/parser_partition_equivalence.py --summary-only
+python tools/dtb/parser_partition_equivalence.py --summary-only --require-equivalence
+python tools/dtb/parser_partition_equivalence.py \
   --qwen-parser-source /path/to/patched/qwen3coder_tool_parser.py \
   --summary-only --require-equivalence
 ```
@@ -852,14 +832,19 @@ python docs/debug/tool_call/test_parser_partition_equivalence.py \
 
 ### 6.1 启动
 
-用 [`start.sh`](tool_call/start.sh) 的既有参数启动，排障 run 额外开启日志：
+使用本轮 manifest 归档的生产启动命令。先用稳定的 request-id run 后缀生成 DTB allowlist：
 
 ```bash
 cd /opt/p00906181/TB-main
-TB_TOOL_STREAM_DEBUG=1 bash docs/debug/tool_call/start.sh
+python tools/dtb/replay_tool_calls.py \
+  --file /path/to/private/task29.jsonl \
+  --start 4 --end 4 --repetitions 100 --mode both \
+  --request-id-run parser-audit-01 --list-dtb-request-ids
 ```
 
-确认 `server.log` 中只有一个目标服务进程，并保存启动头、版本和 controller 配置。
+把输出 ID 写入 `OBSERVABILITY.stream_request_ids`，设 `mode: "stream_audit"`，再用正式启动
+命令重启。确认 `server.log` 中只有一个目标服务进程，并保存启动头、版本、controller 配置、
+YAML hash 和 parser/serving patch hash。
 
 ### 6.2 第一轮：原问题 paired 复现
 
@@ -867,26 +852,27 @@ TB_TOOL_STREAM_DEBUG=1 bash docs/debug/tool_call/start.sh
 归属：
 
 ```bash
-python docs/debug/tool_call/replay_tool_calls.py \
-  --file docs/debug/tool_call/task29-pass1-26.jsonl \
+python tools/dtb/replay_tool_calls.py \
+  --file /path/to/private/task29.jsonl \
   --start 4 --end 4 \
   --repetitions 100 \
   --mode both \
+  --request-id-run parser-audit-01 \
   --url http://127.0.0.1:9000/v1/chat/completions \
   --model qwen3.6-27b \
-  --output-dir docs/debug/tool_call/run_after_handoff_fix
+  --output-dir docs/log/perf/<run_id>/tool_call
 ```
 
 随后关联服务日志：
 
 ```bash
-python docs/debug/tool_call/analyze_tool_call_run.py \
-  docs/debug/tool_call/run_after_handoff_fix \
+python tools/dtb/analyze_tool_call_run.py \
+  docs/log/perf/<run_id>/tool_call \
   server.log
 ```
 
 回传 `manifest.json`、`summary.jsonl`、`chunks.jsonl`、`analysis.json` 和仅含对应 request
-ID 的 `TB_TOOL_STREAM`/`TB_ERROR`/`TB_ROUTE` 日志。不要上传无关请求正文。
+ID 的 `DTB_STREAM_AUDIT` 与标准错误日志。不要上传无关请求正文。
 
 ### 6.3 第五轮：DTB 原生 terminal 恢复与 parser 离线裁决
 
@@ -926,7 +912,7 @@ budget 修复，也不把结果直接当作主干发布批准。
 #### 6.4.1 记录基线并应用
 
 在服务器实际运行的 vLLM workspace 中执行；`/opt/p00906181/TB-main` 和 vLLM 路径按实际部署
-替换。应用前保存 commit、包版本和工作树状态。服务 workspace 可能已有 `dtb.patch`，所以不要求
+替换。应用前保存 commit、包版本和工作树状态。服务 workspace 可能已有 DTB serving patch，所以不要求
 全树为空，但以下两个 parser/test 目标文件必须没有未记录的本地修改：
 
 ```bash
@@ -939,9 +925,9 @@ git diff --exit-code -- \
   vllm/tool_parsers/qwen3coder_tool_parser.py \
   tests/tool_parsers/test_qwen3coder_tool_parser.py
 git apply --check \
-  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+  /opt/p00906181/TB-main/patches/vllm/v0.23.0/qwen3_coder_parser.patch
 git apply --whitespace=fix \
-  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+  /opt/p00906181/TB-main/patches/vllm/v0.23.0/qwen3_coder_parser.patch
 git diff --check
 git diff -- \
   vllm/tool_parsers/qwen3coder_tool_parser.py \
@@ -960,14 +946,14 @@ git diff -- \
 立即把服务器实际应用后的 diff 保存到实验目录；它是服务器事实，优先级高于本地预制 patch：
 
 ```bash
-mkdir -p /opt/p00906181/TB-main/docs/debug/tool_call/run_after_parser_fix
+mkdir -p /opt/p00906181/TB-main/docs/log/perf/<run_id>/tool_call
 cd /path/to/vllm-workspace/vllm
 git diff --binary -- \
   vllm/tool_parsers/qwen3coder_tool_parser.py \
   tests/tool_parsers/test_qwen3coder_tool_parser.py \
-  > /opt/p00906181/TB-main/docs/debug/tool_call/run_after_parser_fix/applied_parser.patch
+  > /opt/p00906181/TB-main/docs/log/perf/<run_id>/tool_call/applied_parser.patch
 sha256sum \
-  /opt/p00906181/TB-main/docs/debug/tool_call/run_after_parser_fix/applied_parser.patch
+  /opt/p00906181/TB-main/docs/log/perf/<run_id>/tool_call/applied_parser.patch
 ```
 
 如果选择在服务器手工替换方法，也必须只实现 3.5.3 的 same-call drain，并执行上述 `git diff`
@@ -979,7 +965,7 @@ sha256sum \
 
 ```bash
 cd /opt/p00906181/TB-main
-python docs/debug/tool_call/test_parser_partition_equivalence.py \
+python tools/dtb/parser_partition_equivalence.py \
   --qwen-parser-source \
   /path/to/vllm-workspace/vllm/vllm/tool_parsers/qwen3coder_tool_parser.py \
   --summary-only --require-equivalence
@@ -1034,9 +1020,9 @@ content，同样判实验失败。
 ```bash
 cd /path/to/vllm-workspace/vllm
 git apply --reverse --check \
-  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+  /opt/p00906181/TB-main/patches/vllm/v0.23.0/qwen3_coder_parser.patch
 git apply --reverse \
-  /opt/p00906181/TB-main/qwen3coder_tool_parser_partition_fix.patch
+  /opt/p00906181/TB-main/patches/vllm/v0.23.0/qwen3_coder_parser.patch
 git diff --exit-code -- \
   vllm/tool_parsers/qwen3coder_tool_parser.py \
   tests/tool_parsers/test_qwen3coder_tool_parser.py
@@ -1046,7 +1032,7 @@ git status --short
 最后一个 `git diff --exit-code` 应恢复为应用前状态；若应用前目标文件本来就有修改，应改为对比
 应用前保存的 diff，而不是强行清理。实验目录至少保留预制 patch SHA、`applied_parser.patch`
 SHA、vLLM commit、pytest 输出、replay 产物、分析结果和对应 telemetry。commit `0b641fd` 验证
-通过后，根目录 patch 文件作为 TB 主分支 MR 的集成资产保留；生产部署仍需显式执行
+通过后，版本化 patch 文件作为 TB 主分支 MR 的集成资产保留；生产部署仍需显式执行
 `git apply --check` 和 apply，不能依赖某台实验服务器残留的工作树状态。
 
 ### 6.5 第三轮：协议矩阵
@@ -1156,7 +1142,7 @@ JSON，并在一个 `finish_reason="tool_calls"` 前完成。不得仅因工具�
 协议矩阵中流式与非流式的 tool name、arguments JSON、content/reasoning 分区和结束语义
 一致；Vanilla 不得因本修复回归。普通 content 和 reasoning + content 请求不得因新增
 boundary 判断提前终止。phase 账本必须把 boundary 前 token 计为 visible thinking、boundary
-及其后 token 计为 final answer，hidden probe 仍独立；不得改变 `TB_PHASE` schema。
+及其后 token 计为 final answer，hidden probe 仍独立；不得改变 `DTB_PHASE` schema 3。
 
 ### 7.2 根因闭环条件
 
@@ -1178,7 +1164,7 @@ forwarded 一致、parser 后失败”，因此按 6.4 用最小原生 parser pa
 
 本轮 DTB terminal 修复可以独立回滚，但不得恢复“人工空 delta 用于 parser flush”的设计；
 reasoning boundary 和 stop-boundary alignment 已有独立实测证据，不随本轮回滚。保守恢复逻辑
-同样不恢复。`TB_TOOL_STREAM_DEBUG` 默认为关闭，可独立关闭，不影响 `TB_PHASE`。
+同样不恢复。`OBSERVABILITY.mode` 默认为 `off`；`stream_audit` 与 `phase` 互斥。
 
 ## 8. 本地验证状态
 
@@ -1318,7 +1304,7 @@ DTB 的实现职责收敛为：
 
 #### 9.3.2 parser patch 消除分片敏感性
 
-[`qwen3coder_tool_parser_partition_fix.patch`](../../qwen3coder_tool_parser_partition_fix.patch) 固定
+[`qwen3_coder_parser.patch`](../../patches/vllm/v0.23.0/qwen3_coder_parser.patch) 固定
 应用到 vLLM `v0.23.0` commit
 `0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。补丁不改变 XML 协议，也不无条件添加字符；它只把
 原方法中已有的 parameter 和 function-close 两段状态迁移在同一次 callback 内 drain 完：
@@ -1335,20 +1321,21 @@ site-packages。
 
 #### 9.3.3 telemetry 与验证工具
 
-`TB_TOOL_STREAM` schema 4 在原生 parser 前记录 raw/forwarded text hash、token IDs、finished、
+`DTB_STREAM_AUDIT` schema 1 在原生 parser 前记录 raw/forwarded text hash、token IDs、finished、
 finish/stop reason、boundary、alignment dropped IDs 和 terminal origin。该 telemetry 用于证明
-控制器没有丢失或制造结构 token，不替代 `TB_PHASE` 性能账本，默认关闭。
+控制器没有丢失或制造结构 token，不替代 `DTB_PHASE` 性能账本，默认关闭。
 
-关闭态是显式 hot-path 契约：`stream_output()` 和状态事件入口只检查一次已缓存布尔值，不调用
-telemetry builder，因此不会复制 token IDs、计算 hash、序列化 JSON 或执行 stdout write/flush。
+关闭态是显式 hot-path 契约：`stream_output()` 和 terminal 入口只检查一次缓存的可选 audit
+对象，不调用 telemetry builder，因此不会复制 token IDs、计算 hash、序列化 JSON 或执行
+stdout write/flush。
 单元测试通过替换 builder 为失败探针来锁定该契约。关闭态仍有一次布尔分支，本文只据此声明
 “没有 telemetry 构造和 I/O 开销”，不把本机无模型测试夸大为目标 NPU 上严格为零的时延测量。
 启用态则是有意的高开销、含正文诊断模式，只允许在隔离排障窗口短时使用。
 
-[`replay_tool_calls.py`](tool_call/replay_tool_calls.py) 负责唯一 request ID、Vanilla/DTB paired
-请求、完整 SSE chunk 和重组结果；[`analyze_tool_call_run.py`](tool_call/analyze_tool_call_run.py)
+[`replay_tool_calls.py`](../../tools/dtb/replay_tool_calls.py) 负责可预生成的唯一 request ID、Vanilla/DTB paired
+请求、完整 SSE chunk 和重组结果；[`analyze_tool_call_run.py`](../../tools/dtb/analyze_tool_call_run.py)
 关联服务器 telemetry，裁决 completion、boundary、terminal、XML 和 arguments。离线
-[`test_parser_partition_equivalence.py`](tool_call/test_parser_partition_equivalence.py) 在无模型条件
+[`parser_partition_equivalence.py`](../../tools/dtb/parser_partition_equivalence.py) 在无模型条件
 下用相同逻辑 text/token IDs 的不同分片直接执行原生 parser、DelegatingParser 和上游 streaming
 test utility。
 
@@ -1421,7 +1408,7 @@ MR 和后续回归统一使用以下分类，避免再次用“有没有任意 t
 | final-answer 默认 2048 cap | 第 11 条此前 5/5 `length` 截断 | 长多工具序列仍可能偏离原生 completion budget | 作为独立问题跟踪；是声明“全局原生等价”的 blocker，不把它归到 parser patch |
 | 真实 `length` 被改写为 `tool_calls` | 与 final cap 样本同时发现 | 客户端无法区分完成与截断 | 独立修复并加入 finish reason 回归；本 MR 不声称已解决 |
 | patch 是 server-wide | Vanilla 也使用修改后 parser；本轮无回归 | 影响所有 Qwen3Coder 工具请求 | 保留 Vanilla paired、上游定向测试和快速 reverse；长期优先推动上游修复 |
-| telemetry 含模型/工具正文 | debug 日志可含命令和参数 | 数据泄露与日志膨胀 | `TB_TOOL_STREAM_DEBUG` 默认 0；关闭态不进入 builder；只在隔离窗口开启并按 request ID 回收 |
+| telemetry 含模型/工具正文 | debug 日志可含命令和参数 | 数据泄露与日志膨胀 | `OBSERVABILITY.mode` 默认 `off`；`stream_audit` 只在隔离窗口开启并精确 allowlist request ID |
 | 排障分支包含大量原始 JSONL | `debug_tool_call` 相对 main 约 36 万新增行，多数为调试证据 | 审阅噪声、仓库体积和后续维护成本 | 原始 chunks/analysis 固定在归档分支；MR 从 main 重构，只保留聚合结论、工具、测试和复现命令 |
 
 这些风险不改变本次目标故障“已修复”的裁决，但限制对外表述。特别是 final-answer cap 和真实
@@ -1434,7 +1421,7 @@ MR 应把以下内容作为一个可部署、可回滚的整体提交：
 
 1. **DTB 实现**：`ReasoningBoundary`、model boundary 后的 continuation final、stop-boundary
    text/token ID alignment、final source terminal 原样透传和 fail-fast completion 约束；
-2. **vLLM 集成资产**：根目录 parser patch、固定 upstream SHA、apply/reverse 和 import-path
+2. **vLLM 集成资产**：版本化 parser patch、固定 upstream SHA、apply/reverse 和 import-path
    校验说明；不提交 `third_party/vllm` 工作树修改；
 3. **回归测试**：adapter 状态机、prompt copy、telemetry、tool debug、离线 parser 分片等价和
    patch 内的上游风格 testcase；
@@ -1447,12 +1434,12 @@ MR 创建前至少完成：
 ```text
 工作树只包含预期变更
 除统一 diff 载荷本身必需的空 context 前缀外，git diff --check 通过
-adapter 无模型测试通过或明确记录环境性 skip
+DTB 无模型测试通过或明确记录环境性 skip
 未修改 parser 的离线等价测试按预期失败
 应用 patch 后的离线等价测试退出 0
 patch 对固定 vLLM SHA 执行 git apply --check 成功
 third_party/vllm 工作树干净
-TB_TOOL_STREAM_DEBUG 默认关闭
+OBSERVABILITY.mode 默认 off，stream_request_ids 默认空
 MR 描述列出已通过范围、未覆盖风险和服务器证据 commit 0b641fd
 ```
 

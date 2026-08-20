@@ -1,6 +1,8 @@
 # Think Budget 重构版：项目完整说明
 
-> 发布说明（2026-07-14）：本目录是独立 BudgetForcing 研究实现的历史/参考文档，**不是**本仓库 vLLM 0.20.2 的生产部署文档。请使用仓库根目录的 [README](../../README.md)、[部署说明](../../docs/deployment_vllm_0_20_2.md) 与 [适配器说明](../../think_budget_vllm_adapter/README.md)。文中涉及固定模型端点、数据集路径和历史性能数字，发布前均需脱敏并以可复现实验重新验证。
+> 发布说明（2026-08-20）：本目录是独立 BudgetForcing 研究实现的历史/参考文档，**不是**生产部署文档。当前服务内实现见 [`dtb/`](../../dtb/README.md)，固定 vLLM patch 见
+> [`patches/vllm/v0.23.0/`](../../patches/vllm/v0.23.0/README.md)。文中涉及固定模型端点、
+> 数据集路径和历史性能数字，发布前均需脱敏并以可复现实验重新验证。
 
 ## 一、项目简介
 

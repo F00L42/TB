@@ -193,7 +193,7 @@ Python 的 `_calculate_average_max_prob_from_logprobs()` 只遍历最多几十�
 ### 4.2 Think Budget 的隐藏成本边界
 
 裁决后实现不再使用任务预算中的 legacy `check_answer_len`。所有
-confidence probe 由 `PerformancePolicy` 固定为最多 50 token，并通过
+confidence probe 由 `DtbAlgorithmPolicy` 固定为最多 50 token，并通过
 `hidden_probe_tokens` 单独记账。任务预算只决定 `BudgetVector` 的首段、
 最小思考、轮数和 stride。
 
@@ -286,72 +286,37 @@ queue、decision、phase residual 加客户端 gap 的量级不足以解释当�
 arithmetic、producer queue 或 `max_num_seqs`。50-token probe 已产生净 token
 收益，也不应作为当前第一缩减变量。
 
-## 6. 建议的控制器接口
+## 6. 重构后的控制器接口
 
 ### 6.1 核心数据结构
 
-```python
-@dataclass(frozen=True)
-class EngineCallContext:
-    parent_request_id: str
-    priority: int
-    lora_request: object | None
-    trace_headers: dict | None
-    data_parallel_rank: int | None
-    prompt_text: str | None
-    reasoning_ended: bool | None
-    reasoning_parser_kwargs: dict | None
+当前生产入口是 `dtb.request_controller.DtbRequestController`。核心值对象为：
 
-@dataclass
-class BudgetLedger:
-    visible_think_tokens: int = 0
-    hidden_probe_tokens: int = 0
-    generate_calls: int = 0
-    controller_ms: float = 0.0
-    probe_ms_ema: float = 0.0
-    max_hidden_probe_tokens: int = 0
-    max_generate_calls: int = 0
-    deadline_ns: int = 0
+- `DtbAlgorithmConfig`：一次请求的状态机配置；
+- `ThinkingBudget`：check/min/round/stride 四维生成限制；
+- `DtbBudgetDecision`：scene、分支、预算、置信度、来源和 hard limit；
+- `DtbRequestContext`：原生 vLLM 调用上下文、请求输入和可选观测器；
+- `DtbRequestState`：状态机进度以及 thinking/probe/final/call 的唯一模型工作账本。
 
-@dataclass
-class PhaseResult:
-    phase: str
-    round: int
-    child_request_id: str
-    output: object
-    prompt_tokens: int
-    cached_prompt_tokens: int
-    generated_tokens: int
-    queue_ms: float
-    prefill_ms: float
-    decode_ms: float
-    wall_ms: float
-```
+`model.py`、`plan.py`、`planner.py`、`executor.py` 这类容易和 vLLM 或通用调度概念冲突的
+弱命名不进入生产结构。telemetry 不维护第二个 `BudgetLedger`。
 
 ### 6.2 内部接口
 
-```python
-async def generate_phase(
-    call_ctx: EngineCallContext,
-    ledger: BudgetLedger,
-    phase: str,
-    round_id: int,
-    prompt,
-    sampling_params,
-    *,
-    visible: bool,
-) -> PhaseResult:
-    """统一透传 engine kwargs、收集 metrics、更新成本账本并输出一条 JSONL。"""
+职责边界固定为：
 
-def should_probe(
-    ledger: BudgetLedger,
-    actual_think_tokens: int,
-    predicted_remaining_tokens: int,
-    stop_probability: float,
-    tpot_ms: float,
-) -> bool:
-    """先过硬预算/最低思考门，再比较预期节省与 probe 成本。"""
+```text
+integration/vllm  原生 request/response/parser 契约
+request_controller 请求编排、配置装配和生命周期
+budgeting          scene、difficulty、history 的预算解析
+reasoning          三状态生成、parser boundary、唯一工作账本
+history            scene 历史存储与预算策略
+observability      可选 phase/stream audit，不参与算法裁决
 ```
+
+所有 child `generate()` 由 `DtbRequestContext.engine_request_kwargs()` 透传 priority、LoRA、
+trace headers、DP rank 和 reasoning/parser 上下文。phase metrics 只在 recorder 非空时读取
+`RequestOutput.metrics`；关闭态不构造 phase record，也不执行计时和 metrics 反射。
 
 ### 6.3 目标流程
 
@@ -359,7 +324,7 @@ def should_probe(
 flowchart TD
     A["Chat request"] --> B{"Budget enabled?"}
     B -- No --> C["Native single generation"]
-    B -- Yes --> D["Classify, then build BudgetPlan"]
+    B -- Yes --> D["Route scene, resolve DtbBudgetDecision"]
     D --> E["Thinking: initial check_length"]
     E --> F["ConfidenceProbe: current 50-token trial"]
     F --> G{"Accepted and minimum met?"}
@@ -375,7 +340,7 @@ flowchart TD
 - **流式/非流式**：内部 phase 使用 DELTA 或 FINAL_ONLY 时，token、text、logprobs 的聚合语义必须一致；不能只保存最后一个 delta。
 - **取消**：客户端断开要中止当前 child request，并保证 parent 不再提交后续 phase。
 - **错误**：orchestrator 不能只记日志后返回一个看似成功的空 200；错误应转换为 OpenAI error response。
-- **预算**：所有隐藏 token 和 final 之外的模型调用都进入 ledger；任何路径都不能绕过上限。
+- **预算**：所有 thinking、hidden probe、final token 和 child 调用都进入 `DtbRequestState`；任何路径都不能绕过上限。
 - **质量**：减少 probe 或调整预算必须同时报告任务正确率/完整性，不能只比较时延。
 - **公平性**：同一 parent 的 priority、DP rank、LoRA、采样参数和 tracing 上下文保持一致。
 - **指标**：Prometheus 低基数标签只用 `phase`/`variant`，不要把 request_id 放进 metric label；request_id 只进入 JSONL/trace。
@@ -408,10 +373,12 @@ docs/log/perf/<run_id>/
 `test_results/` 等子目录；提取时递归搜索整个 run，但每个文件名必须唯一。顺序执行
 多个数据集且中间复用同一服务做 Judge 时，目录边界不依赖两轮之间的等待时长。
 
-`manifest.json` 至少记录：TB commit、该 commit 中 `dtb.patch` 的集成身份、
+`manifest.json` 至少记录：TB commit、该 commit 中
+`patches/vllm/v0.23.0/dtb_serving.patch` 与 `qwen3_coder_parser.patch` 的 hash、
 vLLM/vLLM-Ascend/torch/torch-npu/CANN 版本、模型与 tokenizer revision、
 完整启动命令、设备、TP/DP、`max_num_seqs`、prefix cache、MTP 参数、
-数据集 hash、并发和随机种子。三个仓库的 dirty 状态不作为当前实验身份字段。
+DTB policy/YAML hash、observability mode、experiment role、数据集 hash、并发和随机种子。
+三个仓库的 dirty 状态不作为当前实验身份字段。
 
 从 [`manifest.template.json`](../log/perf/manifest.template.json) 复制到
 `docs/log/perf/<run_id>/manifest.json` 后填写。模板保留当前优化阶段固定的
@@ -419,35 +386,47 @@ vLLM、vLLM-Ascend、CANN、运行时、硬件、模型路径和服务启动基�
 确认 TB commit、控制参数、采样参数和 metrics 进程连续性。任何固定环境变化
 必须写入 `baseline_overrides`。
 
-`controller_phases.jsonl` 每行一个 phase，推荐格式：
+`controller_phases.jsonl` 每行一个 phase，重构后格式为：
 
 ```json
-{"schema":1,"parent_request_id":"chatcmpl-x","child_request_id":"chatcmpl-x_confidence_probe_2","variant":"think_budget","phase":"confidence_probe","round":2,"wall_ms":912.4,"queue_ms":3.1,"prefill_ms":381.5,"decode_ms":524.0,"controller_cpu_ms":3.8,"prompt_tokens":3584,"cached_prompt_tokens":3456,"generated_tokens":50,"visible":false,"confidence":0.7653,"accepted":false,"confidence_method":"average_fallback","average_confidence":0.7653,"value_min_raw":null,"pair_count":50,"value_pair_count":38,"accept_reason":"below_threshold","stop_reason":"length"}
+{"schema":3,"parent_request_id":"chatcmpl-x","child_request_id":"chatcmpl-x_confidence_probe_2","variant":"dtb","policy_version":"dtb-algorithm-v2","phase":"confidence_probe","round":2,"wall_ms":912.4,"queue_ms":3.1,"prefill_ms":381.5,"decode_ms":524.0,"controller_cpu_ms":3.8,"prompt_tokens":3584,"cached_prompt_tokens":3456,"generated_tokens":50,"visible":false,"confidence":0.7653,"accepted":false,"confidence_method":"average_fallback","average_confidence":0.7653,"value_min_raw":null,"pair_count":50,"value_pair_count":38,"accept_reason":"below_threshold","stop_reason":"length"}
 ```
 
-写单行 JSON，时间用 `time.perf_counter_ns()`，不要把完整 prompt、答案或逐 token 事件写入热路径。
+生产写端只在 `OBSERVABILITY.mode: "phase"` 时通过后台有界队列写单行 JSON；请求协程
+不执行 JSON 序列化或同步 flush。不要记录完整 prompt、答案或逐 token 事件。
 
 ## 9. 服务器 profiling runbook
 
-### 9.1 第一级：低开销、每次实验必做
+### 9.1 第一级：正式关闭态 run 与独立 phase 账本 run
 
 1. 从 [`manifest.template.json`](../log/perf/manifest.template.json) 复制本轮
    manifest，填写 TB commit、请求 overrides、工作负载与结果路径。固定的
    vLLM/vLLM-Ascend/CANN/torch/torch-npu、硬件、模型路径和启动脚本已经由
    模板及其 hash 归档；只有 `baseline_overrides` 非空时才重新采集对应环境
-   证据。vLLM 侵入式修改以该 TB commit 中的 `dtb.patch` 为准，不采集三个
+   证据。vLLM 侵入式修改以该 TB commit 中的版本化 patch 为准，不采集三个
    仓库的 dirty。
 
-每轮测试的最小采集流程：
+正式性能/质量 run 使用 `OBSERVABILITY.mode: "off"`，manifest 记录
+`experiment_role=official_performance`；该 run 只采客户端 E2E/质量和服务 Prometheus，
+不会产生 DTB phase。最小流程：
 
 ```bash
 curl -s http://127.0.0.1:41016/metrics \
   > docs/log/perf/<run_id>/metrics.before.prom
-# 发送端到端请求
+# 发送端到端请求；不要执行 phase 提取
 curl -s http://127.0.0.1:41016/metrics \
   > docs/log/perf/<run_id>/metrics.after.prom
-python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>/
 ```
+
+需要裁决分支、hidden probe 和模型工作量时，使用相同 commit、数据、采样、并发、到达
+节奏和 cache 状态，另启 `OBSERVABILITY.mode: "phase"` 服务并记录
+`experiment_role=phase_audit`。完成 workload 后执行：
+
+```bash
+python tools/extract_dtb_phase_metrics.py docs/log/perf/<phase_run_id>/
+```
+
+phase run 的 telemetry 开销必须单列，不能用它的 E2E 替代关闭态正式性能结果。
 
 固定基线发生变化时，才刷新模板引用的公共证据：
 
@@ -464,7 +443,8 @@ curl -s http://127.0.0.1:41016/version \
 
 模型不是固定 revision checkout 时，至少记录 `readlink -f` 后的真实路径及 `config.json`、tokenizer 配置文件 hash。测试后先核对两份 metrics 的 `process_start_time_seconds`；不同则 counter delta 整体无效，不能选择性使用其中某些差值。
 
-2. 控制器默认对每个 phase 输出一条 `TB_PHASE` JSON。优先从最终 `RequestOutput` 读取：
+2. `phase` 模式对每个 phase 异步输出一条 `DTB_PHASE` schema 3。优先从最终
+   `RequestOutput` 读取：
 
 - `num_cached_tokens`；
 - `metrics.queued_ts / scheduled_ts / first_token_ts / last_token_ts`；
@@ -475,12 +455,12 @@ curl -s http://127.0.0.1:41016/version \
 请求完成后从服务日志提取标准产物：
 
 ```bash
-python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>/
+python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>/
 ```
 
 提取器固定读取 `<run_id>/server.log`，递归查找唯一 `_SUMMARY.csv`，再在同一 run
 内解析 summary 引用的全部具体结果 CSV；明细必须包含 `request_id`。提取器用这些 ID 与
-`TB_PHASE.parent_request_id` 精确等值关联，并为每个具体结果文件生成独立的
+phase 事件的 `parent_request_id` 精确等值关联，并为每个具体结果文件生成独立的
 `extracted/<result_stem>/controller_phases.jsonl`、`requests.jsonl` 和
 `phase_summary.csv`。未出现在结果 CSV 中的旧请求和 Judge phase 只计入
 `extraction_manifest.json.excluded_phase_records`，不进入任何被测目录。
@@ -587,30 +567,29 @@ paired_net_gain_ms = vanilla_e2e_ms - controller_e2e_ms
 
 ## 11. 本轮实现与下一轮实验
 
-### 11.1 已落地实现与 run_02 遥测状态
+### 11.1 当前实现与历史证据边界
 
-- `TimingCollector` 增加真实模型工作账本：`visible_think_tokens`、`hidden_probe_tokens`、`final_answer_tokens`、`generate_calls`。
-- 每个 `decision / initial_think / iterative_think / confidence_probe / final_answer` 输出 schema 1 的 `TB_PHASE`；若 vLLM stats 可用，则从 child `RequestOutput` 计算 queue/prefill/decode，并记录 `num_cached_tokens`。
-- decision phase 额外持久化 effective `BudgetPlan`、task type、decision branch
-  和 `source_by_field`；confidence probe 额外持久化 method、average、
-  Value-Min raw、pair/value-pair count 与 `accept_reason`。提取后的
-  `requests.jsonl` 同时保留计划与逐轮 probe assessment。Value-Min 关闭或
-  value pair 不足时，raw 仅作为反事实观测值记录，不参与 score 或接受分支。
-  原有重复输出同一计划的 `TB_DECISION` flush 已移除，由 decision phase
-  单行 JSON 统一持久化。
-- trial prompt 与合成 `</think>` 从递归深拷贝改成受控浅拷贝；静态 suffix token 以 parent request 为单位缓存。
-- state enter/complete 与重复 `TB_CONFIDENCE` flush 默认关闭，保留 `verbose_stage_logging=true` 作为故障调试开关。
-- v0.23.0 route 在 DP rank 解析后执行，子请求透传 priority、LoRA、trace headers、DP rank、prompt/reasoning parser context；外层响应分别继续使用原生流式 reasoning parser、非流式统一 parser 与 chat template kwargs。
-- adapter 算法层已取消 DEER 字段投影，状态机改为 Thinking / ConfidenceProbe / FinalAnswer；首段后立即 probe，最后失败 probe 后仍完成 stride，主 prompt 只追加。
-- trial 上限由 `PerformancePolicy` 固定为 50，DELTA/FINAL_ONLY/CUMULATIVE 使用完整 collector；Value Min 缺少完整 bottom-k 时降级平均置信度，无可用 logprob 时 fail-open。
-- 在线历史增加 parent request 幂等、非阻塞 JSONL writer 和未评分语义；error/cancel 不进入 token 分位数。
-- `dtb.patch` 已在固定的 vLLM `v0.23.0` checkout 上通过 `git apply --check`；本地 46 个无模型单元测试覆盖 scene 预算/拒识、真实产品问题抽样、三状态轨迹、trial collector、置信度与补充遥测、历史闭环、写入失败隔离、phase 账本、浅拷贝、`n=1` 契约与原生路由上下文。
+2026-08-20 起，生产实现位于 `dtb/`：`DtbRequestController` 只做请求编排，
+`DtbBudgetResolver` 输出 `DtbBudgetDecision`，`DtbStateMachine` 驱动 Thinking /
+ConfidenceProbe / FinalAnswer，`DtbRequestState` 是模型工作量的唯一账本。配置只在启动时
+校验加载；history 默认关闭；difficulty 保留但默认关闭，等待独立检视。
 
-run_02 已在目标 NPU 上验证 BudgetPlan、字段来源、confidence method/raw、
-pair count 与 `accept_reason` 的持久化完整性，并以 phase/Prometheus 精确闭环。
-其余接口、异常和流式行为仍属于**源码确定/本地测试**，不能写成目标 NPU
-性能实测。结构化 phase 日志本身仍有一次 JSON 序列化与 flush 成本，但
-run_02 controller CPU 与 E2E residual 已表明它不是当前主项。
+observability 默认为 `off`。关闭态不构造 recorder/writer，不调用计时、metrics 反射、
+序列化、队列或 flush；`phase` 才写 `DTB_PHASE` schema 3 和
+`DTB_REQUEST_SUMMARY`；`stream_audit` 只对 allowlisted request ID 写
+`DTB_STREAM_AUDIT`，且不创建 phase recorder。启用模式会在请求协程中构造相应 record，
+但写出只做 `put_nowait`；后台线程负责 JSON 和输出。队列丢事件会用标准错误日志限频告警，
+phase audit 必须以零 dropped 验收。
+
+版本化 `dtb_serving.patch` 保持 v0.23.0 route、DP 亲和性、priority、LoRA、trace headers、
+prompt/reasoning parser context 与原生流/非流式 parser 契约；Qwen3-Coder parser 修复是同
+目录内独立 patch，不复制进 DTB Python 包。
+
+run_02 的 `TB_PHASE`、`TimingCollector` 和 `BudgetPlan` 是**重构前历史证据**，原始产物
+保持不变并由新提取器兼容读取。它在目标 NPU 上验证了当时版本的字段来源、confidence
+method/raw、pair count 与 `accept_reason`，不能直接证明重构后关闭态性能无影响。重构后的
+接口、默认关闭路径和异常行为目前属于**源码确定/本地无模型测试**；真实性能必须按本章
+off/phase 分离 runbook 重新测量。
 
 ### 11.2 run_02 已确认的结论
 
@@ -667,7 +646,7 @@ token、phase wall/queue/prefill/decode、JSON 结构分和语义质量分。单
 
 ### 11.4 继续固定 50-token probe
 
-`trial_answer_length=50` 继续作为当前 `PerformancePolicy` 不变量。run_02
+`trial_answer_length=50` 继续作为当前 `DtbAlgorithmPolicy` 不变量。run_02
 的 33/33 probe 均以 length 结束，不能直接复用为平均约 447-token 的 final。
 若未来重新做 probe 长度消融，必须建立新 policy version，并与
 threshold/budget 实验分开。
@@ -685,6 +664,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-20 | 生产结构切换到 `dtb/` 和版本化 patch；删除 telemetry 双账本；观测改为默认 off、独立 phase audit 和 allowlisted stream audit；提取器新写 schema 3、兼容读历史 schema | 后续实验必须用关闭态给出正式 E2E，用同身份 phase run 完成分支与总工作量审计；历史 run 保持不可变 |
 | 2026-08-19 | 闭环 DTB 流式工具调用故障：修复 reasoning 终止语义、stop-boundary text/token ID 对齐和 final child terminal 原样透传，并为固定 vLLM 版本提供 parser 分片修复 patch；保留默认关闭且关闭态不进入构造/I/O路径的独立工具流 telemetry | 大批量真实 replay 已验证目标故障；不再使用保守 XML 恢复或人工空 delta，`TB_PHASE` 性能 schema 保持独立 |
 | 2026-08-13 | FinalAnswer 增加显式 `confidence_accepted` / `budget_exhausted` 原因；前者只补 `</think>`，后者追加固定限时提示；phase/request 提取保留该字段 | 对齐 DEER AnswerState 的两类最终生成 prompt，避免 trial 清理后从 `last_chunk.stop_reason` 错判路径 |
 | 2026-08-03 | 按结果 CSV 的 `request_id` 隔离跨数据集 phase；提取命令收敛为单一 run 目录参数，固定读取根部 `server.log` 并递归发现唯一 summary 与全部结果 CSV | 适配数据集后复用同一服务做 Judge 的现有流程；一次实验的日志和客户端结果已同属一个 run，无需依赖 10 秒空档或重复传入可推导路径 |

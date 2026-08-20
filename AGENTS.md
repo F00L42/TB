@@ -15,15 +15,18 @@
 ## 仓库地图
 
 - `deer/`：简化版 DEER，侵入 vLLM Server，通过 `CoTController` 驱动“思考—试答—置信度—回答”状态机。先读 `deer/AGENTS.md`。
-- `think_budget_vllm_adapter/`：基于 DEER 控制接口的服务内 Think Budget 实现，加入任务分类、难度、历史预算、Value Min Confidence 等逻辑。
+- `dtb/`：生产 DTB（Dynamic Think-Budget Control）实现。入口是
+  `request_controller.py`；预算解析、三状态推理、history、telemetry 和 vLLM 适配按子包分离。
 - `think_budget/`：通过 API 转发运行的离线参考实现。范围和与生产 adapter 的边界见
-  `think_budget/README.md`；历史重构说明见 `think_budget_refactored_final/docs/README.md`。
-- `dtb.patch`：对 vLLM Chat Completion 协议和 serving 入口的侵入式修改。生产环境应用方式为`cd vllm-workspace/vllm/ && git apply --reject --whitespace=fix /path/to/dtb.patch`
+  `think_budget/README.md`；已删除源码镜像的历史说明归档见
+  `docs/archive/think_budget_refactored_final/README.md`。
+- `patches/vllm/v0.23.0/`：唯一可部署的 vLLM patch 制品及应用说明；依次应用
+  `dtb_serving.patch`、`qwen3_coder_parser.patch`。
 - `docs/log/`：端到端汇总、vLLM/vLLM-Ascend 服务日志和人工 profiling 结果。
 - `docs/debug/deer_performance_analysis.md`：当前性能诊断、优化优先级和服务器 profiling runbook。
 - `docs/design/think_budget_generalization_plan.md`：13 场景实验、数据提取、自动路由审计、
   候选选择和阶段验收的权威流程。
-- `tools/extract_tb_phase_metrics.py`：按结果 CSV 中的 `request_id` 从共享
+- `tools/extract_dtb_phase_metrics.py`：按结果 CSV 中的 `request_id` 从共享
   `server.log` 隔离请求和 phase；接口只接收一个 run 目录。
 - `docs/report/chart/`：可选的请求级配对复算、表格和图表生成层，不替代 telemetry
   裁决审计。
@@ -31,17 +34,17 @@
 
 ## 推荐阅读顺序
 
-1. 本文件；分析 Think Budget 产品实验时继续读
+1. 本文件；分析 DTB 产品实验时继续读
    `docs/design/think_budget_generalization_plan.md`，分析 DEER 内部实现时再读
    `deer/AGENTS.md`。
 2. 目标 `docs/log/perf/<run_id>/` 的 `manifest.json`、`extraction_manifest.json`、
    `_SUMMARY.csv`、具体结果 CSV 和已有 `RESULT.md`；当前 13 场景自动模式闭环参考
    `docs/log/perf/run_07/RESULT.md`。
-3. 需要重新提取共享日志时读 `tools/extract_tb_phase_metrics.py`；需要生成请求级配对表
+3. 需要重新提取共享日志时读 `tools/extract_dtb_phase_metrics.py`；需要生成请求级配对表
    或图时读 `docs/report/chart/report_chart_workflow.md`。
-4. 需要解释服务内算法时读 `think_budget_vllm_adapter/budget_controller.py`、
-   `think_budget_vllm_adapter/deer_think_budget/state.py`、两个 `context.py` 和
-   `dtb.patch`。
+4. 需要解释服务内算法时读 `dtb/request_controller.py`、
+   `dtb/budgeting/budget_resolver.py`、`dtb/reasoning/state_machine.py`、
+   `dtb/reasoning/generation_states.py` 和版本化 serving patch。
 5. `deer/cot_controller.py`、`deer/state.py`、`deer/context.py` 以及
    `think_budget/CLAUDE.md` 只用于核对历史实现或迁移语义。
 
@@ -54,24 +57,26 @@
 平均值直接跳到算法结论：
 
 1. **确定实验身份和基线。** 从用户说明和 `manifest.json` 确认模型/量化或后训练版本、
-   服务与 adapter commit、请求参数、sampling/seed、并发、到达节奏和 cache 状态。
+   服务与 DTB commit、policy/YAML/patch hash、observability mode、experiment role、
+   请求参数、sampling/seed、并发、到达节奏和 cache 状态。
    优先使用同一实验身份、同一数据集的 Vanilla；模型或训练状态变化时，不得沿用旧
    run 的 Vanilla。文件名前缀（如 `vanilla_`、`qp_vanilla_`、`dtb_`）是 variant，
    不是 scene。
-2. **提取并验证归属。** 若 run 内有根目录 `server.log`、唯一 `_SUMMARY.csv` 和其引用的
-   具体结果 CSV，执行：
+2. **提取并验证归属。** 仅对 `observability.mode=phase` 的账本 run，若目录内有根目录
+   `server.log`、唯一 `_SUMMARY.csv` 和其引用的具体结果 CSV，执行：
 
    ```bash
-   python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
+   python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>
    ```
 
    提取器以具体结果 CSV 的非空 `request_id` 为白名单，生成
    `extraction_manifest.json`、`request_index.csv` 和每个结果独立的 `extracted/`
    子目录。若仓库只上传了已提取产物而缺少原始大日志，不要假装可在本地重新提取。
 3. **先做完整性和裁决审计。** 对账 summary 行、具体结果行、唯一 request ID、日志覆盖、
-   `decision_branch`、scene、reject、有效 `BudgetPlan`、配置签名和 `source_by_field`。
+   `decision_branch`、scene、reject、有效 `DtbBudgetDecision`、配置签名和 `source_by_field`。
    任何请求归属不闭合或 variant 分支断言失败时，该 run 只能用于排障，不能参与性能
-   排名。Vanilla 没有 TB phase 是合法状态。
+   排名。Vanilla 没有 phase 是合法状态；`off` 正式 DTB run 没有 phase 也是设计状态，
+   但不能用于分支或模型总工作量裁决。
 4. **再做请求级配对。** 使用规范化数据集标识和 `QA_ID` 配对 Vanilla/候选；拒绝缺失、
    重复或样本集合不同的静默比较，并核对相同 ID 的问题与参考答案或 manifest 数据集
    哈希。优先报告逐场景 paired E2E、13 场景等权宏平均、请求加权结果、P50/P95、
@@ -101,6 +106,16 @@
 - `controller_cpu`：tokenize/decode、拷贝、置信度聚合、队列和格式转换。
 
 每个 phase 至少记录 `queue_ms`、`prefill_ms`、`decode_ms`、`prompt_tokens`、`cached_prompt_tokens`、`generated_tokens`、`visible`、`round`、`stop_reason`。不要只用 vLLM 每 10 秒打印的全局吞吐率归因单个请求。
+
+DTB telemetry 由 `dtb/config/budget_config.yaml` 的 `OBSERVABILITY.mode` 在服务启动时确定：
+
+- `off` 是生产和正式性能排名默认值，不创建 recorder/writer，日志中不得出现 DTB 成功事件；
+- `phase` 写 `DTB_PHASE` schema 3 和 `DTB_REQUEST_SUMMARY`，用于单独的归属与 phase 账本 run；
+- `stream_audit` 不创建 phase recorder，只对 `stream_request_ids` 显式白名单写
+  `DTB_STREAM_AUDIT`。该事件可能含正文和 token ID，只能用于隔离排障。
+
+不要把 telemetry 启用 run 与 `off` run 混为同一性能基线。提取器兼容读取历史
+`TB_PHASE` schema 1/2，但重构后生产端只写新事件。
 
 比较必须使用相同样本、采样参数、随机种子、到达节奏、并发度、prefix cache 状态和质量评分。目标版本中 MTP 保持生产默认配置，不再作为常规性能分析变量。先看配对请求差值，再看总体分位数。
 

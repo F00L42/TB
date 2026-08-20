@@ -1,5 +1,11 @@
 # think_budget_vllm_adapter 裁决后重构计划
 
+> 历史状态（2026-08-20）：本文记录 2026-07-23 的算法裁决和当时 adapter 路径，不再是
+> 当前生产结构说明。生产实现已迁入 `dtb/`；配置、预算、reasoning、history、observability
+> 和 vLLM integration 的当前边界以
+> `docs/design/dtb_cleanup_and_telemetry_refactor_plan.md` 与源码为准。难度模块已保留迁移，
+> 默认关闭，等待独立复核。
+
 ## 1. 设计目的
 
 本文把算法一致性检视结果和用户裁决转换为可实施的重构计划。目标不再是

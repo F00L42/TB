@@ -1,6 +1,6 @@
 # 独立 Think Budget 参考实现
 
-`think_budget/` 是原始 BudgetForcing 研究代码库。它作为 vLLM 适配器的算法和参考来源保留，并不是面向 vLLM 0.20.2 的生产服务路由。
+`think_budget/` 是原始 BudgetForcing 研究代码库。它作为 DTB 算法的离线参考来源保留，并不是生产服务路由。
 
 ## 范围
 
@@ -8,7 +8,9 @@
 - 包含位于 `docs/` 下的研究与评测资料。
 - 未实现生产适配器的请求模型、字段级外部覆盖约定、耗时遥测和可续接流式会话生命周期。
 
-生产 vLLM 部署应使用 [`../think_budget_vllm_adapter/`](../think_budget_vllm_adapter/README.md) 和仓库级的 [vLLM 0.20.2 部署说明](../docs/deployment_vllm_0_20_2.md)。
+生产 vLLM `v0.23.0` 部署应使用 [`../dtb/`](../dtb/README.md) 和
+[`../patches/vllm/v0.23.0/`](../patches/vllm/v0.23.0/README.md)。后续实验流程以
+[`think_budget_generalization_plan.md`](../docs/design/think_budget_generalization_plan.md) 为准。
 
 ## 公开发布检查
 

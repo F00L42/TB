@@ -1,9 +1,12 @@
-# Think Budget 最终答案生成兼容性设计
+# DTB 最终答案生成兼容性设计
 
 ## 1. 设计目的
 
 本文针对仓库 revision `bc142570103f86ca53ed656c75afd999bd13cbbd` 和
 2026-08-20 的运行状态，设计 DTB 对不同模型终结行为的兼容方式。
+
+状态：**提案，尚未由本次结构重构实现。** 本文路径已切换到重构后的生产结构；后续实现
+不得重新引入旧 adapter 或 telemetry 双账本。
 
 [`run_10_no_final/RESULT.md`](../log/perf/run_10_no_final/RESULT.md) 已实测：W8A8
 量化、特定场景思维链压缩语料增训权重在 `confidence_accepted` 后只收到裸
@@ -28,7 +31,7 @@ cue 时质量与时延不退化。
 
 ### 2.1 当前状态机的不对称行为
 
-当前 `think_budget_vllm_adapter/deer_think_budget/state.py` 中：
+当前 `dtb/reasoning/generation_states.py` 中：
 
 - `confidence_accepted` 使用裸 `THINK_END_TAG`；
 - `budget_exhausted` 使用 `BUDGET_EXHAUSTED_FINAL_PROMPT`；
@@ -45,7 +48,7 @@ run_10 的错误只出现在第一种路径。问题不是预算或分类错误�
 
 `finalization_mode`：服务进程启动时选定的 controller-forced reasoning 终结方式。
 
-同一状态机只通过该值解析后缀。scene、BudgetPlan、置信度和 history 均不感知模型身份。
+同一状态机只通过该值解析后缀。scene、`DtbBudgetDecision`、置信度和 history 均不感知模型身份。
 
 ## 3. 设计决策
 
@@ -191,7 +194,7 @@ class AlgorithmConfig:
     finalization_mode: FinalizationMode = FinalizationMode.MINIMAL_CLOSE_V1
 ```
 
-能够由 mode 和 final reason 推导出的 suffix 不存入 `BudgetPlan` 或请求状态。实验身份所需的
+能够由 mode 和 final reason 推导出的 suffix 不存入 `DtbBudgetDecision` 或请求状态。实验身份所需的
 配置文件路径、SHA 和部署 checkpoint 放在 manifest；请求 telemetry 只记录最终 mode 和实际
 final reason。
 
@@ -218,13 +221,13 @@ RUNTIME:
 
 | 文件 | 修改 |
 | --- | --- |
-| `think_budget_vllm_adapter/context.py` | 增加 `FinalizationMode` 和 `AlgorithmConfig.finalization_mode` 校验 |
-| `think_budget_vllm_adapter/config/unified_config.py` | 加入默认值、YAML 白名单解析；未知值 fail fast |
-| `think_budget_vllm_adapter/config/budget_config.yaml` | 开源默认先声明 `minimal_close_v1`；量化增训 YAML 声明 `guided_close_v1` |
-| `think_budget_vllm_adapter/budget_controller.py` | 把已校验 mode 装入请求 `AlgorithmConfig`，不做模型识别 |
-| `think_budget_vllm_adapter/deer_think_budget/state.py` | 集中解析 controller suffix；增加 final evidence 与空 final 失败/有界重试 |
-| `think_budget_vllm_adapter/telemetry.py` | 记录 mode、attempt、evidence、empty-final outcome；不复制到 BudgetPlan |
-| `tests/test_adapter_state_machine.py` | 覆盖两种 mode、两类 controller exit、模型边界、空 terminal、retry 与 tool call |
+| `dtb/config/schema.py` | 增加 `FinalizationMode` 和 `DtbAlgorithmConfig.finalization_mode` 校验 |
+| `dtb/config/loader.py` | 加入 YAML 白名单解析；未知值 fail fast，仍只在启动时加载 |
+| `dtb/config/budget_config.yaml` | 开源默认先声明 `minimal_close_v1`；量化增训 YAML 声明 `guided_close_v1` |
+| `dtb/request_controller.py` | 把已校验 mode 装入请求 `DtbAlgorithmConfig`，不做模型识别 |
+| `dtb/reasoning/generation_states.py`、`parser_boundary.py` | 集中解析 controller suffix；增加 final evidence 与空 final 失败/有界重试 |
+| `dtb/observability/phase_recorder.py` | 仅在 `phase` audit 记录 mode、attempt、evidence、empty-final outcome；不复制到 `DtbBudgetDecision` |
+| `tests/test_dtb_state_machine.py` | 覆盖两种 mode、两类 controller exit、模型边界、空 terminal、retry 与 tool call |
 
 建议把后缀解析写成无 vLLM 依赖的纯函数，单测直接穷举
 `FinalAnswerReason × FinalizationMode`。不需要新增模块级分类器。
@@ -288,7 +291,7 @@ run_10 已足够支持增加 `guided_close_v1`，无需等待开源实验才实�
 - **接口完备性：** YAML 是唯一行为配置源；环境变量如以后增加，只选 YAML 路径；请求无
   override。
 - **层次一致性：** cue 解析在算法状态机，模型部署选择在配置层，parser-valid evidence 由原生
-  parser 契约约束；不在分类器或 BudgetPlan 中复制职责。
+  parser 契约约束；不在分类器或 `DtbBudgetDecision` 中复制职责。
 - **性能一致性：** mode 不改变 phase 数；suffix token 成本与子请求边界成本分开记录；trial
   复用保持独立实验。
 - **可审计性：** 启动日志记录配置路径/SHA/mode；final phase 记录 mode、reason、attempt 和

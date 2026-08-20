@@ -5,6 +5,12 @@
 > `docs/debug/think_budget_vllm_adapter_refactor_plan.md` 为准。本文中要求
 > 恢复 `answer_list`、soft truncation、safety amplification/fallback、
 > trial evaluator early-stop 或严格协议校验的旧建议均已被新计划替代。
+>
+> 重构说明（2026-08-20）：生产包已经迁移到 `dtb/`，本文旧路径和类型名只用于定位
+> 历史差异。难度估计未因当时“生产未调用”而删除，现保留在
+> `dtb/budgeting/difficulty/` 且默认关闭；它将在结构重构完成后另做一次算法一致性和生产
+> 有效性检视。当前结构与实施结果以
+> `docs/design/dtb_cleanup_and_telemetry_refactor_plan.md` 为准。
 
 ## 1. 文档目的
 

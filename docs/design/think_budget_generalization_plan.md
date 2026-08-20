@@ -1,8 +1,8 @@
-# Think Budget 泛化性实施计划
+# DTB 泛化性实施计划
 
 ## 1. 设计目的
 
-Think Budget 的第一目标是在 13 个产品慢思考场景上，在质量不下降的前提下，
+DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考场景上，在质量不下降的前提下，
 最大化开启特性后的端到端时延收益。用户不应为自己的请求持续传入
 `fixed_*` 参数；这些参数只作为阶段一寻找候选策略的实验入口，最终由服务端根据
 可见请求自动选择预算。
@@ -22,21 +22,28 @@ Think Budget 的第一目标是在 13 个产品慢思考场景上，在质量不
 设计基线：
 
 - 文档日期：2026-07-31；
-- 当前状态日期：2026-08-12；
+- 当前状态日期：2026-08-20；
 - 目标环境：vLLM `v0.23.0`、vLLM-Ascend `v0.23.0rc1`；
 - 当前单场景证据：[`run_02/RESULT.md`](../log/perf/run_02/RESULT.md)；
 - 当前 13 场景自动模式证据：[`run_07/RESULT.md`](../log/perf/run_07/RESULT.md)；
 - 性能归因口径：[`deer_performance_analysis.md`](../debug/deer_performance_analysis.md)；
-- 算法状态机边界：
+- 当前生产结构与 telemetry 边界：
+  [`dtb_cleanup_and_telemetry_refactor_plan.md`](dtb_cleanup_and_telemetry_refactor_plan.md)；
+- 旧 adapter 裁决仅作为历史证据：
   [`think_budget_vllm_adapter_refactor_plan.md`](../debug/think_budget_vllm_adapter_refactor_plan.md)。
+
+从 2026-08-20 起，新实验以 `dtb/`、`patches/vllm/v0.23.0/` 和
+`dtb-algorithm-v2` 为唯一生产基线。历史 run 不改写；新 run 的 manifest 必须记录 TB
+commit、两份 patch hash、YAML hash、观测模式和实验角色。旧
+`think_budget_vllm_adapter/`、根目录 patch 或旧 telemetry 写端不得继续部署。
 
 ### 1.1 不可违反的原则
 
 1. 运行时只使用一个分类标识 `scene`，流程为
    `最新用户消息 → scene 或 reject → scene 对应预算`；不再引入
    `task_type` 或必须经过的语义类型实体。
-2. 预算、匹配证据和优先级继续通过现有
-   `budget_config.yaml → unified_config.py` 分级加载，不新增
+2. 预算、匹配证据和优先级继续通过
+   `dtb/config/budget_config.yaml → dtb/config/loader.py` 在进程启动时一次性校验加载，不新增
    `PolicyBundle`。
 3. 能推导的字段不存储；实验状态、revision 和验证 run ID 放在实验 manifest，
    不进入运行时 dataclass。
@@ -117,7 +124,7 @@ CandidatePolicy
 
 ### 3.3 RouteResult
 
-仅在验证自动路由时记录，不进入 `BudgetPlan`：
+仅在验证自动路由时记录，不进入 `DtbBudgetDecision`：
 
 ```text
 RouteResult
@@ -152,8 +159,9 @@ ExperimentResult
 
 文件：
 
-- `think_budget_vllm_adapter/config/budget_config.yaml`
-- `think_budget_vllm_adapter/config/unified_config.py`
+- `dtb/config/budget_config.yaml`
+- `dtb/config/loader.py`
+- `dtb/config/schema.py`
 
 `SCENES.<scene>` 同时保存：
 
@@ -165,17 +173,18 @@ ExperimentResult
 公开接口：
 
 ```python
-get_scene_definitions() -> dict
-get_scene_budget(scene: str) -> dict
-get_scene_priority() -> list[str]
-is_known_scene(scene: str) -> bool
+load_dtb_service_config(path=DEFAULT_CONFIG_PATH) -> DtbServiceConfig
 ```
 
-`SCENE_PRIORITY` 只解决同分时的确定性顺序，不代替拒识门。
+`DtbServiceConfig` 聚合算法配置、scene 定义、scene 优先级和观测配置；
+`DtbAlgorithmPolicy` 保存不允许由部署 YAML 漂移的算法常量。加载器带进程级缓存，只在
+controller 构造时读取和校验 YAML；请求路径不做文件 I/O、`stat`、mtime 检查或降级到
+内置默认表。配置错误必须启动失败。`SCENE_PRIORITY` 只解决同分时的确定性顺序，不代替
+拒识门。
 
 ### 4.2 scene 匹配模块
 
-文件：`think_budget_vllm_adapter/optimizations/scene_classifier.py`
+文件：`dtb/budgeting/scene_router.py`
 
 输入只取最新一条用户消息，排除 system prompt、工具说明、few-shot assistant 内容
 和输出 schema 对规则的污染。
@@ -207,7 +216,10 @@ classify_scene(
 
 ### 4.3 预算决策模块
 
-文件：`think_budget_vllm_adapter/budget_controller.py`
+文件：
+
+- `dtb/budgeting/budget_resolver.py`
+- `dtb/budgeting/budget_decision.py`
 
 决策顺序：
 
@@ -222,10 +234,10 @@ flowchart TD
     D --> H["统一 fixed override 与 hard token limit"]
     F --> H
     G --> H
-    H --> I["BudgetPlan"]
+    H --> I["DtbBudgetDecision"]
 ```
 
-`BudgetPlan` 只保留执行状态机所需字段：
+`DtbBudgetDecision` 只保留执行状态机所需字段：
 
 ```text
 scene / scene_matched / decision_branch / budget
@@ -234,14 +246,18 @@ source_by_field / policy_version / hard_think_token_limit
 ```
 
 分类证据、难度分解和 history 统计通过 `decision_details` 打点，不放入
-`BudgetPlan`。
+`DtbBudgetDecision`。
+
+难度估计位于 `dtb/budgeting/difficulty/`，是原始设计组成部分，当前默认关闭。此次重构只
+迁移并恢复清晰依赖，没有删除或宣称已完成生产有效性验证；重构完成后的单独一致性检视
+决定它是否启用、调整或淘汰。
 
 ### 4.4 history 模块
 
 文件：
 
-- `think_budget_vllm_adapter/history/history_module.py`
-- `think_budget_vllm_adapter/history/history_budget.py`
+- `dtb/history/store.py`
+- `dtb/history/budget_policy.py`
 
 history 的设计目的不是利用在线正确性反馈，而是让模型面对未识别的新场景时，逐步
 减少不必要的思考：
@@ -255,19 +271,37 @@ history 的设计目的不是利用在线正确性反馈，而是让模型面对
 第 1 次到第 n 次，分别报告 E2E、预算和正确率；只有正确率相对第一次完整思考不下降
 时，才能认为 history 压缩有效。
 
-当前实现已把历史索引和统计统一为 `scene`，并将无在线质量标签明确记为
+当前实现已把历史索引和统计统一为 `scene`，历史数据目录为 `dtb/data/history/`，并将无在线质量标签明确记为
 `thinking_tokens_without_online_quality`。但 `first_full_observation` 目前仍由控制器
 大预算路径模拟，并不等同于原生单次生成。真正的 native bypass 及其验收属于阶段二；
 在完成前不得把该分支描述为“已实现原生首次观察”。
+
+history store 的路径、最大条目、保留天数和异步队列容量由 YAML `HISTORY_STORE` 在启动时
+校验；`enable_history_budget=false` 时 controller 不配置或构造 store，也不读写历史文件。
 
 ### 4.5 telemetry 与提取模块
 
 文件：
 
-- `think_budget_vllm_adapter/telemetry.py`
-- `tools/extract_tb_phase_metrics.py`
+- `dtb/observability/config.py`
+- `dtb/observability/phase_recorder.py`
+- `dtb/observability/stream_audit.py`
+- `dtb/observability/event_writer.py`
+- `tools/extract_dtb_phase_metrics.py`
 
-`TB_PHASE` schema 2 对每个 phase 记录：
+观测配置只有三个互斥模式，均在启动时从 YAML 解析：
+
+| 模式 | 用途 | 写出事件 | 运行约束 |
+| --- | --- | --- | --- |
+| `off` | 正式性能/质量比较的默认模式 | 无 | 不构造 recorder/writer，不调用计时、反射、序列化或队列 |
+| `phase` | 独立的归属与模型工作账本 run | `DTB_PHASE` schema 3、`DTB_REQUEST_SUMMARY` | 异步有界队列；不得与正式性能数混为同一口径 |
+| `stream_audit` | parser/tool 流故障定点审计 | `DTB_STREAM_AUDIT` schema 1 | 仅显式 request-id allowlist；不同时创建 phase recorder |
+
+模式不能由单个 HTTP 请求覆盖。修改 `OBSERVABILITY.mode` 后必须重启服务。队列满时请求
+协程只增加 dropped 计数并返回，后台 writer 以限频标准日志告警；账本 run 必须在 manifest
+和 `RESULT.md` 对账 dropped 数，非零时 phase 完整性门失败。
+
+`DTB_PHASE` schema 3 对每个 phase 记录：
 
 ```text
 parent_request_id / child_request_id / phase / round
@@ -279,7 +313,7 @@ visible / stop_reason
 decision 额外记录：
 
 ```text
-scene / scene_matched / decision_branch / effective BudgetPlan
+scene / scene_matched / decision_branch / effective DtbBudgetDecision
 classification_source / classification_input_chars
 candidate_scene / scores / top_score / second_score / score_margin
 min_score / min_margin / reject_reason
@@ -295,10 +329,15 @@ probe 继续记录置信度方法、原始值、pair count、是否接受及原�
 `confidence_accepted` 或 `budget_exhausted`；提取后的 `requests.jsonl` 保留该字段，
 用于审计最终生成使用了自由回答后缀还是限时回答后缀。
 
-提取器兼容 schema 1 和 2，命令行只接收一个 `run_<id>` 目录。该目录根部必须有
+`DtbRequestState` 是 thinking、hidden probe、final answer token 与 child generate 次数的
+唯一生产账本；telemetry 只读取该状态生成请求摘要，不重复记账。响应 completion token
+不包含 hidden probe，不能替代 `total_model_generated_tokens`。
+
+提取器兼容历史 `TB_PHASE` schema 1/2 和新 `DTB_PHASE` schema 3，命令行只接收一个
+`run_<id>` 目录。该目录根部必须有
 `server.log`，目录内必须恰有一个 `_SUMMARY.csv`，summary 引用的每个具体结果文件名
 也必须在目录内唯一可解析。多个数据集、Judge 和历史请求共用日志时，使用客户端结果
-CSV 中的 `request_id` 作为权威白名单，与 `TB_PHASE.parent_request_id` 做精确等值关联：
+CSV 中的 `request_id` 作为权威白名单，与 phase 事件的 `parent_request_id` 做精确等值关联：
 
 ```text
 具体结果 CSV request_id
@@ -313,12 +352,15 @@ CSV 中的 `request_id` 作为权威白名单，与 `TB_PHASE.parent_request_id`
 在被测结果 CSV 的白名单中，因此即使 phase 与测试请求交错也会被排除。提取器同时输出
 `request_index.csv`，逐行记录结果 CSV 行号、是否在日志出现、phase 数及首末日志行；
 跨结果文件重复的非空 `request_id` 属于不可消歧输入，直接拒绝提取。Vanilla 没有
-`TB_PHASE` 是合法状态，客户端 E2E 结果仍归档，phase 文件为空。
+phase 是合法状态。`off` 正式性能 run 中 DTB 也没有 phase，是设计状态；它可用于客户端
+E2E/质量排名，但不能用于 phase 覆盖、分支来源或总模型 token 裁决。需要这些结论时，使用
+相同代码、数据、采样、并发和 cache 条件另跑 `phase` 账本 run，并明确报告 telemetry
+开销，不能把两个 run 的 E2E 混合排名。
 
 接口固定为：
 
 ```bash
-python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
+python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>
 ```
 
 提取器不再接收或推导 run 外部输入，也不复制原始 CSV。若服务器产物未完整上传，必须
@@ -334,16 +376,17 @@ python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
 
 | 文件 | 改动 |
 | --- | --- |
-| `context.py` | `BudgetPlan` 和决策分支改为 scene 语义，删除双分类字段和重复诊断状态 |
-| `config/unified_config.py`、`budget_config.yaml` | 合并原任务预算、scene token 和指示词为 `SCENES` |
-| `optimizations/scene_classifier.py` | 配置驱动的词边界/结构匹配、产品模板 required gate、score+margin 拒识 |
-| `optimizations/task_type_budget.py` | 删除 |
-| `budget_controller.py` | 最新用户消息直达 scene；scene 命中读预算，拒识走 history |
-| `history/*` | 只保留 scene 索引、统计和预算，不再动态注册任务类型 |
-| `telemetry.py`、提取器 | schema 2 决策证据、有效预算、history/难度和模块耗时 |
-| `tests/*` | 更新 scene-only 决策测试，并从现有产品 CSV 抽样验证分类 |
+| `dtb/config/{loader,schema}.py`、`budget_config.yaml` | 启动时 fail-fast 加载；合并算法、scene 和观测配置；删除请求级重载 |
+| `dtb/budgeting/scene_router.py` | 配置驱动的词边界/结构匹配、产品模板 required gate、score+margin 拒识 |
+| `dtb/budgeting/{budget_resolver,budget_decision}.py` | 最新用户消息直达 scene；输出语义明确的 `DtbBudgetDecision` |
+| `dtb/budgeting/difficulty/*` | 保留原始难度估计设计并随模块迁移；默认关闭，等待重构后单独检视 |
+| `dtb/reasoning/*` | `DtbStateMachine`、`DtbRequestContext`、`DtbRequestState` 与 parser boundary 分责 |
+| `dtb/history/*` | 只保留 scene 索引、统计和预算；读取算法状态的唯一工作账本 |
+| `dtb/observability/*`、提取器 | 默认关闭；phase 与 stream audit 互斥；新写 schema 3、兼容读历史 schema |
+| `dtb/integration/vllm/*`、版本化 patch | vLLM 请求/响应契约与 DTB 算法隔离，patch 只保留可部署差异 |
+| `tests/test_dtb_*` | 覆盖 scene-only 决策、状态机、默认关闭、异步写出和兼容提取 |
 
-截至 run_07 的实现状态：
+截至 run_07 的算法证据状态（重构前历史 run，不回写 telemetry）：
 
 1. [x] 13 个产品场景均已补充 `SCENES` 节点、required gate、离线正/负样本和冻结预算；
 2. [x] 质量合格 CandidatePolicy 已写入运行时，633/633 条 search 请求自动恢复预期预算；
@@ -352,13 +395,18 @@ python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
 5. [ ] 产品 holdout 和一次通用/OOD 校验尚未执行；
 6. [ ] history 的真实 native bypass 仍属于阶段二。
 
+2026-08-20 生产重构状态：旧 adapter 和根目录 patch 已退出生产结构；内部名称统一为
+DTB；配置、预算、reasoning、history、observability 与 vLLM integration 已按上表拆分；
+默认关闭、phase、stream audit 三种模式已由无模型测试覆盖。难度有效性与目标 NPU 上的
+真实“关闭态零可测影响”仍分别需要后续专项检视和服务器 paired run。
+
 ## 6. 阶段一实验与数据采集
 
 ### 6.1 新实验身份的三类必需 run
 
 首次搜索一个新算法版本，或模型、量化/后训练状态、硬件与关键服务配置发生变化时，
 每个产品场景使用相同样本、顺序、采样参数、随机种子、并发、到达节奏和 prefix
-cache 状态，至少提供：
+cache 状态。正式性能/质量候选统一使用 `OBSERVABILITY.mode: "off"`，至少提供：
 
 1. `vanilla`：原生单次生成；
 2. `dtb_default`：仅开启 DTB，不传 fixed 参数；
@@ -367,6 +415,12 @@ cache 状态，至少提供：
 不要把三个 variant 混在同一进程热状态中。若必须复用进程，manifest 中记录执行
 顺序并在结果中标注 cache 状态。新实验身份必须使用同身份 Vanilla；不得因为数据集
 名称相同就跨模型、量化/后训练版本或关键服务配置复用旧 Vanilla。
+
+此外，每个进入裁决的 DTB 候选至少提供一次 `OBSERVABILITY.mode: "phase"` 的账本 run，
+使用相同代码、数据、sampling/seed、并发/到达节奏和 cache 状态，验证分支、预算来源、
+hidden probe 与 phase 完整性。该 run 单独标记 `experiment_role=phase_audit`；正式 run 标记
+`experiment_role=official_performance`。两者不得拼接请求或用 phase run 的 E2E 代替关闭态
+性能。`stream_audit` 只用于 parser/tool hard failure，不是候选裁决的常规步骤。
 
 ### 6.2 基于 Vanilla 构造首个 fixed 候选
 
@@ -490,7 +544,7 @@ extracted/<具体结果名>/requests.jsonl
 
 ```text
 decision_branch / scene / scene_matched / reject_reason
-effective BudgetPlan / confidence_threshold / percentile_step
+effective DtbBudgetDecision / confidence_threshold / percentile_step
 hard_think_token_limit / source_by_field / policy_version
 final_answer_reason
 ```
@@ -513,13 +567,13 @@ scene 的代码分支；若 `decision_details.history.budget_mode=history_disabl
 ```text
 sum(各结果客户端行) = extraction_manifest.client_rows
 sum(decision_branch) = sum(scene) = 被审计 DTB 请求总数
-每个 DTB 请求恰有一个 effective BudgetPlan
+每个 DTB 请求恰有一个 effective DtbBudgetDecision
 Vanilla 原生路径没有 DTB decision phase
 dtb_default 不出现 fixed 分支或 fixed 字段来源
 dtb_fixed_* 全部进入 fixed，且字段来源与传入参数一致
 ```
 
-任一不等式、缺失 BudgetPlan 或 variant 分支断言失败时，该 run 只能用于排障，不能
+任一不等式、缺失 DtbBudgetDecision 或 variant 分支断言失败时，该 run 只能用于排障，不能
 参与 E2E 排名。实例见 [`run_04/RESULT.md`](../log/perf/run_04/RESULT.md)。
 
 ### 6.6 选择规则
@@ -565,7 +619,7 @@ flowchart LR
     A --> E["按数据集键 + QA_ID 配对"]
     E --> F["E2E、Token、Judge、错误复算"]
     C --> G["覆盖率与归属审计"]
-    D --> H["scene、分支、BudgetPlan 与模型工作量审计"]
+    D --> H["scene、分支、DtbBudgetDecision 与模型工作量审计"]
     F --> I["逐场景、MACRO、MICRO"]
     G --> J["RESULT.md 与阶段门"]
     H --> J
@@ -577,7 +631,7 @@ flowchart LR
 | 用户实验说明 + `manifest.json` | 实验身份、variant、基线、代码/模型/采样/cache | 不能由文件名前缀反推完整环境 |
 | 具体结果 CSV | 请求 E2E、TTFT、completion token、`QA_ID`、回答、Judge、客户端错误 | summary 不能替代请求级配对 |
 | `_SUMMARY.csv` | 发现结果文件并与明细复算对账 | 不能单独证明样本相同或路由正确 |
-| `extraction_manifest.json` / `request_index.csv` | request-id 归属、覆盖率、排除项与日志行范围 | 不包含最终 BudgetPlan 细节 |
+| `extraction_manifest.json` / `request_index.csv` | request-id 归属、覆盖率、排除项与日志行范围 | 不包含最终 DtbBudgetDecision 细节 |
 | `requests.jsonl` | 每请求 scene、分支、有效预算、来源、visible/hidden/final token | 不用于替代客户端 E2E |
 | `phase_summary.csv` | 每结果的 phase calls、wall/queue/prefill/decode、prompt/cache/generated 汇总 | 异常请求仍需回到 phase JSONL |
 | `controller_phases.jsonl` | phase 级异常和停止原因调查 | 正常总体分析无需把多个结果目录重新混合 |
@@ -595,6 +649,8 @@ flowchart LR
 candidate run / variant
 baseline run / variant
 model、量化/后训练状态、代码和服务身份
+DTB policy version、YAML hash、serving/parser patch hash
+observability mode 与 experiment_role（official_performance / phase_audit）
 数据集集合与 split（search / holdout / OOD）
 请求 overrides、sampling/seed、并发/到达节奏、prefix cache
 Judge 版本与采样参数
@@ -614,7 +670,7 @@ Vanilla > 只能确认数据集相同的历史 Vanilla。最后一种只能报�
 存在原始输入但还没有提取产物时执行：
 
 ```bash
-python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>
+python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>
 ```
 
 实际 run 目录名含空格、`&` 等 shell 特殊字符时，必须给整个路径加引号。
@@ -628,11 +684,12 @@ sum(具体结果行) = extraction_manifest.client_rows = request_index 行数
 selected_phase_records + excluded_phase_records = total_phase_records_in_log
 每个结果 manifest 的 client_rows/request_ids 与具体 CSV 一致
 sum(每结果 phase_summary.calls) = selected_phase_records
-每个 DTB 请求恰有一个 decision 和一个 effective BudgetPlan
+每个 phase-audit DTB 请求恰有一个 decision 和一个 effective DtbBudgetDecision
+dropped telemetry events = 0
 ```
 
 `extraction_manifest.request_ids` 可以同时包含 Vanilla 和 DTB 请求，而
-`total_phase_parent_requests` 只统计日志中实际有 TB phase 的 parent；原生 Vanilla 没有
+`total_phase_parent_requests` 只统计日志中实际有 phase 的 parent；原生 Vanilla 没有
 phase 时两者不相等是合法的。phase wall 闭合只与**具有 phase 的候选请求 E2E 总和**
 比较，不能把同 run 的 Vanilla E2E 也加进分母。
 
@@ -660,14 +717,14 @@ difficulty 与 history 是否实际参与
 variant 断言：
 
 ```text
-Vanilla：允许没有 TB phase
+Vanilla：允许没有 phase
 dtb_default / 仅开开关：不得出现 fixed 字段来源
-dtb_fixed_*：应进入 fixed，且请求值、BudgetPlan 和 source_by_field 一致
+dtb_fixed_*：应进入 fixed，且请求值、DtbBudgetDecision 和 source_by_field 一致
 自动 scene 验证：预期产品请求应命中目标 scene 和冻结预算
 OOD：重点报告产品 scene 误命中率、reject_reason 与实际兜底预算
 ```
 
-任一请求归属、BudgetPlan 或预期分支不闭合时，先判为路由/配置实验失败，不进入参数
+任一请求归属、DtbBudgetDecision 或预期分支不闭合时，先判为路由/配置实验失败，不进入参数
 优劣排序。
 
 #### 6.7.5 第四步：请求级配对和指标
@@ -808,10 +865,12 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
       fixed_v1/v2/v3 候选，且字段来源可由 decision telemetry 还原；
 - [x] 第一阶段默认关闭 difficulty/history；拒识 telemetry 明确记录
       `history_disabled`、`default_budget` 和拒识原因；
-- [x] `BudgetPlan` 不存 RouteResult、难度分解、history 统计或可推导
+- [x] `DtbBudgetDecision` 不存 RouteResult、难度分解、history 统计或可推导
       `max_visible_think`；
-- [x] schema 2 decision 日志能还原 scene 选择、拒识原因和所有有效预算来源；
-- [x] schema 1 历史日志仍可由提取器读取。
+- [x] `DTB_PHASE` schema 3 decision 日志能还原 scene 选择、拒识原因和所有有效预算来源；
+- [x] 历史 `TB_PHASE` schema 1/2 仍可由提取器读取；
+- [x] `off` 不构造 recorder/writer，`stream_audit` 不创建 phase recorder；
+- [x] 模型工作量只由 `DtbRequestState` 记账，telemetry 不维护第二份 ledger。
 - [x] 共享服务日志可按结果 CSV 的 `request_id` 精确拆分，旧请求和 Judge phase 不进入
       被测结果目录；
 - [x] 每个具体结果文件有独立 `phase_summary.csv`，并有逐请求关联审计与首末日志行；
@@ -861,3 +920,4 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-12 | 纳入 run_07：633/633 个仅开开关请求命中 13 个预期 scene，search 集核心里程碑通过；完整阶段一仍等待 hard failure、profile 复杂度、产品 holdout 与通用/OOD。 |
 | 2026-08-12 | 固化新 run 的端到端分析接口：实验身份、单参数提取、覆盖/配置审计、QA_ID 配对、Judge 人工覆盖、宏微指标、hidden probe 账本、RESULT 模板与降级条件；修正章节编号和 `test_result` 层级。 |
 | 2026-08-13 | final phase 与请求级提取增加 `final_answer_reason`，区分置信度接受和预算耗尽的模型 prompt 后缀。 |
+| 2026-08-20 | 将后续实验基线切换到重构后的 `dtb/` 与版本化 patch；内部决策改称 `DtbBudgetDecision`；telemetry 改为默认 `off`、独立 `phase` 账本 run 和 allowlisted `stream_audit`，生产只写 `DTB_PHASE` schema 3、提取器兼容读取历史 schema。 |

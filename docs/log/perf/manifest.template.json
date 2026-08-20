@@ -1,10 +1,10 @@
 {
-  "schema": 4,
+  "schema": 5,
   "template": {
     "copy_as": "docs/log/perf/<run_id>/manifest.json",
     "baseline_id": "qwen36-27b-vllm-0.23.0-ascend-0.23.0rc1-cann-9.0.1",
-    "baseline_scope": "当前 Think Budget 性能分析与优化阶段；除非某轮 manifest 在 baseline_overrides 中明确声明，否则复用本模板的环境、模型和服务启动配置",
-    "reuse_rule": "复制后必须填写所有 PER_RUN_REQUIRED 字段，并逐轮确认 TB commit、请求控制参数、工作负载和 metrics 进程连续性；vLLM 的侵入式集成由该 TB commit 中的 dtb.patch 标识，三个仓库的 dirty 状态不作为实验身份字段",
+    "baseline_scope": "DTB 重构后性能分析与优化阶段；除非某轮 manifest 在 baseline_overrides 中明确声明，否则复用本模板的环境、模型和服务启动配置",
+    "reuse_rule": "复制后必须填写所有 PER_RUN_REQUIRED 字段，并逐轮确认 TB commit、DTB 请求控制参数、观测模式、工作负载和 metrics 进程连续性；vLLM 侵入式集成由该 commit 中的版本化 patch 标识，三个仓库的 dirty 状态不作为实验身份字段",
     "fixed_sections": [
       "upstream",
       "runtime",
@@ -16,7 +16,13 @@
       "run_id",
       "created_at",
       "code.commit_sha",
+      "code.vllm_integration_patch.sha256",
+      "code.reasoning_parser_patch.sha256",
       "server.controller_config",
+      "server.controller_config.budget_config_sha256",
+      "server.controller_config.observability.mode",
+      "server.experiment_role",
+      "controller.policy_version",
       "controller.request_overrides",
       "workload.dataset_path",
       "workload.dataset_sha256",
@@ -69,7 +75,7 @@
   "run_id": null,
   "created_at": null,
   "created_at_timezone": "Asia/Shanghai",
-  "variant": "think_budget",
+  "variant": "dtb",
   "baseline_overrides": [],
   "collection_procedure": {
     "working_directory": "repository root",
@@ -77,16 +83,23 @@
     "workload": "发送端到端请求",
     "metrics_after": "curl -s http://127.0.0.1:41016/metrics > docs/log/perf/<run_id>/metrics.after.prom",
     "cann": "cat /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/ascend_toolkit_install.info > docs/log/perf/cann.txt",
-    "extract": "python tools/extract_tb_phase_metrics.py docs/log/perf/<run_id>"
+    "extract": "仅 observability.mode=phase 的账本 run 执行：python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>"
   },
   "code": {
     "repository": "TB",
     "server_path": "/opt/p00906181/260707/TB",
     "commit_sha": null,
     "vllm_integration_patch": {
-      "path_from_copied_manifest": "../../../../dtb.patch",
+      "path_from_copied_manifest": "../../../../patches/vllm/v0.23.0/dtb_serving.patch",
+      "sha256": null,
       "identity": "content at code.commit_sha",
       "description": "vLLM Chat Completion 协议与 serving 入口的侵入式修改"
+    },
+    "reasoning_parser_patch": {
+      "path_from_copied_manifest": "../../../../patches/vllm/v0.23.0/qwen3_coder_parser.patch",
+      "sha256": null,
+      "identity": "content at code.commit_sha",
+      "description": "Qwen3-Coder reasoning/tool parser 分片边界修复"
     },
     "status": "PER_RUN_REQUIRED"
   },
@@ -256,20 +269,33 @@
       "num_speculative_tokens": 4
     },
     "controller_config": {
-      "budget_config_path": "think_budget_vllm_adapter/config/budget_config.yaml",
-      "unified_config_path": "think_budget_vllm_adapter/config/unified_config.py",
+      "budget_config_path": "dtb/config/budget_config.yaml",
+      "budget_config_sha256": null,
+      "loader_path": "dtb/config/loader.py",
       "effective_enable_value_min_confidence": null,
+      "observability": {
+        "mode": "off",
+        "queue_capacity": 2048,
+        "stream_request_ids": []
+      },
+      "history_store": {
+        "enabled": false,
+        "path": "dtb/data/history/inference_history.jsonl",
+        "max_entries": 5000,
+        "max_age_days": 7,
+        "queue_capacity": 1024
+      },
       "identity": "files at code.commit_sha plus effective values recorded in this section",
       "status": "PER_RUN_REQUIRED"
     },
-    "phase_metrics_enabled": true,
-    "verbose_stage_logging": false,
+    "phase_metrics_enabled": false,
+    "experiment_role": "official_performance",
     "baseline_status": "FIXED_UNLESS_DECLARED_OVERRIDE"
   },
   "controller": {
-    "adapter": "think_budget_vllm_adapter",
-    "design_document": "docs/debug/think_budget_vllm_adapter_refactor_plan.md",
-    "policy_version": "think-budget-performance-v1",
+    "adapter": "dtb",
+    "design_document": "docs/design/dtb_cleanup_and_telemetry_refactor_plan.md",
+    "policy_version": "dtb-algorithm-v2",
     "request_overrides": {
       "enable_think_budget": null,
       "fixed_prob_th": null,

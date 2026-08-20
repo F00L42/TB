@@ -63,15 +63,15 @@ parser-facing 输出和取消语义：
 | F-02 | phase telemetry 实际默认开启 | `unified_config.py:61`、`budget_config.yaml:42`、`context.py:219`、`telemetry.py:81` 均为 `True` | 生产默认执行结构化日志热路径 | 默认改为 `off`，观测配置从算法配置拆出 |
 | F-03 | `emit_phase_metrics=false` 只跳过最后的 `print` | `TimingCollector.record_phase()` 在开关判断前读取 metrics、构造 record、更新 ledger | “关闭”仍有 CPU、分配和反射成本 | 关闭态不创建 recorder，调用点在计时/构造前短路 |
 | F-04 | `TB_PROFILE` 每个请求无条件 `snapshot()`、打印并 `flush` | `state.py:976-982` | 即使 phase 输出关闭仍有请求末尾 I/O | request summary 归入启用态 sink |
-| F-05 | `TB_ROUTE` 和 `TB_POLICY` 不受统一观测开关控制 | `dtb.patch`、`patches/serving_patch.py`、`context.py:81-91` | 无法通过一个开关得到安静的成功路径 | 成功事件归 telemetry；异常日志始终保留 |
+| F-05 | `TB_ROUTE` 和 `TB_POLICY` 不受统一观测开关控制 | 根目录 serving patch、旧 `patches/serving_patch.py`、`context.py:81-91` | 无法通过一个开关得到安静的成功路径 | 成功事件归 telemetry；异常日志始终保留 |
 | F-06 | 工具流审计关闭态设计正确，但实现嵌入核心请求上下文 | `deer_think_budget/context.py:198-346` | context 引入 `os/json/hashlib` 和大段高基数诊断职责 | 迁入独立 `stream_audit`；保留构造前短路 |
 | F-07 | telemetry `BudgetLedger` 与算法状态重复计数 | `BudgetLedger` 和 `RequestAlgorithmState` 同时维护 thinking/probe/final/calls | 双写可能漂移；history 反向依赖 telemetry | history 读取算法状态，删除 telemetry ledger |
 | F-08 | history 默认关闭但 recorder 仍在 controller 构造时加载文件，并在每个请求结束后写入 | `BudgetController.__init__()`、`_record_history()`、`AsyncHistoryRecorder.__init__()` | 默认路径有磁盘检查、内存索引、任务和写入副作用 | 仅 `enable_history_budget=true` 时构造和记录 |
 | F-09 | 配置并非真正单一来源，且每次查询检查文件 mtime | YAML 与 `_RUNTIME_DEFAULTS`/`_SCENE_DEFAULTS` 重复；`load_budget_config()` 被请求路径多次调用 | 漂移风险和无意义系统调用 | 启动时一次性加载并校验 YAML；失败即 fail-fast |
-| F-10 | 三个核心文件职责过载 | `budget_controller.py` 约 980 行、runtime context 约 485 行、state 约 991 行 | 决策、vLLM 接入、parser 边界和 telemetry 难以独立验证 | 按 integration/decision/runtime/observability 拆分 |
+| F-10 | 三个核心文件职责过载 | `budget_controller.py` 约 980 行、runtime context 约 485 行、state 约 991 行 | 预算解析、vLLM 接入、推理控制和 telemetry 难以独立验证 | 按 integration/budgeting/reasoning/observability 拆分 |
 | F-11 | 存在仅供旧导入或旧测试的兼容层 | `BudgetConfig`、`ThinkBudgetConfig`、`BudgetRequestContext`、四个旧 state alias、`_build_budget_config` 等 | 保留已删除概念并扩大 API 面 | 仓库内原子迁移后删除，不建立第二代别名 |
-| F-12 | 存在已确认无生产调用的迁移残留 | `optimizations/complexity_analyzer.py` 只由包 `__init__` 重导出；若干 difficulty helper 仅定义未使用 | 无效代码和测试负担 | 完成外部消费者审计后删除 |
-| F-13 | vLLM 集成有两份表达 | 根目录 `dtb.patch` 与 `patches/serving_patch.py`/`protocol_patch.py` | 容易发生 patch 与说明代码漂移 | 选择 deployable patch 为唯一制品，说明进入文档/测试 |
+| F-12 | 难度估计属于原始算法设计，但生产默认关闭，部分组件没有进入当前调用链 | `enable_difficulty_estimator=false`；`complexity_analyzer.py` 仅被重导出；一致性检视 F-03/F-04 指出难度配置、历史输入和覆盖顺序曾迁移不完整 | 无调用既可能是冗余，也可能是集成遗漏，当前证据不足以删除 | 全量随 `budgeting/difficulty` 迁移；结构重构完成后单独做算法一致性检视 |
+| F-13 | vLLM 集成有两份表达 | 根目录 deployable patch 与 `patches/serving_patch.py`/`protocol_patch.py` 说明性副本 | 容易发生 patch 与说明代码漂移 | 两个 deployable patch 统一进入版本化 patch 目录；删除说明性 Python 副本 |
 | F-14 | 自动化测试反向依赖 `docs/debug` 脚本和原始结果 | `tests/test_tool_call_debug.py` import `docs.debug.tool_call.*` | 文档目录变成代码依赖，无法清理实验资产 | 可复用逻辑迁入 `tools/dtb/`，fixture 迁入 `tests/fixtures/` |
 | F-15 | 主分支仍有约 7 MB 单个原始 replay 文件 | `docs/debug/tool_call/task29-pass1-26.jsonl` 为 7,065,753 bytes | 仓库体积、敏感正文和长期维护成本 | 从主分支删除，保留归档 commit 和聚合结论 |
 
@@ -133,62 +133,105 @@ telemetry。
 
 ```text
 dtb/
-├── controller.py                 # 稳定门面；组装一次请求
-├── model.py                      # DtbPlan、ThinkingBudget、DtbRequestState
+├── request_controller.py         # DTB 请求门面；连接接入、预算与推理控制
 ├── config/
 │   ├── loader.py                 # 启动时一次性加载和校验
-│   ├── schema.py                 # DtbRuntimeConfig、DtbObservabilityConfig
+│   ├── schema.py                 # DtbAlgorithmConfig、DtbObservabilityConfig
 │   └── budget_config.yaml        # 唯一部署配置源
-├── decision/
-│   ├── planner.py                # fixed/scene/difficulty/history 决策
+├── budgeting/
+│   ├── budget_decision.py        # ThinkingBudget、DtbBudgetDecision
+│   ├── budget_resolver.py        # 按优先级解析各预算来源并生成最终决策
 │   ├── scene_router.py
-│   └── difficulty.py
-├── runtime/
-│   ├── executor.py               # 三状态驱动器
+│   └── difficulty/
+│       ├── estimator.py          # 难度特征和评分
+│       ├── complexity.py         # 原始复杂度分析，先保留迁移
+│       └── budget.py             # difficulty → budget 映射
+├── reasoning/
+│   ├── state_machine.py          # Thinking/Probe/FinalAnswer 状态迁移
+│   ├── request_state.py          # DtbRequestState，算法状态与模型工作账本
 │   ├── request_context.py        # vLLM identity、prompt 和输出队列
-│   ├── phases.py                 # 三个 state/phase 的生成逻辑
-│   ├── output_boundary.py        # parser-facing text/token/terminal 契约
+│   ├── generation_states.py      # 三个生成状态的 child request 行为
+│   ├── parser_boundary.py        # parser-facing text/token/terminal 契约
 │   └── confidence.py
 ├── history/
-│   ├── policy.py
+│   ├── budget_policy.py
 │   └── store.py
 ├── observability/
 │   ├── config.py
-│   ├── phase.py
+│   ├── phase_recorder.py
 │   ├── stream_audit.py
-│   └── writer.py
+│   └── event_writer.py
 └── integration/vllm/
-    └── README.md                 # patch 契约，不复制 patch 实现
+    ├── request_adapter.py        # 原生请求上下文读取与 DTB 输入适配
+    └── response_adapter.py       # 原生 stream/non-stream formatter 适配
+
+patches/vllm/v0.23.0/
+├── dtb_serving.patch             # DTB protocol/serving 接入制品
+├── qwen3_coder_parser.patch      # 固定版本 parser 分片修复制品
+└── README.md                     # 上游身份、应用顺序、契约和验证命令
 ```
 
-仓库根部继续保留 `dtb.patch` 作为生产应用制品，并通过固定 checkout 的
-`git apply --check` 防漂移。第一轮不同时移动 patch，以免部署脚本和 Python 包迁移难以归因。
+目标结构不使用 `model.py`、`plan.py`、`planner.py` 或 `executor.py`：
 
-### 3.3 类型和事件迁移表
+- `budgeting/budget_decision.py` 明确保存“最终思考预算决策”，不会与基础大模型或任务规划混淆；
+- `budgeting/budget_resolver.py` 明确执行 fixed/scene/difficulty/history 的来源解析和优先级合并；
+- `reasoning/state_machine.py` 明确只驱动 DTB 三状态，不承担 vLLM model executor、worker 或
+  scheduler 的职责；
+- 可变请求状态属于 DTB 推理状态机生命周期，因此放在 `reasoning/request_state.py`，不与不可变
+  `DtbBudgetDecision` 放在同一文件。
+
+命名规则固定为“领域对象 + 领域动作”。`manager`、`handler`、`model`、`plan`、`planner`、
+`executor`、`utils` 等弱名称不进入目标生产结构；确需使用时必须由完整路径消除歧义。
+
+### 3.3 Patch 制品与契约
+
+这里的“patch 契约”是指两个 patch 必须保持的行为约束，而不是再写一份与 patch 内容近似的
+Python 示例：
+
+- DTB disabled 必须回到原生单次生成；
+- priority、LoRA、trace headers、DP rank 和 parser 上下文必须完整透传；
+- DTB 只缩短思考，不能改变原生 parser-facing token、结构标记、增量顺序和 terminal；
+- 两个 patch 各自固定上游 revision、应用顺序、SHA 和 apply-check 命令。
+
+两个实际 patch 都是针对固定 vLLM checkout 的部署制品，放入
+`patches/vllm/v0.23.0/` 比放入可 import 的 `dtb` Python 包更清楚。移动本身不会改变 patch 内
+相对上游仓库的文件路径，也不会影响 `git apply`；需要同步处理的问题只有：
+
+1. 生产部署命令、runbook 和 CI apply-check 的旧路径；
+2. manifest 中记录的 patch path/hash；
+3. 固定并记录应用顺序，分别执行 `git apply --check`；当前两者修改不同文件，顺序不影响结果，
+   但固定顺序有利于复现实验；
+4. Python wheel/sdist 不应把部署 patch 当作运行时 package data 隐式携带。
+
+因此目标不是“不移动 patch”，而是**移动两个唯一 deployable 制品，删除说明性实现副本**。
+内部包重命名时先更新 patch 内容，制品路径移动放在独立提交中，便于区分代码兼容问题和部署
+路径问题。
+
+### 3.4 类型和事件迁移表
 
 | 当前名称 | 目标名称 | 说明 |
 | --- | --- | --- |
-| `BudgetController` | `DtbController` | 请求级稳定门面 |
-| `AlgorithmConfig` | `DtbRuntimeConfig` | 只含算法和执行配置 |
-| `PerformancePolicy` | `DtbExecutionPolicy` | 仅保留真正的不变量和 policy version |
+| `BudgetController` | `DtbRequestController` | DTB 请求级稳定门面，不表示预算算法本身 |
+| `AlgorithmConfig` | `DtbAlgorithmConfig` | 只含算法和推理控制配置 |
+| `PerformancePolicy` | `DtbAlgorithmPolicy` | 仅保留真正的算法不变量和 policy version |
 | `BudgetVector` | `ThinkingBudget` | 明确是思考预算，不是通用向量 |
-| `BudgetPlan` | `DtbPlan` | 决策结果 |
+| `BudgetPlan` | `DtbBudgetDecision` | fixed/scene/difficulty/history 解析后的不可变决策结果 |
 | `RequestAlgorithmState` | `DtbRequestState` | 算法必需状态和模型工作量唯一账本 |
 | `RequestStateContext` | `DtbRequestContext` | vLLM 请求身份和可变 prompt |
-| `AsyncReasoningOrchestrator` | `DtbExecutor` | 驱动三状态，不使用泛化的 reasoning 名称 |
+| `AsyncReasoningOrchestrator` | `DtbStateMachine` | 只驱动 Thinking/ConfidenceProbe/FinalAnswer 状态迁移 |
 | `TimingCollector` | 删除并拆分 | 变为可选 `DtbPhaseRecorder` 和异步 sink |
 | `TB_PHASE` | `DTB_PHASE` schema 3 | 提取器过渡期双读，生产只写新前缀 |
 | `TB_TOOL_STREAM` | `DTB_STREAM_AUDIT` schema 1 | 明确高成本和敏感性 |
 | `TB_PROFILE` | `DTB_REQUEST_SUMMARY` | 仅 phase telemetry 启用时输出 |
 
-内部 import 和 `dtb.patch` 在同一提交原子切换，不新增 `think_budget_vllm_adapter → dtb` 的长期
+内部 import 和版本化 serving patch 在同一提交原子切换，不新增 `think_budget_vllm_adapter → dtb` 的长期
 shim。外部 HTTP 字段保持原名，直到有独立的客户端迁移计划。
 
 ## 4. Telemetry 设计
 
 ### 4.1 配置模型
 
-观测配置不再属于 `DtbRuntimeConfig`：
+观测配置不再属于 `DtbAlgorithmConfig`：
 
 ```python
 class DtbTelemetryMode(str, Enum):
@@ -231,7 +274,7 @@ flowchart TD
 具体约束：
 
 - `decision_trace` 只在 recorder 存在时创建；
-- `DtbPlan.to_event_dict()` 只在 telemetry/history 确有消费者时调用；
+- `DtbBudgetDecision.to_event_dict()` 只在 telemetry/history 确有消费者时调用；
 - phase start/end 的 `perf_counter_ns()` 只在 recorder 存在时读取；
 - `_interval_ms()`、vLLM metrics 反射和 stop reason 规范化只在 `finish_phase()` 内发生；
 - `stream_output()` 的普通路径只做 parser-facing 处理和 `result_queue.put()`；stream audit 参数、
@@ -280,7 +323,7 @@ JSON 序列化和日志写入不在请求 coroutine 中执行。队列满时：
 - child phase 的 queue/prefill/decode、prompt/cache/generated token；
 - probe assessment 和 final answer reason。
 
-`tools/extract_tb_phase_metrics.py` 在一个过渡周期内同时读取：
+`tools/extract_dtb_phase_metrics.py` 在一个过渡周期内同时读取：
 
 - 历史 `TB_PHASE` schema 1/2；
 - 新 `DTB_PHASE` schema 3。
@@ -295,11 +338,8 @@ JSON 序列化和日志写入不在请求 coroutine 中执行。队列满时：
 
 ### 5.1 直接删除项
 
-以下项目在仓库内无生产调用；完成一次外部部署 import 审计后删除：
+以下项目属于兼容层、重复配置或说明性实现；完成一次外部部署 import 审计后删除：
 
-- `optimizations/complexity_analyzer.py` 及其 `__init__` 重导出；
-- `difficulty_estimator.py` 中仅定义未使用的 `has_math_content`、`has_code_content`、
-  `has_logic_content`；
 - `BudgetConfig`、`ThinkBudgetConfig`、`BudgetRequestContext`；
 - `_build_budget_config`、`_emit_think_end_once`；
 - `_InitialThinkState`、`_IterativeThinkState`、`_ConfidenceCheckState`、`_AnswerState`；
@@ -307,12 +347,37 @@ JSON 序列化和日志写入不在请求 coroutine 中执行。队列满时：
 - 不可配置却重复写入 YAML 的 `PERFORMANCE_POLICY` flags 和
   `get_performance_policy_config()`；policy version 与固定 50-token probe 改为源码不变量；
 - `patches/serving_patch.py`、`patches/protocol_patch.py` 说明性副本；部署实现只保留
-  `dtb.patch`。
+  版本化目录中的实际 patch。
 
-删除前要求 `rg` 在生产包、测试、`dtb.patch` 和服务器启动脚本中均无剩余消费者。不能因为
+删除前要求 `rg` 在生产包、测试、版本化 patch 和服务器启动脚本中均无剩余消费者。不能因为
 名称像旧代码就直接删除。
 
-### 5.2 配置收敛
+### 5.2 难度估计模块保留与后置检视
+
+难度估计是原始 Think Budget 算法的组成部分，不能用“当前没有生产调用”直接推导为“应删除”。
+[`think_budget_vllm_adapter_consistency_review.md`](../debug/think_budget_vllm_adapter_consistency_review.md)
+已经指出历史集成至少存在以下风险：
+
+- 多组 difficulty base/max 参数没有完整迁移或曾使用不同默认值；
+- 难度决策应读取历史统计，当前接线可能没有提供完整输入；
+- difficulty 与 history stride、fixed override 的覆盖顺序可能发生过变化。
+
+当前实现虽然在 `_decide()` 中保留条件调用，但生产配置默认
+`enable_difficulty_estimator=false`；`complexity_analyzer.py` 和若干 helper 没有进入现有调用
+链。两种事实都不能证明这些组件在目标算法中无用。
+
+本轮处理规则：
+
+1. `complexity_analyzer.py`、`difficulty_estimator.py` 和相关 helper 全量迁入
+   `dtb/budgeting/difficulty/`，按 estimator/complexity/budget 职责拆文件但不做行为删减；
+2. 目录迁移测试只证明调用和结果没有变化，不裁决算法是否完整；
+3. DTB 主体重构通过后，建立独立“难度估计一致性检视”，对照离线参考实现检查调用入口、配置
+   字段、history 输入、预算合并顺序和 source_by_field；
+4. 使用 difficulty on/off、scene hit/reject、history cold/warm 和 fixed override 的表驱动测试
+   固化结论；
+5. 只有专项检视证明某个函数与目标算法均无关系后，才能另行提交删除。
+
+### 5.3 配置收敛
 
 当前 Python `_SCENE_DEFAULTS` 与约 500 行 YAML 重复。目标为：
 
@@ -324,28 +389,28 @@ JSON 序列化和日志写入不在请求 coroutine 中执行。队列满时：
 
 这既是清理，也是实验身份约束：静默 fallback 会使 manifest 中记录的配置与实际预算不一致。
 
-### 5.3 Controller 和 runtime 拆分
+### 5.4 请求控制与推理状态机拆分
 
-`DtbController` 只保留：
+`DtbRequestController` 只保留：
 
 - 检查 server enable；
 - 取得 vLLM 原生 route identity；
-- 调用 planner；
-- 组装 request context 与 executor；
-- 把 executor 输出交回原生流式/非流式 formatter；
+- 调用 budget resolver；
+- 组装 request context 与 state machine；
+- 把 state machine 输出交回原生流式/非流式 formatter；
 - 在取消/异常/finally 中收敛可选 history 与 telemetry 生命周期。
 
-下列逻辑移出 controller：
+下列逻辑移出 request controller：
 
-- 最新用户消息提取 → `integration/vllm/request_input.py`；
-- fixed/scene/difficulty/history 合并与 clamp → `decision/planner.py`；
-- 输出队列聚合 → `runtime/output_stream.py`；
-- response formatter 参数适配 → `integration/vllm/response.py`。
+- 最新用户消息提取 → `integration/vllm/request_adapter.py`；
+- fixed/scene/difficulty/history 合并与 clamp → `budgeting/budget_resolver.py`；
+- 输出队列聚合 → `integration/vllm/response_adapter.py`；
+- response formatter 参数适配 → `integration/vllm/response_adapter.py`。
 
-`runtime/request_context.py` 不再包含 JSON/hash/env/logging；`runtime/output_boundary.py` 独立维护
-text/token/logprobs/terminal 的 parser-facing 不变量，防止普通状态重构再次破坏工具调用。
+`reasoning/request_context.py` 不再包含 JSON/hash/env/logging；`reasoning/parser_boundary.py` 独立
+维护 text/token/logprobs/terminal 的 parser-facing 不变量，防止普通状态重构再次破坏工具调用。
 
-### 5.4 History 边界
+### 5.5 History 边界
 
 history 是可选算法模块，不是“顺便采集”的 telemetry：
 
@@ -356,17 +421,18 @@ history 是可选算法模块，不是“顺便采集”的 telemetry：
 - error/cancel 仍可记录诊断状态，但不进入有效 token 分位数；
 - native first observation 未实现前继续按泛化计划标记为阶段二缺口。
 
-### 5.5 实验资产清理
+### 5.6 实验资产清理
 
 | 当前资产 | 处理 | 保留的长期价值 |
 | --- | --- | --- |
 | `docs/debug/tool_call/task29-pass1-26.jsonl`（约 7.1 MB） | 从主分支删除；用归档 commit 标识原始证据 | 聚合结论和 commit ID |
-| `docs/debug/tool_call/chunks-4-fail.jsonl` | 裁剪、脱敏为 `tests/fixtures/dtb/tool_stream_failure.jsonl` | 最小失败回归 |
+| `docs/debug/tool_call/chunks-4-fail.jsonl` | 裁剪为 `tests/fixtures/tool_call/chunks-4-fail.jsonl` | 约 7.6 KB 最小失败回归 |
 | `docs/debug/tool_call/test.py`、`start.sh` | 删除；有效命令写入 runbook | 可执行说明 |
 | `analyze_tool_call_run.py`、`replay_tool_calls.py` | 去掉现场路径和重复逻辑后迁入 `tools/dtb/` | 可复现 paired replay/分析 |
-| `test_parser_partition_equivalence.py` | 迁入 `tools/dtb/verify_parser_partition.py`，最小断言进入 `tests/` | 固定上游 parser 等价验证 |
+| `test_parser_partition_equivalence.py` | 迁入 `tools/dtb/parser_partition_equivalence.py`，最小断言进入 `tests/` | 固定上游 parser 等价验证 |
 | `tests/test_tool_call_debug.py` | 改为 import `tools/dtb` 并使用最小 fixture | 自动化回归 |
 | 约 100 KB 的工具调用排障长文 | 提炼为 parser 契约、最终根因、补丁身份和 run 汇总；迭代日记留在历史 commit | 可维护设计依据 |
+| 根目录 `dtb.patch`、parser patch | 迁入 `patches/vllm/v0.23.0/`，同步部署命令、hash 和应用顺序 | 唯一、版本化 deployable 制品 |
 | `think_budget_refactored_final/` 源码镜像 | 把仍有效的历史裁决迁入 `docs/archive/` 后删除镜像 | 历史说明，不保留第二套可执行实现 |
 
 `think_budget/` 继续作为 AGENTS.md 定义的离线参考实现；`deer/` 继续作为历史集成语义参考；
@@ -377,35 +443,49 @@ history 是可选算法模块，不是“顺便采集”的 telemetry：
 关键内部接口控制在以下范围：
 
 ```python
-class DtbPlanner:
-    def plan(self, request: DtbDecisionInput) -> DtbPlan: ...
+class DtbBudgetResolver:
+    def resolve(
+        self,
+        prompt_text: str,
+        config: DtbAlgorithmConfig,
+        phase_recorder: DtbPhaseRecorder | None,
+        *,
+        hard_token_limit: int | None = None,
+        reference: str = "",
+        decision_trace: dict | None = None,
+    ) -> DtbBudgetDecision: ...
 
 
-class DtbExecutor:
-    async def run(self, context: DtbRequestContext) -> None: ...
+class DtbStateMachine:
+    def __init__(self, context: DtbRequestContext) -> None: ...
+    async def run(self) -> None: ...
 
 
 class DtbPhaseRecorder:
-    def begin(self, phase: DtbPhaseKey) -> DtbPhaseHandle: ...
-    def finish(self, handle: DtbPhaseHandle, result: object) -> None: ...
-    def finish_request(self, state: DtbRequestState) -> None: ...
+    def record_phase(self, **phase_fields: object) -> dict[str, object]: ...
+    def record_request_summary(
+        self,
+        *,
+        parent_request_id: str,
+        state: DtbRequestState,
+        error: str | None,
+    ) -> dict[str, object]: ...
 
 
-class DtbHistoryStore:
-    def lookup(self, scene: str) -> DtbHistoryStats: ...
-    def record(self, outcome: DtbHistoryOutcome) -> bool: ...
+class AsyncHistoryRecorder:
+    def record_outcome(self, outcome: HistoryOutcome) -> bool: ...
     async def flush(self, timeout_s: float) -> bool: ...
 ```
 
-关系为：controller 调用 planner 得到不可变 plan，executor 只消费 plan 和 request context；
-history 只通过 planner lookup 和请求完成后的 record 参与；telemetry recorder 是可选旁观者，任何
-返回值都不能改变状态迁移、输出或错误处理。
+关系为：request controller 调用 budget resolver 得到不可变 `DtbBudgetDecision`，state machine
+只消费 budget decision 和 request context；history 只通过 budget resolver lookup 和请求完成后的
+record 参与；telemetry recorder 是可选旁观者，任何返回值都不能改变状态迁移、输出或错误处理。
 
 ## 7. 实施顺序
 
 ### P0：冻结语义和基线
 
-1. 固定基线 revision、`dtb.patch` hash、YAML hash 和当前测试清单；
+1. 固定基线 revision、两份原 patch hash、YAML hash 和当前测试清单；
 2. 为三状态黄金轨迹、stream/non-stream、取消、工具调用 terminal、fixed/scene/history 决策保存
    测试基线；
 3. 记录当前默认配置下实际输出的 `TB_*` 事件，作为“需要消失”的反向基线；
@@ -414,8 +494,8 @@ history 只通过 planner lookup 和请求完成后的 record 参与；telemetry
 ### P1：统一术语和目录，不改行为
 
 1. 先建立本文件第 3 节术语；
-2. 机械迁移 `think_budget_vllm_adapter` → `dtb`、`deer_think_budget` → `runtime`；
-3. 原子更新 tests、`dtb.patch`、工具和文档 import；
+2. 机械迁移 `think_budget_vllm_adapter` → `dtb`，再按职责拆为 `reasoning` 等领域子包；
+3. 原子更新 tests、版本化 patch、工具和文档 import；
 4. 保持 HTTP 字段、日志 schema 和算法输出不变；
 5. 全仓 `rg` 确认生产代码不再出现旧包名和 DEER 算法命名。
 
@@ -433,10 +513,12 @@ P1 单独提交，便于通过 diff 确认只有 move/rename/import，没有行�
 ### P3：去重和模块拆分
 
 1. 先让 history 读取 `DtbRequestState`，再删除 `BudgetLedger`；
-2. 拆 planner/controller/runtime output boundary；
-3. 删除兼容 alias、死模块和固定 policy 配置；
+2. 拆分 request controller、budget resolver、reasoning state machine 和 parser boundary；
+3. 删除兼容 alias、已确认重复的实现和固定 policy 配置；难度估计模块只迁移、不删减；
 4. 配置改为启动时单次、强校验、无 fallback；
 5. history disabled 路径不实例化 store。
+
+P3 完成后另开难度估计一致性检视；其算法裁决不与结构重构混在同一提交。
 
 每个小步都保持黄金轨迹不变，禁止一次提交同时改变预算算法和文件布局。
 
@@ -444,15 +526,16 @@ P1 单独提交，便于通过 diff 确认只有 move/rename/import，没有行�
 
 1. 先生成最小 fixture 并让测试通过；
 2. 再移动可复现工具，解除 tests → docs/debug 依赖；
-3. 提炼长文和历史裁决；
-4. 最后删除原始 JSONL、一次性脚本和历史源码镜像；
-5. 更新 `AGENTS.md`、adapter README、两份背景文档和变更记录。
+3. 将 DTB 和 parser patch 一并迁入版本化目录，更新部署/CI/runbook/manifest 路径；
+4. 提炼长文和历史裁决；
+5. 最后删除原始 JSONL、一次性脚本和历史源码镜像；
+6. 更新 `AGENTS.md`、adapter README、两份背景文档和变更记录。
 
 ### P5：服务器验收
 
 按 [`deer_performance_analysis.md`](../debug/deer_performance_analysis.md) runbook 在目标服务器执行：
 
-1. 同一进程配置、同一数据集、同一顺序/并发/seed/cache，至少三次旧基线与新 `off`；
+1. 同一重构 revision、同一数据集、同一顺序/并发/seed/cache，至少三次 Vanilla 与 DTB `off`；
 2. 分别运行 `phase` 和定向 `stream_audit`，确认字段完整并单列启用成本；
 3. telemetry off 的正式性能结果中不得出现 `DTB_PHASE`、`DTB_REQUEST_SUMMARY`、
    `DTB_STREAM_AUDIT` 或成功路径 `TB_*`；
@@ -465,7 +548,7 @@ P1 单独提交，便于通过 diff 确认只有 move/rename/import，没有行�
 
 - 生产包统一为 `dtb`；`deer_think_budget` 不再存在；
 - 除历史文档、兼容读取和 HTTP 协议字段外，生产代码不出现 `Think Budget`/`TB_*`；
-- controller、planner、runtime、history、observability、vLLM integration 依赖方向单向；
+- request controller、budgeting、reasoning、history、observability、vLLM integration 依赖方向单向；
 - tests 不 import `docs/debug`；
 - 删除项均有全仓零引用证据。
 
@@ -487,7 +570,7 @@ P1 单独提交，便于通过 diff 确认只有 move/rename/import，没有行�
 
 ### 8.4 性能和功能
 
-- 本地无模型测试、静态检查和 `dtb.patch` apply-check 通过；
+- 本地无模型测试、静态检查和两份版本化 patch apply-check 通过；
 - 目标 NPU telemetry-off paired E2E、P50、P95、吞吐无可测退化；
 - phase/stream 启用成本单列，不混入正式 DTB 性能排名；
 - DTB 的质量、hard failure、取消、工具调用和 parser-facing 契约不退化。
@@ -497,15 +580,50 @@ P1 单独提交，便于通过 diff 确认只有 move/rename/import，没有行�
 - **概念一致性：** DTB 是产品名；phase telemetry、stream audit、operational log、history store
   无同义异名。
 - **状态一致性：** telemetry 是旁观者，不能返回下一状态或修改 prompt/token/output。
-- **层次一致性：** vLLM 特有对象只进入 integration/runtime；planner 不 import vLLM；tests 不
-  import 文档目录。
+- **层次一致性：** vLLM 特有对象只进入 integration/reasoning；budget resolver 不 import vLLM；
+  tests 不 import 文档目录。
 - **配置一致性：** YAML 是部署参数唯一来源；源码只保留真正不可调的不变量。
 - **性能一致性：** 算法必需的计数与 elapsed 不伪装成 telemetry 开销；telemetry 专属工作在 off
   下为零。
 - **数据一致性：** 原始实验正文不留在主分支；结构化 perf run 仍按 AGENTS.md 的证据规则处理。
 - **升级一致性：** 内部 Python import 原子迁移；外部 HTTP 字段另行版本化，不叠加永久 alias。
 
-## 10. 风险与回退
+## 10. 实施结果（2026-08-20）
+
+P0～P4 已在工作区基线 `f8f7a052e5475217415fcaf532b12148a6f5e068` 上完成：
+
+1. 生产包迁为 `dtb/`，并按 `config / budgeting / reasoning / history / observability /
+   integration.vllm` 拆分；公开入口为 `DtbRequestController`，不保留旧包兼容 alias。
+2. `DtbBudgetDecision` 取代弱语义 plan，`DtbBudgetResolver` 负责预算解析；
+   `DtbRequestState` 是 thinking/probe/final/call 的唯一账本。难度模块随迁到
+   `dtb/budgeting/difficulty/`，默认关闭且没有在结构重构中删除或重新裁决。
+3. 配置改为启动时单次 fail-fast 加载。默认 `OBSERVABILITY.mode: "off"`；`phase` 与
+   `stream_audit` 互斥，后者必须 request-ID allowlist。队列满时 request 线程只记 dropped
+   counter，告警由后台 writer 发出。
+4. 生产写端只输出 `DTB_PHASE` schema 3、`DTB_REQUEST_SUMMARY` 或
+   `DTB_STREAM_AUDIT` schema 1；提取器和 analyzer 兼容读取历史事件，不双写旧前缀。
+5. vLLM 制品迁入 `patches/vllm/v0.23.0/`；Python 包内旧 patch 说明副本和根目录 patch 已删除。
+   当前 SHA-256 为：
+   - `dtb_serving.patch`：`60ed3cb93e9717f95e1c37da35927bcfe405ae303ccfb2f3989fcf80dd7cff14`；
+   - `qwen3_coder_parser.patch`：`2f78be9d87a3e090a5385dcb588296670e6b3291c17fff729ad18927ad3e3288`；
+   - `budget_config.yaml`：`cc4fff5de2618282e6bb567e689cbd1c05489e8484ce5c3dceb19933463b2595`。
+6. 可复现工具迁入 `tools/dtb/`，小型失败 fixture 迁入 `tests/fixtures/tool_call/`；一次性启动/
+   实验脚本及约 7 MB 原始模型输出从主工作树删除；`think_budget_refactored_final/` 的 6 份
+   说明迁入 `docs/archive/think_budget_refactored_final/` 后删除重复源码镜像。历史仍可由 Git
+   revision 定位。
+
+本地验证结果：
+
+- 93 个源码、DTB、提取器和工具测试通过；
+- 使用带 Pillow 的工作区运行时，5 个报表回归测试通过；
+- `python -m compileall -q dtb tools tests` 与 `git diff --check` 通过；
+- 两份 patch 均在只读、固定 vLLM `v0.23.0` checkout 上通过 `git apply --check`。
+
+P5 尚未完成：本机没有目标模型/NPU，因此不能声称 telemetry-off 的 E2E、P50、P95 或吞吐
+已经实测无回归。所有后续实验必须基于本重构结构，按权威 runbook 分别运行 `off` 正式 run
+与同身份 `phase` 账本 run；难度模块另开专项检视。
+
+## 11. 风险与回退
 
 | 风险 | 控制 |
 | --- | --- |
@@ -519,8 +637,11 @@ P1 单独提交，便于通过 diff 确认只有 move/rename/import，没有行�
 任一阶段出现 parser-facing token、终止语义或质量变化时，回退该阶段提交；不能通过重新开启旧
 兼容 alias 或吞掉 terminal 来“修复”。
 
-## 11. 变更记录
+## 12. 变更记录
 
 | 日期 | 变更 | 原因 |
 | --- | --- | --- |
+| 2026-08-20 | 完成 P0～P4 实施、版本化 patch 和工具/fixture 收口；记录 98 个分环境本地测试、静态检查与 apply-check；P5 明确保留为目标 NPU 任务 | 区分源码/本地证据与真实服务器性能，不把默认关闭的结构保证夸大为硬件实测 |
+| 2026-08-20 | 将弱语义的 controller/plan/planner/executor/runtime 命名收敛为 request controller、budget decision、budget resolver、reasoning state machine，并同步目录、类型和接口 | 避免与任务规划、基础大模型和 vLLM executor/runtime 概念重叠，使模块名直接表达 DTB 领域职责 |
+| 2026-08-20 | 根据检视意见保留难度估计模块并增加重构后专项审计；拆分不可变预算决策与可变请求状态；明确两个 vLLM patch 的版本化制品目录和契约含义 | 避免把可能漏集成的原始算法模块误删，消除 model 术语歧义，并让 patch 的运行时、部署和文档职责分离 |
 | 2026-08-20 | 基于 `bc1425` 完成当前实现、命名、telemetry 热路径、history、配置和实验资产检视，给出分阶段重构与验收计划 | 在保留工具流排障能力的同时，使 DTB 生产边界清晰、默认安静且可证明无额外观测工作 |
