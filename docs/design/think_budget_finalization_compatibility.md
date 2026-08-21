@@ -2,303 +2,331 @@
 
 ## 1. 设计目的
 
-本文针对仓库 revision `bc142570103f86ca53ed656c75afd999bd13cbbd` 和
-2026-08-20 的运行状态，设计 DTB 对不同模型终结行为的兼容方式。
-
-状态：**提案，尚未由本次结构重构实现。** 本文路径已切换到重构后的生产结构；后续实现
-不得重新引入旧 adapter 或 telemetry 双账本。
+本文最初基于仓库 revision `bc142570103f86ca53ed656c75afd999bd13cbbd` 建立。
+2026-08-21 已在重构后的 `dtb/` 生产代码中实现本轮设计，算法身份提升为
+`dtb-algorithm-v3`；本地无模型回归已通过，目标服务器行为与性能等待 run_11 验收。
 
 [`run_10_no_final/RESULT.md`](../log/perf/run_10_no_final/RESULT.md) 已实测：W8A8
 量化、特定场景思维链压缩语料增训权重在 `confidence_accepted` 后只收到裸
-`</think>` 时，48 条历史失败集中有 8 条立即以 stop token 结束且没有最终答案；改为
-`BUDGET_EXHAUSTED_FINAL_PROMPT` 后，空 final 从 8/48 降为 0/48，严格正确数从
-34/48 升至 43/48。这个结果证明该权重需要明确 answer cue，但尚未证明开源权重使用同一
-cue 时质量与时延不退化。
+`</think>` 时，48 条历史失败集中有 8 条立即停止且没有最终答案；将该 fresh-final 后缀改为
+现有 `BUDGET_EXHAUSTED_FINAL_PROMPT` 后，空 final 从 8/48 降为 0/48，严格正确数从
+34/48 升至 43/48。
 
-设计目标是：
+本轮决策固定为：
 
-1. 同一份 DTB 状态机代码同时支持开源权重和量化增训权重；
-2. 量化增训权重可以稳定从 controller-forced reasoning exit 进入最终答案；
-3. 不因兼容性改动新增内部请求，并把 prefix-cache 尾块增量限制在必要的 cue token；
-4. 保持原生 parser-facing 契约，包括单一 reasoning 边界、工具调用结构、流式
-   `text/token_ids` 连续性及最终 `finish_reason`；
-5. 配置选择可审计，且不能由用户请求或不可靠的 prompt/model-name 启发式改变。
+1. **不修改 confidence probe。** Probe 继续使用当前 `TRIAL_PROMPT`，不向其 prompt 添加
+   `</think>`，trial 继续隐藏并在本轮实现中丢弃；
+2. **只修改 `confidence_accepted` 的 fresh-final 后缀。** 它与 `budget_exhausted` 一样使用
+   run_10 已验证的 answer cue；
+3. **`budget_exhausted`、模型主动 `</think>` 和模型主动 `<tool_call>` 的逻辑保持不变；**
+4. **不增加模型识别、YAML mode 或环境变量算法分支。** 开源权重和量化增训权重使用同一份
+   DTB 算法行为；
+5. accepted trial 复用作为后续独立优化保留在本文，但不进入本轮实现和验收。
 
-本文只设计最终答案兼容性。accepted trial 的复用仍是后续独立优化，不与本次 cue 修复一起
-上线。
+该收口优先用最小行为改动修复已证实的协议错误，同时把 trial 复用对采样语义、流式 parser、
+账本和 prefix caching 的影响从修复版本中解耦。
 
-## 2. 现状与核心问题
+## 2. 修改前实现与问题证据
 
-### 2.1 当前状态机的不对称行为
+### 2.1 Probe 使用不含 `</think>` 的独立诱导语
 
-当前 `dtb/reasoning/generation_states.py` 中：
-
-- `confidence_accepted` 使用裸 `THINK_END_TAG`；
-- `budget_exhausted` 使用 `BUDGET_EXHAUSTED_FINAL_PROMPT`；
-- 模型主动输出 `</think>` 或 `<tool_call>` 时，沿模型边界直接进入 final；
-- hidden probe 使用独立的 21-token `TRIAL_PROMPT`，接受后丢弃，再发起 fresh-final。
-
-run_10 的错误只出现在第一种路径。问题不是预算或分类错误，而是“为何进入 final”意外决定了
-模型能否生成 final。
-
-### 2.2 需要建模的是终结兼容性，而不是另一套算法
-
-不同权重需要不同的 controller close suffix，类似 chat template 或特殊 token 兼容性。它不应
-成为 scene 预算、不应由请求参数传入，也不需要建立模型分类器。本文定义一个最小概念：
-
-`finalization_mode`：服务进程启动时选定的 controller-forced reasoning 终结方式。
-
-同一状态机只通过该值解析后缀。scene、`DtbBudgetDecision`、置信度和 history 均不感知模型身份。
-
-## 3. 设计决策
-
-### 3.1 使用 YAML 模式，不在状态机中读取环境变量
-
-新增两个具名模式：
-
-| `finalization_mode` | `confidence_accepted` | `budget_exhausted` | 用途 |
-| --- | --- | --- | --- |
-| `minimal_close_v1` | `</think>` | 现有 answer cue | 保持当前开源权重行为 |
-| `guided_close_v1` | 现有 answer cue | 现有 answer cue | 量化增训权重 |
-
-answer cue 继续作为代码内受审查常量，YAML 只保存枚举名，不允许写任意 prompt 文本。这样可
-避免部署文件中的转义、额外 `</think>`、prompt 注入和无法追踪的文案漂移。
-
-run_10 只证明了现有 cue 的确切文本有效。实现时应给相同字节内容增加语义中立的代码名
-`GUIDED_FINAL_PROMPT_V1`，而不是让 confidence 分支依赖名为
-`BUDGET_EXHAUSTED_FINAL_PROMPT` 的原因专用常量。是否把文案改成更短、更中性的提示属于新的
-单变量实验，不能在本次重构中顺手修改。
-
-配置放在 `budget_config.yaml` 的 `RUNTIME.finalization_mode`。量化增训 YAML 设为
-`guided_close_v1`；开源 YAML 在兼容性实验完成前保持 `minimal_close_v1`。两者使用相同 Python
-代码和状态机。
-
-不建议增加 `TB_FINAL_ANSWER_CUE=1` 一类直接控制算法分支的环境变量，原因是：
-
-- 它会形成 YAML 之外的第二优先级，容易发生“文件显示 A、实际运行 B”；
-- 现有实验 manifest、配置签名和 `source_by_field` 无法自然解释覆盖关系；
-- 状态机将依赖进程环境，而非已校验的有效配置。
-
-如果运维以后不希望复制替换同名 YAML，可以只增加
-`TB_BUDGET_CONFIG_PATH=/path/to/model.yaml` 来选择**完整配置文件**。环境变量只负责文件定位，
-不直接选择 `finalization_mode`；启动日志必须记录规范化路径、文件 SHA256 和最终 mode。当前
-人工替换 YAML 已能满足部署，因此这项不是本轮必需实现。
-
-本设计假定一个服务进程只承载一个基础 checkpoint。以后若同一进程承载终结行为不同的多个
-模型或 LoRA，应在模型注册配置中显式映射 mode，不能按 prompt、模型路径字符串或 token ID
-猜测。
-
-### 3.2 仅对 controller-forced exit 使用模式
-
-后缀解析规则为：
+v3 继续使用的 `dtb/reasoning/generation_states.py` 常量为：
 
 ```python
-def controller_final_suffix(reason, finalization_mode):
-    if reason == BUDGET_EXHAUSTED:
-        return GUIDED_FINAL_PROMPT_V1
-    if reason == CONFIDENCE_ACCEPTED:
-        return (
-            GUIDED_FINAL_PROMPT_V1
-            if finalization_mode == GUIDED_CLOSE_V1
-            else THINK_END_TAG
-        )
-    return None
+GUIDED_FINAL_PROMPT_V1 = (
+    "Considering the limited time by the user, I have to give the solution "
+    "based on the thinking directly now.\n</think>\n\n"
+)
+BUDGET_EXHAUSTED_FINAL_PROMPT = GUIDED_FINAL_PROMPT_V1
+TRIAL_PROMPT = (
+    "I have to give the answer based on the thinking directly "
+    "without explanation now.\n**Final Answer**\n"
+)
 ```
 
-`MODEL_THINK_END` 和 `MODEL_TOOL_CALL` 返回 `None`：模型已经给出原生边界，控制器不得再追加
-cue 或第二个 `</think>`。这也避免破坏工具调用 XML/JSON 和多轮 parser 状态。
+Probe 通过 `context.child_prompt(TRIAL_PROMPT)` 构造主思维链的浅拷贝。它传入
+`reasoning_ended=True` 并以 `</think>` 为停止词，但 `</think>` 不在实际 child prompt token
+序列中，主 prompt 也不会被修改。
 
-状态转换如下：
+Trial 完成后只用于 `assess_trial_confidence()`：
+
+```python
+state.current_trial = observation
+state.hidden_probe_tokens += observation.generated_tokens
+assessment = assess_trial_confidence(observation, ...)
+if accepted:
+    return enter_final_answer(CONFIDENCE_ACCEPTED)
+```
+
+当前测试明确断言 trial token 不进入 final prompt、trial 文本不向客户端输出。因此当前
+`confidence_accepted` 表示“接受停止思考的决策”，不表示“接受该 trial 作为最终答案”。
+
+### 2.2 v2 final 后缀不对称
+
+修改前，v2 `_FinalAnswerState` 的 controller-forced 分支为：
+
+```python
+if reason is FinalAnswerReason.CONFIDENCE_ACCEPTED:
+    prompt_suffix = THINK_END_TAG
+elif reason is FinalAnswerReason.BUDGET_EXHAUSTED:
+    prompt_suffix = BUDGET_EXHAUSTED_FINAL_PROMPT
+```
+
+两个分支都会调用 `context.close_reasoning(prompt_suffix)`，然后从主 prompt 发起一个新的
+fresh-final child request。run_10 证明第一种裸 close 对量化增训权重不稳定。
+
+### 2.3 v3 状态转换
 
 ```mermaid
 flowchart TD
-    P["confidence probe"] -->|"accepted"| R["resolve controller suffix"]
-    T["thinking"] -->|"budget exhausted"| R
+    T["thinking"] --> P["hidden probe: P + TRIAL_PROMPT"]
+    P -->|"reject"| T
+    P -->|"confidence accepted"| G["append verified cue + </think>"]
+    T -->|"budget exhausted"| G
     T -->|"model emits </think>"| M["preserve model boundary"]
     T -->|"model emits <tool_call>"| M
-    R -->|"minimal_close_v1 + confidence"| N["append </think>"]
-    R -->|"guided or budget exhausted"| G["append answer cue + </think>"]
-    N --> F["fresh final generation"]
-    G --> F
+    G --> F["fresh final generation"]
     M --> F
 ```
 
-本轮继续保留 fresh-final。它已在开源权重上验证，且把 cue 支持与 trial 复用的 parser 风险
-解耦。
+Probe、trial 收集、置信度计算和 fresh-final 都保持现有结构；唯一行为差异是
+`confidence_accepted` 从裸 `</think>` 改为已验证 cue。
 
-### 3.3 final 非空是统一协议不变量
+## 3. 本轮设计决策
 
-cue 能降低失败概率，但不能替代输出协议校验。`_FinalAnswerState` 当前只要收到 terminal
-output 就把 `completion_status` 写成 `success`；这使 one-token stop 被误记为成功。
+### 3.1 使用一个代码内 canonical cue
 
-应增加统一不变量：controller 关闭 reasoning 后，成功结束必须已经产生至少一种 parser-visible
-final evidence：
+把 run_10 已验证的确切字节定义为语义中立的代码常量：
 
-- 非空 final content；或
-- 完整、可解析的 tool call。
+```python
+GUIDED_FINAL_PROMPT_V1 = (
+    "Considering the limited time by the user, I have to give the solution "
+    "based on the thinking directly now.\n</think>\n\n"
+)
+```
 
-裸 stop token、空白文本、只有空 delta 都不构成 evidence。首次 final 没有 evidence 时：
+`BUDGET_EXHAUSTED_FINAL_PROMPT` 可以作为迁移期别名，或由两个 controller-forced reason 直接
+引用 canonical 常量。不能在本次修改中顺便缩短、翻译或中性化提示文案；任何字节变化都是
+新的单变量实验。
 
-1. 暂不向上游发送该空 terminal；
-2. 若当前是 `minimal_close_v1`，使用 `guided_close_v1` 的 cue 做一次有界 fresh-final retry；
-3. 若已经是 `guided_close_v1`，可使用一条版本化 stronger cue 重试一次，或直接报告
-   `protocol_no_final_answer`；在新的 stronger cue 通过实验前，推荐后者；
-4. 重试仍为空时标记错误，禁止写 `success`；不得用 `ignore_eos` 强行生成。
+后缀解析收口为：
 
-只有在尚未向客户端发送 final content 时才允许重试。若已经发送可见 final delta，控制器不能
-回滚或重采样。tool call 是否完整由原生 parser 契约测试裁决，不能只检查字符串长度。
+```python
+def controller_final_suffix(reason):
+    if reason in {
+        FinalAnswerReason.CONFIDENCE_ACCEPTED,
+        FinalAnswerReason.BUDGET_EXHAUSTED,
+    }:
+        return GUIDED_FINAL_PROMPT_V1
+    return None
+```
 
-### 3.4 prefix caching 成本模型
+`MODEL_THINK_END` 和 `MODEL_TOOL_CALL` 返回 `None`。模型已经生成原生边界时，控制器不得追加
+cue 或第二个 `</think>`，否则可能破坏工具调用结构和多轮 parser 状态。
 
-answer cue 不新增 engine child call；现有 final 请求无论使用何种后缀都要经历一次排队、prefill
-和首 token 生成。设：
+### 3.2 不增加配置分支
 
-- `B`：实际 KV cache block size；
-- `L`：进入 final 前已提交的主 prompt token 数；
-- `S`：final suffix token 数；
-- `H`：被 APC 命中的共同前缀，通常按完整 block 对齐且 `H <= floor(L/B)×B`。
+本次决策废弃初版文档提出的 `minimal_close_v1/guided_close_v1` 双 YAML 方案：
 
-该 final child 的待计算 prompt 量近似为：
+- 不修改 `dtb/config/budget_config.yaml`；
+- 不增加 `FinalizationMode` 或模型类型字段；
+- 不增加 `TB_FINAL_ANSWER_CUE` 环境变量；
+- 不允许请求级 override；
+- scene、`DtbBudgetDecision` 和 history 均不感知模型身份。
+
+这是 code-owned 算法语义变化，`dtb/config/schema.py` 的 `POLICY_VERSION` 已从
+`dtb-algorithm-v2` 提升为 `dtb-algorithm-v3`。实验 manifest 必须记录 DTB commit、policy
+version 和 patch/YAML hash。若后续开源权重实测出现不可接受回归，再基于证据重新讨论显式
+兼容配置，不能现在预设运行时分支。
+
+### 3.3 不在本轮增加自动重试
+
+本次实施范围只有后缀替换，不增加 `final_attempt`、空 final 自动重试或 stronger cue。空 final
+仍必须在客户端结果和 hard-failure 审计中强制计错；若统一 cue 后仍出现，应作为新的协议缺陷
+单独设计，不能由 Judge 的语义结果掩盖。
+
+### 3.4 Prefix caching 成本
+
+Probe 完全不变，因此不会把完整 cue 重复提交到每个 probe，也不会改变 probe 次数、prompt
+token 或置信度分布。
+
+只有 `confidence_accepted` 的既有 fresh-final child prompt 从 1-token `</think>` 变为 run_10
+目标 tokenizer 上的 24-token cue。设进入 final 前主 prompt 为 `L`、prefix cache block size
+为 `B`、实际命中前缀为 `H`，则该 child 的待计算 prompt 量近似为：
 
 ```text
-U = (L - H) + S
+U = (L - H) + suffix_tokens
 ```
 
-从裸 `</think>` 的 1 token 改为 run_10 的 24-token cue，单次 final 的理论增量是 23 token，
-不是一个 block，也不会新增一次“完整首字”调用。vLLM v0.23.0 的
-`KVCacheManager.get_computed_blocks()` 只返回完整 block，并在全命中时仍保留最后 token 重算；
-这些尾块/最后 token 成本在两个模式中都存在。
+相对旧实现只增加约 23 个 suffix token；不新增 child request，也不新增一次完整首 token
+调用。APC 仍只能复用实际保留的完整共同 prefix block，尾部不完整 block 和 vLLM 为获得 logits
+保留的最后 token 重算仍需在目标服务器按 `cached_prompt_tokens/prefill/TTFT` 实测。
 
-如果未来为了复用 accepted trial，要求 probe 与 final 使用同一个 cue，那么每次 probe 确实会
-重新计算共同前缀后的尾块和短后缀。但 run_10 目标 tokenizer 上，现有 `TRIAL_PROMPT` 为 21
-token、guided cue 为 24 token；81 次 probe 的直接提示增量只有 243 token，即约 3 token/probe。
-主要成本仍是 probe 子请求数量和 50-token decode，而不是这 3 个 prompt token。
+`budget_exhausted` 已经使用同一 cue，因此该路径没有 token 或缓存行为变化。
 
-上述推导只说明增量边界，不假定增长中的 parent prefix 一定被保留。run_00 曾实测后续 phase
-只命中固定 1,536 token，说明目标服务器仍需按实际 `cached_prompt_tokens` 审计。实验必须记录
-block size、final/probe 的 `prompt_tokens`、`cached_prompt_tokens`、prefill、TTFT 和 phase
-calls，不能用公式替代服务器测量。
+## 4. 后续方案：避免 accepted trial 被丢弃
 
-## 4. 核心数据与配置
+### 4.1 与本轮决策的边界
 
-只新增一个运行时配置字段，不新增 model type、profile bundle 或 scene 字段：
+当前 trial 是在 `主思维链 + TRIAL_PROMPT` 上采样，而本轮 final 是在
+`主思维链 + GUIDED_FINAL_PROMPT_V1` 上采样。两个条件前缀不同，所以不能把当前 trial 直接
+拼接到 final：即使文本看起来像答案，它也不是 committed final prompt 下的合法采样前缀。
 
-```python
-class FinalizationMode(str, Enum):
-    MINIMAL_CLOSE_V1 = "minimal_close_v1"
-    GUIDED_CLOSE_V1 = "guided_close_v1"
+因此存在一个不可绕过的约束：**要安全复用 accepted trial，未来版本必须修改 probe，使其使用
+与接受后提交完全一致的 `GUIDED_FINAL_PROMPT_V1`。** 这与“本轮不修改 probe”不冲突，因为
+trial reuse 被明确推迟到独立算法版本。
 
-@dataclass
-class AlgorithmConfig:
-    # existing fields ...
-    finalization_mode: FinalizationMode = FinalizationMode.MINIMAL_CLOSE_V1
+### 4.2 事务式 accepted-trial replay
+
+后续候选流程为：
+
+```mermaid
+flowchart TD
+    A["主思维链 P 保持 OPEN"] --> B["child: P + GUIDED_FINAL_PROMPT_V1"]
+    B --> C["buffer exact trial chunks/tokens and score confidence"]
+    C -->|"reject"| D["discard trial; P 未变; 继续 thinking"]
+    C -->|"accept"| E["atomically commit the same cue"]
+    E --> F["emit exactly one </think> and replay trial as final prefix"]
+    F -->|"trial naturally terminal"| G["forward one final terminal"]
+    F -->|"trial stopped by 50-token length"| H["append exact trial token IDs and continue final"]
 ```
 
-能够由 mode 和 final reason 推导出的 suffix 不存入 `DtbBudgetDecision` 或请求状态。实验身份所需的
-配置文件路径、SHA 和部署 checkpoint 放在 manifest；请求 telemetry 只记录最终 mode 和实际
-final reason。
+这不是简单输出 `TrialObservation.full_text`。必须满足：
 
-为了实现协议校验，请求状态只增加运行时真正需要的最小状态：
+1. **条件前缀一致。** Probe child 和接受后主状态提交的 cue 必须逐 token 相同；
+2. **事务性。** 置信度判定前不修改主 prompt；reject 后仍能继续 reasoning；
+3. **精确 replay。** 缓存原始 chunk 顺序、`text`、`token_ids`、logprobs 和终止字段，不能把
+   聚合文本重新 tokenize；
+4. **终止语义。** 自然 `stop/eos` 的 accepted trial 可直接完成；50-token `length` 只是内部
+   截断，replay 时必须清除中间 `finish_reason/stop_reason/finished`，续写后只暴露一个最终
+   terminal；
+5. **原生 stop 与 API 字段。** 可见 trial 必须采用 final-answer 的用户 stop、logprobs 和
+   parser 参数语义；当前 probe 强制 `logprobs=1` 且覆盖 stop 的实现不能直接复用；
+6. **工具调用连续性。** `<tool_call>`、参数 JSON 和结构 token 跨 trial/continuation 边界时，
+   必须继续走原生 parser-facing 路径，不得泄漏 XML、重复标记或截断参数；
+7. **取消和错误。** replay 或 continuation 期间取消时必须终止当前 child，不能留下第二个
+   terminal 或后台生成。
 
-```python
-final_attempt: int = 0
-final_evidence_seen: bool = False
+### 4.3 账本语义
+
+accepted trial 的模型工作只能计算一次：
+
+- rejected trial 计入 `hidden_probe_tokens`；
+- accepted 且 replay 的 trial 计入 `final_answer_tokens`，不再计入 hidden；
+- phase 仍可标记为 `confidence_probe`，但要增加 `trial_reused=true` 和复用 token 数，使请求
+  摘要满足：
+
+```text
+total_model_generated =
+  visible_thinking + rejected_hidden_probe
+  + reused_trial_final + final_continuation
 ```
 
-`final_evidence_seen` 是 parser-facing content/tool-call 证据，不是 Judge 正确性，也不能由
-`generated_tokens > 0` 推导，因为 stop token 可能计入生成量但不产生可见答案。
+不得因为同一批 token 先参与置信度计算、后成为可见 final，就在 probe 和 final 两个账本中
+重复相加。
 
-YAML 示例：
+### 4.4 性能边界
 
-```yaml
-RUNTIME:
-  finalization_mode: guided_close_v1
-```
+run_10 的 43 个 accepted probe 中，41 个以 50-token `length` 结束，只有 2 个自然终止。因此
+trial reuse 对多数请求不会减少 child call 数：当前是 `probe + fresh final`，候选通常是
+`probe + continuation`。主要潜在收益是避免 final 的前 50 token 被第二次采样，而不是消除
+final 请求。
 
-未知 mode 必须启动失败，不能静默回落到 built-in default。请求参数不提供 override。
+Continuation prompt 为 `P + cue + accepted trial tokens`。如果 vLLM 保留了 accepted probe
+产生的完整 KV block，APC 可以复用完整共同块；尾部不完整 block 仍需重算。不能仅凭相同
+request family 假定命中，必须记录每个 probe/continuation 的 `prompt_tokens`、
+`cached_prompt_tokens`、prefill、decode 和 TTFT。
 
-## 5. 主要修改点
+## 5. 实现状态与后续计划
+
+### 5.1 本轮实现（本地完成，待 run_11 服务器验收）
 
 | 文件 | 修改 |
 | --- | --- |
-| `dtb/config/schema.py` | 增加 `FinalizationMode` 和 `DtbAlgorithmConfig.finalization_mode` 校验 |
-| `dtb/config/loader.py` | 加入 YAML 白名单解析；未知值 fail fast，仍只在启动时加载 |
-| `dtb/config/budget_config.yaml` | 开源默认先声明 `minimal_close_v1`；量化增训 YAML 声明 `guided_close_v1` |
-| `dtb/request_controller.py` | 把已校验 mode 装入请求 `DtbAlgorithmConfig`，不做模型识别 |
-| `dtb/reasoning/generation_states.py`、`parser_boundary.py` | 集中解析 controller suffix；增加 final evidence 与空 final 失败/有界重试 |
-| `dtb/observability/phase_recorder.py` | 仅在 `phase` audit 记录 mode、attempt、evidence、empty-final outcome；不复制到 `DtbBudgetDecision` |
-| `tests/test_dtb_state_machine.py` | 覆盖两种 mode、两类 controller exit、模型边界、空 terminal、retry 与 tool call |
+| `dtb/reasoning/generation_states.py` | 定义 canonical verified cue；`confidence_accepted` 与 `budget_exhausted` 都选择该 cue；probe 不变 |
+| `dtb/config/schema.py` | 提升 code-owned `POLICY_VERSION`；不增加 YAML 字段 |
+| `tests/test_dtb_state_machine.py` | 断言 probe prompt/隐藏语义不变；两个 controller-forced reason 都使用相同 cue；模型边界不追加 cue |
+| `tests/test_dtb_prompt_copy.py` | 断言 close suffix 只提交一次、主 prompt 只有一个 `</think>`，并回归 terminal 原样透传 |
+| `tests/test_dtb_state_machine.py`、`tests/test_tool_call_debug.py` | 回归 stream/non-stream、`text/token_ids` 连续性、工具调用与唯一 terminal |
 
-建议把后缀解析写成无 vLLM 依赖的纯函数，单测直接穷举
-`FinalAnswerReason × FinalizationMode`。不需要新增模块级分类器。
+本轮未修改 `dtb/config/budget_config.yaml`、`DtbBudgetDecision`、history、phase recorder 或
+request API。现有无模型测试已覆盖 probe/final prompt、hidden trial、原生模型边界、唯一
+reasoning boundary、唯一 terminal 和工具调用流式连续性。
 
-## 6. 实验与收口决策
+### 5.2 后续 trial-reuse 版本
 
-### 6.1 实现可以先做，默认值先不统一
+后续实现至少需要修改：
 
-run_10 已足够支持增加 `guided_close_v1`，无需等待开源实验才实现配置能力；但它不足以把 guided
-模式设为所有权重的唯一默认。推荐顺序：
+- `generation_states.py`：probe 使用 canonical cue；accepted/rejected 分流；replay 和
+  continuation；
+- `request_state.py`：保存可 replay 的原始 trial chunk/token 状态；
+- `parser_boundary.py` / request context：把 accepted trial 作为 final prefix 送入同一原生
+  parser-facing 输出链；
+- phase recorder 与请求摘要：区分 rejected hidden trial、reused visible trial 和 continuation；
+- 状态机、流式、非流式、工具调用及取消测试。
 
-1. 实现具名 mode、final 非空不变量和 telemetry；开源 YAML 保持 minimal，量化 YAML 使用
-   guided；
-2. 量化权重把 48 条定向集再重复 2 轮，随后执行 633 条全集；
-3. 开源权重做同 commit、同 13 场景的 minimal/guided 请求级 A/B；
-4. 若 guided 在开源权重也通过质量、hard failure 和时延门，则统一默认 guided，后续删除模型
-   差异；否则长期保留两份 YAML，但仍只有一份状态机实现。
+该版本必须单独提升 policy version，不能与本轮 cue 修复共用同一算法身份。
 
-### 6.2 必需的 2×2 证据
+## 6. 验收标准
 
-| 权重 | minimal | guided | 当前证据 |
-| --- | --- | --- | --- |
-| 量化增训 | 定向故障基线 | 目标模式 | run_10 已有单轮 8/48 → 0/48；需重复与全集 |
-| 开源 | 当前行为基线 | 兼容性候选 | 缺同轮 A/B，必须补测 |
+### 6.1 本轮 cue 修复
 
-每个比较固定请求、sampling/seed、并发、到达节奏、cache 初态、服务和 adapter commit。Judge
-使用 temperature=0，按 `QA_ID` 配对；空 final 与 parser hard failure先独立强制计错。
+本地无模型验收：
 
-### 6.3 验收标准
+- Probe child prompt 仍以 `TRIAL_PROMPT` 结尾且不包含合成 `</think>`；
+- trial 仍不进入主 prompt或客户端输出；
+- `confidence_accepted` 和 `budget_exhausted` 的 fresh-final prompt 都以 canonical cue 结尾；
+- model-generated `</think>` / `<tool_call>` 不追加 cue；
+- stream/non-stream 只有一个 reasoning boundary 和一个 final terminal；
+- 配置 schema 没有新增 `finalization_mode` 或请求 override。
 
-功能与协议门：
+服务器验收：
 
-- 48 条定向集连续 3 轮 `protocol_no_final_answer=0`；
-- 633 条全集不新增空 final、工具 XML 泄漏、参数 JSON 不完整、重复 `</think>` 或错误
-  `finish_reason`；
-- stream/non-stream、模型主动 `</think>`、模型主动 `<tool_call>`、confidence exit 和 budget
-  exit 全部通过；
-- 有效 final 前不能发送空 terminal，失败不能记录为 `success`。
+- run_11 使用量化增训权重执行 13 场景全集和 fixed_v4 候选，空 final 为 0，不新增工具 XML
+  泄漏、参数 JSON 不完整或错误 `finish_reason`；
+- 与同模型、同数据集 Vanilla 按 `QA_ID` 请求级配对；若复用 run_08 Vanilla，manifest 必须证明
+  模型/tokenizer revision、数据集、sampling、并发、到达节奏和 cache 状态可比；
+- 逐场景按质量优先原则选择：正确数不低于 Vanilla 的候选优先，只有该层为空时才允许少 1 题；
+  质量层内选择 paired E2E 更低者，不得新增 hard failure；
+- paired E2E 单列 `confidence_accepted` 请求，核对 engine call 数不变、final prompt 约增加
+  23 token，并报告 cache/prefill/TTFT；
+- 正式 E2E 排名使用 `OBSERVABILITY.mode=off`；如需 phase 账本，使用同身份的独立
+  `experiment_role=phase_audit` 运行，不与正式结果混算；
+- 实验 manifest 记录新的 policy version、DTB commit、两份 patch hash、YAML hash、sampling、
+  并发、到达节奏和 prefix-cache 状态。
 
-质量门：
+开源权重也使用同一算法行为；其 13 场景回归仍是统一实现的兼容性验收，但不阻塞 run_11 对
+量化增训权重的直接目标判断。
 
-- 继续使用项目已确认的选择原则：先选正确率不低于对应 Vanilla/模式基线的结果；若没有，最多
-  多错 1 条才进入时延比较；
-- 对开源权重，guided 只有在不突破该门时才可成为统一默认。
+### 6.2 后续 trial reuse
 
-性能与缓存门：
+以“canonical cue + fresh-final”为唯一对照，先验证：
 
-- fresh-final 阶段两种 mode 的 engine call 数必须相同；
-- 单列 final suffix token、uncached prompt token、prefill、TTFT、final decode 和 E2E；
-- 13 场景等权宏平均 paired E2E 不出现预先声明容忍线之外的退化；建议实验前声明 1% 为候选
-  容忍线，并同时报告置信区间，不能测试后再选择阈值；
-- 若后续启用 trial 复用，另做 `cue+fresh-final` 与 `cue+trial-reuse` A/B，不把收益归给本次
-  compatibility mode。
+- accept+natural-terminal、accept+length-continuation、reject+continue-thinking、error 和 cancel；
+- stream/non-stream 的 trial prefix 与 continuation `text/token_ids` 连续，只有一个 terminal；
+- 工具调用标记、参数 JSON、role 和 `finish_reason` 与原生 parser 契约一致；
+- accepted trial token 在总模型工作量中只计一次；
+- 两种权重重新采集置信度，不能用旧 probe telemetry 静态推导阈值；
+- 质量通过后再用请求级 paired E2E、总 generated token 和 phase 账本决定是否保留。
 
 ## 7. 一致性校验
 
-- **概念一致性：** `finalization_mode` 只表示模型终结兼容性；scene 仍只决定 budget，final
-  reason 仍只说明为何离开 thinking。
-- **状态完备性：** 两个 controller exit、两个模型原生 boundary、空 terminal、正常 stop、
-  length、error 和 cancel 均有明确处理。
-- **接口完备性：** YAML 是唯一行为配置源；环境变量如以后增加，只选 YAML 路径；请求无
-  override。
-- **层次一致性：** cue 解析在算法状态机，模型部署选择在配置层，parser-valid evidence 由原生
-  parser 契约约束；不在分类器或 `DtbBudgetDecision` 中复制职责。
-- **性能一致性：** mode 不改变 phase 数；suffix token 成本与子请求边界成本分开记录；trial
-  复用保持独立实验。
-- **可审计性：** 启动日志记录配置路径/SHA/mode；final phase 记录 mode、reason、attempt 和
-  evidence outcome，能够从日志证明每个请求实际走了哪种终结行为。
+- **概念一致性：** 本轮只有一个 code-owned verified cue，不再存在运行时 finalization mode；
+  trial reuse 是后续算法版本。
+- **状态完备性：** 本轮保持现有 probe/final 状态数；两个 controller reason 共用 cue，两个模型
+  boundary 保持原生路径。
+- **接口完备性：** 不新增 YAML、环境变量或请求字段；行为由 policy version 和 commit 审计。
+- **层次一致性：** scene 只决定预算，final reason 只解释退出原因，cue 由 generation state
+  选择，不进入 `DtbBudgetDecision`。
+- **性能一致性：** 本轮不改变 probe 和 child call 数；只增加一次 confidence-final suffix
+  token。trial reuse 的重复 prefill、decode 节省和账本另行测量。
+- **parser 一致性：** cue 只存在于模型 prompt，控制器对客户端仍只合成一个 `</think>`；模型
+  自带边界不被重复修改。
 
 ## 8. 变更历史
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
-| 2026-08-20 | 初版：定义 YAML 驱动的终结兼容模式、空 final 不变量、prefix-cache 成本模型及跨权重收口实验 | run_10 证明量化增训权重需要 answer cue，但开源权重的统一适用性尚未验证 |
+| 2026-08-20 | 初版：提出 YAML 驱动的 minimal/guided 终结兼容模式 | run_10 证明量化增训权重需要 answer cue，但开源权重统一适用性尚未验证 |
+| 2026-08-21 | 决策收口：取消当前版本的配置分支；probe 保持不变，仅把 `confidence_accepted` fresh-final 改为已验证 cue；补充 accepted-trial 事务式 replay/continuation 后续方案 | 用最小改动修复已证实空 final，并将高风险 trial 复用与兼容性修复解耦 |
+| 2026-08-21 | 完成 `dtb-algorithm-v3` 本地实现与无模型回归；同步 manifest、泛化计划和性能 runbook；服务器验收目标固定为 run_11 量化增训权重 13 场景全集与 fixed_v4 | 让代码、实验身份和验收口径在服务器测试前闭合 |

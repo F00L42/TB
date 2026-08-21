@@ -9,7 +9,7 @@ from dtb.budgeting.budget_decision import ThinkingBudget
 
 
 TRIAL_ANSWER_LENGTH = 50
-POLICY_VERSION = "dtb-algorithm-v2"
+POLICY_VERSION = "dtb-algorithm-v3"
 
 
 class MissingConfidencePolicy(str, Enum):

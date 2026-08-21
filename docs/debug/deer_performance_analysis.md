@@ -389,7 +389,7 @@ vLLM、vLLM-Ascend、CANN、运行时、硬件、模型路径和服务启动基�
 `controller_phases.jsonl` 每行一个 phase，重构后格式为：
 
 ```json
-{"schema":3,"parent_request_id":"chatcmpl-x","child_request_id":"chatcmpl-x_confidence_probe_2","variant":"dtb","policy_version":"dtb-algorithm-v2","phase":"confidence_probe","round":2,"wall_ms":912.4,"queue_ms":3.1,"prefill_ms":381.5,"decode_ms":524.0,"controller_cpu_ms":3.8,"prompt_tokens":3584,"cached_prompt_tokens":3456,"generated_tokens":50,"visible":false,"confidence":0.7653,"accepted":false,"confidence_method":"average_fallback","average_confidence":0.7653,"value_min_raw":null,"pair_count":50,"value_pair_count":38,"accept_reason":"below_threshold","stop_reason":"length"}
+{"schema":3,"parent_request_id":"chatcmpl-x","child_request_id":"chatcmpl-x_confidence_probe_2","variant":"dtb","policy_version":"dtb-algorithm-v3","phase":"confidence_probe","round":2,"wall_ms":912.4,"queue_ms":3.1,"prefill_ms":381.5,"decode_ms":524.0,"controller_cpu_ms":3.8,"prompt_tokens":3584,"cached_prompt_tokens":3456,"generated_tokens":50,"visible":false,"confidence":0.7653,"accepted":false,"confidence_method":"average_fallback","average_confidence":0.7653,"value_min_raw":null,"pair_count":50,"value_pair_count":38,"accept_reason":"below_threshold","stop_reason":"length"}
 ```
 
 生产写端只在 `OBSERVABILITY.mode: "phase"` 时通过后台有界队列写单行 JSON；请求协程
@@ -664,6 +664,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-21 | `dtb-algorithm-v3` 将 `confidence_accepted` 的 fresh-final 裸 `</think>` 后缀替换为 run_10 已验证的 answer cue；probe、`budget_exhausted` 与模型原生边界保持原逻辑；run_11 使用量化增训权重的 13 场景全集与 fixed_v4 验收 | 修复量化增训权重在置信度接受后可能立即结束且无 final 的协议问题，并独立测量新增约 23 个 suffix token 对 E2E/prefill 的影响 |
 | 2026-08-20 | 生产结构切换到 `dtb/` 和版本化 patch；删除 telemetry 双账本；观测改为默认 off、独立 phase audit 和 allowlisted stream audit；提取器新写 schema 3、兼容读历史 schema | 后续实验必须用关闭态给出正式 E2E，用同身份 phase run 完成分支与总工作量审计；历史 run 保持不可变 |
 | 2026-08-19 | 闭环 DTB 流式工具调用故障：修复 reasoning 终止语义、stop-boundary text/token ID 对齐和 final child terminal 原样透传，并为固定 vLLM 版本提供 parser 分片修复 patch；保留默认关闭且关闭态不进入构造/I/O路径的独立工具流 telemetry | 大批量真实 replay 已验证目标故障；不再使用保守 XML 恢复或人工空 delta，`TB_PHASE` 性能 schema 保持独立 |
 | 2026-08-13 | FinalAnswer 增加显式 `confidence_accepted` / `budget_exhausted` 原因；前者只补 `</think>`，后者追加固定限时提示；phase/request 提取保留该字段 | 对齐 DEER AnswerState 的两类最终生成 prompt，避免 trial 清理后从 `last_chunk.stop_reason` 错判路径 |

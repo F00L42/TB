@@ -34,14 +34,28 @@ if TYPE_CHECKING:
     from vllm.outputs import RequestOutput
 
 
-BUDGET_EXHAUSTED_FINAL_PROMPT = (
+GUIDED_FINAL_PROMPT_V1 = (
     "Considering the limited time by the user, I have to give the solution "
     "based on the thinking directly now.\n</think>\n\n"
 )
+# Compatibility alias for callers that still use the former reason-specific name.
+BUDGET_EXHAUSTED_FINAL_PROMPT = GUIDED_FINAL_PROMPT_V1
 TRIAL_PROMPT = (
     "I have to give the answer based on the thinking directly "
     "without explanation now.\n**Final Answer**\n"
 )
+
+
+def controller_final_suffix(
+    reason: FinalAnswerReason,
+) -> str | None:
+    """Resolve only controller-forced reasoning exits to the verified cue."""
+    if reason in {
+        FinalAnswerReason.CONFIDENCE_ACCEPTED,
+        FinalAnswerReason.BUDGET_EXHAUSTED,
+    }:
+        return GUIDED_FINAL_PROMPT_V1
+    return None
 
 
 def _output_kind_name(value: Any) -> str:
@@ -357,7 +371,7 @@ class _ThinkingState(_BaseState):
         remaining_budget = _BaseState.remaining_think_budget(context)
         remaining_context = _BaseState.remaining_context(context)
         forced_final_reserve = len(context.encode_prompt_suffix(
-            BUDGET_EXHAUSTED_FINAL_PROMPT)) + 1
+            GUIDED_FINAL_PROMPT_V1)) + 1
         available_think_context = remaining_context - forced_final_reserve
         if remaining_budget <= 0 or available_think_context <= 0:
             return _BaseState.enter_final_answer(
@@ -636,11 +650,7 @@ class _FinalAnswerState(_BaseState):
         if reason is None:
             raise RuntimeError(
                 "FinalAnswerState requires an explicit final_answer_reason")
-        prompt_suffix = None
-        if reason is FinalAnswerReason.CONFIDENCE_ACCEPTED:
-            prompt_suffix = THINK_END_TAG
-        elif reason is FinalAnswerReason.BUDGET_EXHAUSTED:
-            prompt_suffix = BUDGET_EXHAUSTED_FINAL_PROMPT
+        prompt_suffix = controller_final_suffix(reason)
         if state.reasoning_state is ReasoningState.OPEN:
             if prompt_suffix is None:
                 raise RuntimeError(

@@ -22,18 +22,21 @@ DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考
 设计基线：
 
 - 文档日期：2026-07-31；
-- 当前状态日期：2026-08-20；
+- 当前状态日期：2026-08-21；
 - 目标环境：vLLM `v0.23.0`、vLLM-Ascend `v0.23.0rc1`；
 - 当前单场景证据：[`run_02/RESULT.md`](../log/perf/run_02/RESULT.md)；
 - 当前 13 场景自动模式证据：[`run_07/RESULT.md`](../log/perf/run_07/RESULT.md)；
 - 性能归因口径：[`deer_performance_analysis.md`](../debug/deer_performance_analysis.md)；
 - 当前生产结构与 telemetry 边界：
   [`dtb_cleanup_and_telemetry_refactor_plan.md`](dtb_cleanup_and_telemetry_refactor_plan.md)；
+- 当前 finalization 行为与 run_11 验收：
+  [`think_budget_finalization_compatibility.md`](think_budget_finalization_compatibility.md)；
 - 旧 adapter 裁决仅作为历史证据：
   [`think_budget_vllm_adapter_refactor_plan.md`](../debug/think_budget_vllm_adapter_refactor_plan.md)。
 
-从 2026-08-20 起，新实验以 `dtb/`、`patches/vllm/v0.23.0/` 和
-`dtb-algorithm-v2` 为唯一生产基线。历史 run 不改写；新 run 的 manifest 必须记录 TB
+从 2026-08-21 起，新实验以 `dtb/`、`patches/vllm/v0.23.0/` 和
+`dtb-algorithm-v3` 为唯一生产基线。v3 仅把 `confidence_accepted` fresh-final 后缀改为
+run_10 已验证的 answer cue，probe 与预算逻辑不变。历史 run 不改写；新 run 的 manifest 必须记录 TB
 commit、两份 patch hash、YAML hash、观测模式和实验角色。旧
 `think_budget_vllm_adapter/`、根目录 patch 或旧 telemetry 写端不得继续部署。
 
@@ -921,3 +924,4 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-12 | 固化新 run 的端到端分析接口：实验身份、单参数提取、覆盖/配置审计、QA_ID 配对、Judge 人工覆盖、宏微指标、hidden probe 账本、RESULT 模板与降级条件；修正章节编号和 `test_result` 层级。 |
 | 2026-08-13 | final phase 与请求级提取增加 `final_answer_reason`，区分置信度接受和预算耗尽的模型 prompt 后缀。 |
 | 2026-08-20 | 将后续实验基线切换到重构后的 `dtb/` 与版本化 patch；内部决策改称 `DtbBudgetDecision`；telemetry 改为默认 `off`、独立 `phase` 账本 run 和 allowlisted `stream_audit`，生产只写 `DTB_PHASE` schema 3、提取器兼容读取历史 schema。 |
+| 2026-08-21 | 算法基线提升为 `dtb-algorithm-v3`：probe 保持不变，`confidence_accepted` 与 `budget_exhausted` 统一使用 run_10 已验证的 fresh-final answer cue；run_11 在量化增训权重的 13 场景全集与 fixed_v4 上验收空 final、质量和 paired E2E。 |

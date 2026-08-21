@@ -10,14 +10,23 @@ from dtb.budgeting.budget_decision import (
     ThinkingBudget,
     DecisionBranch,
 )
-from dtb.config.schema import DtbAlgorithmConfig, DtbAlgorithmPolicy
+from dtb.config.schema import (
+    DtbAlgorithmConfig,
+    DtbAlgorithmPolicy,
+    POLICY_VERSION,
+)
 from dtb.reasoning.request_context import DtbRequestContext
 from dtb.reasoning.request_state import (
     FinalAnswerReason,
     ReasoningState,
     DtbRequestState,
 )
-from dtb.reasoning.generation_states import BUDGET_EXHAUSTED_FINAL_PROMPT
+from dtb.reasoning.generation_states import (
+    BUDGET_EXHAUSTED_FINAL_PROMPT,
+    GUIDED_FINAL_PROMPT_V1,
+    TRIAL_PROMPT,
+    controller_final_suffix,
+)
 from dtb.reasoning.state_machine import DtbStateMachine
 
 
@@ -152,7 +161,7 @@ def make_context(
         confidence_threshold=0.9,
         percentile_step=0.75,
         source_by_field={},
-        policy_version="think-budget-performance-v1",
+        policy_version=POLICY_VERSION,
         hard_think_token_limit=hard_limit,
     )
     context = DtbRequestContext(
@@ -214,6 +223,21 @@ def call_phases(engine: ScriptedEngine) -> list[str]:
 
 
 class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
+    def test_only_controller_forced_exits_select_guided_final_prompt(self):
+        self.assertEqual(
+            controller_final_suffix(
+                FinalAnswerReason.CONFIDENCE_ACCEPTED),
+            GUIDED_FINAL_PROMPT_V1,
+        )
+        self.assertEqual(
+            controller_final_suffix(FinalAnswerReason.BUDGET_EXHAUSTED),
+            GUIDED_FINAL_PROMPT_V1,
+        )
+        self.assertIsNone(
+            controller_final_suffix(FinalAnswerReason.MODEL_THINK_END))
+        self.assertIsNone(
+            controller_final_suffix(FinalAnswerReason.MODEL_TOOL_CALL))
+
     async def test_final_body_and_terminal_remain_bound_together(self):
         final_result = result(
             "answer", [30], finish_reason="stop", stop_reason="eos")
@@ -255,19 +279,37 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(engine.calls[0]["max_tokens"], 5)
         self.assertEqual(engine.calls[1]["max_tokens"], 50)
+        trial_tokens = context.tokenizer.encode(
+            TRIAL_PROMPT, add_special_tokens=False)
+        self.assertEqual(
+            engine.calls[1]["prompt_token_ids"][-len(trial_tokens):],
+            trial_tokens,
+        )
+        self.assertNotIn("</think>", TRIAL_PROMPT)
+        self.assertNotIn(
+            "</think>",
+            context.tokenizer.decode(
+                engine.calls[1]["prompt_token_ids"],
+                skip_special_tokens=False,
+            ),
+        )
         self.assertNotIn(20, engine.calls[2]["prompt_token_ids"])
         self.assertEqual(visible.count("</think>"), 1)
         self.assertNotIn("trial", visible)
-        self.assertNotIn(
+        self.assertIn(
             "Considering the limited time by the user",
             context.prompt_text,
         )
-        self.assertTrue(context.prompt_text.endswith("</think>"))
+        self.assertTrue(context.prompt_text.endswith(GUIDED_FINAL_PROMPT_V1))
         close_tokens = context.tokenizer.encode(
-            "</think>", add_special_tokens=False)
+            GUIDED_FINAL_PROMPT_V1, add_special_tokens=False)
         self.assertEqual(
             engine.calls[-1]["prompt_token_ids"][-len(close_tokens):],
             close_tokens,
+        )
+        self.assertNotIn(
+            "Considering the limited time by the user",
+            "".join(visible),
         )
         self.assertEqual(
             context.request_state.final_answer_reason,
@@ -359,6 +401,7 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             "Considering the limited time by the user, I have to give the "
             "solution based on the thinking directly now.\n</think>\n\n"
         )
+        self.assertEqual(GUIDED_FINAL_PROMPT_V1, expected_prompt)
         self.assertEqual(BUDGET_EXHAUSTED_FINAL_PROMPT, expected_prompt)
         context, engine = make_context(
             [

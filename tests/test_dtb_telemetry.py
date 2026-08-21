@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from dtb.config.schema import (
     DtbObservabilityConfig,
     DtbTelemetryMode,
+    POLICY_VERSION,
 )
 from dtb.observability.config import DtbObservabilityRuntime
 from dtb.observability.event_writer import DtbEventWriter
@@ -31,7 +32,7 @@ class DtbTelemetryTests(unittest.TestCase):
         lines: list[str] = []
         writer = DtbEventWriter(16, lines.append)
         try:
-            recorder = DtbPhaseRecorder(writer, "dtb-algorithm-v2")
+            recorder = DtbPhaseRecorder(writer, POLICY_VERSION)
             output = SimpleNamespace(
                 metrics=SimpleNamespace(
                     queued_ts=10.0,
@@ -68,6 +69,7 @@ class DtbTelemetryTests(unittest.TestCase):
         finally:
             writer.close()
         self.assertEqual(record["schema"], 3)
+        self.assertEqual(record["policy_version"], "dtb-algorithm-v3")
         self.assertEqual(record["variant"], "dtb")
         self.assertEqual(record["queue_ms"], 250.0)
         self.assertEqual(record["prefill_ms"], 500.0)

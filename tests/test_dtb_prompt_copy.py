@@ -11,7 +11,11 @@ from dtb.budgeting.budget_decision import (
     ThinkingBudget,
     DecisionBranch,
 )
-from dtb.config.schema import DtbAlgorithmConfig, DtbAlgorithmPolicy
+from dtb.config.schema import (
+    DtbAlgorithmConfig,
+    DtbAlgorithmPolicy,
+    POLICY_VERSION,
+)
 from dtb.integration.vllm.response_adapter import (
     aggregate_queue,
     native_chat_response,
@@ -66,7 +70,7 @@ def make_context() -> DtbRequestContext:
         confidence_threshold=0.9,
         percentile_step=0.75,
         source_by_field={},
-        policy_version="think-budget-performance-v1",
+        policy_version=POLICY_VERSION,
         hard_think_token_limit=20,
     )
     return DtbRequestContext(
