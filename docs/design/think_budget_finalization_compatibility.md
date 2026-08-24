@@ -14,6 +14,11 @@
 parser-facing 已输出额度。该修改已通过本地无模型回归，等待目标服务器定向验收；run_11
 仍是 v3 历史证据，不回写其实验身份。
 
+[`run_11_fixed_v5/RESULT.md`](../log/perf/run_11_fixed_v5/RESULT.md) 已提供首批服务器路径证据：
+240/240 个 final 的额度字段闭合，`answer_limit` 均等于外部剩余额度，全部自然 `stop` 且没有
+2,048 cap。该 run 的 final 最长只有 238 token，且不含两条历史截断和 48 条 no-final，因此
+状态仍是“服务器路径部分通过、协议定向验收未完成”。
+
 [`run_10_no_final/RESULT.md`](../log/perf/run_10_no_final/RESULT.md) 已实测：W8A8
 量化、特定场景思维链压缩语料增训权重在 `confidence_accepted` 后只收到裸
 `</think>` 时，48 条历史失败集中有 8 条立即停止且没有最终答案；将该 fresh-final 后缀改为
@@ -418,3 +423,4 @@ telemetry-off 正式 E2E 和完整 manifest 未通过或未验证。详见
 | 2026-08-21 | 完成 `dtb-algorithm-v3` 本地实现与无模型回归；同步 manifest、泛化计划和性能 runbook；服务器验收目标固定为 run_11 量化增训权重 13 场景全集与 fixed_v4 | 让代码、实验身份和验收口径在服务器测试前闭合 |
 | 2026-08-24 | 纳入 run_11：318 个 controller-forced final 均使用 24-token cue，空 final 为 0/633；同时发现两条 2,048-token final 截断，完整 final 协议仍未通过 | cue 修复可以冻结；下一优先级是移除控制器额外 final 硬帽，而不是改 probe、回滚 cue 或提前实现 trial reuse |
 | 2026-08-24 | 完成 `dtb-algorithm-v4` 本地实现：复用原生有效 completion 上限，增加 parser-facing 统一额度账本，删除默认 final cap 并补充 final/request telemetry 与回归测试 | 让多 child DTB 与一次原生 assistant completion 的 `max_tokens`、上下文和真实 `finish_reason` 语义一致 |
+| 2026-08-24 | 纳入 run_11_fixed_v5 的 v4 服务器路径证据：240 个 final 额度字段闭合、全部自然 stop、无 2,048 cap；历史长 final、no-final 集和小 `max_tokens` 仍未覆盖 | 不把短 final 的成功误写为完整协议通过，保留定向验收门 |

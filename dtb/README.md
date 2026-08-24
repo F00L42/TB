@@ -23,6 +23,24 @@ DTB（Dynamic Think-Budget Control）在 vLLM Chat Completion serving 内控制�
 `HISTORY_STORE` 保存可选 history 的路径、保留上限和异步队列容量；history 关闭时不会配置、
 构造或读取 store。
 
+默认部署入口固定为 `config/budget_config.yaml`。`config/budget_config_quant.yaml` 是量化增训
+权重的 13 场景 **TP4 待验收候选**，不是运行时自动选择的第二套策略。服务器应在停止服务后
+备份规范文件，把候选复制为 `budget_config.yaml`，记录候选文件名与 SHA，再重启服务；不要
+重命名或移走仓库中的候选文件，也不要在运行中覆盖。正式 E2E 使用 `OBSERVABILITY.mode=off`。
+这样部署选择保持显式、启动时生效且可由 manifest 审计，无需增加环境变量或权重专属算法分支。
+
+```bash
+cp dtb/config/budget_config_quant.yaml dtb/config/budget_config.yaml
+sha256sum dtb/config/budget_config_quant.yaml dtb/config/budget_config.yaml
+```
+
+两行应在服务停止后执行；随后重启，并把相同 SHA 写入本轮 `manifest.json`。
+
+量化候选包含 5 个 fixed_v5 和 8 个 fixed_v4 复验点。当前 resolver 不支持由 YAML 声明的
+逐场景原生旁路；因此低收益场景仍是诊断候选，不能通过添加一个未实现的 `native` 字段冒充
+bypass。TP4 对齐实验若确认某场景无净收益或质量不合格，应先实现真正的 serving native
+bypass，再将其纳入发布配置。
+
 请求仍可使用既有 fixed override 字段。公网开关 `enable_think_budget` 为外部协议兼容字段，
 内部 Python 包和事件统一使用 DTB 命名。
 

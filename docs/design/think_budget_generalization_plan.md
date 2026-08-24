@@ -74,7 +74,9 @@ DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考
 | run_07 使用参与规则和选点的同一批 633 条 search 样本，且缺少实验 manifest | 实测 | 不能据此声明产品 holdout、通用/OOD 泛化或解释跨 run 质量波动 |
 | run_11 在量化增训权重 fixed_v4 上使空 final 从旧 fixed_v4 的 23/633 降至 0/633，318 个 controller-forced final 均命中 24-token cue | 实测 | `dtb-algorithm-v3` guided cue 可以冻结，不再继续修改 probe 或引入权重专属算法分支 |
 | run_11 相对同权重 run_08 Vanilla 的 phase-on 微/宏 E2E 收益为 7.97%/9.33%，但 NetQAD 单步少 2 题并新增两条 2,048-token final 截断 | 实测 | 量化权重策略未通过质量与 hard-failure 门；先修 final cap，再做 5 场景有界 fixed_v5 和 telemetry-off 自动全集 |
-| `dtb-algorithm-v4` 已在本地移除默认 final cap，复用原生有效 completion 上限并维护 parser-facing 统一额度 | 源码确定、本地无模型测试 | 下一次服务器实验必须先重放两条截断和 48 条 no-final；通过后才能进入 fixed_v5 性能搜索 |
+| run_11_fixed_v5 的 5 组参数均进入质量层：4 个严格、1 个一题容差；完整模型工作量相对同权重 Vanilla 降低 16.46% | 实测 | 停止 fixed 网格，5 组参数进入量化专用 YAML 候选；显式 fixed 尚未证明自动配置 |
+| run_11_fixed_v5 的 v4 额度字段 240/240 闭合、final 全部自然 stop 且无 2,048 cap，但未包含两条历史长 final 和 48 条 no-final | 实测 | 证明新服务器路径已部署，不能替代协议定向验收；仍须重放 `TC00000069`、`YH0032` 和 no-final 集 |
+| run_11_fixed_v5 使用 TP8、run_08 Vanilla 使用 TP4；跨 run decode wall/token 从约 58.3 ms 降至 17.6 ms，而完整模型工作量只降低 15.43% | 用户提供的部署事实 + 实测 | fixed_v5 的 68.04% phase-on E2E 不可裁决；下一轮统一 TP4 后以 telemetry-off Vanilla/自动 DTB 正式排名 |
 
 当前尚待回答：
 
@@ -87,6 +89,11 @@ DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考
 因此当前状态固定表述为：**13 个已知产品 search 场景的核心里程碑通过，完整阶段一
 尚未通过**。完成 holdout、通用/OOD、hard failure 和复杂度门之前，不得缩写为“阶段一
 已完成”。
+
+量化增训权重的独立状态为：**五个交叉场景的 fixed 搜索已经停止，已形成专用候选
+YAML；仍缺 completion 协议定向回放、TP4 对齐的 telemetry-off Vanilla/自动全集和 manifest，
+因此量化权重自动策略尚未通过发布门。** 详见
+[`run_11_fixed_v5/RESULT.md`](../log/perf/run_11_fixed_v5/RESULT.md)。
 
 ## 3. 最小数据模型
 
@@ -167,6 +174,7 @@ ExperimentResult
 文件：
 
 - `dtb/config/budget_config.yaml`
+- `dtb/config/budget_config_quant.yaml`
 - `dtb/config/loader.py`
 - `dtb/config/schema.py`
 
@@ -188,6 +196,16 @@ load_dtb_service_config(path=DEFAULT_CONFIG_PATH) -> DtbServiceConfig
 controller 构造时读取和校验 YAML；请求路径不做文件 I/O、`stat`、mtime 检查或降级到
 内置默认表。配置错误必须启动失败。`SCENE_PRIORITY` 只解决同分时的确定性顺序，不代替
 拒识门。
+
+部署选择接口保持单一：loader 和 controller 仍只认规范入口 `budget_config.yaml`；量化增训
+候选不触发运行时权重识别，也不新增环境变量算法分支。服务器在停服状态下把
+`budget_config_quant.yaml` **复制**为规范入口并重启，同时在实验 manifest 记录候选文件名、
+SHA 与 TP。禁止运行中覆盖，禁止把候选文件重命名移走。该候选当前由 5 个 fixed_v5 与
+8 个 fixed_v4 复验点组成；它是 TP4 E2E 实验输入，不是已发布配置。
+
+当前 resolver 没有由 YAML 表达的逐场景原生旁路。低收益场景不得写入一个未实现的
+`native` 字段；先在 TP4 同身份对照中复验，仍不合格时再把真实 serving native bypass
+作为独立接口设计和验收。
 
 ### 4.2 scene 匹配模块
 
@@ -383,7 +401,7 @@ python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>
 
 | 文件 | 改动 |
 | --- | --- |
-| `dtb/config/{loader,schema}.py`、`budget_config.yaml` | 启动时 fail-fast 加载；合并算法、scene 和观测配置；删除请求级重载 |
+| `dtb/config/{loader,schema}.py`、`budget_config*.yaml` | 启动时 fail-fast 加载；规范入口不变；量化候选只由停服复制人工选择，不做请求级或权重级动态切换 |
 | `dtb/budgeting/scene_router.py` | 配置驱动的词边界/结构匹配、产品模板 required gate、score+margin 拒识 |
 | `dtb/budgeting/{budget_resolver,budget_decision}.py` | 最新用户消息直达 scene；输出语义明确的 `DtbBudgetDecision` |
 | `dtb/budgeting/difficulty/*` | 保留原始难度估计设计并随模块迁移；默认关闭，等待重构后单独检视 |
@@ -412,8 +430,8 @@ DTB；配置、预算、reasoning、history、observability 与 vLLM integration
 ### 6.1 新实验身份的三类必需 run
 
 首次搜索一个新算法版本，或模型、量化/后训练状态、硬件与关键服务配置发生变化时，
-每个产品场景使用相同样本、顺序、采样参数、随机种子、并发、到达节奏和 prefix
-cache 状态。正式性能/质量候选统一使用 `OBSERVABILITY.mode: "off"`，至少提供：
+每个产品场景使用相同样本、顺序、采样参数、随机种子、张量并行度、并发、到达节奏和
+prefix cache 状态。正式性能/质量候选统一使用 `OBSERVABILITY.mode: "off"`，至少提供：
 
 1. `vanilla`：原生单次生成；
 2. `dtb_default`：仅开启 DTB，不传 fixed 参数；
@@ -830,6 +848,7 @@ phase wall 合计 ≈ 具有 phase 的候选客户端 E2E 合计
 | Judge 存在未解决项 | 性能可报告，质量门 pending |
 | 缺 telemetry | 可报告客户端 E2E/质量，不能归因分支或声称总模型 token |
 | 缺 manifest | 可报告实测差异；跨 run 波动和环境原因保持未归因 |
+| 模型、TP 或关键 serving 配置不同 | 可报告跨身份观测和模型工作量；E2E 不参与 DTB 候选排名 |
 | 同一 search 集既用于选点又用于验证 | 只能声明 search 里程碑，不能声明 holdout/OOD 泛化 |
 
 ## 7. 两阶段实施顺序
@@ -883,6 +902,9 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 - [x] 每个具体结果文件有独立 `phase_summary.csv`，并有逐请求关联审计与首末日志行；
 - [x] 提取 CLI 只需一个 run 目录参数，并能递归发现唯一 summary 和结果 CSV；
 - [x] 所有原始输入均位于 `<run_id>` 内，Vanilla 无 phase 时仍可完整归档。
+- [x] 量化增训权重候选是独立 YAML，默认配置和 loader 入口不变；633 条产品样本可离线恢复
+      13 个目标 scene 及各自候选预算；
+- [ ] 量化候选已在 TP4 同身份、telemetry-off Vanilla/自动 DTB 全集上通过质量与 E2E 门。
 
 ### 8.2 阶段一算法结果
 
@@ -916,6 +938,7 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-08-24 | 澄清 run_11_fixed_v5 为 TP8、run_08 Vanilla 为 TP4，68.04% E2E 改判为跨 TP 不可裁决；新增 `budget_config_quant.yaml`，以 5 个 fixed_v5 + 8 个 fixed_v4 复验点支持 TP4 自动全集。部署只允许停服复制到规范入口并重启，不增加权重专属算法分支；逐场景 native 等 TP4 结果后单独实现。 |
 | 2026-07-30 | 初版：定义 13 场景寻优、自动路由和生产化方案 |
 | 2026-07-31 | 调整为算法寻优优先、生产化后置的两阶段计划 |
 | 2026-07-31 | 根据评审删除强制语义类型、PolicyBundle 和重复指标；统一 scene，明确拒识门、history 无在线质量反馈目的、源码重构和三类服务器数据采集计划 |
@@ -931,3 +954,4 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-21 | 算法基线提升为 `dtb-algorithm-v3`：probe 保持不变，`confidence_accepted` 与 `budget_exhausted` 统一使用 run_10 已验证的 fresh-final answer cue；run_11 在量化增训权重的 13 场景全集与 fixed_v4 上验收空 final、质量和 paired E2E。 |
 | 2026-08-24 | 纳入 run_11：空 final 归零，量化权重的 guided cue 目标通过；phase-on paired E2E 有候选正收益，但 NetQAD 单步少 2 题且两条 final 在 2,048 token 截断。下一步先修 final 上限，再进行 5 场景 fixed_v5 与 telemetry-off 自动配置全集，详见 [`run_11/RESULT.md`](../log/perf/run_11/RESULT.md)。 |
 | 2026-08-24 | 实现 `dtb-algorithm-v4` completion 总额度：serving 复用原生 `get_max_tokens()`，所有 parser-facing token 共用 `completion_token_limit`，hidden probe 不占外部额度，默认 schema/YAML 删除 `final_answer_max_tokens`；下一 run 先做协议定向验收。 |
+| 2026-08-24 | 纳入 run_11_fixed_v5：五场景 4 个严格质量层、1 个一题容差层，完整模型工作量相对同权重 Vanilla 降低 16.46%；因 decode 性能身份漂移，68.04% phase-on E2E 只作候选证据。停止 fixed 搜索，下一步是协议定向回放、量化专用 YAML、同运行时 off 自动全集及 DTB×量化增训权重包 2×2（中间权重可用时 2×2×2）价值实验。 |

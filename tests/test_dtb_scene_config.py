@@ -25,6 +25,24 @@ _EXPECTED_PROFILES = {
     "complaint_classification_en": (400, 200, 4, 400, 1050, 0.93),
 }
 
+_QUANT_CONFIG_PATH = DEFAULT_CONFIG_PATH.with_name("budget_config_quant.yaml")
+
+_EXPECTED_QUANT_PROFILES = {
+    "react_whitebox_single_step": (450, 200, 4, 450, 1100, 0.93),
+    "react_whitebox_overall_planning": (1550, 150, 3, 1550, 1900, 0.95),
+    "react_machine_data_analysis": (750, 100, 3, 750, 1050, 0.95),
+    "kpi_configuration_assurance": (500, 300, 4, 500, 1600, 0.93),
+    "netqad_e2e_single_step": (300, 300, 3, 300, 1050, 0.93),
+    "netqad_e2e_planning": (2100, 200, 3, 2100, 2550, 0.95),
+    "event_self_closure": (700, 350, 3, 700, 1700, 0.93),
+    "alarm_diagnosis_advice": (1750, 150, 3, 1750, 2100, 0.95),
+    "alarm_diagnosis_conclusion": (1600, 200, 2, 1600, 2000, 0.95),
+    "long_context_root_cause": (1450, 100, 1, 1450, 1450, 0.95),
+    "complaint_tool_use": (1000, 250, 3, 1000, 1650, 0.93),
+    "complaint_classification_zh": (400, 200, 3, 400, 1000, 0.93),
+    "complaint_classification_en": (400, 200, 4, 400, 1050, 0.93),
+}
+
 _DATASET_PATTERNS = {
     "react_whitebox_single_step": "*ReAct白盒-单步规划*.csv",
     "react_whitebox_overall_planning": "*ReAct白盒-整体规划*.csv",
@@ -101,6 +119,75 @@ class SceneConfigTests(unittest.TestCase):
                     hard_token_limit=10000,
                 )
                 expected = _EXPECTED_PROFILES[scene]
+                with self.subTest(scene=scene, qa_id=row["QA_ID"]):
+                    self.assertEqual(
+                        decision.decision_branch,
+                        DecisionBranch.SCENE_DIFFICULTY,
+                    )
+                    self.assertEqual(decision.scene, scene)
+                    self.assertEqual(
+                        (
+                            decision.budget.check_length,
+                            decision.budget.think_stride,
+                            decision.budget.num_thinking,
+                            decision.budget.min_think_budget,
+                            decision.hard_think_token_limit,
+                            decision.confidence_threshold,
+                        ),
+                        expected,
+                    )
+        self.assertEqual(total, 633)
+
+
+class QuantSceneConfigTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.service = load_dtb_service_config(_QUANT_CONFIG_PATH)
+        self.resolver = DtbBudgetResolver(self.service)
+
+    def test_quant_candidate_is_static_off_mode_config(self) -> None:
+        self.assertFalse(self.service.algorithm.enable_history_budget)
+        self.assertFalse(self.service.algorithm.enable_difficulty_estimator)
+        self.assertEqual(self.service.observability.mode.value, "off")
+        self.assertEqual(
+            self.service.scene_priority[:len(_EXPECTED_QUANT_PROFILES)],
+            tuple(_EXPECTED_QUANT_PROFILES),
+        )
+        for scene, expected in _EXPECTED_QUANT_PROFILES.items():
+            values = self.service.scenes[scene]
+            actual = (
+                values["check_length"],
+                values["think_stride"],
+                values["num_thinking"],
+                values["min_think_tokens"],
+                values["max_think_tokens"],
+                values["prob_th"],
+            )
+            with self.subTest(scene=scene):
+                self.assertEqual(actual, expected)
+                self.assertEqual(
+                    values["token_range"],
+                    (expected[3], expected[4]),
+                )
+
+    def test_quant_candidate_routes_full_product_replay(self) -> None:
+        result_dir = (
+            Path(__file__).resolve().parents[1]
+            / "docs/log/perf/run_06_v3/test_result"
+        )
+        total = 0
+        for scene, pattern in _DATASET_PATTERNS.items():
+            path = next(result_dir.glob(pattern))
+            with path.open("r", encoding="utf-8-sig", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            for row in rows:
+                total += 1
+                decision = self.resolver.resolve(
+                    row["问题"],
+                    self.service.algorithm,
+                    None,
+                    hard_token_limit=10000,
+                )
+                expected = _EXPECTED_QUANT_PROFILES[scene]
                 with self.subTest(scene=scene, qa_id=row["QA_ID"]):
                     self.assertEqual(
                         decision.decision_branch,
