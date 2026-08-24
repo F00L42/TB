@@ -27,6 +27,13 @@ from typing import Iterable, Sequence
 
 PHASE_MARKERS = ("DTB_PHASE ", "TB_PHASE ")
 NUMERIC_TIMING_FIELDS = ("wall_ms", "queue_ms", "prefill_ms", "decode_ms")
+FINAL_QUOTA_FIELDS = (
+    "completion_token_limit",
+    "emitted_completion_tokens_before",
+    "pending_boundary_tokens",
+    "external_remaining_tokens",
+    "answer_limit",
+)
 SUMMARY_RESULT_COLUMN = "结果文件名"
 REQUEST_ID_COLUMN = "request_id"
 PLAIN_REQUEST_ID_PATTERN = re.compile(
@@ -180,6 +187,19 @@ def summarize_phases(records: list[dict[str, object]]) -> list[dict[str, object]
             int(record.get("cached_prompt_tokens") or 0) for record in phase_records)
         summary["generated_tokens_total"] = sum(
             int(record.get("generated_tokens") or 0) for record in phase_records)
+        for field in FINAL_QUOTA_FIELDS:
+            values = [
+                int(record[field])
+                for record in phase_records
+                if isinstance(record.get(field), int)
+                and not isinstance(record.get(field), bool)
+            ]
+            summary[f"{field}_known"] = len(values)
+            summary[f"{field}_min"] = min(values) if values else None
+            summary[f"{field}_mean"] = (
+                round(sum(values) / len(values), 3) if values else None
+            )
+            summary[f"{field}_max"] = max(values) if values else None
         summaries.append(summary)
     return summaries
 
@@ -214,6 +234,11 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
             record for record in request_records
             if record.get("phase") == "final_answer"
         ), {})
+        decision_details = decision.get("decision_details")
+        decision_completion_limit = (
+            decision_details.get("completion_token_limit")
+            if isinstance(decision_details, dict) else None
+        )
         result.append({
             "schema": decision.get("schema", 1),
             "parent_request_id": request_id,
@@ -261,6 +286,19 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
             ), None),
             "final_answer_reason": final_answer.get(
                 "final_answer_reason"),
+            "completion_token_limit": final_answer.get(
+                "completion_token_limit", decision_completion_limit
+            ),
+            "emitted_completion_tokens_before": final_answer.get(
+                "emitted_completion_tokens_before"
+            ),
+            "pending_boundary_tokens": final_answer.get(
+                "pending_boundary_tokens"
+            ),
+            "external_remaining_tokens": final_answer.get(
+                "external_remaining_tokens"
+            ),
+            "answer_limit": final_answer.get("answer_limit"),
             "probe_assessments": probe_assessments,
         })
     return result
@@ -281,6 +319,13 @@ def _phase_summary_fieldnames() -> list[str]:
         "cached_prompt_tokens_total",
         "generated_tokens_total",
     ))
+    for field in FINAL_QUOTA_FIELDS:
+        fields.extend((
+            f"{field}_known",
+            f"{field}_min",
+            f"{field}_mean",
+            f"{field}_max",
+        ))
     return fields
 
 

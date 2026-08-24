@@ -9,6 +9,11 @@
 13 场景全集的空 final 降至 0/633，但完整 final 协议仍被两条 2,048-token final 长度截断
 阻塞，量化权重的正式性能策略尚未收口。
 
+2026-08-24 已按本文原生等价目标完成后续额度修复，算法身份提升为
+`dtb-algorithm-v4`：移除默认 final 硬帽，复用 vLLM 原生有效 completion 上限，并统一维护
+parser-facing 已输出额度。该修改已通过本地无模型回归，等待目标服务器定向验收；run_11
+仍是 v3 历史证据，不回写其实验身份。
+
 [`run_10_no_final/RESULT.md`](../log/perf/run_10_no_final/RESULT.md) 已实测：W8A8
 量化、特定场景思维链压缩语料增训权重在 `confidence_accepted` 后只收到裸
 `</think>` 时，48 条历史失败集中有 8 条立即停止且没有最终答案；将该 fresh-final 后缀改为
@@ -263,12 +268,48 @@ Run_11 在量化增训权重的 633 条全集请求上实测：
 - `</think>` 后空 final 为 0/633，且没有只生成 1～2 token 的旧失败签名，因此本轮 cue
   修改的直接目标通过；
 - 另有 `TC00000069`、`YH0032` 两个 final phase 在 2,048 token 处以 `length` 结束并截断
-  JSON/正文。该签名与当前 `final_answer_max_tokens=2048` 一致，属于独立的 final 上限契约
+  JSON/正文。该签名与 run_11 使用的 v3 `final_answer_max_tokens=2048` 一致，属于独立的 final 上限契约
   问题，不回滚 cue；应先让 final 使用调用方剩余 completion budget，再继续 fixed 搜索；
 - 本轮开启 phase telemetry 且缺 manifest，E2E 收益只作为候选证据，不能替代 telemetry off
   的正式排名。
 
-### 5.2 后续 trial-reuse 版本
+### 5.2 Completion 总额度修复（v4 本地完成）
+
+V4 不改变 v3 cue、probe 或预算选择，只修复“一个外部 completion 被拆成多个 child 后的
+总额度语义”。核心概念统一为：
+
+```text
+completion_token_limit
+  = vLLM get_max_tokens(original request, original prompt)
+
+emitted_completion_tokens
+  = 已送入原生 parser 的 aligned 可见 token
+
+external_remaining
+  = completion_token_limit - emitted_completion_tokens
+
+answer_limit
+  = min(model_context_remaining, external_remaining)
+```
+
+`emitted_completion_tokens` 包含 visible thinking、模型或控制器产生的 reasoning boundary 和
+final/tool token；不包含 hidden probe、answer cue prompt token 和 stop 后丢弃的 speculative
+token ID。模型上下文和外部 completion 是两套独立门：answer cue 会占用前者，但不会占用后者。
+
+| 文件 | 修改 |
+| --- | --- |
+| `patches/vllm/v0.23.0/dtb_serving.patch` | 在原生 serving 层复用 `get_max_tokens()`，把一次解析后的有效总额度放入私有 route identity |
+| `dtb/reasoning/request_state.py` | 新增 `completion_token_limit`、`emitted_completion_tokens`，作为单请求统一额度账本 |
+| `dtb/reasoning/request_context.py` | 在唯一 parser-facing `stream_output()` 边界累计 token，并在越界进入 parser 前失败 |
+| `dtb/reasoning/generation_states.py` | thinking 为 boundary/final 保留额度；final 移除 2,048 cap，只使用上下文与外部剩余额度 |
+| `dtb/config/schema.py`、`budget_config.yaml` | 删除 `final_answer_max_tokens`，提升 policy 为 `dtb-algorithm-v4` |
+| `dtb/observability/phase_recorder.py` | final phase 记录总额度、final child 启动前已输出量、pending boundary、剩余额度和 `answer_limit` |
+
+若 serving patch 未提供正整数 `completion_token_limit`，controller 明确拒绝请求，避免 adapter 与
+旧 patch 混装后静默恢复错误语义。默认生产路径不再提供另一个 final cap；未来若确需安全帽，
+必须作为显式非等价策略建模并使用新的 policy identity。
+
+### 5.3 后续 trial-reuse 版本
 
 后续实现至少需要修改：
 
@@ -317,7 +358,32 @@ Run_11 对上述标准的裁决是：空 final 与 cue 覆盖通过；逐场景�
 telemetry-off 正式 E2E 和完整 manifest 未通过或未验证。详见
 [`run_11/RESULT.md`](../log/perf/run_11/RESULT.md) 第 8 节。
 
-### 6.2 后续 trial reuse
+### 6.2 Completion 总额度修复
+
+本地验收：
+
+- 默认 schema/YAML 不再含 `final_answer_max_tokens`；
+- serving patch 对固定 vLLM v0.23.0 checkout 通过 `git apply --check`，有效额度来自原生
+  `get_max_tokens()`；
+- visible thinking、模型边界、synthetic `</think>` 和 final token 只计一次，hidden probe 与
+  dropped IDs 不计入 `emitted_completion_tokens`；
+- final child 的 `max_tokens` 等于更新后的上下文剩余额度与外部剩余额度较小值；
+- parser-facing 输出试图超过总额度时，在写入结果队列前失败；
+- final phase 和 request summary 可以直接审计有效总额度、已用额度、剩余额度及
+  `answer_limit`。
+
+服务器验收：
+
+- 定向重放 run_11 的 `TC00000069`、`YH0032`，不得再在 2,048 token 截断；若命中外部总额度，
+  必须原样返回 `finish_reason=length`；
+- 重放 run_10 的 48 条 no-final 集，保持 0 空 final；
+- 对至少一个较小 `max_tokens` 请求核对所有 parser-facing token 总数不超过外部上限，hidden
+  probe 不减少 final 可用额度；
+- phase telemetry 的 `answer_limit = min(model_context_remaining, external_remaining_tokens)`，
+  request summary 的 `emitted_completion_tokens <= completion_token_limit`；
+- 通过协议定向验收后，才能继续 fixed_v5 和 telemetry-off 性能排名。
+
+### 6.3 后续 trial reuse
 
 以“canonical cue + fresh-final”为唯一对照，先验证：
 
@@ -330,15 +396,16 @@ telemetry-off 正式 E2E 和完整 manifest 未通过或未验证。详见
 
 ## 7. 一致性校验
 
-- **概念一致性：** 本轮只有一个 code-owned verified cue，不再存在运行时 finalization mode；
-  trial reuse 是后续算法版本。
-- **状态完备性：** 本轮保持现有 probe/final 状态数；两个 controller reason 共用 cue，两个模型
-  boundary 保持原生路径。
-- **接口完备性：** 不新增 YAML、环境变量或请求字段；行为由 policy version 和 commit 审计。
+- **概念一致性：** v3 的 code-owned verified cue 与 v4 的 completion 总额度职责分离；trial
+  reuse 仍是后续算法版本。
+- **状态完备性：** v4 不新增推理状态；两个 controller reason 共用 cue，所有可见状态共用一份
+  `emitted_completion_tokens` 账本。
+- **接口完备性：** 不新增公开 YAML、环境变量或请求字段；有效额度通过 serving 私有 route
+  identity 传递，缺失时 fail closed。
 - **层次一致性：** scene 只决定预算，final reason 只解释退出原因，cue 由 generation state
   选择，不进入 `DtbBudgetDecision`。
-- **性能一致性：** 本轮不改变 probe 和 child call 数；只增加一次 confidence-final suffix
-  token。trial reuse 的重复 prefill、decode 节省和账本另行测量。
+- **性能一致性：** v4 不改变 probe 和 child call 数，也不增加正常 EOS 请求的 token；只取消
+  非原生 2,048 cap。trial reuse 的重复 prefill、decode 节省和账本另行测量。
 - **parser 一致性：** cue 只存在于模型 prompt，控制器对客户端仍只合成一个 `</think>`；模型
   自带边界不被重复修改。
 
@@ -350,3 +417,4 @@ telemetry-off 正式 E2E 和完整 manifest 未通过或未验证。详见
 | 2026-08-21 | 决策收口：取消当前版本的配置分支；probe 保持不变，仅把 `confidence_accepted` fresh-final 改为已验证 cue；补充 accepted-trial 事务式 replay/continuation 后续方案 | 用最小改动修复已证实空 final，并将高风险 trial 复用与兼容性修复解耦 |
 | 2026-08-21 | 完成 `dtb-algorithm-v3` 本地实现与无模型回归；同步 manifest、泛化计划和性能 runbook；服务器验收目标固定为 run_11 量化增训权重 13 场景全集与 fixed_v4 | 让代码、实验身份和验收口径在服务器测试前闭合 |
 | 2026-08-24 | 纳入 run_11：318 个 controller-forced final 均使用 24-token cue，空 final 为 0/633；同时发现两条 2,048-token final 截断，完整 final 协议仍未通过 | cue 修复可以冻结；下一优先级是移除控制器额外 final 硬帽，而不是改 probe、回滚 cue 或提前实现 trial reuse |
+| 2026-08-24 | 完成 `dtb-algorithm-v4` 本地实现：复用原生有效 completion 上限，增加 parser-facing 统一额度账本，删除默认 final cap 并补充 final/request telemetry 与回归测试 | 让多 child DTB 与一次原生 assistant completion 的 `max_tokens`、上下文和真实 `finish_reason` 语义一致 |

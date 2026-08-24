@@ -109,6 +109,21 @@ class DtbRequestContext:
         terminal_origin: str = "none",
         final_terminal_passthrough: bool = False,
     ) -> None:
+        output = self._first_output(result)
+        token_ids = (
+            getattr(output, "token_ids", None)
+            if output is not None else None
+        )
+        emitted_tokens = len(token_ids or ())
+        if emitted_tokens:
+            state = self.request_state
+            updated = state.emitted_completion_tokens + emitted_tokens
+            if updated > state.completion_token_limit:
+                raise RuntimeError(
+                    "DTB parser-facing completion token budget exceeded: "
+                    f"{updated}>{state.completion_token_limit}"
+                )
+            state.emitted_completion_tokens = updated
         audit = self.stream_audit
         if audit is not None:
             audit.record(

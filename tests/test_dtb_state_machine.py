@@ -140,13 +140,15 @@ def make_context(
     num_thinking: int = 2,
     min_think_budget: int = 1,
     hard_limit: int = 30,
+    completion_limit: int = 100,
+    model_context_limit: int = 1000,
 ) -> tuple[DtbRequestContext, ScriptedEngine]:
     tokenizer = FakeTokenizer()
     engine = ScriptedEngine(scripts)
     serving = SimpleNamespace(
         engine_client=engine,
         default_sampling_params={},
-        model_config=SimpleNamespace(max_model_len=1000),
+        model_config=SimpleNamespace(max_model_len=model_context_limit),
     )
     plan = DtbBudgetDecision(
         scene="code_generation",
@@ -171,13 +173,15 @@ def make_context(
             enable_value_min_confidence=True,
             value_min_bottom_k=1,
             max_internal_calls=20,
-            final_answer_max_tokens=20,
         ),
         policy=DtbAlgorithmPolicy(),
         serving_chat=serving,
         request_id="parent",
         engine_prompt={"prompt": "<think>", "prompt_token_ids": [60]},
-        request_state=DtbRequestState(budget_decision=plan),
+        request_state=DtbRequestState(
+            budget_decision=plan,
+            completion_token_limit=completion_limit,
+        ),
         prompt_text="<think>",
         phase_recorder=CaptureRecorder(),
     )
@@ -279,6 +283,7 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(engine.calls[0]["max_tokens"], 5)
         self.assertEqual(engine.calls[1]["max_tokens"], 50)
+        self.assertEqual(engine.calls[2]["max_tokens"], 91)
         trial_tokens = context.tokenizer.encode(
             TRIAL_PROMPT, add_special_tokens=False)
         self.assertEqual(
@@ -320,6 +325,11 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             ReasoningState.CLOSED,
         )
         self.assertEqual(
+            context.request_state.emitted_completion_tokens,
+            10,
+        )
+        self.assertEqual(context.request_state.hidden_probe_tokens, 1)
+        self.assertEqual(
             context.request_state.completion_status, "success")
         self.assertEqual(context.prompt_text.count("</think>"), 1)
         probe = next(
@@ -338,6 +348,89 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             final["final_answer_reason"], "confidence_accepted")
+        self.assertEqual(final["completion_token_limit"], 100)
+        self.assertEqual(final["emitted_completion_tokens_before"], 9)
+        self.assertEqual(final["pending_boundary_tokens"], 0)
+        self.assertEqual(final["external_remaining_tokens"], 91)
+        self.assertEqual(final["answer_limit"], 91)
+
+    async def test_final_uses_external_remaining_not_per_child_limit(self):
+        context, engine = make_context(
+            [
+                [result("thought", [10, 11, 12])],
+                [result("trial", [20, 21], confidence=-0.01)],
+                [result("answer", [30], finish_reason="stop")],
+            ],
+            completion_limit=20,
+        )
+
+        await run_and_drain(context)
+
+        boundary_tokens = len(context.tokenizer.encode(
+            "</think>", add_special_tokens=False))
+        self.assertEqual(
+            engine.calls[-1]["max_tokens"],
+            20 - 3 - boundary_tokens,
+        )
+        self.assertEqual(context.request_state.hidden_probe_tokens, 2)
+        self.assertEqual(
+            context.request_state.emitted_completion_tokens,
+            3 + boundary_tokens + 1,
+        )
+
+    async def test_final_limit_also_respects_updated_model_context(self):
+        tokenizer = FakeTokenizer()
+        cue_tokens = len(tokenizer.encode(
+            GUIDED_FINAL_PROMPT_V1, add_special_tokens=False))
+        context, engine = make_context(
+            [
+                [result("thought", [10])],
+                [result("trial", [20], confidence=-0.01)],
+                [result("answer", [30], finish_reason="stop")],
+            ],
+            completion_limit=100,
+            model_context_limit=1 + 1 + cue_tokens + 4,
+        )
+
+        await run_and_drain(context)
+
+        self.assertEqual(engine.calls[-1]["max_tokens"], 4)
+
+    async def test_final_reserves_boundary_when_no_visible_chunk_exists(self):
+        context, engine = make_context(
+            [[result("answer", [30], finish_reason="stop")]],
+            hard_limit=1,
+            completion_limit=10,
+        )
+        context.config = DtbAlgorithmConfig(
+            enable_safety_gate=True,
+            baseline_time_limit=0,
+        )
+        context.budget_start_time = 0
+
+        visible = await run_and_drain(context)
+
+        boundary_tokens = len(context.tokenizer.encode(
+            "</think>", add_special_tokens=False
+        ))
+        self.assertEqual(call_phases(engine), ["final_answer"])
+        self.assertEqual(
+            engine.calls[-1]["max_tokens"], 10 - boundary_tokens
+        )
+        self.assertEqual(visible.count("</think>"), 1)
+        final = next(
+            phase for phase in context.phase_recorder.phases
+            if phase["phase"] == "final_answer"
+        )
+        self.assertEqual(final["emitted_completion_tokens_before"], 0)
+        self.assertEqual(final["pending_boundary_tokens"], boundary_tokens)
+        self.assertEqual(
+            final["external_remaining_tokens"], 10 - boundary_tokens
+        )
+        self.assertEqual(
+            context.request_state.emitted_completion_tokens,
+            boundary_tokens + 1,
+        )
 
     async def test_second_probe_accepts_after_one_stride(self):
         context, engine = make_context([

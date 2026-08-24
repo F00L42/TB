@@ -209,10 +209,11 @@ confidence threshold 或增加 probe 轮次而直接改变。因此下一轮不�
 **实测**：两条都不是空 final，而是生成到同一 2,048-token 上限后被截断；Judge 原因也直接
 指出 JSON/文本末尾不完整。
 
-**源码确定的候选原因**：当前仓库 `DtbAlgorithmConfig.final_answer_max_tokens=2048`，
+**源码确定的候选原因**：run_11 对应的 v3 代码中
+`DtbAlgorithmConfig.final_answer_max_tokens=2048`，
 `_FinalAnswerState` 用 `min(remaining_context, final_answer_max_tokens, request limit)` 作为 final
 上限。该实现会给原生请求额外增加一个 2,048-token 硬帽。由于 run_11 缺 manifest，不能独立
-证明服务器文件逐字一致，但 telemetry 的精确 2,048-token `length` 与当前源码完全吻合。
+证明服务器文件逐字一致，但 telemetry 的精确 2,048-token `length` 与 v3 源码完全吻合。
 
 这两条属于新增结构/终止 hard failure，必须先修复。仅把它们在 Judge 中计错不等于协议门
 通过。
@@ -278,10 +279,12 @@ Run_11 相比 run_09 的 E2E、质量和工作量都显著改善，但 cue 不�
 
 ### 9.1 P0：先消除 final 的额外 2,048-token 硬帽
 
-先做单变量协议实验，不调整任何 fixed 参数：
+2026-08-24，`dtb-algorithm-v4` 已完成本地实现：删除 schema/YAML 默认 cap，复用 vLLM 原生
+有效 completion 总额度，并维护 parser-facing 已输出 token。下一步是服务器单变量协议验收，
+不调整任何 fixed 参数：
 
-1. 让 final child 使用调用方剩余 completion budget，而不是再被控制器的 2,048-token 上限
-   截断；短期可用 `final_answer_max_tokens: 4096` 验证，最终实现应与原生请求上限语义一致；
+1. 部署 v4 adapter 与配套版本化 serving patch，确认 manifest 中 policy/commit/patch/YAML hash
+   一致；不使用把 cap 临时提高到 4,096 的替代方案；
 2. 定向重放 `TC00000069`、`YH0032` 至少两轮，要求 final 不以 2,048 `length` 截断、JSON
    完整、无第二个 `</think>`、客户端错误为 0；
 3. phase 增加或确认可审计的 `answer_limit`，避免以后只能从 generated token 反推；

@@ -69,7 +69,7 @@ class DtbTelemetryTests(unittest.TestCase):
         finally:
             writer.close()
         self.assertEqual(record["schema"], 3)
-        self.assertEqual(record["policy_version"], "dtb-algorithm-v3")
+        self.assertEqual(record["policy_version"], "dtb-algorithm-v4")
         self.assertEqual(record["variant"], "dtb")
         self.assertEqual(record["queue_ms"], 250.0)
         self.assertEqual(record["prefill_ms"], 500.0)
@@ -118,10 +118,40 @@ class DtbTelemetryTests(unittest.TestCase):
         self.assertIsNone(record["decode_ms"])
         self.assertIsNone(record["cached_prompt_tokens"])
 
+    def test_final_phase_records_unified_completion_quota(self) -> None:
+        writer = DtbEventWriter(8, lambda _line: None)
+        try:
+            record = DtbPhaseRecorder(writer, "policy").record_phase(
+                parent_request_id="p",
+                child_request_id="final",
+                phase="final_answer",
+                round_id=2,
+                wall_ms=1.0,
+                controller_cpu_ms=0.1,
+                prompt_tokens=80,
+                generated_tokens=24,
+                visible=True,
+                final_answer_reason="confidence_accepted",
+                completion_token_limit=100,
+                emitted_completion_tokens_before=40,
+                pending_boundary_tokens=1,
+                external_remaining_tokens=59,
+                answer_limit=59,
+            )
+        finally:
+            writer.close()
+        self.assertEqual(record["completion_token_limit"], 100)
+        self.assertEqual(record["emitted_completion_tokens_before"], 40)
+        self.assertEqual(record["pending_boundary_tokens"], 1)
+        self.assertEqual(record["external_remaining_tokens"], 59)
+        self.assertEqual(record["answer_limit"], 59)
+
     def test_request_state_is_the_only_model_work_ledger(self) -> None:
         lines: list[str] = []
         writer = DtbEventWriter(8, lines.append)
         state = DtbRequestState(
+            completion_token_limit=20,
+            emitted_completion_tokens=10,
             thinking_tokens=4,
             hidden_probe_tokens=5,
             final_answer_tokens=6,
@@ -138,7 +168,21 @@ class DtbTelemetryTests(unittest.TestCase):
             writer.close()
         self.assertEqual(record["total_model_generated_tokens"], 15)
         self.assertEqual(record["child_generate_calls"], 3)
+        self.assertEqual(record["completion_token_limit"], 20)
+        self.assertEqual(record["emitted_completion_tokens"], 10)
+        self.assertEqual(record["completion_tokens_remaining"], 10)
         self.assertTrue(lines[0].startswith("DTB_REQUEST_SUMMARY "))
+
+    def test_request_state_rejects_non_positive_completion_limit(self) -> None:
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            DtbRequestState(completion_token_limit=0)
+
+    def test_request_state_rejects_emitted_tokens_above_limit(self) -> None:
+        with self.assertRaisesRegex(ValueError, "within"):
+            DtbRequestState(
+                completion_token_limit=2,
+                emitted_completion_tokens=3,
+            )
 
     def test_stream_audit_requires_allowlisted_request(self) -> None:
         runtime = DtbObservabilityRuntime(DtbObservabilityConfig(
@@ -208,13 +252,42 @@ class PhaseLogExtractionTests(unittest.TestCase):
                 "generated_tokens": 3,
                 "visible": False,
             },
+            {
+                "schema": 3,
+                "parent_request_id": "p",
+                "child_request_id": "final",
+                "phase": "final_answer",
+                "round": 1,
+                "wall_ms": 6.0,
+                "queue_ms": 0.5,
+                "prefill_ms": 1.0,
+                "decode_ms": 4.5,
+                "controller_cpu_ms": 0.1,
+                "prompt_tokens": 28,
+                "cached_prompt_tokens": 24,
+                "generated_tokens": 4,
+                "visible": True,
+                "completion_token_limit": 12,
+                "emitted_completion_tokens_before": 5,
+                "pending_boundary_tokens": 1,
+                "external_remaining_tokens": 6,
+                "answer_limit": 6,
+            },
         ]
         phase_rows = summarize_phases(records)
         request_rows = summarize_requests(records)
-        self.assertEqual(len(phase_rows), 2)
+        self.assertEqual(len(phase_rows), 3)
         self.assertEqual(request_rows[0]["visible_think_tokens"], 5)
         self.assertEqual(request_rows[0]["hidden_probe_tokens"], 3)
-        self.assertEqual(request_rows[0]["total_model_generated_tokens"], 8)
+        self.assertEqual(request_rows[0]["total_model_generated_tokens"], 12)
+        self.assertEqual(request_rows[0]["completion_token_limit"], 12)
+        self.assertEqual(request_rows[0]["answer_limit"], 6)
+        final_phase = next(
+            row for row in phase_rows if row["phase"] == "final_answer"
+        )
+        self.assertEqual(final_phase["answer_limit_known"], 1)
+        self.assertEqual(final_phase["answer_limit_min"], 6)
+        self.assertEqual(final_phase["answer_limit_max"], 6)
 
     def test_request_summary_uses_budget_decision_name(self) -> None:
         rows = summarize_requests([{

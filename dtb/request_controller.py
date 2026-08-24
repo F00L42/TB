@@ -248,6 +248,7 @@ class DtbRequestController:
         reasoning_parser = None
         response_parser = None
         chat_template_kwargs = None
+        completion_token_limit = None
         if isinstance(route_identity, dict):
             model_name = route_identity.get("model_name", model_name)
             lora_request = route_identity.get("lora_request", lora_request)
@@ -263,6 +264,9 @@ class DtbRequestController:
             reasoning_parser = route_identity.get("reasoning_parser")
             response_parser = route_identity.get("response_parser")
             chat_template_kwargs = route_identity.get("chat_template_kwargs")
+            completion_token_limit = route_identity.get(
+                "completion_token_limit"
+            )
         elif isinstance(route_identity, tuple) and len(route_identity) == 3:
             routed_model, routed_lora, routed_rank = route_identity
             model_name = model_name or routed_model
@@ -275,6 +279,15 @@ class DtbRequestController:
             )
         if model_name is None:
             model_name = serving_chat.models.model_name(lora_request)
+        if (
+            not isinstance(completion_token_limit, int)
+            or isinstance(completion_token_limit, bool)
+            or completion_token_limit < 1
+        ):
+            return serving_chat.create_error_response(
+                "DTB serving patch did not provide a positive native "
+                "completion token limit"
+            )
 
         phase_recorder = self.observability.create_phase_recorder(policy.version)
         prompt_token_ids = engine_inputs[0].get("prompt_token_ids", [])
@@ -297,13 +310,7 @@ class DtbRequestController:
             1,
             int(serving_chat.model_config.max_model_len) - len(prompt_token_ids),
         )
-        requested_limit = (
-            getattr(request, "max_completion_tokens", None)
-            or getattr(request, "max_tokens", None)
-        )
-        hard_token_limit = remaining_context
-        if isinstance(requested_limit, int) and requested_limit > 0:
-            hard_token_limit = min(hard_token_limit, requested_limit)
+        hard_token_limit = min(remaining_context, completion_token_limit)
 
         if phase_recorder is None:
             decision = self.budget_resolver.resolve(
@@ -317,6 +324,7 @@ class DtbRequestController:
             decision_trace: dict[str, Any] = {
                 "classification_source": classification_source,
                 "classification_input_chars": len(classification_text),
+                "completion_token_limit": completion_token_limit,
             }
             with phase_recorder.measure("decision.total"):
                 decision = self.budget_resolver.resolve(
@@ -343,7 +351,10 @@ class DtbRequestController:
                 decision_details=decision_trace,
             )
 
-        request_state = DtbRequestState(budget_decision=decision)
+        request_state = DtbRequestState(
+            budget_decision=decision,
+            completion_token_limit=completion_token_limit,
+        )
         context = DtbRequestContext(
             request=request,
             tokenizer=tokenizer,

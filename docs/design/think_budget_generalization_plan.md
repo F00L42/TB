@@ -34,10 +34,11 @@ DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考
 - 旧 adapter 裁决仅作为历史证据：
   [`think_budget_vllm_adapter_refactor_plan.md`](../debug/think_budget_vllm_adapter_refactor_plan.md)。
 
-从 2026-08-21 起，新实验以 `dtb/`、`patches/vllm/v0.23.0/` 和
-`dtb-algorithm-v3` 为唯一生产基线。v3 仅把 `confidence_accepted` fresh-final 后缀改为
-run_10 已验证的 answer cue，probe 与预算逻辑不变。历史 run 不改写；新 run 的 manifest 必须记录 TB
-commit、两份 patch hash、YAML hash、观测模式和实验角色。旧
+从 2026-08-24 起，新实验以 `dtb/`、`patches/vllm/v0.23.0/` 和
+`dtb-algorithm-v4` 为唯一待验收生产基线。v4 保留 v3 已验证的 answer cue 和 probe，只移除
+默认 final 硬帽，并使所有 DTB child 共用一次原生 assistant completion 的有效总额度。run_11
+等历史 run 保持其 v3 身份；新 run 的 manifest 必须记录 TB commit、两份 patch hash、YAML hash、
+观测模式和实验角色。旧
 `think_budget_vllm_adapter/`、根目录 patch 或旧 telemetry 写端不得继续部署。
 
 ### 1.1 不可违反的原则
@@ -73,6 +74,7 @@ commit、两份 patch hash、YAML hash、观测模式和实验角色。旧
 | run_07 使用参与规则和选点的同一批 633 条 search 样本，且缺少实验 manifest | 实测 | 不能据此声明产品 holdout、通用/OOD 泛化或解释跨 run 质量波动 |
 | run_11 在量化增训权重 fixed_v4 上使空 final 从旧 fixed_v4 的 23/633 降至 0/633，318 个 controller-forced final 均命中 24-token cue | 实测 | `dtb-algorithm-v3` guided cue 可以冻结，不再继续修改 probe 或引入权重专属算法分支 |
 | run_11 相对同权重 run_08 Vanilla 的 phase-on 微/宏 E2E 收益为 7.97%/9.33%，但 NetQAD 单步少 2 题并新增两条 2,048-token final 截断 | 实测 | 量化权重策略未通过质量与 hard-failure 门；先修 final cap，再做 5 场景有界 fixed_v5 和 telemetry-off 自动全集 |
+| `dtb-algorithm-v4` 已在本地移除默认 final cap，复用原生有效 completion 上限并维护 parser-facing 统一额度 | 源码确定、本地无模型测试 | 下一次服务器实验必须先重放两条截断和 48 条 no-final；通过后才能进入 fixed_v5 性能搜索 |
 
 当前尚待回答：
 
@@ -928,3 +930,4 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 | 2026-08-20 | 将后续实验基线切换到重构后的 `dtb/` 与版本化 patch；内部决策改称 `DtbBudgetDecision`；telemetry 改为默认 `off`、独立 `phase` 账本 run 和 allowlisted `stream_audit`，生产只写 `DTB_PHASE` schema 3、提取器兼容读取历史 schema。 |
 | 2026-08-21 | 算法基线提升为 `dtb-algorithm-v3`：probe 保持不变，`confidence_accepted` 与 `budget_exhausted` 统一使用 run_10 已验证的 fresh-final answer cue；run_11 在量化增训权重的 13 场景全集与 fixed_v4 上验收空 final、质量和 paired E2E。 |
 | 2026-08-24 | 纳入 run_11：空 final 归零，量化权重的 guided cue 目标通过；phase-on paired E2E 有候选正收益，但 NetQAD 单步少 2 题且两条 final 在 2,048 token 截断。下一步先修 final 上限，再进行 5 场景 fixed_v5 与 telemetry-off 自动配置全集，详见 [`run_11/RESULT.md`](../log/perf/run_11/RESULT.md)。 |
+| 2026-08-24 | 实现 `dtb-algorithm-v4` completion 总额度：serving 复用原生 `get_max_tokens()`，所有 parser-facing token 共用 `completion_token_limit`，hidden probe 不占外部额度，默认 schema/YAML 删除 `final_answer_max_tokens`；下一 run 先做协议定向验收。 |

@@ -47,8 +47,10 @@ class TrialObservation:
 
 @dataclass
 class DtbRequestState:
+    completion_token_limit: int
     reasoning_state: ReasoningState = ReasoningState.OPEN
     reasoning_boundary: ReasoningBoundary | None = None
+    emitted_completion_tokens: int = 0
     thinking_tokens: int = 0
     hidden_probe_tokens: int = 0
     final_answer_tokens: int = 0
@@ -62,3 +64,21 @@ class DtbRequestState:
     final_answer_reason: FinalAnswerReason | None = None
     assistant_completion_epoch: int = 1
     final_terminal_count: int = 0
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.completion_token_limit, int)
+            or isinstance(self.completion_token_limit, bool)
+            or self.completion_token_limit < 1
+        ):
+            raise ValueError("completion_token_limit must be a positive integer")
+        if (
+            not isinstance(self.emitted_completion_tokens, int)
+            or isinstance(self.emitted_completion_tokens, bool)
+            or self.emitted_completion_tokens < 0
+            or self.emitted_completion_tokens > self.completion_token_limit
+        ):
+            raise ValueError(
+                "emitted_completion_tokens must be an integer within the "
+                "completion token limit"
+            )

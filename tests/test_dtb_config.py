@@ -32,9 +32,10 @@ class DtbConfigTests(unittest.TestCase):
         }.isdisjoint(names))
         self.assertNotIn("emit_phase_metrics", names)
         self.assertNotIn("verbose_stage_logging", names)
+        self.assertNotIn("final_answer_max_tokens", names)
 
     def test_algorithm_policy_is_code_owned(self) -> None:
-        self.assertEqual(POLICY_VERSION, "dtb-algorithm-v3")
+        self.assertEqual(POLICY_VERSION, "dtb-algorithm-v4")
         self.assertEqual(DtbAlgorithmPolicy().version, POLICY_VERSION)
         with self.assertRaises(ValueError):
             DtbAlgorithmPolicy(trial_answer_length=51)

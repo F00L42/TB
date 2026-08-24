@@ -9,7 +9,7 @@ from dtb.budgeting.budget_decision import ThinkingBudget
 
 
 TRIAL_ANSWER_LENGTH = 50
-POLICY_VERSION = "dtb-algorithm-v3"
+POLICY_VERSION = "dtb-algorithm-v4"
 
 
 class MissingConfidencePolicy(str, Enum):
@@ -142,7 +142,6 @@ class DtbAlgorithmConfig:
     baseline_time_limit: float = 90.0
     max_internal_calls: int = 20
     max_thinking_tokens: int = 65536
-    final_answer_max_tokens: int = 2048
     budget_enabled: bool = True
 
     def __post_init__(self) -> None:
@@ -154,7 +153,6 @@ class DtbAlgorithmConfig:
             "difficulty_stride_base", "difficulty_stride_max",
             "difficulty_num_thinking_base", "difficulty_num_thinking_max",
             "history_warmup_count", "max_thinking_tokens",
-            "final_answer_max_tokens",
         )
         for name in positive_fields:
             value = getattr(self, name)

@@ -18,6 +18,8 @@ git apply --reject --whitespace=fix \
 - `dtb_serving.patch` adds the external `enable_think_budget` protocol field
   and routes enabled requests to `DtbRequestController`. A false request flag
   or false server master switch remains on vLLM's native single-generate path.
+  The enabled route resolves the whole assistant completion limit with vLLM's
+  native `get_max_tokens()` before passing it through private route identity.
 - `qwen3_coder_parser.patch` preserves parser partition equivalence for the
   fixed Qwen3-Coder tool parser.
 

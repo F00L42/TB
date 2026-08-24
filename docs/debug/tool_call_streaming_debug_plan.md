@@ -633,6 +633,12 @@ answer_limit = min(model_context_remaining, external_remaining)
 默认值不能再是 2048。若保留显式 cap，telemetry 和响应必须标记实际生效的 cap，且对应实验
 不能声称原生 parser-facing/生成预算等价。
 
+2026-08-24，`dtb-algorithm-v4` 已按上述公式完成本地实现：固定 vLLM serving 使用原生
+`get_max_tokens()` 解析总额度，DTB 在唯一 parser-facing 输出边界累计
+`emitted_completion_tokens`，schema/YAML 删除默认 cap，final telemetry 直接记录
+`external_remaining_tokens` 和 `answer_limit`。本地无模型测试与 patch apply check 已通过；
+目标服务器仍需按第 6 节重放后才能标记完成。
+
 若 final child 真实结束原因为 `length`，必须原样向 SSE 传播 `finish_reason="length"`。
 即使此前已经流出 tool header，也不得改写为 `tool_calls`；未闭合的工具序列是 hard failure，
 不能由 parser 猜测补齐。只有模型正常完成一个逻辑 tool-call 序列时才返回

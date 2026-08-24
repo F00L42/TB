@@ -71,6 +71,11 @@ class DtbPhaseRecorder:
         value_pair_count: int | None = None,
         accept_reason: str | None = None,
         final_answer_reason: str | None = None,
+        completion_token_limit: int | None = None,
+        emitted_completion_tokens_before: int | None = None,
+        pending_boundary_tokens: int | None = None,
+        external_remaining_tokens: int | None = None,
+        answer_limit: int | None = None,
         stop_reason: object = None,
         **_: Any,
     ) -> dict[str, object]:
@@ -156,7 +161,16 @@ class DtbPhaseRecorder:
                 "accept_reason": accept_reason,
             })
         if phase == "final_answer":
-            record["final_answer_reason"] = final_answer_reason
+            record.update({
+                "final_answer_reason": final_answer_reason,
+                "completion_token_limit": completion_token_limit,
+                "emitted_completion_tokens_before": (
+                    emitted_completion_tokens_before
+                ),
+                "pending_boundary_tokens": pending_boundary_tokens,
+                "external_remaining_tokens": external_remaining_tokens,
+                "answer_limit": answer_limit,
+            })
         self._writer.publish("DTB_PHASE", record)
         return record
 
@@ -173,6 +187,13 @@ class DtbPhaseRecorder:
             "variant": "dtb",
             "policy_version": self._policy_version,
             "completion_status": state.completion_status,
+            "completion_token_limit": state.completion_token_limit,
+            "emitted_completion_tokens": state.emitted_completion_tokens,
+            "completion_tokens_remaining": max(
+                0,
+                state.completion_token_limit
+                - state.emitted_completion_tokens,
+            ),
             "thinking_tokens": state.thinking_tokens,
             "hidden_probe_tokens": state.hidden_probe_tokens,
             "final_answer_tokens": state.final_answer_tokens,

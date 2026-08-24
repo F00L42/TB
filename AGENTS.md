@@ -106,6 +106,8 @@
 - `controller_cpu`：tokenize/decode、拷贝、置信度聚合、队列和格式转换。
 
 每个 phase 至少记录 `queue_ms`、`prefill_ms`、`decode_ms`、`prompt_tokens`、`cached_prompt_tokens`、`generated_tokens`、`visible`、`round`、`stop_reason`。不要只用 vLLM 每 10 秒打印的全局吞吐率归因单个请求。
+`final_answer` 还必须记录原生 `completion_token_limit`、final child 启动前已透传 token、待透传
+reasoning boundary、外部剩余额度和实际 `answer_limit`，以便审计统一 completion 额度。
 
 DTB telemetry 由 `dtb/config/budget_config.yaml` 的 `OBSERVABILITY.mode` 在服务启动时确定：
 

@@ -389,7 +389,7 @@ vLLM、vLLM-Ascend、CANN、运行时、硬件、模型路径和服务启动基�
 `controller_phases.jsonl` 每行一个 phase，重构后格式为：
 
 ```json
-{"schema":3,"parent_request_id":"chatcmpl-x","child_request_id":"chatcmpl-x_confidence_probe_2","variant":"dtb","policy_version":"dtb-algorithm-v3","phase":"confidence_probe","round":2,"wall_ms":912.4,"queue_ms":3.1,"prefill_ms":381.5,"decode_ms":524.0,"controller_cpu_ms":3.8,"prompt_tokens":3584,"cached_prompt_tokens":3456,"generated_tokens":50,"visible":false,"confidence":0.7653,"accepted":false,"confidence_method":"average_fallback","average_confidence":0.7653,"value_min_raw":null,"pair_count":50,"value_pair_count":38,"accept_reason":"below_threshold","stop_reason":"length"}
+{"schema":3,"parent_request_id":"chatcmpl-x","child_request_id":"chatcmpl-x_confidence_probe_2","variant":"dtb","policy_version":"dtb-algorithm-v4","phase":"confidence_probe","round":2,"wall_ms":912.4,"queue_ms":3.1,"prefill_ms":381.5,"decode_ms":524.0,"controller_cpu_ms":3.8,"prompt_tokens":3584,"cached_prompt_tokens":3456,"generated_tokens":50,"visible":false,"confidence":0.7653,"accepted":false,"confidence_method":"average_fallback","average_confidence":0.7653,"value_min_raw":null,"pair_count":50,"value_pair_count":38,"accept_reason":"below_threshold","stop_reason":"length"}
 ```
 
 生产写端只在 `OBSERVABILITY.mode: "phase"` 时通过后台有界队列写单行 JSON；请求协程
@@ -664,6 +664,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-24 | 完成 `dtb-algorithm-v4` 本地实现：serving 复用原生 `get_max_tokens()` 得到整个 assistant completion 总额度，parser-facing 可见 token 统一计数，hidden probe 不占外部额度，默认 2,048 final cap 删除；final phase 增加总额度、已用量、剩余额度和 `answer_limit` | 先以 run_11 两条截断和 run_10 48 条 no-final 做服务器协议验收；正式性能仍须 telemetry off，不能把本地无模型通过写成目标服务器已修复 |
 | 2026-08-24 | run_11 在量化增训权重 fixed_v4 上验证 `dtb-algorithm-v3`：318 个 controller-forced final 均增加 24-token cue，空 final 为 0/633；相对 run_08 同权重 Vanilla 的 phase-on 微/宏 E2E 候选收益为 7.97%/9.33%，总模型生成量降低 13.52%；同时发现 NetQAD 单步少 2 题和两条 2,048-token final 截断 | cue 修复可以冻结；正式排名仍须 telemetry off。下一轮先让 final 遵循调用方剩余 completion budget并重放两条截断，再对 5 个交叉场景做有界 fixed_v5，不能用响应 token 替代包含 14,157 hidden probe token 的总工作量 |
 | 2026-08-21 | `dtb-algorithm-v3` 将 `confidence_accepted` 的 fresh-final 裸 `</think>` 后缀替换为 run_10 已验证的 answer cue；probe、`budget_exhausted` 与模型原生边界保持原逻辑；run_11 使用量化增训权重的 13 场景全集与 fixed_v4 验收 | 修复量化增训权重在置信度接受后可能立即结束且无 final 的协议问题，并独立测量新增约 23 个 suffix token 对 E2E/prefill 的影响 |
 | 2026-08-20 | 生产结构切换到 `dtb/` 和版本化 patch；删除 telemetry 双账本；观测改为默认 off、独立 phase audit 和 allowlisted stream audit；提取器新写 schema 3、兼容读历史 schema | 后续实验必须用关闭态给出正式 E2E，用同身份 phase run 完成分支与总工作量审计；历史 run 保持不可变 |

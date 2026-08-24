@@ -142,6 +142,14 @@ class _BaseState(ABC):
         )
 
     @staticmethod
+    def remaining_completion_budget(context: DtbRequestContext) -> int:
+        state = context.request_state
+        return max(
+            0,
+            state.completion_token_limit - state.emitted_completion_tokens,
+        )
+
+    @staticmethod
     def remaining_context(context: DtbRequestContext) -> int:
         return max(
             0,
@@ -373,7 +381,18 @@ class _ThinkingState(_BaseState):
         forced_final_reserve = len(context.encode_prompt_suffix(
             GUIDED_FINAL_PROMPT_V1)) + 1
         available_think_context = remaining_context - forced_final_reserve
-        if remaining_budget <= 0 or available_think_context <= 0:
+        forced_completion_reserve = (
+            len(context.encode_prompt_suffix(THINK_END_TAG)) + 1
+        )
+        available_think_completion = (
+            _BaseState.remaining_completion_budget(context)
+            - forced_completion_reserve
+        )
+        if (
+            remaining_budget <= 0
+            or available_think_context <= 0
+            or available_think_completion <= 0
+        ):
             return _BaseState.enter_final_answer(
                 context, FinalAnswerReason.BUDGET_EXHAUSTED)
         if not _BaseState.has_call_room(context, 2):
@@ -390,6 +409,7 @@ class _ThinkingState(_BaseState):
             requested_tokens,
             remaining_budget,
             available_think_context,
+            available_think_completion,
         )
         if maximum <= 0:
             return _BaseState.enter_final_answer(
@@ -476,6 +496,8 @@ class _ThinkingState(_BaseState):
         if (
             _BaseState.remaining_think_budget(context) <= 0
             or _BaseState.remaining_context(context) <= forced_final_reserve
+            or _BaseState.remaining_completion_budget(context)
+            <= forced_completion_reserve
         ):
             return _BaseState.enter_final_answer(
                 context, FinalAnswerReason.BUDGET_EXHAUSTED)
@@ -662,19 +684,26 @@ class _FinalAnswerState(_BaseState):
                 "closed reasoning has no parser-visible boundary")
 
         remaining_context = _BaseState.remaining_context(context)
-        requested_limit = (
-            getattr(context.request, "max_completion_tokens", None)
-            or getattr(context.request, "max_tokens", None)
+        emitted_before_final = state.emitted_completion_tokens
+        pending_boundary_tokens = (
+            0
+            if context.reasoning_boundary_emitted
+            else len(context.encode_prompt_suffix(THINK_END_TAG))
+        )
+        external_remaining = max(
+            0,
+            state.completion_token_limit
+            - emitted_before_final
+            - pending_boundary_tokens,
         )
         answer_limit = min(
             remaining_context,
-            context.config.final_answer_max_tokens,
+            external_remaining,
         )
-        if isinstance(requested_limit, int) and requested_limit > 0:
-            answer_limit = min(answer_limit, requested_limit)
         if answer_limit <= 0:
             raise RuntimeError(
-                "no context space remains for the final answer")
+                "no context or completion token budget remains for the "
+                "final answer")
 
         params = context.request.to_sampling_params(
             answer_limit, context.default_sampling_params)
@@ -773,5 +802,10 @@ class _FinalAnswerState(_BaseState):
                 visible=True,
                 output=last_output,
                 final_answer_reason=reason.value,
+                completion_token_limit=state.completion_token_limit,
+                emitted_completion_tokens_before=emitted_before_final,
+                pending_boundary_tokens=pending_boundary_tokens,
+                external_remaining_tokens=external_remaining,
+                answer_limit=answer_limit,
             )
         return None

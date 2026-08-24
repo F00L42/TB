@@ -38,9 +38,11 @@ DTB（Dynamic Think-Budget Control）在 vLLM Chat Completion serving 内控制�
 - `stream_audit`：不创建 phase recorder，只对 `stream_request_ids` 白名单请求写
   `DTB_STREAM_AUDIT` schema 1。事件可能含模型正文、工具参数和 token ID，必须限定排障窗口。
 
-模型工作量只由 `DtbRequestState` 维护：`thinking_tokens`、`hidden_probe_tokens`、
-`final_answer_tokens`、`child_generate_calls`、`completion_status`。history 和 request summary 都读取
-该状态；telemetry 不再维护第二本 ledger。
+请求级账本只由 `DtbRequestState` 维护：模型工作量使用 `thinking_tokens`、
+`hidden_probe_tokens`、`final_answer_tokens`、`child_generate_calls`；原生 completion 契约使用
+`completion_token_limit`、`emitted_completion_tokens`。后者只累计送入 parser 的可见 token，
+不包含 hidden probe、answer cue prompt 或 stop 后丢弃的 token ID。history 和 request summary
+都读取该状态；telemetry 不再维护第二本 ledger。
 
 提取共享日志：
 
@@ -53,4 +55,6 @@ python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>
 ## vLLM patch
 
 唯一部署制品位于 `patches/vllm/v0.23.0/`。应用顺序和 `git apply --check` 命令见该目录
-`README.md`。包内不保存 serving/protocol patch 的 Python 副本。
+`README.md`。Serving patch 复用 vLLM 原生 `get_max_tokens()` 解析一次整个 assistant completion
+的有效额度，并通过私有 route identity 交给 DTB；包内不保存 serving/protocol patch 的 Python
+副本。

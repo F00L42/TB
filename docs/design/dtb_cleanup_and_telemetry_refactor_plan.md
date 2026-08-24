@@ -641,6 +641,7 @@ P5 尚未完成：本机没有目标模型/NPU，因此不能声称 telemetry-of
 
 | 日期 | 变更 | 原因 |
 | --- | --- | --- |
+| 2026-08-24 | `dtb-algorithm-v4` 使 serving patch 复用原生 completion 总额度并删除 YAML 默认 final cap；新 `dtb_serving.patch` SHA-256 为 `bfb4660b12ee4d5a2e6b3d5ee35973d217a3faa3a3978a429d62756a9b98dbfa`，新 `budget_config.yaml` SHA-256 为 `38a0f3456df84cd4f3df460ea4ac9c9193b6d5205ab55ab68d11112e34efb6c8`，parser patch 不变 | 保留 2026-08-20 实施结果中的历史 hash，同时给后续 manifest 提供当前部署制品身份 |
 | 2026-08-20 | 完成 P0～P4 实施、版本化 patch 和工具/fixture 收口；记录 98 个分环境本地测试、静态检查与 apply-check；P5 明确保留为目标 NPU 任务 | 区分源码/本地证据与真实服务器性能，不把默认关闭的结构保证夸大为硬件实测 |
 | 2026-08-20 | 将弱语义的 controller/plan/planner/executor/runtime 命名收敛为 request controller、budget decision、budget resolver、reasoning state machine，并同步目录、类型和接口 | 避免与任务规划、基础大模型和 vLLM executor/runtime 概念重叠，使模块名直接表达 DTB 领域职责 |
 | 2026-08-20 | 根据检视意见保留难度估计模块并增加重构后专项审计；拆分不可变预算决策与可变请求状态；明确两个 vLLM patch 的版本化制品目录和契约含义 | 避免把可能漏集成的原始算法模块误删，消除 model 术语歧义，并让 patch 的运行时、部署和文档职责分离 |

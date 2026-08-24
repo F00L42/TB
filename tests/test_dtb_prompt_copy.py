@@ -85,7 +85,10 @@ def make_context() -> DtbRequestContext:
             "prompt_token_ids": [1, 2],
             "multi_modal_data": object(),
         },
-        request_state=DtbRequestState(budget_decision=plan),
+        request_state=DtbRequestState(
+            completion_token_limit=10_000,
+            budget_decision=plan,
+        ),
         lora_request="lora",
         data_parallel_rank=3,
         trace_headers={"traceparent": "x"},
@@ -253,6 +256,24 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         await context.stream_output(source, phase="final_answer")
 
         self.assertIs(await context.result_queue.get(), source)
+
+    async def test_parser_visible_completion_budget_rejects_overflow(self) -> None:
+        context = make_context()
+        context.request_state.completion_token_limit = 2
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="three tokens",
+            token_ids=[10, 11, 12],
+            finish_reason=None,
+            stop_reason=None,
+        )])
+
+        with self.assertRaisesRegex(
+            RuntimeError, "completion token budget exceeded"
+        ):
+            await context.stream_output(source, phase="final_answer")
+
+        self.assertEqual(context.request_state.emitted_completion_tokens, 0)
+        self.assertTrue(context.result_queue.empty())
 
     async def test_stream_audit_disabled_has_only_one_none_check(self) -> None:
         context = make_context()

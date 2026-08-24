@@ -29,12 +29,22 @@
 +        self.cot_controller = CoTController()
 +        self.dtb_request_controller = DtbRequestController()
          self.python_tool = None
-@@ -271,1 +276,57 @@
+@@ -271,1 +276,68 @@
 +        # Server-side master switch: when disabled, continue through native
 +        # vLLM as a single generation without constructing controller state.
 +        if (request.enable_think_budget
 +                and self.dtb_request_controller.is_enabled()):
 +            assert len(engine_inputs) == 1
++            completion_token_limit = get_max_tokens(
++                self.model_config.max_model_len,
++                request.max_completion_tokens
++                if request.max_completion_tokens is not None
++                else request.max_tokens,
++                self._extract_prompt_len(engine_inputs[0]),
++                self.default_sampling_params,
++                self.override_max_tokens,
++                truncate_prompt_tokens=request.truncate_prompt_tokens,
++            )
 +            prompt_components = self._extract_prompt_components(engine_inputs[0])
 +            trace_headers = (
 +                None if raw_request is None
@@ -73,6 +83,7 @@
 +                "reasoning_parser": reasoning_parser,
 +                "response_parser": response_parser,
 +                "chat_template_kwargs": chat_template_kwargs,
++                "completion_token_limit": completion_token_limit,
 +            })
 +            return await self.dtb_request_controller.handle_request(
 +                self, conversation, engine_inputs,
