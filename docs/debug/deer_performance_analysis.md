@@ -664,6 +664,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-24 | run_11 在量化增训权重 fixed_v4 上验证 `dtb-algorithm-v3`：318 个 controller-forced final 均增加 24-token cue，空 final 为 0/633；相对 run_08 同权重 Vanilla 的 phase-on 微/宏 E2E 候选收益为 7.97%/9.33%，总模型生成量降低 13.52%；同时发现 NetQAD 单步少 2 题和两条 2,048-token final 截断 | cue 修复可以冻结；正式排名仍须 telemetry off。下一轮先让 final 遵循调用方剩余 completion budget并重放两条截断，再对 5 个交叉场景做有界 fixed_v5，不能用响应 token 替代包含 14,157 hidden probe token 的总工作量 |
 | 2026-08-21 | `dtb-algorithm-v3` 将 `confidence_accepted` 的 fresh-final 裸 `</think>` 后缀替换为 run_10 已验证的 answer cue；probe、`budget_exhausted` 与模型原生边界保持原逻辑；run_11 使用量化增训权重的 13 场景全集与 fixed_v4 验收 | 修复量化增训权重在置信度接受后可能立即结束且无 final 的协议问题，并独立测量新增约 23 个 suffix token 对 E2E/prefill 的影响 |
 | 2026-08-20 | 生产结构切换到 `dtb/` 和版本化 patch；删除 telemetry 双账本；观测改为默认 off、独立 phase audit 和 allowlisted stream audit；提取器新写 schema 3、兼容读历史 schema | 后续实验必须用关闭态给出正式 E2E，用同身份 phase run 完成分支与总工作量审计；历史 run 保持不可变 |
 | 2026-08-19 | 闭环 DTB 流式工具调用故障：修复 reasoning 终止语义、stop-boundary text/token ID 对齐和 final child terminal 原样透传，并为固定 vLLM 版本提供 parser 分片修复 patch；保留默认关闭且关闭态不进入构造/I/O路径的独立工具流 telemetry | 大批量真实 replay 已验证目标故障；不再使用保守 XML 恢复或人工空 delta，`TB_PHASE` 性能 schema 保持独立 |

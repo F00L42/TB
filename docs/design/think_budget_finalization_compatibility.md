@@ -4,7 +4,10 @@
 
 本文最初基于仓库 revision `bc142570103f86ca53ed656c75afd999bd13cbbd` 建立。
 2026-08-21 已在重构后的 `dtb/` 生产代码中实现本轮设计，算法身份提升为
-`dtb-algorithm-v3`；本地无模型回归已通过，目标服务器行为与性能等待 run_11 验收。
+`dtb-algorithm-v3`；本地无模型回归已通过。2026-08-24 的
+[`run_11/RESULT.md`](../log/perf/run_11/RESULT.md) 已获得目标服务器验收结果：guided cue 使
+13 场景全集的空 final 降至 0/633，但完整 final 协议仍被两条 2,048-token final 长度截断
+阻塞，量化权重的正式性能策略尚未收口。
 
 [`run_10_no_final/RESULT.md`](../log/perf/run_10_no_final/RESULT.md) 已实测：W8A8
 量化、特定场景思维链压缩语料增训权重在 `confidence_accepted` 后只收到裸
@@ -239,7 +242,7 @@ request family 假定命中，必须记录每个 probe/continuation 的 `prompt_
 
 ## 5. 实现状态与后续计划
 
-### 5.1 本轮实现（本地完成，待 run_11 服务器验收）
+### 5.1 本轮实现与 run_11 服务器结果
 
 | 文件 | 修改 |
 | --- | --- |
@@ -252,6 +255,18 @@ request family 假定命中，必须记录每个 probe/continuation 的 `prompt_
 本轮未修改 `dtb/config/budget_config.yaml`、`DtbBudgetDecision`、history、phase recorder 或
 request API。现有无模型测试已覆盖 probe/final prompt、hidden trial、原生模型边界、唯一
 reasoning boundary、唯一 terminal 和工具调用流式连续性。
+
+Run_11 在量化增训权重的 633 条全集请求上实测：
+
+- 309 个 `confidence_accepted` 和 9 个 `budget_exhausted` 请求的 final prompt 后缀均为
+  24 token，315 个 `model_think_end` 请求没有追加 cue；
+- `</think>` 后空 final 为 0/633，且没有只生成 1～2 token 的旧失败签名，因此本轮 cue
+  修改的直接目标通过；
+- 另有 `TC00000069`、`YH0032` 两个 final phase 在 2,048 token 处以 `length` 结束并截断
+  JSON/正文。该签名与当前 `final_answer_max_tokens=2048` 一致，属于独立的 final 上限契约
+  问题，不回滚 cue；应先让 final 使用调用方剩余 completion budget，再继续 fixed 搜索；
+- 本轮开启 phase telemetry 且缺 manifest，E2E 收益只作为候选证据，不能替代 telemetry off
+  的正式排名。
 
 ### 5.2 后续 trial-reuse 版本
 
@@ -280,7 +295,7 @@ reasoning boundary、唯一 terminal 和工具调用流式连续性。
 - stream/non-stream 只有一个 reasoning boundary 和一个 final terminal；
 - 配置 schema 没有新增 `finalization_mode` 或请求 override。
 
-服务器验收：
+服务器验收标准：
 
 - run_11 使用量化增训权重执行 13 场景全集和 fixed_v4 候选，空 final 为 0，不新增工具 XML
   泄漏、参数 JSON 不完整或错误 `finish_reason`；
@@ -297,6 +312,10 @@ reasoning boundary、唯一 terminal 和工具调用流式连续性。
 
 开源权重也使用同一算法行为；其 13 场景回归仍是统一实现的兼容性验收，但不阻塞 run_11 对
 量化增训权重的直接目标判断。
+
+Run_11 对上述标准的裁决是：空 final 与 cue 覆盖通过；逐场景质量门、hard-failure 门、
+telemetry-off 正式 E2E 和完整 manifest 未通过或未验证。详见
+[`run_11/RESULT.md`](../log/perf/run_11/RESULT.md) 第 8 节。
 
 ### 6.2 后续 trial reuse
 
@@ -330,3 +349,4 @@ reasoning boundary、唯一 terminal 和工具调用流式连续性。
 | 2026-08-20 | 初版：提出 YAML 驱动的 minimal/guided 终结兼容模式 | run_10 证明量化增训权重需要 answer cue，但开源权重统一适用性尚未验证 |
 | 2026-08-21 | 决策收口：取消当前版本的配置分支；probe 保持不变，仅把 `confidence_accepted` fresh-final 改为已验证 cue；补充 accepted-trial 事务式 replay/continuation 后续方案 | 用最小改动修复已证实空 final，并将高风险 trial 复用与兼容性修复解耦 |
 | 2026-08-21 | 完成 `dtb-algorithm-v3` 本地实现与无模型回归；同步 manifest、泛化计划和性能 runbook；服务器验收目标固定为 run_11 量化增训权重 13 场景全集与 fixed_v4 | 让代码、实验身份和验收口径在服务器测试前闭合 |
+| 2026-08-24 | 纳入 run_11：318 个 controller-forced final 均使用 24-token cue，空 final 为 0/633；同时发现两条 2,048-token final 截断，完整 final 协议仍未通过 | cue 修复可以冻结；下一优先级是移除控制器额外 final 硬帽，而不是改 probe、回滚 cue 或提前实现 trial reuse |
