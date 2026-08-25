@@ -1,8 +1,9 @@
 # 测试结果汇报图表工作流
 
 本目录把一组基线与候选实验的请求级 CSV 转换为可审计的 ALLin1 表、总览图和逐场景图。
-当前示例包括 `run_04_fixed_v1` 和 `run_07` 相对同一份 `run_04` Vanilla 的结果；统计口径
-与图表选择依据见 `fixed_v1_report_chart_workflow_design.md`。
+当前示例包括 `run_04_fixed_v1`、`run_07` 相对同一份 `run_04` Vanilla 的结果，以及
+`run_12` 相对同权重量化增训 `run_08` Vanilla 的结果；统计口径与图表选择依据见
+`fixed_v1_report_chart_workflow_design.md`。
 
 ## 1. 输出契约
 
@@ -52,6 +53,19 @@ confidence probe。`MACRO` 是场景等权；`MICRO` 是请求等权，两者不
 Judge 正确率和 pp 便于审计，但 `01_overview_matrix` 只显示净正确条目绝对数，避免小样本场景
 因一题变化呈现夸张的百分比；该指标在 MACRO 行显示为“不适用”，MICRO 行显示全量净变化。
 
+只有基线和候选的 `Token数` 语义相同时才计算 Token saving。字段语义不同时，配置必须声明：
+
+```json
+"token_comparison": {
+  "comparable": false,
+  "note": "说明两侧 Token 字段各自包含什么以及为何不可比"
+}
+```
+
+生成器仍用各自原始 Token 列与 `_SUMMARY.csv` 对账，但 ALLin1 的 saving 单元格留空、manifest
+的 Token saving 置为 `null`；总览中间面板切换为“更快请求占比”，逐场景图仅展示 E2E
+收益分布并显式写明 Token 不可比。禁止把字段口径变化画成算法 Token 收益。
+
 ## 3. 生成新版本
 
 先安装 Python 绘图依赖：
@@ -96,6 +110,8 @@ node docs/report/chart/build_allin1_workbook.mjs `
 - `expected` 的已知指标。新实验第一次接入时可先仅保留 `scenes`/`pairs`，人工核验后再补齐
   时延、Token 和 Judge 断言。
 - 可选的 `judge_overrides` 与 `additional_inputs`；只有具备可审计人工裁决时才允许使用。
+- 若两侧 `Token数` 的采集语义不同，必须设置 `token_comparison.comparable=false` 并填写原因；
+  不得在 `expected` 中加入 Token saving 断言。
 
 视觉迭代修改 `generate_report.py` 顶部的 `PALETTE` 或对应 renderer，并使用新的 revision；
 不要覆盖旧图。统计公式改变时还需提升 `SCRIPT_VERSION`，更新本说明与设计文档变更记录。
@@ -106,11 +122,17 @@ node docs/report/chart/build_allin1_workbook.mjs `
 - manifest 的 `actual` 复现已知指标，所有输入与产物有 SHA-256；
 - `allin1.csv`、`allin1.md`、`allin1.xlsx` 的 13 个场景及 MACRO/MICRO 一致；
 - `all` profile 恰有 3 张总览图和 13 张逐场景图，每张同时有 SVG/PNG；
-- 总览确认 13/13 场景时延、Token 均正收益；Judge 面板以净正确条目显示总体和局部变化；
+- 总览的时延、请求级方向和 Judge 变化与 `RESULT.md` 一致，不把负收益场景隐藏在总体均值中；
+- Token 可比时展示 saving；不可比时总览、逐场景图、表和 manifest 均明确降级且不出现伪收益；
 - 逐场景图使用共享模板，parity 图、请求级 gain 分布和 Judge 转移均可独立解读；
 - 本地产物标为既有日志“实测”的复算，不表述为重新运行了 vLLM 性能测试。
 
 ## 6. 当前样例
+
+`generated/run_12_vs_quant_vanilla/v2/`：13 个场景、633 对请求；相对同权重 TP4 Vanilla，
+宏平均 E2E 优化 9.86%，请求加权 E2E 优化 9.75%，413/633 请求更快，正确数 586→584。
+8/13 场景平均更快，5 个场景平均回退；两侧 Token 字段语义不同，图表不计算或展示 Token
+saving，改用更快请求占比并保留口径说明。
 
 `generated/run_07_vs_vanilla/v1/`：13 个场景、633 对请求，宏平均 E2E 优化 50.65%，
 请求加权 E2E 优化 44.58%，可见 Token 节省 55.61%；606/633 请求更快。人工裁决 1 条后，

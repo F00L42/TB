@@ -8,6 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = REPO_ROOT / "docs" / "report" / "chart" / "generate_report.py"
 CONFIG_PATH = REPO_ROOT / "docs" / "report" / "chart" / "configs" / "run_04_fixed_v1.json"
 RUN_07_CONFIG_PATH = REPO_ROOT / "docs" / "report" / "chart" / "configs" / "run_07.json"
+RUN_12_CONFIG_PATH = REPO_ROOT / "docs" / "report" / "chart" / "configs" / "run_12.json"
 
 SPEC = importlib.util.spec_from_file_location("report_chart_generator", MODULE_PATH)
 assert SPEC and SPEC.loader
@@ -85,6 +86,36 @@ class Run07ReportChartWorkflowTest(unittest.TestCase):
         )
         self.assertEqual(sum(scene["net_correct"] < 0 for scene in scenes), 6)
         self.assertTrue(all(scene["net_correct"] >= -1 for scene in scenes))
+
+
+class Run12ReportChartWorkflowTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.comparison = REPORT.load_comparison(RUN_12_CONFIG_PATH)
+        cls.summaries = REPORT.build_summaries(cls.comparison)
+
+    def test_run_12_regression_metrics(self):
+        REPORT.validate_expected(
+            self.summaries,
+            self.comparison["config"]["expected"],
+        )
+        macro = self.summaries["macro"]
+        micro = self.summaries["micro"]
+        self.assertEqual(len(self.summaries["scenes"]), 13)
+        self.assertEqual(micro["n"], 633)
+        self.assertEqual(micro["faster_count"], 413)
+        self.assertEqual((micro["baseline_correct"], micro["candidate_correct"]), (586, 584))
+        self.assertEqual((micro["vanilla_only"], micro["candidate_only"]), (21, 19))
+        self.assertEqual(micro["net_correct"], -2)
+        self.assertAlmostEqual(macro["e2e_gain_pct"], 9.86, places=2)
+        self.assertAlmostEqual(micro["e2e_gain_pct"], 9.75, places=2)
+
+    def test_run_12_marks_token_fields_as_not_comparable(self):
+        self.assertFalse(self.comparison["token_comparison"]["comparable"])
+        self.assertFalse(self.summaries["token_comparable"])
+        self.assertIn("不能直接比较", self.summaries["token_note"])
+        self.assertEqual(sum(scene["e2e_gain_pct"] > 0 for scene in self.summaries["scenes"]), 8)
+        self.assertEqual(sum(scene["net_correct"] < 0 for scene in self.summaries["scenes"]), 5)
 
 
 if __name__ == "__main__":

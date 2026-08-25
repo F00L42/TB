@@ -3,7 +3,20 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SpreadsheetFile, Workbook } from "@oai/artifact-tool";
+import { pathToFileURL } from "node:url";
+
+const artifactToolSpecifier = process.env.CODEX_WORKSPACE_NODE_MODULES
+  ? pathToFileURL(
+      path.join(
+        process.env.CODEX_WORKSPACE_NODE_MODULES,
+        "@oai",
+        "artifact-tool",
+        "dist",
+        "artifact_tool.mjs",
+      ),
+    ).href
+  : "@oai/artifact-tool";
+const { SpreadsheetFile, Workbook } = await import(artifactToolSpecifier);
 
 const [sourcePathArg, outputPathArg, previewDirArg, manifestPathArg] = process.argv.slice(2);
 if (!sourcePathArg || !outputPathArg || !previewDirArg) {
@@ -19,6 +32,8 @@ const manifestPath = manifestPathArg ? path.resolve(manifestPathArg) : null;
 const source = JSON.parse(await fs.readFile(sourcePath, "utf8"));
 
 const palette = source.palette;
+const tokenComparable = source.token_comparable !== false;
+const tokenNote = source.token_note || "";
 const workbook = Workbook.create();
 const allin1 = workbook.worksheets.add("ALLin1");
 const pairData = workbook.worksheets.add("Pair Data");
@@ -35,10 +50,10 @@ const pairHeaders = [
   `${source.candidate_label} E2E (s)`,
   "E2E gain (s)",
   "E2E gain (%)",
-  `${source.baseline_label} 可见 Token`,
-  `${source.candidate_label} 可见 Token`,
-  "Token saving",
-  "Token saving (%)",
+  `${source.baseline_label} Token${tokenComparable ? "" : "（原始字段）"}`,
+  `${source.candidate_label} Token${tokenComparable ? "" : "（原始字段）"}`,
+  tokenComparable ? "Token saving" : "Token comparison (N/A)",
+  tokenComparable ? "Token saving (%)" : "Token comparison (%) (N/A)",
   `${source.baseline_label} Judge 正确 (1/0)`,
   `${source.candidate_label} Judge 正确 (1/0)`,
   "Judge transition",
@@ -69,10 +84,12 @@ pairData.getRange("E2").formulas = [["=C2-D2"]];
 pairData.getRange(`E2:E${pairEndRow}`).fillDown();
 pairData.getRange("F2").formulas = [["=IFERROR(E2/C2,0)"]];
 pairData.getRange(`F2:F${pairEndRow}`).fillDown();
-pairData.getRange("I2").formulas = [["=G2-H2"]];
-pairData.getRange(`I2:I${pairEndRow}`).fillDown();
-pairData.getRange("J2").formulas = [["=IFERROR(I2/G2,0)"]];
-pairData.getRange(`J2:J${pairEndRow}`).fillDown();
+if (tokenComparable) {
+  pairData.getRange("I2").formulas = [["=G2-H2"]];
+  pairData.getRange(`I2:I${pairEndRow}`).fillDown();
+  pairData.getRange("J2").formulas = [["=IFERROR(I2/G2,0)"]];
+  pairData.getRange(`J2:J${pairEndRow}`).fillDown();
+}
 pairData.getRange("M2").formulas = [[
   '=IF(AND(K2=1,L2=1),"both_correct",IF(K2=1,"vanilla_only",IF(L2=1,"candidate_only","both_wrong")))',
 ]];
@@ -116,16 +133,18 @@ pairData.getRange(`E2:F${pairEndRow}`).conditionalFormats.add("cellIs", {
   formula: 0,
   format: { fill: palette.negative_fill, font: { color: palette.negative } },
 });
-pairData.getRange(`I2:J${pairEndRow}`).conditionalFormats.add("cellIs", {
-  operator: "greaterThan",
-  formula: 0,
-  format: { fill: palette.positive_fill, font: { color: palette.positive } },
-});
-pairData.getRange(`I2:J${pairEndRow}`).conditionalFormats.add("cellIs", {
-  operator: "lessThan",
-  formula: 0,
-  format: { fill: palette.negative_fill, font: { color: palette.negative } },
-});
+if (tokenComparable) {
+  pairData.getRange(`I2:J${pairEndRow}`).conditionalFormats.add("cellIs", {
+    operator: "greaterThan",
+    formula: 0,
+    format: { fill: palette.positive_fill, font: { color: palette.positive } },
+  });
+  pairData.getRange(`I2:J${pairEndRow}`).conditionalFormats.add("cellIs", {
+    operator: "lessThan",
+    formula: 0,
+    format: { fill: palette.negative_fill, font: { color: palette.negative } },
+  });
+}
 
 const allin1Headers = [
   "类型",
@@ -141,10 +160,10 @@ const allin1Headers = [
   `${source.candidate_label} P50 (s)`,
   `${source.baseline_label} P95 (s)`,
   `${source.candidate_label} P95 (s)`,
-  `${source.baseline_label} 平均可见 Token`,
-  `${source.candidate_label} 平均可见 Token`,
-  "可见 Token 节省",
-  "可见 Token 节省率",
+  `${source.baseline_label} 平均 Token${tokenComparable ? "" : "（原始字段）"}`,
+  `${source.candidate_label} 平均 Token${tokenComparable ? "" : "（原始字段）"}`,
+  tokenComparable ? "可见 Token 节省" : "Token 比较（不可比）",
+  tokenComparable ? "可见 Token 节省率" : "Token 比较率（不可比）",
   `${source.baseline_label} Judge 正确率`,
   `${source.candidate_label} Judge 正确率`,
   "精度变化 (pp)",
@@ -161,8 +180,11 @@ allin1.mergeCells("A1:AA1");
 allin1.getRange("A1").values = [[`${source.candidate_label} vs ${source.baseline_label}：ALLin1 汇总表`]];
 allin1.mergeCells("A2:AA2");
 allin1.getRange("A2").values = [[
-  `正向定义：E2E/Token 为 ${source.baseline_label} - ${source.candidate_label}；`
-  + `精度为 ${source.candidate_label} - ${source.baseline_label}。可见 Token 不含隐藏 confidence probe。`,
+  `正向定义：E2E 为 ${source.baseline_label} - ${source.candidate_label}；`
+  + (tokenComparable
+    ? `Token 为 ${source.baseline_label} - ${source.candidate_label}；可见 Token 不含隐藏 confidence probe；`
+    : `Token 不作比较（${tokenNote}）；`)
+  + `精度为 ${source.candidate_label} - ${source.baseline_label}。`,
 ]];
 allin1.mergeCells("A3:AA3");
 allin1.getRange("A3").values = [[
@@ -209,8 +231,8 @@ source.scene_summaries.forEach((scene, index) => {
     `=PERCENTILE.INC('Pair Data'!$D$${start}:$D$${end},0.95)`,
     `=AVERAGE('Pair Data'!$G$${start}:$G$${end})`,
     `=AVERAGE('Pair Data'!$H$${start}:$H$${end})`,
-    `=N${row}-O${row}`,
-    `=IFERROR(P${row}/N${row},0)`,
+    tokenComparable ? `=N${row}-O${row}` : '=""',
+    tokenComparable ? `=IFERROR(P${row}/N${row},0)` : '=""',
     `=SUM('Pair Data'!$K$${start}:$K$${end})/C${row}`,
     `=SUM('Pair Data'!$L$${start}:$L$${end})/C${row}`,
     `=(S${row}-R${row})*100`,
@@ -242,8 +264,8 @@ allin1.getRange(`C${macroRow}:Z${macroRow}`).formulas = [[
   `=AVERAGE(M${sceneStartRow}:M${sceneEndRow})`,
   `=AVERAGE(N${sceneStartRow}:N${sceneEndRow})`,
   `=AVERAGE(O${sceneStartRow}:O${sceneEndRow})`,
-  `=AVERAGE(P${sceneStartRow}:P${sceneEndRow})`,
-  `=AVERAGE(Q${sceneStartRow}:Q${sceneEndRow})`,
+  tokenComparable ? `=AVERAGE(P${sceneStartRow}:P${sceneEndRow})` : '=""',
+  tokenComparable ? `=AVERAGE(Q${sceneStartRow}:Q${sceneEndRow})` : '=""',
   `=AVERAGE(R${sceneStartRow}:R${sceneEndRow})`,
   `=AVERAGE(S${sceneStartRow}:S${sceneEndRow})`,
   `=(S${macroRow}-R${macroRow})*100`,
@@ -271,8 +293,8 @@ allin1.getRange(`C${microRow}:Z${microRow}`).formulas = [[
   `=PERCENTILE.INC('Pair Data'!$D$2:$D$${pairEndRow},0.95)`,
   `=AVERAGE('Pair Data'!$G$2:$G$${pairEndRow})`,
   `=AVERAGE('Pair Data'!$H$2:$H$${pairEndRow})`,
-  `=N${microRow}-O${microRow}`,
-  `=P${microRow}/N${microRow}`,
+  tokenComparable ? `=N${microRow}-O${microRow}` : '=""',
+  tokenComparable ? `=P${microRow}/N${microRow}` : '=""',
   `=SUM('Pair Data'!$K$2:$K$${pairEndRow})/C${microRow}`,
   `=SUM('Pair Data'!$L$2:$L$${pairEndRow})/C${microRow}`,
   `=(S${microRow}-R${microRow})*100`,
@@ -313,11 +335,13 @@ allin1.getRange(`G6:G${allin1EndRow}`).conditionalFormats.add("cellIs", {
   formula: 0,
   format: { fill: palette.positive_fill, font: { color: palette.positive } },
 });
-allin1.getRange(`Q6:Q${allin1EndRow}`).conditionalFormats.add("cellIs", {
-  operator: "greaterThan",
-  formula: 0,
-  format: { fill: palette.positive_fill, font: { color: palette.positive } },
-});
+if (tokenComparable) {
+  allin1.getRange(`Q6:Q${allin1EndRow}`).conditionalFormats.add("cellIs", {
+    operator: "greaterThan",
+    formula: 0,
+    format: { fill: palette.positive_fill, font: { color: palette.positive } },
+  });
+}
 allin1.getRange(`T6:T${allin1EndRow}`).conditionalFormats.add("cellIs", {
   operator: "greaterThan",
   formula: 0,
@@ -353,7 +377,12 @@ const noteRows = [
   ["配对键", "规范化场景名 + QA_ID；缺失或重复时工作流直接失败"],
   ["E2E gain", `${source.baseline_label} E2E - ${source.candidate_label} E2E；正值表示候选更快`],
   ["E2E gain %", `每场景 mean(gain) / mean(${source.baseline_label} E2E)`],
-  ["可见 Token saving", "客户端 completion Token 差；不含隐藏 confidence probe"],
+  [
+    "Token 比较",
+    tokenComparable
+      ? "客户端 completion Token 差；不含隐藏 confidence probe"
+      : `不可比；${tokenNote}`,
+  ],
   ["精度变化", `${source.candidate_label} Judge accuracy - ${source.baseline_label} Judge accuracy`],
   ["人工裁决", judgeOverrideNote],
   ["宏平均", "13 个场景等权；百分比为场景级百分比的算术平均"],

@@ -664,6 +664,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-08-25 | run_12 使用量化专用 YAML、TP4、telemetry off 完成 633 条自动全集：请求加权/场景等权 E2E 收益 9.75%/9.86%，正确数为 Vanilla/旧 DTB/run_12 = 586/547/584；两个 scene 各少 2 题、五 scene 平均负收益、总体 P95 回退 1.37%；633 个 final 非空，`TC00000069`/`YH0032` 分别以 3,271/2,792 token 正确完成 | 量化预算已从大面积质量失败收敛到局部路由问题，不再做 fixed_v6；下一步实现白盒单步、机器数据、NetQAD 规划、告警建议、长文本根因的真实 native bypass，其余八 scene 保留 DTB，再做一次 TP4 off 自动全集正式收口 |
 | 2026-08-24 | run_11_fixed_v5 在量化增训权重的 5 个交叉场景完成 240 请求 phase 复验：4 个严格质量层、1 个一题容差层；完整模型生成量相对 run_08 同权重 Vanilla 降低 16.46%；用户补充确认候选为 TP8、Vanilla 为 TP4，跨 TP 的 68.04% phase-on E2E 不可裁决；v4 额度字段 240/240 闭合且无 2,048 cap | 停止 fixed 网格，创建 5 个 fixed_v5 + 8 个 fixed_v4 复验点的量化候选 YAML；先补协议回放，再统一 TP4 运行 telemetry-off Vanilla/自动全集正式排名并记录配置 SHA；跨方案价值先做开源/量化增训权重包 × Vanilla/DTB 的 2×2，对可用中间权重再做训练×量化×DTB 的 2×2×2 |
 | 2026-08-24 | 完成 `dtb-algorithm-v4` 本地实现：serving 复用原生 `get_max_tokens()` 得到整个 assistant completion 总额度，parser-facing 可见 token 统一计数，hidden probe 不占外部额度，默认 2,048 final cap 删除；final phase 增加总额度、已用量、剩余额度和 `answer_limit` | 先以 run_11 两条截断和 run_10 48 条 no-final 做服务器协议验收；正式性能仍须 telemetry off，不能把本地无模型通过写成目标服务器已修复 |
 | 2026-08-24 | run_11 在量化增训权重 fixed_v4 上验证 `dtb-algorithm-v3`：318 个 controller-forced final 均增加 24-token cue，空 final 为 0/633；相对 run_08 同权重 Vanilla 的 phase-on 微/宏 E2E 候选收益为 7.97%/9.33%，总模型生成量降低 13.52%；同时发现 NetQAD 单步少 2 题和两条 2,048-token final 截断 | cue 修复可以冻结；正式排名仍须 telemetry off。下一轮先让 final 遵循调用方剩余 completion budget并重放两条截断，再对 5 个交叉场景做有界 fixed_v5，不能用响应 token 替代包含 14,157 hidden probe token 的总工作量 |

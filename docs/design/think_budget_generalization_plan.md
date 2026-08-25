@@ -77,6 +77,9 @@ DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考
 | run_11_fixed_v5 的 5 组参数均进入质量层：4 个严格、1 个一题容差；完整模型工作量相对同权重 Vanilla 降低 16.46% | 实测 | 停止 fixed 网格，5 组参数进入量化专用 YAML 候选；显式 fixed 尚未证明自动配置 |
 | run_11_fixed_v5 的 v4 额度字段 240/240 闭合、final 全部自然 stop 且无 2,048 cap，但未包含两条历史长 final 和 48 条 no-final | 实测 | 证明新服务器路径已部署，不能替代协议定向验收；仍须重放 `TC00000069`、`YH0032` 和 no-final 集 |
 | run_11_fixed_v5 使用 TP8、run_08 Vanilla 使用 TP4；跨 run decode wall/token 从约 58.3 ms 降至 17.6 ms，而完整模型工作量只降低 15.43% | 用户提供的部署事实 + 实测 | fixed_v5 的 68.04% phase-on E2E 不可裁决；下一轮统一 TP4 后以 telemetry-off Vanilla/自动 DTB 正式排名 |
+| run_12 在量化 YAML、TP4、telemetry-off 自动全集上取得请求加权/场景等权 E2E 收益 9.75%/9.86%，但仅 8/13 场景平均更快且总体 P95 回退 1.37% | 实测 | 全局时延方向成立，当前 13 DTB 不能发布；五个负收益 scene 应转真实 native，不再做 fixed_v6 |
+| run_12 为 584/633，较旧 DTB 恢复 37 题，但白盒单步和 NetQAD 规划各比 Vanilla 少 2 题；其余为 8 严格、3 一题容差 | 实测 | 逐场景质量门仍失败；投诉分类中文多 4 题不得抵消两个失败 scene |
+| run_12 的 633 个 final 全部非空，`TC00000069`、`YH0032` 分别生成 3,271/2,792 token 且 Judge 正确 | 实测 | 已知空 final 和 2,048-token 截断回归项关闭；telemetry off 不提供额度字段或总模型工作量 |
 
 当前尚待回答：
 
@@ -90,10 +93,10 @@ DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考
 尚未通过**。完成 holdout、通用/OOD、hard failure 和复杂度门之前，不得缩写为“阶段一
 已完成”。
 
-量化增训权重的独立状态为：**五个交叉场景的 fixed 搜索已经停止，已形成专用候选
-YAML；仍缺 completion 协议定向回放、TP4 对齐的 telemetry-off Vanilla/自动全集和 manifest，
-因此量化权重自动策略尚未通过发布门。** 详见
-[`run_11_fixed_v5/RESULT.md`](../log/perf/run_11_fixed_v5/RESULT.md)。
+量化增训权重的独立状态为：**专用 YAML 已完成 TP4 telemetry-off 自动全集；宏/微 E2E
+为正，已知 finalization 回归项关闭，但两个 scene 各少 2 题、五个 scene 平均负收益，故自动
+策略尚未通过发布门。下一步最小收口为五 scene 真实 native + 八 scene 保留 DTB。** 详见
+[`run_12/RESULT.md`](../log/perf/run_12/RESULT.md)。
 
 ## 3. 最小数据模型
 
@@ -200,12 +203,14 @@ controller 构造时读取和校验 YAML；请求路径不做文件 I/O、`stat`
 部署选择接口保持单一：loader 和 controller 仍只认规范入口 `budget_config.yaml`；量化增训
 候选不触发运行时权重识别，也不新增环境变量算法分支。服务器在停服状态下把
 `budget_config_quant.yaml` **复制**为规范入口并重启，同时在实验 manifest 记录候选文件名、
-SHA 与 TP。禁止运行中覆盖，禁止把候选文件重命名移走。该候选当前由 5 个 fixed_v5 与
-8 个 fixed_v4 复验点组成；它是 TP4 E2E 实验输入，不是已发布配置。
+SHA 与 TP。禁止运行中覆盖，禁止把候选文件重命名移走。Run_12 已测试由 5 个 fixed_v5 与
+8 个 fixed_v4 组成的 TP4 候选，但它因两个质量失败 scene 和五个负收益 scene 仍不是发布配置。
 
 当前 resolver 没有由 YAML 表达的逐场景原生旁路。低收益场景不得写入一个未实现的
-`native` 字段；先在 TP4 同身份对照中复验，仍不合格时再把真实 serving native bypass
-作为独立接口设计和验收。
+`native` 字段。Run_12 已完成“不合格”的实测判定，下一实现应把真实 serving native bypass
+作为独立接口设计和验收：scene 命中后必须在构造 DTB 状态机、probe 或 answer cue 前回到
+原生单次生成路径；off 正式 run 评 E2E，少量 phase audit 只验证分支，不能用大预算或
+reject 后的默认 DTB 路径近似 native。
 
 ### 4.2 scene 匹配模块
 
@@ -904,7 +909,10 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 - [x] 所有原始输入均位于 `<run_id>` 内，Vanilla 无 phase 时仍可完整归档。
 - [x] 量化增训权重候选是独立 YAML，默认配置和 loader 入口不变；633 条产品样本可离线恢复
       13 个目标 scene 及各自候选预算；
-- [ ] 量化候选已在 TP4 同身份、telemetry-off Vanilla/自动 DTB 全集上通过质量与 E2E 门。
+- [ ] 量化候选已在 TP4、telemetry-off Vanilla/自动 DTB 全集上通过逐场景质量与 E2E 门；
+      run_12 已完成全集且宏/微 E2E 为正，但两个 scene 各少 2 题、五个 scene 平均负收益；
+- [x] run_12 的 633 个 final 均非空，两个历史 2,048-token 截断样本均超过该长度且正确；
+- [ ] 量化配置的五个负收益 scene 已实现真正 native bypass，并以 off 全集和隔离 phase audit 验收。
 
 ### 8.2 阶段一算法结果
 
@@ -938,6 +946,7 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-08-25 | 纳入 run_12：量化 YAML 的 TP4 telemetry-off 自动全集取得微/宏 E2E +9.75%/+9.86%，质量恢复至 584/633，但白盒单步与 NetQAD 规划各少 2 题、五 scene 平均负收益且总体 P95 回退；两个历史长 final 均超过 2,048 token 且正确。停止 fixed 搜索，下一收口改为五 scene 真 native + 八 scene DTB。 |
 | 2026-08-24 | 澄清 run_11_fixed_v5 为 TP8、run_08 Vanilla 为 TP4，68.04% E2E 改判为跨 TP 不可裁决；新增 `budget_config_quant.yaml`，以 5 个 fixed_v5 + 8 个 fixed_v4 复验点支持 TP4 自动全集。部署只允许停服复制到规范入口并重启，不增加权重专属算法分支；逐场景 native 等 TP4 结果后单独实现。 |
 | 2026-07-30 | 初版：定义 13 场景寻优、自动路由和生产化方案 |
 | 2026-07-31 | 调整为算法寻优优先、生产化后置的两阶段计划 |

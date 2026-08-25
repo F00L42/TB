@@ -26,6 +26,9 @@ accuracy delta  = Candidate accuracy - Vanilla accuracy
 
 其中“可见 Token”指客户端结果 CSV 的 completion `Token数`。隐藏 confidence probe Token
 不能混入该列；若 technical profile 展示总模型工作量，必须从 telemetry 单列读取并另图说明。
+该定义还要求基线和候选的 `Token数` 具有相同采集语义。若一侧包含思考与回答、另一侧只记录
+final，则只允许各自与 `_SUMMARY.csv` 对账，不允许计算 saving。配置应显式声明不可比原因，
+总览第二面板降级为“更快请求占比”，逐场景 Token 分布替换为不可比说明。
 
 ## 2. 数据事实与汇报口径
 
@@ -241,6 +244,7 @@ variant 选择器、显示名和场景展示映射。工作簿由第二条命令
 8. manifest 记录源码路径、文件哈希、公式版本、依赖版本、随机 seed 和生成时间；
 9. `scenes`/`all` profile 必须为 13/13 场景各生成一张详情图和索引条目；
 10. 本地只做数据与出图验证，不把图表生成描述为真实 vLLM 性能复测。
+11. 两侧 Token 语义不同时，Token saving 在表、图和 manifest 中必须同时停用，不能只加脚注。
 
 ## 9. 已确认并落地的首版
 
@@ -260,6 +264,7 @@ CSV/Markdown/XLSX 三种 ALLin1 表、规范化工作簿数据源和带文件哈
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-08-25 | 增加 Token 口径不可比降级：保留源列对账，停用 saving，总览改为更快请求占比并在逐场景图显式说明 | run_08 Vanilla 与 run_12 的 Token 字段采集语义不同，避免把口径差异误报为算法收益 |
 | 2026-08-11 | 总览 Judge 面板由 accuracy delta（pp）改为净正确条目绝对数；MACRO 行不适用，MICRO 行显示全量净变化 | 避免小样本场景一题变化产生夸张百分比；run_04 历史图不回刷 |
 | 2026-08-06 | 采用冷静、克制的灰蓝/低饱和绿红配色，完成脚本、流程说明、工作簿与 v4 示例产物 | 用户确认后执行工作流；显示标签改为配置驱动 |
 | 2026-08-06 | 将图表工作流整体下沉到 `docs/report/chart/` | 为未来其他 report 任务预留独立目录 |

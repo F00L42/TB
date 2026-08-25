@@ -30,7 +30,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 
-SCRIPT_VERSION = "1.2.0"
+SCRIPT_VERSION = "1.3.0"
 TIMESTAMP_RE = re.compile(r"_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$")
 
 PALETTE = {
@@ -418,6 +418,15 @@ def resolve_judge_correct(
 
 def load_comparison(config_path: Path) -> dict[str, Any]:
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    token_comparison = config.get("token_comparison", {"comparable": True})
+    if not isinstance(token_comparison, dict) or not isinstance(
+        token_comparison.get("comparable", True), bool
+    ):
+        raise ValueError("token_comparison.comparable must be a boolean")
+    if not token_comparison.get("comparable", True) and not str(
+        token_comparison.get("note", "")
+    ).strip():
+        raise ValueError("token_comparison.note is required when token fields are not comparable")
     judge_overrides = build_judge_override_map(config)
     used_overrides: set[tuple[str, str, str]] = set()
     base_dir = (config_path.parent / config["baseline"]["run_dir"]).resolve()
@@ -536,6 +545,10 @@ def load_comparison(config_path: Path) -> dict[str, Any]:
         "pairs_by_scene": pairs_by_scene,
         "input_files": list(dict.fromkeys(input_files)),
         "judge_overrides": config.get("judge_overrides", []),
+        "token_comparison": {
+            "comparable": token_comparison.get("comparable", True),
+            "note": str(token_comparison.get("note", "")).strip(),
+        },
     }
 
 
@@ -592,6 +605,8 @@ def summarize_pairs(pairs: Sequence[PairRecord], row_type: str, scene: str) -> d
 def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
     baseline_label = comparison["config"]["baseline"]["label"]
     candidate_label = comparison["config"]["candidate"]["label"]
+    token_comparable = comparison["token_comparison"]["comparable"]
+    token_note = comparison["token_comparison"]["note"]
     scene_summaries = []
     override_counts: dict[str, int] = {}
     for override in comparison["judge_overrides"]:
@@ -603,6 +618,8 @@ def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
         summary["slug"] = pairs[0].slug
         summary["baseline_label"] = baseline_label
         summary["candidate_label"] = candidate_label
+        summary["token_comparable"] = token_comparable
+        summary["token_note"] = token_note
         if override_counts.get(scene_key):
             summary["status"] = f"paired; {override_counts[scene_key]} manual Judge override"
         scene_summaries.append(summary)
@@ -651,6 +668,8 @@ def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
     macro["status"] = "13 scenes, equal weight"
     macro["baseline_label"] = baseline_label
     macro["candidate_label"] = candidate_label
+    macro["token_comparable"] = token_comparable
+    macro["token_note"] = token_note
 
     micro = summarize_pairs(comparison["pairs"], "MICRO", "请求加权微平均")
     if comparison["judge_overrides"]:
@@ -659,6 +678,8 @@ def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
         )
     micro["baseline_label"] = baseline_label
     micro["candidate_label"] = candidate_label
+    micro["token_comparable"] = token_comparable
+    micro["token_note"] = token_note
     return {
         "scenes": scene_summaries,
         "macro": macro,
@@ -666,6 +687,8 @@ def build_summaries(comparison: dict[str, Any]) -> dict[str, Any]:
         "baseline_label": baseline_label,
         "candidate_label": candidate_label,
         "judge_overrides": comparison["judge_overrides"],
+        "token_comparable": comparison["token_comparison"]["comparable"],
+        "token_note": comparison["token_comparison"]["note"],
     }
 
 
@@ -699,7 +722,12 @@ def fmt_number(value: Any, decimals: int = 2) -> str:
     return f"{float(value):.{decimals}f}"
 
 
-def allin1_columns(baseline_label: str, candidate_label: str) -> list[tuple[str, str]]:
+def allin1_columns(
+    baseline_label: str,
+    candidate_label: str,
+    token_comparable: bool = True,
+) -> list[tuple[str, str]]:
+    token_suffix = "" if token_comparable else "_原始字段_口径不同"
     return [
         ("row_type", "类型"),
         ("scene", "场景"),
@@ -714,10 +742,13 @@ def allin1_columns(baseline_label: str, candidate_label: str) -> list[tuple[str,
         ("candidate_e2e_p50_s", f"{candidate_label}_P50_s"),
         ("baseline_e2e_p95_s", f"{baseline_label}_P95_s"),
         ("candidate_e2e_p95_s", f"{candidate_label}_P95_s"),
-        ("baseline_visible_tokens_mean", f"{baseline_label}平均可见Token"),
-        ("candidate_visible_tokens_mean", f"{candidate_label}平均可见Token"),
-        ("visible_token_saving", "可见Token节省"),
-        ("visible_token_saving_pct", "可见Token节省_pct"),
+        ("baseline_visible_tokens_mean", f"{baseline_label}平均Token{token_suffix}"),
+        ("candidate_visible_tokens_mean", f"{candidate_label}平均Token{token_suffix}"),
+        ("visible_token_saving", "可见Token节省" if token_comparable else "Token比较_不可比"),
+        (
+            "visible_token_saving_pct",
+            "可见Token节省_pct" if token_comparable else "Token比较_pct_不可比",
+        ),
         ("baseline_judge_accuracy_pct", f"{baseline_label}_Judge正确率_pct"),
         ("candidate_judge_accuracy_pct", f"{candidate_label}_Judge正确率_pct"),
         ("accuracy_delta_pp", "精度变化_pp"),
@@ -739,13 +770,19 @@ def write_allin1(output_dir: Path, summaries: dict[str, Any]) -> list[Path]:
     rows = output_rows(summaries)
     baseline_label = summaries["baseline_label"]
     candidate_label = summaries["candidate_label"]
-    columns = allin1_columns(baseline_label, candidate_label)
+    token_comparable = summaries["token_comparable"]
+    token_note = summaries["token_note"]
+    columns = allin1_columns(baseline_label, candidate_label, token_comparable)
     csv_path = output_dir / "allin1.csv"
     with csv_path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=[label for _, label in columns])
         writer.writeheader()
         for row in rows:
-            writer.writerow({label: row.get(key, "") for key, label in columns})
+            values = {label: row.get(key, "") for key, label in columns}
+            if not token_comparable:
+                values["Token比较_不可比"] = ""
+                values["Token比较_pct_不可比"] = ""
+            writer.writerow(values)
 
     md_path = output_dir / "allin1.md"
     headers = [
@@ -754,8 +791,12 @@ def write_allin1(output_dir: Path, summaries: dict[str, Any]) -> list[Path]:
         "N",
         f"平均E2E {baseline_label}→{candidate_label} (s)",
         "时延优化",
-        f"平均可见Token {baseline_label}→{candidate_label}",
-        "Token节省",
+        (
+            f"平均可见Token {baseline_label}→{candidate_label}"
+            if token_comparable
+            else "原始 Token 字段（口径不同）"
+        ),
+        "Token节省" if token_comparable else "Token 比较",
         f"Judge {baseline_label}→{candidate_label}",
         "精度变化",
         "净正确条目",
@@ -764,9 +805,17 @@ def write_allin1(output_dir: Path, summaries: dict[str, Any]) -> list[Path]:
         f"# {candidate_label} vs {baseline_label}：ALLin1 汇总表",
         "",
         f"> 正向定义：时延优化 = {baseline_label} - {candidate_label}；"
-        f"Token 节省 = {baseline_label} - {candidate_label}；",
+        + (
+            f"Token 节省 = {baseline_label} - {candidate_label}；"
+            if token_comparable
+            else "Token 不参与跨版本比较；"
+        ),
         f"> 精度变化 = {candidate_label} - {baseline_label}。"
-        "可见 Token 不包含隐藏 confidence probe Token。",
+        + (
+            "可见 Token 不包含隐藏 confidence probe Token。"
+            if token_comparable
+            else token_note
+        ),
     ]
     if summaries["judge_overrides"]:
         md_lines.append(
@@ -792,8 +841,12 @@ def write_allin1(output_dir: Path, summaries: dict[str, Any]) -> list[Path]:
             f"{fmt_number(row['e2e_gain_s'])} s / {fmt_number(row['e2e_gain_pct'])}%{faster}",
             f"{fmt_number(row['baseline_visible_tokens_mean'], 1)} → "
             f"{fmt_number(row['candidate_visible_tokens_mean'], 1)}",
-            f"{fmt_number(row['visible_token_saving'], 1)} / "
-            f"{fmt_number(row['visible_token_saving_pct'])}%",
+            (
+                f"{fmt_number(row['visible_token_saving'], 1)} / "
+                f"{fmt_number(row['visible_token_saving_pct'])}%"
+                if token_comparable
+                else "不可比"
+            ),
             f"{fmt_number(row['baseline_judge_accuracy_pct'])}% → "
             f"{fmt_number(row['candidate_judge_accuracy_pct'])}%",
             f"{fmt_number(row['accuracy_delta_pp'])} pp",
@@ -901,6 +954,8 @@ def draw_box_strip(
 def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list[Path]:
     baseline_label = summaries["baseline_label"]
     candidate_label = summaries["candidate_label"]
+    token_comparable = summaries["token_comparable"]
+    token_note = summaries["token_note"]
     rows = [*summaries["scenes"], summaries["macro"], summaries["micro"]]
     width = 1740
     row_height = 52
@@ -910,15 +965,25 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
         width,
         height,
         f"{candidate_label} vs {baseline_label}：13 场景总览",
-        "按场景展示端到端时延优化、可见 Token 节省和 Judge 净正确条目变化。",
+        (
+            "按场景展示端到端时延优化、可见 Token 节省和 Judge 净正确条目变化。"
+            if token_comparable
+            else "按场景展示端到端时延优化、更快请求占比和 Judge 净正确条目变化。"
+        ),
     )
     canvas.text(28, 24, f"{candidate_label} vs {baseline_label}：13 场景总览", 28, bold=True)
     micro = summaries["micro"]
+    faster_scene_count = sum(row["e2e_gain_pct"] > 0 for row in summaries["scenes"])
     canvas.text(
         28,
         67,
-        f"13/13 场景平均更快；请求加权 E2E -{micro['e2e_gain_pct']:.2f}%，"
-        f"可见 Token -{micro['visible_token_saving_pct']:.2f}%；"
+        f"{faster_scene_count}/13 场景平均更快；请求加权 E2E 优化 {micro['e2e_gain_pct']:+.2f}%；"
+        + (
+            f"可见 Token 节省 {micro['visible_token_saving_pct']:+.2f}%；"
+            if token_comparable
+            else f"{micro['faster_count']}/{micro['n']} 请求更快；"
+        )
+        +
         f"Judge 净正确条目 {micro['net_correct']:+d}"
         f"（{baseline_label}-only {micro['vanilla_only']} / {candidate_label}-only {micro['candidate_only']}）",
         16,
@@ -935,17 +1000,24 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
     label_x = 28
     panels = [
         ("端到端时延优化", "e2e_gain_pct", (390, 790), PALETTE["candidate"], "%"),
-        ("可见 Token 节省", "visible_token_saving_pct", (875, 1275), PALETTE["token"], "%"),
+        (
+            "可见 Token 节省" if token_comparable else "更快请求占比",
+            "visible_token_saving_pct" if token_comparable else "faster_pct",
+            (875, 1275),
+            PALETTE["token"],
+            "%",
+        ),
         ("Judge 净正确条目变化", "net_correct", (1360, 1700), None, " 条"),
     ]
     e2e_domain = nice_domain([row["e2e_gain_pct"] for row in rows], include_zero=True)
-    token_domain = nice_domain([row["visible_token_saving_pct"] for row in rows], include_zero=True)
+    middle_key = "visible_token_saving_pct" if token_comparable else "faster_pct"
+    middle_domain = nice_domain([row[middle_key] for row in rows], include_zero=True)
     judge_count_domain = nice_domain(
         [row["net_correct"] for row in rows if row["net_correct"] is not None],
         include_zero=True,
         symmetric=True,
     )
-    domains = [e2e_domain, token_domain, judge_count_domain]
+    domains = [e2e_domain, middle_domain, judge_count_domain]
 
     for (title, _, x_range, _, unit), domain in zip(panels, domains):
         canvas.text((x_range[0] + x_range[1]) / 2, 122, title, 16, anchor="middle", bold=True)
@@ -992,7 +1064,11 @@ def render_overview_matrix(output_base: Path, summaries: dict[str, Any]) -> list
     canvas.text(
         28,
         height - 44,
-        "可见 Token 不含隐藏 confidence probe；Judge 使用绝对条目变化，宏平均行不适用，微平均行为全量净变化。",
+        (
+            "可见 Token 不含隐藏 confidence probe；Judge 使用绝对条目变化，宏平均行不适用，微平均行为全量净变化。"
+            if token_comparable
+            else f"Token 指标未绘制：{token_note} Judge 使用绝对条目变化。"
+        ),
         12,
         PALETTE["muted"],
     )
@@ -1167,17 +1243,19 @@ def draw_scene_gain_panel(
     y0: float,
     width: float,
     height: float,
+    token_comparable: bool,
+    token_note: str,
 ) -> None:
     e2e_values = [pair.e2e_gain_pct for pair in pairs]
-    token_values = [pair.token_saving_pct for pair in pairs]
+    token_values = [pair.token_saving_pct for pair in pairs] if token_comparable else []
     domain = nice_domain([*e2e_values, *token_values], include_zero=True)
     x_range = (x0 + 145, x0 + width - 28)
     draw_horizontal_axis(canvas, domain, x_range, y0 + 64, y0 + height - 30, "%", tick_count=5)
     canvas.text(x0 + 18, y0 + 14, "配对收益分布", 17, bold=True)
-    for label, values, y, color, suffix in (
-        ("E2E 优化", e2e_values, y0 + 128, PALETTE["candidate"], "e2e"),
-        ("Token 节省", token_values, y0 + 224, PALETTE["token"], "token"),
-    ):
+    series = [("E2E 优化", e2e_values, y0 + 128, PALETTE["candidate"], "e2e")]
+    if token_comparable:
+        series.append(("Token 节省", token_values, y0 + 224, PALETTE["token"], "token"))
+    for label, values, y, color, suffix in series:
         canvas.text(x0 + 18, y - 12, label, 13)
         draw_box_strip(
             canvas,
@@ -1190,6 +1268,9 @@ def draw_scene_gain_panel(
             PALETTE["negative"],
             point_radius=3.2,
         )
+    if not token_comparable:
+        canvas.text(x0 + 18, y0 + 220, "Token 比较不可用", 13, PALETTE["muted"], bold=True)
+        canvas.text(x0 + 18, y0 + 250, token_note, 12, PALETTE["muted"])
 
 
 def draw_judge_matrix(
@@ -1257,20 +1338,31 @@ def render_scene_detail(
 ) -> list[Path]:
     baseline_label = summary["baseline_label"]
     candidate_label = summary["candidate_label"]
+    token_comparable = summary["token_comparable"]
+    token_note = summary["token_note"]
     width, height = 1660, 980
     canvas = DualCanvas(
         width,
         height,
         f"{summary['scene']}：{candidate_label} vs {baseline_label}",
-        "逐请求展示端到端时延配对关系、时延与可见 Token 收益分布，以及 Judge 配对转移。",
+        (
+            "逐请求展示端到端时延配对关系、时延与可见 Token 收益分布，以及 Judge 配对转移。"
+            if token_comparable
+            else "逐请求展示端到端时延配对关系、时延收益分布，以及 Judge 配对转移。"
+        ),
     )
     canvas.text(28, 24, summary["scene"], 28, bold=True)
     canvas.text(
         28,
         66,
         f"N={summary['n']}；平均 E2E {summary['baseline_e2e_mean_s']:.2f}s → "
-        f"{summary['candidate_e2e_mean_s']:.2f}s（-{summary['e2e_gain_pct']:.2f}%）；"
-        f"可见 Token -{summary['visible_token_saving_pct']:.2f}%；"
+        f"{summary['candidate_e2e_mean_s']:.2f}s（E2E 优化 {summary['e2e_gain_pct']:+.2f}%）；"
+        + (
+            f"可见 Token -{summary['visible_token_saving_pct']:.2f}%；"
+            if token_comparable
+            else "Token 口径不可比；"
+        )
+        +
         f"Judge {summary['accuracy_delta_pp']:+.2f} pp",
         16,
         PALETTE["muted"],
@@ -1340,13 +1432,26 @@ def render_scene_detail(
 
     right_x = 830
     canvas.rect(right_x, 130, 802, 350, PALETTE["surface"], PALETTE["frame"], 1.0)
-    draw_scene_gain_panel(canvas, pairs, right_x, 130, 802, 350)
+    draw_scene_gain_panel(
+        canvas,
+        pairs,
+        right_x,
+        130,
+        802,
+        350,
+        token_comparable,
+        token_note,
+    )
     canvas.rect(right_x, 510, 802, 410, PALETTE["surface"], PALETTE["frame"], 1.0)
     draw_judge_matrix(canvas, summary, right_x, 510, 802, 410)
     canvas.text(
         28,
         944,
-        "可见 Token 不含隐藏 confidence probe；所有点均按 QA_ID 严格配对。",
+        (
+            "可见 Token 不含隐藏 confidence probe；所有点均按 QA_ID 严格配对。"
+            if token_comparable
+            else f"Token 指标未比较：{token_note} 所有点均按 QA_ID 严格配对。"
+        ),
         12,
         PALETTE["muted"],
     )
@@ -1401,6 +1506,8 @@ def write_workbook_source(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "palette": PALETTE,
         "judge_overrides": comparison["judge_overrides"],
+        "token_comparable": summaries["token_comparable"],
+        "token_note": summaries["token_note"],
         "scene_summaries": [dict(row, **offsets[row["scene_key"]]) for row in summaries["scenes"]],
         "macro": summaries["macro"],
         "micro": summaries["micro"],
@@ -1462,8 +1569,20 @@ def write_manifest(
         "metrics": {
             "e2e_gain": "mean(vanilla_e2e - candidate_e2e)",
             "e2e_gain_pct": "mean(gain) / mean(vanilla_e2e)",
-            "visible_token_saving": "mean(vanilla_completion_tokens - candidate_completion_tokens)",
-            "visible_token_saving_pct": "mean(saving) / mean(vanilla_completion_tokens)",
+            "visible_token_saving": (
+                "mean(vanilla_completion_tokens - candidate_completion_tokens)"
+                if summaries["token_comparable"]
+                else None
+            ),
+            "visible_token_saving_pct": (
+                "mean(saving) / mean(vanilla_completion_tokens)"
+                if summaries["token_comparable"]
+                else None
+            ),
+            "token_comparison": {
+                "comparable": summaries["token_comparable"],
+                "note": summaries["token_note"],
+            },
             "accuracy_delta_pp": "100 * (candidate_correct_rate - vanilla_correct_rate)",
             "overview_judge_delta": "candidate_correct_count - baseline_correct_count (items)",
             "pairing": "normalized scene key + QA_ID",
@@ -1478,7 +1597,11 @@ def write_manifest(
             "net_correct": summaries["micro"]["net_correct"],
             "macro_e2e_gain_pct": summaries["macro"]["e2e_gain_pct"],
             "micro_e2e_gain_pct": summaries["micro"]["e2e_gain_pct"],
-            "micro_visible_token_saving_pct": summaries["micro"]["visible_token_saving_pct"],
+            "micro_visible_token_saving_pct": (
+                summaries["micro"]["visible_token_saving_pct"]
+                if summaries["token_comparable"]
+                else None
+            ),
             "macro_accuracy_delta_pp": summaries["macro"]["accuracy_delta_pp"],
             "micro_accuracy_delta_pp": summaries["micro"]["accuracy_delta_pp"],
         },
