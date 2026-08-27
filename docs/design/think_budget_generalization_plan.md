@@ -22,7 +22,7 @@ DTB（Dynamic Think-Budget Control）的第一目标是在 13 个产品慢思考
 设计基线：
 
 - 文档日期：2026-07-31；
-- 当前状态日期：2026-08-24；
+- 当前状态日期：2026-08-27；
 - 目标环境：vLLM `v0.23.0`、vLLM-Ascend `v0.23.0rc1`；
 - 当前单场景证据：[`run_02/RESULT.md`](../log/perf/run_02/RESULT.md)；
 - 当前 13 场景自动模式证据：[`run_07/RESULT.md`](../log/perf/run_07/RESULT.md)；
@@ -256,12 +256,12 @@ classify_scene(
 ```mermaid
 flowchart TD
     A["最新用户消息"] --> B["scene 匹配与拒识"]
-    B --> C{"请求含 fixed 实验参数?"}
+    B --> C{"fixed_budget_tokens > 0?"}
     C -- "是" --> D["FIXED；同时记录 RouteResult"]
     C -- "否" --> E{"scene 命中?"}
     E -- "是" --> F["SCENE_DIFFICULTY：scene 预算与难度结果合并"]
     E -- "否" --> G["HISTORY：按 general/scene 历史预算；无历史时完整观察"]
-    D --> H["统一 fixed override 与 hard token limit"]
+    D --> H["正值 fixed 子字段覆盖；统一 hard token limit"]
     F --> H
     G --> H
     H --> I["DtbBudgetDecision"]
@@ -277,6 +277,58 @@ source_by_field / policy_version / hard_think_token_limit
 
 分类证据、难度分解和 history 统计通过 `decision_details` 打点，不放入
 `DtbBudgetDecision`。
+
+#### 4.3.1 `fixed_*` 参数语义与源码生效位置
+
+生产 DTB 当前只定义以下 6 个 `fixed_*` 参数。它们既可在启动 YAML 的 `RUNTIME` 中配置，
+也可由启用 DTB 的 Chat Completion 请求临时覆盖；`think_budget/` 离线参考实现中的大写
+`FIXED_BUDGET_TOKEN` 等旧入口不属于生产 `dtb/` 契约。
+
+参数只有在请求满足 `enable_think_budget=true` 且服务端 `BUDGET_ENABLED=true`、实际进入
+`DtbRequestController` 时才可能生效，否则 serving 继续走原生单次生成。HTTP 字段由
+`patches/vllm/v0.23.0/dtb_serving.patch` 的 `ChatCompletionRequest` patch 声明并完成第一层
+范围校验；YAML 由 `dtb/config/loader.py::load_dtb_service_config()` 写入
+`DtbAlgorithmConfig`。`dtb/config/schema.py::DtbAlgorithmConfig.__post_init__()` 校验服务端快照，
+`dtb/request_controller.py::DtbRequestController._build_algorithm_config()` 再校验请求覆盖。
+
+所有字段都以 `0` 表示“本层未设置”：请求值只有大于 0 才会覆盖启动时配置，因此请求传
+`0` **不能清除** YAML 中已经为正的 `fixed_*` 值。5 个 token/次数字段必须为非负整数，
+`fixed_prob_th` 必须位于 `[0, 1]`；但 `fixed_prob_th=0.0` 同样表示未设置，不能用来显式选择
+零阈值。
+
+| 参数 | 非零值的实际作用 | 预算解析生效位置 | 状态机中的消费位置与边界 |
+| --- | --- | --- | --- |
+| `fixed_budget_tokens` | 唯一会选择 `DecisionBranch.FIXED` 的字段；跳过 scene/difficulty/history 的**预算计算**，但仍执行 scene 路由以保留 `RouteResult`。同时加入 `hard_think_token_limit` 候选，限制累计可见 thinking token；不包含 hidden probe 或 final answer token。 | `dtb/budgeting/budget_resolver.py::DtbBudgetResolver.resolve()` 的 fixed 分支（当前 127–167 行）和 hard-limit 合并（300–322 行）。 | `dtb/reasoning/generation_states.py::_BaseState.remaining_think_budget()` 与 `_ThinkingState.handle()` 用它解析后的 hard limit 限制每段 thinking。实际上限还会取 `max_thinking_tokens`、请求 completion 剩余额度和上下文剩余额度的更小值；较小的 `fixed_num_thinking`、模型自行结束或安全/调用数限制也可使思考提前结束。 |
+| `fixed_check_length` | 覆盖 `ThinkingBudget.check_length`，即首个 `initial_think` 子请求的最大生成 token 数；它是单段上限，不保证模型一定生成到该长度。 | fixed 分支构造（129–140 行），以及所有分支之后的正值统一覆盖（278–298 行）。 | `_ThinkingState.handle()` 当前 402–425 行在 `thinking_segments == 0` 时读取；随后仍受 hard limit、上下文和外部 completion 剩余额度约束。 |
+| `fixed_think_stride` | 覆盖 `ThinkingBudget.think_stride`，即每次 probe 未接受后，下一段 `iterative_think` 子请求的最大生成 token 数。 | fixed 分支构造（134–140 行），以及统一覆盖（278–298 行）。 | `_ThinkingState.handle()` 当前 402–425 行在非首段读取；实际段长仍取 remaining think/context/completion 的最小值。 |
+| `fixed_num_thinking` | 覆盖 `ThinkingBudget.num_thinking`；其准确含义是**最多发起的 hidden confidence probe 次数**，不包含首个 thinking 段，也不是总生成 token 上限。在额度允许时，第 N 个 probe 未接受后仍生成与它对应的一段 stride，然后进入 final answer。 | fixed 分支当前 141–149 行；未显式设置时由总预算、check length 和 stride 推导。所有分支的正值统一覆盖位于 278–298 行。 | `_ThinkingState.handle()` 当前 504–515 行和 `_ConfidenceProbeState.handle()` 当前 529–537、569 行按 `probe_round` 判断。置信度提前接受、模型边界、hard limit、`max_internal_calls` 等都会减少实际 probe 数。 |
+| `fixed_min_think_tokens` | 覆盖 `ThinkingBudget.min_think_budget`；累计可见 thinking token 未达到它时，一个**可用的** probe 置信度不能触发提前接受。它不是绝对最小生成量：模型可自行闭合 reasoning，hard/context/completion/safety/call-limit 可提前结束，置信度不可用时当前实现还会 fail-open。 | fixed 分支当前 150–159 行；`fixed_budget_tokens > 0` 且本字段为 0 时默认取整个 fixed budget。统一覆盖位于 278–298 行。 | `_ConfidenceProbeState.handle()` 当前 610–624 行先处理 confidence unavailable，再检查 `thinking_tokens < min_think_budget`。 |
+| `fixed_prob_th` | 覆盖最终 `confidence_threshold`；可用 probe 的得分必须 `>=` 该阈值才提前结束思考。值越高通常越难提前接受，但不改变单次 probe 的 token 长度。 | `DtbBudgetResolver.resolve()` 当前 323–335 行；优先级为 `fixed_prob_th` > 服务级 `RUNTIME.confidence_threshold` 显式非默认值 > scene/history/runtime 默认。 | `_ConfidenceProbeState.handle()` 当前 603–626 行计算置信度并比较；confidence unavailable 的 fail-open 不受该阈值控制。 |
+
+解析优先级固定为：请求中的正值先覆盖启动 YAML；`fixed_budget_tokens > 0` 决定 FIXED
+主分支，否则仍选择 scene/history；其余 4 个预算子字段随后对所选向量做逐字段正值覆盖；
+`fixed_prob_th` 单独覆盖置信度阈值；最后 `DtbBudgetResolver._clamp_budget()` 把四维
+`ThinkingBudget` 都限制到统一 `hard_think_token_limit`。因此仅传
+`fixed_check_length`、`fixed_think_stride`、`fixed_num_thinking` 或
+`fixed_min_think_tokens` 时，字段可以生效，但 `decision_branch` 仍是
+`scene_difficulty` 或 `history`，不能审计成 `fixed`。
+
+当 `fixed_budget_tokens=B>0` 时，fixed 分支先用以下规则构造候选向量，再执行上述正值覆盖
+和 hard-limit clamp：
+
+```text
+C = min(fixed_check_length if > 0 else default.check_length, B)
+S = min(fixed_think_stride if > 0 else default.think_stride, B)
+N = fixed_num_thinking if > 0 else max(1, ceil(max(B - C, 0) / max(S, 1)))
+M = fixed_min_think_tokens if > 0 else B
+
+ThinkingBudget(check_length=C, min_think_budget=M,
+               num_thinking=N, think_stride=S)
+```
+
+`source_by_field` 记录每个最终字段来自 fixed、scene、difficulty、history/default 还是 hard
+limit clamp；phase 账本 run 必须用它核对请求值，而不能只凭 variant 文件名或
+`decision_branch` 推断参数已生效。
 
 难度估计位于 `dtb/budgeting/difficulty/`，是原始设计组成部分，当前默认关闭。此次重构只
 迁移并恢复清晰依赖，没有删除或宣称已完成生产有效性验证；重构完成后的单独一致性检视
@@ -600,7 +652,8 @@ sum(decision_branch) = sum(scene) = 被审计 DTB 请求总数
 每个 DTB 请求恰有一个 effective DtbBudgetDecision
 Vanilla 原生路径没有 DTB decision phase
 dtb_default 不出现 fixed 分支或 fixed 字段来源
-dtb_fixed_* 全部进入 fixed，且字段来源与传入参数一致
+dtb_fixed_* 若 fixed_budget_tokens > 0，则全部进入 fixed，且字段来源与传入参数一致
+仅测试 fixed 子字段覆盖时，按实际 scene_difficulty/history 分支审计 source_by_field
 ```
 
 任一不等式、缺失 DtbBudgetDecision 或 variant 分支断言失败时，该 run 只能用于排障，不能
@@ -749,7 +802,8 @@ variant 断言：
 ```text
 Vanilla：允许没有 phase
 dtb_default / 仅开开关：不得出现 fixed 字段来源
-dtb_fixed_*：应进入 fixed，且请求值、DtbBudgetDecision 和 source_by_field 一致
+dtb_fixed_*：fixed_budget_tokens > 0 时应进入 fixed；否则按实际分支审计局部字段来源
+所有请求值、DtbBudgetDecision 和 source_by_field 必须一致
 自动 scene 验证：预期产品请求应命中目标 scene 和冻结预算
 OOD：重点报告产品 scene 误命中率、reject_reason 与实际兜底预算
 ```
@@ -946,6 +1000,7 @@ CandidatePolicy 开始**离线**聚类、分类规则和拒识单测；未通过
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-08-27 | 补充生产 DTB 全部 6 个 `fixed_*` 参数的入口、零值语义、覆盖优先级、预算解析与状态机消费位置；明确只有 `fixed_budget_tokens > 0` 选择 FIXED 分支，其余字段可在 scene/history 分支上做局部覆盖。 |
 | 2026-08-25 | 纳入 run_12：量化 YAML 的 TP4 telemetry-off 自动全集取得微/宏 E2E +9.75%/+9.86%，质量恢复至 584/633，但白盒单步与 NetQAD 规划各少 2 题、五 scene 平均负收益且总体 P95 回退；两个历史长 final 均超过 2,048 token 且正确。停止 fixed 搜索，下一收口改为五 scene 真 native + 八 scene DTB。 |
 | 2026-08-24 | 澄清 run_11_fixed_v5 为 TP8、run_08 Vanilla 为 TP4，68.04% E2E 改判为跨 TP 不可裁决；新增 `budget_config_quant.yaml`，以 5 个 fixed_v5 + 8 个 fixed_v4 复验点支持 TP4 自动全集。部署只允许停服复制到规范入口并重启，不增加权重专属算法分支；逐场景 native 等 TP4 结果后单独实现。 |
 | 2026-07-30 | 初版：定义 13 场景寻优、自动路由和生产化方案 |
