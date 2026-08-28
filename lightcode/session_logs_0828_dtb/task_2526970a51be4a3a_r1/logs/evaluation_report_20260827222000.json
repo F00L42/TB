@@ -1,0 +1,58 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "29_ExperienceAssuranceService_cfd6a6f0",
+    "commit": "cfd6a6f09a3ca5e2edace283cdc3a16f9afb4588",
+    "evaluation_time": "2026-08-27T22:20:00+08:00"
+  },
+  "requirement": {
+    "description": "在体验保障服务中引入分布式锁机制，解决场景创建和任务创建的高并发调用问题，包括锁管理服务、恢复调度器、数据访问层扩展等组件。",
+    "files_count": 8,
+    "files_expected": [
+      "ScenesMgrDBMapper.java (修改)",
+      "SceneTaskLockRecoveryScheduler.java (新建)",
+      "SceneTaskLockServiceImpl.java (新建)",
+      "SceneTaskManageServiceImpl.java (修改)",
+      "ScenesMgrServiceImpl.java (修改)",
+      "LocaleMsg_en_US.properties (修改)",
+      "LocaleMsg_zh_CN.properties (修改)",
+      "ScenesMgrDBMapper.xml (修改)"
+    ]
+  },
+  "code_generation": {
+    "status": "partial",
+    "files_generated": [
+      "ScenesMgrDBMapper.java (已修改)",
+      "SceneTaskLockRecoveryScheduler.java (已创建)",
+      "SceneTaskManageServiceImpl.java (已修改)",
+      "ScenesMgrServiceImpl.java (已修改)",
+      "LocaleMsg_en_US.properties (已修改)",
+      "LocaleMsg_zh_CN.properties (已修改)",
+      "ScenesMgrDBMapper.xml (已修改)"
+    ],
+    "extra_files": [],
+    "missing_files": [
+      "SceneTaskLockServiceImpl.java - 该文件为新建文件，AI生成子agent未成功创建"
+    ],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行test_patch应用"
+  },
+  "compilation": {
+    "status": "failed",
+    "error_message": "Compilation failure: SceneTaskLockRecoveryScheduler.java 引用了不存在的类 SceneTaskLockServiceImpl。具体错误：[ERROR] /implements/venuealloc/.../scheduler/SceneTaskLockRecoveryScheduler.java:[11,82] cannot find symbol - symbol: class SceneTaskLockServiceImpl; [ERROR] /implements/venuealloc/.../scheduler/SceneTaskLockRecoveryScheduler.java:[37,24] cannot find symbol - symbol: class SceneTaskLockServiceImpl",
+    "fail_reason": "AI代码生成子agent漏生成了SceneTaskLockServiceImpl.java文件，导致SceneTaskLockRecoveryScheduler.java编译失败"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行DT"
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI代码生成子agent未能完整生成所有8个文件，漏生成了SceneTaskLockServiceImpl.java（新建文件）。该文件是锁管理的核心实现类，被SceneTaskLockRecoveryScheduler.java依赖。缺少该文件导致编译失败（2个cannot find symbol错误），无法继续执行test_patch应用和DT测试。7个已生成的文件修改看似正确，但由于关键文件的缺失，整体评测结果为不合格。",
+    "failure_step": "步骤4：编译验证（主代码）",
+    "pass_rate": "0%"
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "26_ExperienceAssuranceService_0222e644",
+    "commit": "0222e6444d6c7d7d93a8ba5d37884ef3f28438fe",
+    "evaluation_time": "2026-08-27T12:41:20+08:00"
+  },
+  "requirement": {
+    "description": "ExperienceAssuranceService新增查询所有实例ID与当前实例ID功能。实现InstanceUtils工具类，提供queryAllInstanceIds()和queryCurrentInstanceId()方法，通过IR接口和POD_NAME环境变量获取实例ID，解析返回的实例名称获取整数ID。",
+    "files_count": 1,
+    "files_expected": [
+      "implements/common/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/common/impl/utils/InstanceUtils.java"
+    ],
+    "files_generated": [
+      "implements/common/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/common/impl/utils/InstanceUtils.java"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "api_mismatches": [
+      {
+        "issue": "StringUtil.isNullOrEmpty() not found",
+        "detail": "StringUtil类没有isNullOrEmpty()方法，正确方法为isEmpty()。AI生成了6处isNullOrEmpty()调用（第52、59、85、121、129行）。",
+        "occurrences": 6
+      },
+      {
+        "issue": "RestCaller.builder() not found",
+        "detail": "RestCaller类没有静态builder()方法，正确用法为new RestCaller.Builder(url, method)。AI在第102行使用了错误的API。",
+        "occurrences": 1
+      },
+      {
+        "issue": "getBackendList方法签名不匹配",
+        "detail": "AI生成的getBackendList()不接受respHeaderMap参数，与测试代码中mock的call().getRespHeaderMap()返回Map<String, String>不匹配。测试mock的是call()返回RestfulResponse，通过getRespHeaderMap()获取Map<String, String>响应头。AI的实现使用Map<String, List<String>>作为返回值类型。",
+        "occurrences": 1
+      },
+      {
+        "issue": "缺少必要的import",
+        "detail": "AI代码缺少java.util.Arrays和java.util.stream.Collectors的import（因为未使用流式API处理实例列表，而是使用了for循环）。参考patch使用流式API处理实例列表。",
+        "occurrences": 0
+      },
+      {
+        "issue": "缺少日志语句",
+        "detail": "AI代码缺少queryAllInstanceIds()开始时的日志'Query all instance IDs successfully, instance count: {}'，以及queryCurrentInstanceId()中的中间日志。",
+        "occurrences": 2
+      }
+    ]
+  },
+  "test_patch_apply": {
+    "method": "not_executed",
+    "reason": "主代码编译失败，未执行test_patch应用"
+  },
+  "compilation": {
+    "status": "failed",
+    "error_message": "6 compilation errors:\n1. [Line 52] StringUtil.isNullOrEmpty() - cannot find symbol\n2. [Line 59] StringUtil.isNullOrEmpty() - cannot find symbol\n3. [Line 85] StringUtil.isNullOrEmpty() - cannot find symbol\n4. [Line 102] RestCaller.builder() - cannot find symbol\n5. [Line 121] StringUtil.isNullOrEmpty() - cannot find symbol\n6. [Line 129] StringUtil.isNullOrEmpty() - cannot find symbol"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行DT"
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI生成的代码存在严重的API使用错误导致编译失败。主要问题：(1) StringUtil类没有isNullOrEmpty()方法（应使用isEmpty()），共6处错误；(2) RestCaller类没有builder()静态方法（应使用new RestCaller.Builder(url, method)），共1处错误；(3) getBackendList()实现与测试代码的mock不兼容，使用的响应头Map类型不匹配。AI未能正确识别项目已有的API接口，生成了不存在的API调用，导致编译完全失败。代码结构（类定义、常量、方法签名）基本正确，但关键API调用全部错误。",
+    "pass_rate": "0%",
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0
+  }
+}

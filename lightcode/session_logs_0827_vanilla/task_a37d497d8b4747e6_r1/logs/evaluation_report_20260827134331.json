@@ -1,0 +1,48 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "35_DVAIAgentService_00725ad1",
+    "commit": "00725ad136cf306f680ae0c512ae3dd301e9598e",
+    "evaluation_time": "20260827134331"
+  },
+  "requirement": {
+    "description": "fix:增加空指针判空&注册事务同步管理器",
+    "files_count": 2,
+    "files_generated": [
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/cluster/IncidentManage.java",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/executor/DelayedIncidentScheduler.java"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": [
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/impl/IncidentManageTest.java"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": [
+      "com.huawei.i2000.dvaiagentservice.impl.IncidentManageTest"
+    ],
+    "total_tests": 36,
+    "passed_tests": 36,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "errors": 0,
+    "pass_rate": "100.00%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI生成的代码完全正确。2个目标文件均已成功修改，编译通过，36个测试用例全部通过（通过率100%）。主要变更包括：1) IncidentManage.addIncident方法重构，增加null/empty判空保护；2) 新增prepareEvents/persistData/dispatchTasks/handleAlarmTask/submitDiagnosisTask/handleTaskSubmissionFailure等私有方法拆分逻辑；3) handleAlarmTask中使用TransactionSynchronizationManager注册事务提交后回调；4) DelayedIncidentScheduler.checkRecoveryStatus增加incident为null的判空保护。"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "29_ExperienceAssuranceService_cfd6a6f0",
+    "commit": "cfd6a6f09a3ca5e2edace283cdc3a16f9afb4588",
+    "evaluation_time": "20260827114644"
+  },
+  "requirement": {
+    "description": "在体验保障服务中，系统存在场景创建和任务创建的高并发调用问题。通过实现分布式并发控制机制，解决高并发场景下的数据一致性问题，包括分布式锁机制、锁超时处理、定时恢复等。",
+    "files_count": 2,
+    "files_generated": [
+      "implements/venuealloc/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/venuealloc/impl/scheduler/SceneTaskLockRecoveryScheduler.java",
+      "implements/venuealloc/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/venuealloc/impl/service/SceneTaskLockServiceImpl.java"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [
+      "文件头部版权信息格式不完整：单行格式 \"/* Copyright ... */\" 而非多行格式"
+    ]
+  },
+  "test_patch_apply": {
+    "method": "git_apply",
+    "manual_applied_files": []
+  },
+  "compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": [
+      "SceneTaskLockRecoverySchedulerTest",
+      "SceneTaskLockServiceImplTest",
+      "SceneTaskManageServiceImplTest",
+      "ScenesMgrServiceImplTest"
+    ],
+    "total_tests": 87,
+    "passed_tests": 86,
+    "failed_tests": 1,
+    "skipped_tests": 0,
+    "pass_rate": "98.85%",
+    "failed_test_details": [
+      {
+        "test_name": "SceneTaskLockServiceImplTest.testRunTaskWhenQueryDatabaseErrorThenWriteLog",
+        "error_message": "TooManyActualInvocations: scenesMgrDBMapper.clearExpiredLocks(<any>, <any>); Wanted 1 time but was 2 times. AI生成的代码中try-catch块位于for循环内部，导致第一次调用clearExpiredLocks抛出异常后被catch捕获，循环继续执行第二次调用。期望代码中try-catch块应该包裹整个for循环，异常抛出后循环终止。"
+      }
+    ]
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI成功生成了SceneTaskLockRecoveryScheduler和SceneTaskLockServiceImpl两个新文件，编译通过，87个测试用例中86个通过，通过率98.85%。存在1个测试失败：SceneTaskLockServiceImpl.runTask()方法中，AI将try-catch块放置在for循环内部而非外部，导致异常处理逻辑与参考实现不一致。当clearExpiredLocks第一次调用抛出异常时，参考实现期望循环终止仅调用1次，而AI生成代码继续执行了第二次调用。"
+  }
+}
