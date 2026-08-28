@@ -9,9 +9,10 @@ import hashlib
 import json
 import os
 import re
+import statistics
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -87,6 +88,13 @@ class Observation:
     chunk_after_terminal: bool
     anomaly_reasons: list[str]
     error: str = ""
+    first_chunk_ms: float = 0.0
+    first_output_ms: float = 0.0
+    first_reasoning_ms: float = 0.0
+    first_content_ms: float = 0.0
+    first_tool_call_ms: float = 0.0
+    chunk_count: int = 0
+    usage: dict[str, Any] = field(default_factory=dict)
 
 
 def json_hash(value: Any) -> str:
@@ -186,11 +194,13 @@ def build_body(
     body["request_id"] = client_request_id
     if args.model:
         body["model"] = args.model
-    if args.max_tokens > 0:
+    if args.max_tokens is not None and args.max_tokens > 0:
         body["max_tokens"] = args.max_tokens
         body.pop("max_completion_tokens", None)
-    body["temperature"] = args.temperature
-    body["top_p"] = args.top_p
+    if args.temperature is not None:
+        body["temperature"] = args.temperature
+    if args.top_p is not None:
+        body["top_p"] = args.top_p
 
     if variant == "dtb":
         body["enable_think_budget"] = True
@@ -225,6 +235,11 @@ def assemble_observation(
     expected_tool_call: bool,
     chunks: list[dict],
     error: str = "",
+    first_chunk_ms: float = 0.0,
+    first_output_ms: float = 0.0,
+    first_reasoning_ms: float = 0.0,
+    first_content_ms: float = 0.0,
+    first_tool_call_ms: float = 0.0,
 ) -> Observation:
     content_parts: list[str] = []
     reasoning_parts: list[str] = []
@@ -236,9 +251,12 @@ def assemble_observation(
     chunk_after_terminal = False
     terminal_event_indexes: list[int] = []
     terminal_seen = False
+    usage: dict[str, Any] = {}
 
     for event_index, chunk in enumerate(chunks, start=1):
         server_request_id = server_request_id or str(chunk.get("id") or "")
+        if isinstance(chunk.get("usage"), dict) and chunk["usage"]:
+            usage = chunk["usage"]
         for choice in chunk.get("choices") or []:
             delta = choice.get("delta") or {}
             finish_reason = choice.get("finish_reason")
@@ -343,6 +361,13 @@ def assemble_observation(
         chunk_after_terminal=chunk_after_terminal,
         anomaly_reasons=anomaly_reasons,
         error=error,
+        first_chunk_ms=round(first_chunk_ms, 3),
+        first_output_ms=round(first_output_ms, 3),
+        first_reasoning_ms=round(first_reasoning_ms, 3),
+        first_content_ms=round(first_content_ms, 3),
+        first_tool_call_ms=round(first_tool_call_ms, 3),
+        chunk_count=len(chunks),
+        usage=usage,
     )
 
 
@@ -363,9 +388,16 @@ async def run_one(
     status_code = 0
     error = ""
     started = time.perf_counter()
+    first_chunk_ms = 0.0
+    first_output_ms = 0.0
+    first_reasoning_ms = 0.0
+    first_content_ms = 0.0
+    first_tool_call_ms = 0.0
     try:
+        request_headers = dict(headers)
+        request_headers["X-Request-Id"] = client_request_id
         async with client.stream(
-            "POST", url, json=body, headers=headers
+            "POST", url, json=body, headers=request_headers
         ) as response:
             status_code = response.status_code
             if status_code != 200:
@@ -398,6 +430,25 @@ async def run_one(
                     chunks_file.flush()
                     if parsed is not None:
                         chunks.append(parsed)
+                        elapsed_ms = (time.perf_counter() - started) * 1000
+                        if first_chunk_ms == 0.0:
+                            first_chunk_ms = elapsed_ms
+                        for choice in parsed.get("choices") or []:
+                            delta = choice.get("delta") or {}
+                            reasoning = delta.get("reasoning")
+                            content = delta.get("content")
+                            tool_calls = delta.get("tool_calls")
+                            if (
+                                first_output_ms == 0.0
+                                and (reasoning or content or tool_calls)
+                            ):
+                                first_output_ms = elapsed_ms
+                            if first_reasoning_ms == 0.0 and reasoning:
+                                first_reasoning_ms = elapsed_ms
+                            if first_content_ms == 0.0 and content:
+                                first_content_ms = elapsed_ms
+                            if first_tool_call_ms == 0.0 and tool_calls:
+                                first_tool_call_ms = elapsed_ms
                     if parse_error and not error:
                         error = f"invalid SSE JSON: {parse_error}"
     except Exception as exc:
@@ -413,7 +464,147 @@ async def run_one(
         expected_tool_call=expected_tool_call,
         chunks=chunks,
         error=error,
+        first_chunk_ms=first_chunk_ms,
+        first_output_ms=first_output_ms,
+        first_reasoning_ms=first_reasoning_ms,
+        first_content_ms=first_content_ms,
+        first_tool_call_ms=first_tool_call_ms,
     )
+
+
+def percentile(values: list[float], fraction: float) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * fraction
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = position - lower
+    return ordered[lower] * (1 - weight) + ordered[upper] * weight
+
+
+def metric_summary(values: list[float]) -> dict[str, float]:
+    return {
+        "mean": round(statistics.fmean(values), 3) if values else 0.0,
+        "median": round(statistics.median(values), 3) if values else 0.0,
+        "p95": round(percentile(values, 0.95), 3),
+    }
+
+
+def usage_int(observation: Observation, key: str) -> int:
+    value = observation.usage.get(key, 0)
+    return int(value) if isinstance(value, (int, float)) else 0
+
+
+def build_paired_summary(observations: list[Observation]) -> dict[str, Any]:
+    variants: dict[str, Any] = {}
+    for variant in sorted({row.variant for row in observations}):
+        rows = [row for row in observations if row.variant == variant]
+        variants[variant] = {
+            "requests": len(rows),
+            "protocol_passes": sum(not row.anomaly_reasons for row in rows),
+            "protocol_failures": sum(bool(row.anomaly_reasons) for row in rows),
+            "request_errors": sum(bool(row.error) for row in rows),
+            "elapsed_ms": metric_summary([row.elapsed_ms for row in rows]),
+            "first_output_ms": metric_summary([
+                row.first_output_ms for row in rows if row.first_output_ms > 0
+            ]),
+            "prompt_tokens": sum(usage_int(row, "prompt_tokens") for row in rows),
+            "completion_tokens": sum(
+                usage_int(row, "completion_tokens") for row in rows
+            ),
+        }
+
+    grouped: dict[tuple[int, int], dict[str, Observation]] = {}
+    for row in observations:
+        grouped.setdefault((row.line_no, row.attempt), {})[row.variant] = row
+    pairs = [
+        rows for rows in grouped.values()
+        if "vanilla" in rows and "dtb" in rows
+    ]
+    clean_pairs = [
+        rows for rows in pairs
+        if not rows["vanilla"].anomaly_reasons
+        and not rows["dtb"].anomaly_reasons
+    ]
+
+    def paired_metrics(rows: list[dict[str, Observation]]) -> dict[str, Any]:
+        deltas = [
+            pair["dtb"].elapsed_ms - pair["vanilla"].elapsed_ms
+            for pair in rows
+        ]
+        speedups = [
+            (pair["vanilla"].elapsed_ms - pair["dtb"].elapsed_ms)
+            / pair["vanilla"].elapsed_ms
+            * 100
+            for pair in rows
+            if pair["vanilla"].elapsed_ms > 0
+        ]
+        return {
+            "pairs": len(rows),
+            "dtb_minus_vanilla_ms": metric_summary(deltas),
+            "dtb_speedup_percent": metric_summary(speedups),
+            "dtb_faster_pairs": sum(
+                pair["dtb"].elapsed_ms < pair["vanilla"].elapsed_ms
+                for pair in rows
+            ),
+        }
+
+    per_case = []
+    for line_no in sorted({row.line_no for row in observations}):
+        case_pairs = [
+            rows for (case_line, _), rows in grouped.items()
+            if case_line == line_no and "vanilla" in rows and "dtb" in rows
+        ]
+        per_case.append({"line_no": line_no, **paired_metrics(case_pairs)})
+
+    return {
+        "request_count": len(observations),
+        "variants": variants,
+        "all_pairs": paired_metrics(pairs),
+        "protocol_clean_pairs": paired_metrics(clean_pairs),
+        "per_case": per_case,
+        "latency_ranking_valid": bool(pairs) and len(clean_pairs) == len(pairs),
+    }
+
+
+def write_result_markdown(path: Path, summary: dict[str, Any]) -> None:
+    lines = [
+        "# Tool-call paired streaming replay",
+        "",
+        "## Protocol",
+        "",
+        "| Variant | Requests | Pass | Failure | E2E median ms | E2E P95 ms | First output median ms |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for variant, values in summary["variants"].items():
+        lines.append(
+            "| {variant} | {requests} | {passes} | {failures} | {median} | {p95} | {first} |".format(
+                variant=variant,
+                requests=values["requests"],
+                passes=values["protocol_passes"],
+                failures=values["protocol_failures"],
+                median=values["elapsed_ms"]["median"],
+                p95=values["elapsed_ms"]["p95"],
+                first=values["first_output_ms"]["median"],
+            )
+        )
+    clean = summary["protocol_clean_pairs"]
+    lines.extend([
+        "",
+        "## Paired latency",
+        "",
+        f"- All pairs: {summary['all_pairs']['pairs']}",
+        f"- Protocol-clean pairs: {clean['pairs']}",
+        f"- Median DTB minus Vanilla: {clean['dtb_minus_vanilla_ms']['median']} ms",
+        f"- Median DTB speedup: {clean['dtb_speedup_percent']['median']}%",
+        f"- DTB faster clean pairs: {clean['dtb_faster_pairs']}/{clean['pairs']}",
+        f"- Latency ranking valid: {summary['latency_ranking_valid']}",
+        "",
+        "Latency ranking is valid only when every pair is free of protocol anomalies.",
+        "",
+    ])
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -436,21 +627,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--mode", choices=("both", "dtb", "vanilla"), default="both"
     )
     parser.add_argument(
+        "--order",
+        choices=("alternating", "fixed"),
+        default="alternating",
+        help="counterbalance variant order across repetitions",
+    )
+    parser.add_argument(
         "--url", default="http://127.0.0.1:9000/v1/chat/completions"
     )
     parser.add_argument("--model", default="")
     parser.add_argument("--api-key", default=os.getenv("OPENAI_API_KEY", ""))
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--max-tokens", type=int, default=32000)
-    parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--top-p", type=float, default=0.95)
-    parser.add_argument("--fixed-budget-tokens", type=int, default=30000)
-    parser.add_argument("--fixed-check-length", type=int, default=256)
-    parser.add_argument("--fixed-think-stride", type=int, default=128)
-    parser.add_argument("--fixed-num-thinking", type=int, default=3)
-    parser.add_argument("--fixed-min-think-tokens", type=int, default=20)
-    parser.add_argument("--fixed-prob-th", type=float, default=0.9)
+    parser.add_argument(
+        "--max-tokens", type=int, default=None,
+        help="override the archived value; default preserves each source request",
+    )
+    parser.add_argument(
+        "--temperature", type=float, default=None,
+        help="override the archived value; default preserves each source request",
+    )
+    parser.add_argument(
+        "--top-p", type=float, default=None,
+        help="override the archived value; default preserves each source request",
+    )
+    parser.add_argument("--fixed-budget-tokens", type=int, default=20000)
+    parser.add_argument("--fixed-check-length", type=int, default=400)
+    parser.add_argument("--fixed-think-stride", type=int, default=500)
+    parser.add_argument("--fixed-num-thinking", type=int, default=4)
+    parser.add_argument("--fixed-min-think-tokens", type=int, default=1)
+    parser.add_argument("--fixed-prob-th", type=float, default=0.93)
     return parser.parse_args(argv)
 
 
@@ -467,7 +673,7 @@ async def async_main(args: argparse.Namespace) -> int:
         if "dtb" in variants:
             for line_no, _, _ in cases:
                 for attempt in range(1, args.repetitions + 1):
-                    print(build_request_id(
+                    print("chatcmpl-" + build_request_id(
                         line_no, attempt, "dtb", request_id_run
                     ))
         return 0
@@ -495,6 +701,9 @@ async def async_main(args: argparse.Namespace) -> int:
         "repetitions": args.repetitions,
         "request_id_run": request_id_run,
         "variants": list(variants),
+        "variant_order": args.order,
+        "request_id_header": "X-Request-Id",
+        "stream_audit_parent_request_id_prefix": "chatcmpl-",
         "url": args.url,
         "model_override": args.model or None,
         "request_overrides": {
@@ -510,6 +719,7 @@ async def async_main(args: argparse.Namespace) -> int:
     )
 
     failures = 0
+    observations: list[Observation] = []
     timeout = httpx.Timeout(args.timeout)
     limits = httpx.Limits(max_connections=1, max_keepalive_connections=1)
     async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
@@ -518,7 +728,14 @@ async def async_main(args: argparse.Namespace) -> int:
         ) as summary_file:
             for line_no, source_body, expected in cases:
                 for attempt in range(1, args.repetitions + 1):
-                    for variant in variants:
+                    attempt_variants = variants
+                    if (
+                        args.order == "alternating"
+                        and len(variants) == 2
+                        and attempt % 2 == 0
+                    ):
+                        attempt_variants = tuple(reversed(variants))
+                    for variant in attempt_variants:
                         request_id = build_request_id(
                             line_no, attempt, variant, request_id_run
                         )
@@ -548,6 +765,7 @@ async def async_main(args: argparse.Namespace) -> int:
                             expected_tool_call=expected,
                             chunks_file=chunks_file,
                         )
+                        observations.append(observation)
                         summary_file.write(
                             json.dumps(asdict(observation), ensure_ascii=False) + "\n"
                         )
@@ -565,6 +783,12 @@ async def async_main(args: argparse.Namespace) -> int:
                             flush=True,
                         )
 
+    paired_summary = build_paired_summary(observations)
+    (output_dir / "paired_summary.json").write_text(
+        json.dumps(paired_summary, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    write_result_markdown(output_dir / "RESULT.md", paired_summary)
     print(
         f"completed output={output_dir} failures={failures}",
         flush=True,

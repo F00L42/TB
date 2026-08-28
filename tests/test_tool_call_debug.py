@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -9,8 +10,13 @@ from tools.dtb.analyze_tool_call_run import classify
 from tools.dtb.replay_tool_calls import (
     assemble_observation,
     build_body,
+    build_paired_summary,
     build_request_id,
     validate_conversation,
+)
+from tools.dtb.extract_tool_call_replay_cases import (
+    read_candidates,
+    select_first_clean,
 )
 
 
@@ -186,6 +192,73 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertNotIn("fixed_budget_tokens", vanilla)
         self.assertTrue(dtb["enable_think_budget"])
         self.assertEqual(dtb["fixed_budget_tokens"], 10)
+
+    def test_full_log_extractor_selects_wire_exact_clean_case(self) -> None:
+        record = {
+            "timestamp": "2026-08-27T00:00:00",
+            "request_id": "source-request",
+            "request_body": {
+                "model": "m",
+                "messages": [
+                    {"role": "system", "content": "system"},
+                    {"role": "user", "content": "- branch: branch-a\nrun"},
+                ],
+                "tools": [],
+            },
+            "response_data": {
+                "content": "l_call>\n<function=read>",
+                "reasoning": "",
+                "tool_calls": "",
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "full_log.jsonl"
+            path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            candidates = read_candidates(path, {"branch-a"})
+
+        selected = select_first_clean(candidates, ["branch-a"])
+        self.assertEqual(len(selected), 1)
+        self.assertEqual(selected[0].request_id, "source-request")
+        self.assertEqual(selected[0].leaked_functions, ("read",))
+        self.assertTrue(selected[0].context_clean)
+        self.assertEqual(selected[0].record["request_body"], record["request_body"])
+
+    def test_paired_summary_excludes_protocol_failures_from_latency(self) -> None:
+        terminal = [{"id": "r", "choices": [{
+            "delta": {"content": "done"}, "finish_reason": "stop",
+        }]}]
+        vanilla = assemble_observation(
+            line_no=1,
+            attempt=1,
+            variant="vanilla",
+            client_request_id="v",
+            status_code=200,
+            elapsed_ms=100.0,
+            expected_tool_call=False,
+            chunks=terminal,
+            first_output_ms=20.0,
+        )
+        dtb = assemble_observation(
+            line_no=1,
+            attempt=1,
+            variant="dtb",
+            client_request_id="d",
+            status_code=200,
+            elapsed_ms=80.0,
+            expected_tool_call=False,
+            chunks=terminal,
+            first_output_ms=15.0,
+        )
+
+        summary = build_paired_summary([vanilla, dtb])
+
+        self.assertEqual(summary["all_pairs"]["pairs"], 1)
+        self.assertEqual(summary["protocol_clean_pairs"]["pairs"], 1)
+        self.assertEqual(
+            summary["protocol_clean_pairs"]["dtb_minus_vanilla_ms"]["median"],
+            -20.0,
+        )
+        self.assertTrue(summary["latency_ranking_valid"])
 
     def test_analysis_accepts_one_completion_with_tool_continuation(self) -> None:
         summary = {
