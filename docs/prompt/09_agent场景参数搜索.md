@@ -24,3 +24,9 @@ docs\design\agent_multiturn_dtb_experiment_plan.md
 1. dtb固定参数的实验原因是因为分析vanilla思维链分布（docs\debug\vanilla_baseline_analysis.md）后，发现长思维链的分布极度倾斜，短的极短，只有少数长思考，经过分析，长思考中确实存在已得到最终答案但冗余思考的情况，因此将优化策略确定为短程自由思考，专注优化长思维链来得到时延优化，目前通过固定参数接口进行实验，确认可行后配置对应的yaml配置文件即可自动启用
 2. 基于1，短思维链也加入answer cue（docs\design\think_budget_finalization_compatibility.md）的行为可能造成时延的不必要消耗
 3. tool_call故障的排查是第一优先级，已确认服务器环境已完整应用现有的修复方案（dtb+parser patch），可以先抽取一些run-02中存在故障的prompt进行配对流失回放时延，提取结果和测试脚本
+
+---
+
+docs\log\perf\agent_tool_call_run02_replay\run_server_01是runbook执行结果，没有发现问题
+回顾目标和思维连分布特征，我认为answer cue的修改对tool_call成功率和时延的影响嫌疑大，分析：对于短思维链（十几个token）开启dtb的场景，模型在输出</think>或者<tool_call>后，要先看一遍十几个token的诱导prompt再续写，带来额外的首字时延消耗和语义偏移
+找到并展示源码里相关的证据，分析这一猜想的证据是否准确，评估实际影响会有多大

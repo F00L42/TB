@@ -17,3 +17,17 @@
 - Latency ranking valid: True
 
 Latency ranking is valid only when every pair is free of protocol anomalies.
+
+## Server audit status
+
+The archived `analysis.json` was generated before the 2026-08-28 analyzer
+compatibility fix and must not be used for lifecycle acceptance. Its 40 DTB
+requests all record one source terminal, one final-terminal passthrough, no
+synthetic terminal, and no terminal-passthrough violation, but the old analyzer
+incorrectly required `terminal_flush=1` from historical schema 1.
+
+The raw `server.log` is not included in this directory, so the corrected
+analyzer cannot recheck every production-schema delta from the uploaded
+artifacts alone. Rerun `tools/dtb/analyze_tool_call_run.py` against the original
+server log before replacing `analysis.json` or declaring 40/40 server-audit
+acceptance.

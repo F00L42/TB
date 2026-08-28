@@ -10,6 +10,35 @@ from typing import Any
 
 
 PREFIXES = ("DTB_STREAM_AUDIT ", "TB_TOOL_STREAM ")
+PRODUCTION_STREAM_AUDIT_SOURCE = "controller_pre_parser"
+
+
+def uses_source_terminal_contract(records: list[dict[str, Any]]) -> bool:
+    """Detect audit formats that bind completion to the source terminal.
+
+    Historical ``TB_TOOL_STREAM`` introduced this contract in schema 4.  The
+    production ``DTB_STREAM_AUDIT`` restarted its schema at 1 and identifies
+    itself with ``source=controller_pre_parser``.
+    """
+    return any(
+        row.get("source") == PRODUCTION_STREAM_AUDIT_SOURCE
+        or (
+            isinstance(row.get("schema"), int)
+            and row["schema"] >= 4
+        )
+        for row in records
+    )
+
+
+def supports_passthrough_digests(record: dict[str, Any]) -> bool:
+    """Return whether a record carries the raw/forwarded digest contract."""
+    return (
+        record.get("source") == PRODUCTION_STREAM_AUDIT_SOURCE
+        or (
+            isinstance(record.get("schema"), int)
+            and record["schema"] >= 2
+        )
+    )
 
 
 def is_valid_stop_boundary_alignment(record: dict[str, Any]) -> bool:
@@ -82,6 +111,10 @@ def classify(
     summary: dict[str, Any],
     records: list[dict[str, Any]],
 ) -> dict[str, Any]:
+    source_terminal_contract = uses_source_terminal_contract(records)
+    terminal_contract_mode = (
+        "source_terminal" if source_terminal_contract else "terminal_flush"
+    )
     visible_records = [
         row for row in records
         if row.get("event") in {
@@ -163,8 +196,7 @@ def classify(
     passthrough_violations = [
         int(row.get("sequence") or 0)
         for row in records
-        if isinstance(row.get("schema"), int)
-        and row["schema"] >= 2
+        if supports_passthrough_digests(row)
         and row.get("event") in {
             "delta", "terminal_body", "final_terminal_passthrough",
         }
@@ -194,16 +226,12 @@ def classify(
             or row.get("raw_finished") != row.get("forwarded_finished")
         )
     ]
-    has_schema_four = any(
-        isinstance(row.get("schema"), int) and row["schema"] >= 4
-        for row in records
-    )
     terminal_contract_failure = (
         final_source_terminal_count != 1
         or final_terminal_passthrough_count != 1
         or synthetic_terminal_count != 0
         or bool(terminal_passthrough_violations)
-    ) if has_schema_four else terminal_flush_count != 1
+    ) if source_terminal_contract else terminal_flush_count != 1
     lifecycle_failures = (
         terminal_contract_failure
         or completion_epoch_count != 1
@@ -298,6 +326,7 @@ def classify(
         "final_source_terminal_count": final_source_terminal_count,
         "final_terminal_passthrough_count": final_terminal_passthrough_count,
         "synthetic_terminal_count": synthetic_terminal_count,
+        "terminal_contract_mode": terminal_contract_mode,
         "terminal_contract_valid": not terminal_contract_failure,
         "terminal_passthrough_violation_sequences": (
             terminal_passthrough_violations),
@@ -358,7 +387,8 @@ def main(argv: list[str] | None = None) -> int:
             f"source_terminals={analysis['final_source_terminal_count']} "
             "terminal_passthroughs="
             f"{analysis['final_terminal_passthrough_count']} "
-            f"synthetic_terminals={analysis['synthetic_terminal_count']}"
+            f"synthetic_terminals={analysis['synthetic_terminal_count']} "
+            f"terminal_contract={analysis['terminal_contract_mode']}"
         )
 
     output_path = args.output or args.run_dir / "analysis.json"
@@ -404,6 +434,14 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "terminal_contract_valid": sum(
                     row["terminal_contract_valid"] for row in dtb_analyses
+                ),
+                "source_terminal_contract": sum(
+                    row["terminal_contract_mode"] == "source_terminal"
+                    for row in dtb_analyses
+                ),
+                "legacy_terminal_flush_contract": sum(
+                    row["terminal_contract_mode"] == "terminal_flush"
+                    for row in dtb_analyses
                 ),
                 "no_fresh_final_after_tool_boundary": sum(
                     row["fresh_final_after_tool_boundary"] == 0

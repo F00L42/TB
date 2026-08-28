@@ -748,8 +748,10 @@ raw/forwarded 摘要与 SSE 结果关联，
   delta boundary，并供后续 AutoTokenizer 离线解码；
 - 对 schema 3 校验 stop boundary alignment 的 raw/forwarded 前缀关系，并在
   `stop_boundary_alignments` 保留 raw、forwarded 和 dropped IDs；
-- 对旧 schema 计算 `terminal_flush_count`，对 schema 4 计算 `final_source_terminal_count`、
-  `final_terminal_passthrough_count`、`synthetic_terminal_count`，并继续计算
+- 对历史 `TB_TOOL_STREAM` schema 1～3 计算 `terminal_flush_count`；对历史 schema 4 和
+  `source=controller_pre_parser` 的生产 `DTB_STREAM_AUDIT` schema 1 计算
+  `final_source_terminal_count`、`final_terminal_passthrough_count`、
+  `synthetic_terminal_count`，并继续计算
   `completion_epoch_count`、`fresh_final_after_tool_boundary` 和
   `thinking_or_probe_after_tool_boundary`；
 - 在 `analysis.json.summary.dtb_acceptance` 汇总上述逐请求门槛，便于直接核对 100 次发布门；
@@ -1481,3 +1483,4 @@ summary/analysis 和服务器 patch 结果由 `debug_tool_call` 归档分支及�
 | 2026-08-17 | 决定先用可逆 patch 直接修改服务器原生 parser 做因果实验，不引入 plugin、不修改 `third_party/vllm`，实验结果与实际 diff 保存后 reverse，且不合入主干 | 直接修改让 Vanilla/DTB 共用同一修复并减少实验变量；离线 A/B 已把三层 bundled JSON 从无效变为有效，仍需目标服务器验证真实 MTP 与协议矩阵 |
 | 2026-08-19 | 根据 commit `0b641fd` 完成最终复盘，将修复定义为“DTB 原生流契约 + 固定 vLLM parser patch”的成套交付，并把 patch 文件升级为主分支 MR 的受版本约束集成资产 | 180 对真实 replay 与 265 个 DTB tool calls 证明目标流式故障闭环；同时保留 direct tool boundary、非流式、schema 校验、final cap 和大体积证据治理等风险，避免把阶段通过扩大为全局等价 |
 | 2026-08-19 | 从 `main` 重构 MR 整理分支，保留默认关闭的 schema 4 telemetry 并锁定关闭态 fast path；原始 `run_after_*` 结果留在 `debug_tool_call` 归档分支 | 长期保留 parser 前诊断能力，同时避免 telemetry 构造/I/O 进入正常请求路径，并阻止 36 万行含正文实验数据进入主干历史 |
+| 2026-08-28 | 修正 analyzer 对生产 `DTB_STREAM_AUDIT` schema 1 的契约识别，并将其普通 delta 纳入 raw/forwarded digest 检查 | `run_server_01` 的 40 个 DTB 请求都满足 source-terminal 字段，却因沿用历史 schema 1 的 `terminal_flush` 门槛被误报为生命周期失败；同一分支还会漏检生产 delta 变异 |

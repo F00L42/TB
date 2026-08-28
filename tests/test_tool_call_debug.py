@@ -316,6 +316,7 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertEqual(analysis["diagnosis"], "pass")
         self.assertEqual(analysis["completion_epoch_count"], 1)
         self.assertEqual(analysis["terminal_flush_count"], 1)
+        self.assertEqual(analysis["terminal_contract_mode"], "terminal_flush")
         self.assertEqual(analysis["fresh_final_after_tool_boundary"], 0)
         self.assertEqual(analysis["thinking_or_probe_after_tool_boundary"], 0)
 
@@ -360,9 +361,125 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertEqual(analysis["final_source_terminal_count"], 1)
         self.assertEqual(analysis["final_terminal_passthrough_count"], 1)
         self.assertEqual(analysis["synthetic_terminal_count"], 0)
+        self.assertEqual(analysis["terminal_contract_mode"], "source_terminal")
         self.assertTrue(analysis["terminal_contract_valid"])
         self.assertEqual(
             analysis["terminal_passthrough_violation_sequences"], [])
+
+    def test_analysis_accepts_production_schema_one_source_terminal(
+        self,
+    ) -> None:
+        summary = {
+            "client_request_id": "r",
+            "server_request_id": "r",
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": [],
+        }
+        records = [
+            {
+                "schema": 1,
+                "source": "controller_pre_parser",
+                "event": "delta",
+                "phase": "final_answer",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "raw_text": "<tool_call>",
+                "raw_text_sha256": "text",
+                "forwarded_text_sha256": "text",
+                "source_token_ids_sha256": "ids",
+                "forwarded_token_ids_sha256": "ids",
+                "terminal_flush": False,
+                "final_terminal_passthrough": False,
+                "synthetic_terminal": False,
+            },
+            {
+                "schema": 1,
+                "source": "controller_pre_parser",
+                "event": "final_terminal_passthrough",
+                "phase": "final_answer",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "raw_text": "</tool_call>",
+                "raw_text_sha256": "terminal-text",
+                "forwarded_text_sha256": "terminal-text",
+                "source_token_ids_sha256": "terminal-ids",
+                "forwarded_token_ids_sha256": "terminal-ids",
+                "source_finish_reason": "stop",
+                "forwarded_finish_reason": "stop",
+                "source_stop_reason": None,
+                "forwarded_stop_reason": None,
+                "raw_finished": True,
+                "forwarded_finished": True,
+                "terminal_origin": "source",
+                "final_terminal_passthrough": True,
+                "synthetic_terminal": False,
+                "terminal_flush": False,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(analysis["diagnosis"], "pass")
+        self.assertEqual(analysis["terminal_contract_mode"], "source_terminal")
+        self.assertEqual(analysis["terminal_flush_count"], 0)
+        self.assertTrue(analysis["terminal_contract_valid"])
+        self.assertEqual(
+            analysis["controller_passthrough_violation_sequences"], [])
+
+    def test_analysis_checks_production_schema_one_delta_digests(self) -> None:
+        summary = {
+            "client_request_id": "r",
+            "server_request_id": "r",
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": [],
+        }
+        records = [
+            {
+                "schema": 1,
+                "source": "controller_pre_parser",
+                "event": "delta",
+                "phase": "final_answer",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "raw_text": "<tool_call>",
+                "raw_text_sha256": "source",
+                "forwarded_text_sha256": "mutated",
+                "source_token_ids_sha256": "ids",
+                "forwarded_token_ids_sha256": "ids",
+                "terminal_flush": False,
+            },
+            {
+                "schema": 1,
+                "source": "controller_pre_parser",
+                "event": "final_terminal_passthrough",
+                "phase": "final_answer",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "raw_text_sha256": "terminal-text",
+                "forwarded_text_sha256": "terminal-text",
+                "source_token_ids_sha256": "terminal-ids",
+                "forwarded_token_ids_sha256": "terminal-ids",
+                "source_finish_reason": "stop",
+                "forwarded_finish_reason": "stop",
+                "source_stop_reason": None,
+                "forwarded_stop_reason": None,
+                "raw_finished": True,
+                "forwarded_finished": True,
+                "terminal_origin": "source",
+                "final_terminal_passthrough": True,
+                "synthetic_terminal": False,
+                "terminal_flush": False,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(
+            analysis["diagnosis"], "controller_passthrough_violation")
+        self.assertEqual(
+            analysis["controller_passthrough_violation_sequences"], [1])
 
     def test_analysis_rejects_mutated_schema_four_terminal(self) -> None:
         summary = {
