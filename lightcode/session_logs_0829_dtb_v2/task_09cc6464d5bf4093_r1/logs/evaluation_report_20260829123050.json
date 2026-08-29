@@ -1,0 +1,77 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "34_DVAIAgentService_6f4c4230",
+    "commit": "6f4c4230a8937bac39a3874fb180349568b871b8",
+    "evaluation_time": "2026-08-29 12:30:50"
+  },
+  "requirement": {
+    "description": "知识检索解析原始知识数据",
+    "files_count": 2,
+    "files_generated": [
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/business/intent/KnowledgeQuery.java",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/business/intent/KnowledgeRsp.java"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "details": "AI正确生成了2个文件。KnowledgeQuery.java中新增了extractKnowledgeData静态方法，KnowledgeRsp.java中新增了@NoArgsConstructor注解、Map import和properties字段。"
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": [
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/KnowledgeQueryTest.java"
+    ],
+    "reason": "由于在detached HEAD状态下git apply存在风险，采用手动写入测试文件"
+  },
+  "compilation": {
+    "status": "success",
+    "main_code_compile": "BUILD SUCCESS (02:47 min)",
+    "test_code_compile": "BUILD SUCCESS (51.576 s)"
+  },
+  "dt_results": {
+    "test_classes": ["KnowledgeQueryTest"],
+    "total_tests": 5,
+    "passed_tests": 5,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "errors": 0,
+    "pass_rate": "100.00%",
+    "failed_test_details": [],
+    "test_details": [
+      {
+        "test_name": "testExtractKnowledgeDataFromLink",
+        "status": "PASS",
+        "description": "从links属性中提取知识数据"
+      },
+      {
+        "test_name": "testExtractKnowledgeDataFromKnowledge",
+        "status": "PASS",
+        "description": "从knowledge字段提取知识数据"
+      },
+      {
+        "test_name": "testExtractKnowledgeDataEmptyLink",
+        "status": "PASS",
+        "description": "links为空字符串时回退到knowledge"
+      },
+      {
+        "test_name": "testExtractKnowledgeDataNullLink",
+        "status": "PASS",
+        "description": "links为null时回退到knowledge"
+      },
+      {
+        "test_name": "testExtractKnowledgeDataIncorrectLink",
+        "status": "PASS",
+        "description": "links类型不是String时回退到knowledge"
+      }
+    ]
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI生成的代码完全正确。KnowledgeQuery.java中新增的extractKnowledgeData方法逻辑完整，正确处理了从properties.links和knowledge两个字段的优先级逻辑。KnowledgeRsp.java中正确添加了properties字段、@NoArgsConstructor注解和相关import。所有5个测试用例全部通过，编译无错误，无多余或缺失文件。",
+    "pass_rate": "100%"
+  }
+}

@@ -64,7 +64,7 @@ def count_tokens(text: str) -> int:
 
 
 # ================= 配置区 =================
-RESULTS_DIR = "results/qwen/local-task29/local-apiserver/dtb/run-02"
+RESULTS_DIR = "results/qwen/local-task29/local-apiserver/dtb/run-04"
 
 TARGET_BASE_URL = "http://10.44.160.79:9001"
 LISTEN_PORT = 9000
@@ -80,8 +80,8 @@ dtb_tight = {"model": "qwen3.6-27b", "enable_think_budget": True,
             "fixed_think_stride": 400, "fixed_num_thinking": 2,
             "fixed_min_think_tokens": 1, "fixed_prob_th": 0.93}
 dtb_moderate = {"model": "qwen3.6-27b", "enable_think_budget": True,
-               "fixed_budget_tokens": 20000, "fixed_check_length": 400,
-               "fixed_think_stride": 500, "fixed_num_thinking": 4,
+               "fixed_budget_tokens": 20000, "fixed_check_length": 850,
+               "fixed_think_stride": 500, "fixed_num_thinking": 5,
                "fixed_min_think_tokens": 1, "fixed_prob_th": 0.93}
 # dtb_loose: {"model": "qwen3.6-27b", "enable_think_budget": True,
 #             "fixed_budget_tokens": 1650, "fixed_check_length": 1000,
