@@ -8,15 +8,18 @@ Agent DTB 透传代理 — 基于 qwen_transparent.py 扩展
 4. Tool Calls 重建：从流式 delta 拼接重建为结构化对象
 5. 人类可读交互记录：interaction_log.md
 6. 结构化 session 输出：session_<id>.json + session_summary.jsonl
-7. 请求 ID 生成：UUID 并记录到 full_log
+7. 请求 ID 生成：UUID 并记录到有界 full-log 分片
 
-保留向后兼容：token_usage.jsonl、full_log.jsonl、chunks.jsonl 格式不变
+保留 token_usage.jsonl、chunks.jsonl 格式；完整日志升级为 schema 2 的
+full_log/proxy_session_<id>/part-*.jsonl 分片布局。
 """
 
 import json
+import hashlib
 import logging
 import asyncio
 import os
+import re
 import uuid
 from datetime import datetime
 from urllib.parse import urlparse, urlunparse
@@ -25,6 +28,11 @@ from typing import Optional
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import StreamingResponse
 import httpx
+
+try:
+    from .full_log_writer import FullLogShardWriter
+except ImportError:  # 支持从 proxy/ 目录直接执行本文件
+    from full_log_writer import FullLogShardWriter
 
 os.environ['NO_PROXY'] = 'api.openai.rnd.huawei.com'
 os.environ['no_proxy'] = 'api.openai.rnd.huawei.com'
@@ -89,6 +97,8 @@ dtb_moderate = {"model": "qwen3.6-27b", "enable_think_budget": True,
 APPEND_BODY = dtb_moderate
 # 是否记录 chunks.jsonl（流式 chunk 粒度较大时可关闭以节省磁盘）
 ENABLE_CHUNKS_LOG = True
+# full-log 分片目标上限。单条记录不会被拆分；超限单条记录独占一个 part。
+FULL_LOG_SHARD_MAX_BYTES = 16 * 1024 * 1024
 
 # Tokenizer 路径（用于将 reasoning/content 字符长度转为 token 数）
 # 当 API usage 中 reasoning_tokens 为 0 时，使用 tokenizer 本地计算
@@ -108,10 +118,11 @@ EXCLUDED_RESP_HEADERS = {"content-encoding", "content-length", "transfer-encodin
 # ================= 日志文件路径 =================
 os.makedirs(RESULTS_DIR, exist_ok=True)
 TOKEN_RECORD_FILE = os.path.join(RESULTS_DIR, "token_usage.jsonl")
-FULL_LOG_FILE = os.path.join(RESULTS_DIR, "full_log.jsonl")
+FULL_LOG_DIR = os.path.join(RESULTS_DIR, "full_log")
 CHUNKS_LOG_FILE = os.path.join(RESULTS_DIR, "chunks.jsonl")
 SESSION_SUMMARY_FILE = os.path.join(RESULTS_DIR, "session_summary.jsonl")
 INTERACTION_LOG_FILE = os.path.join(RESULTS_DIR, "interaction_log.md")
+full_log_writer = FullLogShardWriter(FULL_LOG_DIR, FULL_LOG_SHARD_MAX_BYTES)
 
 
 # ================= 数据模型 =================
@@ -316,6 +327,43 @@ def classify_turn(messages: list) -> str:
     if any(m.get("role") == "tool" for m in messages):
         return "tool_result"
     return "other"
+
+
+_LIGHTCODE_BRANCH_RE = re.compile(r"(?m)^\s*-\s*branch:\s*([^\r\n]+?)\s*$")
+
+
+def correlation_metadata(messages: list) -> dict:
+    """Build a stable, non-invasive key for post-run LightCode correlation."""
+    root_content = ""
+    for message in messages or []:
+        if message.get("role") != "user":
+            continue
+        content = message.get("content", "")
+        if isinstance(content, str):
+            root_content = content
+        else:
+            root_content = json.dumps(
+                content,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        break
+
+    branch_match = _LIGHTCODE_BRANCH_RE.search(root_content)
+    is_lightcode_main = (
+        "code-production-evaluation" in root_content
+        and "任务参数:" in root_content
+        and branch_match is not None
+    )
+    return {
+        "root_user_message_sha256": hashlib.sha256(
+            root_content.encode("utf-8")
+        ).hexdigest(),
+        "root_user_message_preview": root_content[:240],
+        "agent_role_hint": "main" if is_lightcode_main else "unknown",
+        "case_branch_hint": branch_match.group(1).strip() if branch_match else "",
+    }
 
 
 def reconstruct_tool_calls(accumulated_str: str) -> list:
@@ -537,26 +585,65 @@ async def async_save_token_record(post_time, usage, model_name):
     await asyncio.to_thread(save_token_record_sync, post_time, receive_time, usage, model_name)
 
 
-# ================= 日志保存 (完整 Request/Response) — 增加 request_id =================
+def full_log_metrics(turn: Turn, usage: dict) -> dict:
+    """Keep task-level analysis independent of session finalization."""
+    return {
+        "e2e_ms": turn.e2e_ms,
+        "prompt_tokens": turn.input_prompt_tokens,
+        "completion_tokens": turn.output_completion_tokens,
+        "reasoning_tokens": turn.output_reasoning_tokens,
+        "tool_tokens": turn.output_tool_tokens,
+        "reasoning_tokens_local": turn.reasoning_tokens_local,
+        "content_tokens_local": turn.content_tokens_local,
+        "has_tool_calls": turn.has_tool_calls,
+        "stop_reason": turn.stop_reason,
+        "usage": usage,
+    }
+
+
+# ===== 日志保存 (完整 Request/Response) — proxy session 有界分片 =====
 def save_full_log_sync(timestamp, request_body, response_content, response_reasoning=None,
-                       response_tool_calls=None, request_id=""):
+                       response_tool_calls=None, request_id="", proxy_session_id="",
+                       proxy_turn_index=0, completed_at="", metrics=None):
     record = {
+        "schema": 2,
         "timestamp": timestamp,
+        "completed_at": completed_at,
         "request_id": request_id,
+        "proxy_session_id": proxy_session_id,
+        "proxy_turn_index": proxy_turn_index,
+        "correlation": correlation_metadata(request_body.get("messages", [])),
         "request_body": request_body,
         "response_data": {
             "content": response_content,
             "reasoning": response_reasoning,
             "tool_calls": response_tool_calls
-        }
+        },
+        "metrics": metrics or {},
     }
-    append_jsonl_sync(FULL_LOG_FILE, record)
+    try:
+        result = full_log_writer.append(record)
+        if result.oversized:
+            logger.warning(
+                "Full-log record %s exceeds shard target (%d > %d bytes) and was "
+                "stored alone in %s",
+                request_id,
+                result.byte_length,
+                FULL_LOG_SHARD_MAX_BYTES,
+                result.path,
+            )
+    except Exception as e:
+        logging.error(f"保存 full-log 分片失败 ({request_id}): {e}")
 
 
 async def async_save_full_log(timestamp, request_body, response_content, response_reasoning=None,
-                              response_tool_calls=None, request_id=""):
+                              response_tool_calls=None, request_id="",
+                              proxy_session_id="", proxy_turn_index=0,
+                              completed_at="", metrics=None):
     await asyncio.to_thread(save_full_log_sync, timestamp, request_body, response_content,
-                            response_reasoning, response_tool_calls, request_id)
+                            response_reasoning, response_tool_calls, request_id,
+                            proxy_session_id, proxy_turn_index, completed_at,
+                            metrics)
 
 
 # ================= 日志保存 (流式 Chunk) — 沿用原有格式 =================
@@ -695,7 +782,9 @@ async def handle_normal_response(content: bytes, status_code: int, resp_headers,
     session.add_turn(turn)
 
     await async_save_full_log(post_time, request_body, response_content, response_reasoning,
-                              response_tool_calls, request_id)
+                              response_tool_calls, request_id, session.session_id,
+                              turn.turn_index, turn.receive_time,
+                              full_log_metrics(turn, usage))
     await async_save_token_record(post_time, usage, model_name)
 
     return Response(content=content, status_code=status_code, headers=resp_headers)
@@ -797,7 +886,9 @@ async def handle_stream_response(upstream_resp, client, stream_ctx, resp_headers
 
         # 保存日志
         await async_save_full_log(post_time, request_body, accumulated_content,
-                                  accumulated_reasoning, accumulated_tool_call, request_id)
+                                  accumulated_reasoning, accumulated_tool_call, request_id,
+                                  session.session_id, turn.turn_index,
+                                  turn.receive_time, full_log_metrics(turn, usage))
         await async_save_token_record(post_time, usage, model_name)
 
     return StreamingResponse(stream_generator(), status_code=upstream_resp.status_code, headers=resp_headers)
@@ -816,6 +907,10 @@ if __name__ == "__main__":
     logger.info(f"Starting Agent DTB Proxy on port {LISTEN_PORT}")
     logger.info(f"Target: {TARGET_BASE_URL}")
     logger.info(f"Results dir: {RESULTS_DIR}")
+    logger.info(
+        f"Full-log shards: {FULL_LOG_DIR} "
+        f"(target <= {FULL_LOG_SHARD_MAX_BYTES} bytes each)"
+    )
     logger.info(f"DTB config: {DTB_CONFIG_NAME}")
     logger.info(f"APPEND_BODY: {json.dumps(APPEND_BODY, ensure_ascii=False)}")
     uvicorn.run(app, host="0.0.0.0", port=LISTEN_PORT)

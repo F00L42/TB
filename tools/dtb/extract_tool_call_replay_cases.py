@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract wire-exact tool-call replay cases from a proxy full_log.jsonl."""
+"""Extract wire-exact tool-call cases from legacy or sharded proxy full logs."""
 from __future__ import annotations
 
 import argparse
@@ -23,6 +23,7 @@ FUNCTION_RE = re.compile(r"<function=([^>\r\n]+)>")
 
 @dataclass(frozen=True)
 class Candidate:
+    source_file: Path
     source_line: int
     timestamp: str
     request_id: str
@@ -37,6 +38,43 @@ def sha256_file(path: Path) -> str:
     with path.open("rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def full_log_files(path: Path) -> list[Path]:
+    """Resolve one legacy file or a new full_log shard directory."""
+    if path.is_file():
+        return [path]
+    if not path.is_dir():
+        raise FileNotFoundError(path)
+
+    root = path / "full_log" if (path / "full_log").is_dir() else path
+    if root.name.startswith(("session_", "proxy_session_")):
+        files = sorted(root.glob("part-*.jsonl"))
+    else:
+        files = sorted({
+            *root.glob("proxy_session_*/part-*.jsonl"),
+            *root.glob("session_*/part-*.jsonl"),
+        })
+    if not files:
+        raise ValueError(f"no full-log shard files found under {root}")
+    return files
+
+
+def full_log_sha256(path: Path, files: list[Path]) -> str:
+    """Hash file names and bytes so a shard collection has one stable digest."""
+    if path.is_file():
+        return sha256_file(path)
+
+    root = path / "full_log" if (path / "full_log").is_dir() else path
+    digest = hashlib.sha256()
+    for file_path in files:
+        relative = file_path.relative_to(root).as_posix().encode("utf-8")
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        with file_path.open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
     return digest.hexdigest()
 
 
@@ -90,34 +128,36 @@ def assistant_context_has_leak(messages: Any) -> bool:
 
 def read_candidates(path: Path, branches: set[str]) -> list[Candidate]:
     candidates: list[Candidate] = []
-    with path.open("r", encoding="utf-8") as source:
-        for line_no, line in enumerate(source, start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"{path}:{line_no}: {exc}") from exc
-            body = record.get("request_body")
-            response = record.get("response_data")
-            if not isinstance(body, dict) or not isinstance(response, dict):
-                continue
-            content = str(response.get("content") or "")
-            if not LEAKED_XML_RE.search(content):
-                continue
-            branch = infer_branch(body.get("messages"))
-            if branches and branch not in branches:
-                continue
-            functions = tuple(dict.fromkeys(FUNCTION_RE.findall(content)))
-            candidates.append(Candidate(
-                source_line=line_no,
-                timestamp=str(record.get("timestamp") or ""),
-                request_id=str(record.get("request_id") or ""),
-                branch=branch,
-                record=record,
-                context_clean=not assistant_context_has_leak(body.get("messages")),
-                leaked_functions=functions,
-            ))
+    for source_file in full_log_files(path):
+        with source_file.open("r", encoding="utf-8") as source:
+            for line_no, line in enumerate(source, start=1):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"{source_file}:{line_no}: {exc}") from exc
+                body = record.get("request_body")
+                response = record.get("response_data")
+                if not isinstance(body, dict) or not isinstance(response, dict):
+                    continue
+                content = str(response.get("content") or "")
+                if not LEAKED_XML_RE.search(content):
+                    continue
+                branch = infer_branch(body.get("messages"))
+                if branches and branch not in branches:
+                    continue
+                functions = tuple(dict.fromkeys(FUNCTION_RE.findall(content)))
+                candidates.append(Candidate(
+                    source_file=source_file,
+                    source_line=line_no,
+                    timestamp=str(record.get("timestamp") or ""),
+                    request_id=str(record.get("request_id") or ""),
+                    branch=branch,
+                    record=record,
+                    context_clean=not assistant_context_has_leak(body.get("messages")),
+                    leaked_functions=functions,
+                ))
     return candidates
 
 
@@ -135,7 +175,9 @@ def select_first_clean(
             raise ValueError(
                 f"branch {branch!r} has no leaked response with clean assistant context"
             )
-        clean.sort(key=lambda item: (item.timestamp, item.source_line))
+        clean.sort(key=lambda item: (
+            item.timestamp, item.source_file.as_posix(), item.source_line,
+        ))
         selected.append(clean[0])
     return selected
 
@@ -183,6 +225,28 @@ def load_proxy_turn_metrics(run_dir: Path) -> dict[str, dict[str, Any]]:
     return metrics
 
 
+def proxy_run_dir(source: Path) -> Path:
+    if source.is_file():
+        return source.parent
+    if (source / "full_log").is_dir():
+        return source
+    if source.name == "full_log":
+        return source.parent
+    if source.name.startswith(("session_", "proxy_session_")) and source.parent.name == "full_log":
+        return source.parent.parent
+    return source.parent
+
+
+def display_source_file(source: Path, source_file: Path) -> str:
+    if source.is_file():
+        return source_file.name
+    root = source / "full_log" if (source / "full_log").is_dir() else source
+    try:
+        return source_file.relative_to(root).as_posix()
+    except ValueError:
+        return str(source_file.resolve())
+
+
 def write_outputs(
     *,
     source: Path,
@@ -198,7 +262,8 @@ def write_outputs(
         if path.exists():
             raise FileExistsError(f"refusing to overwrite {path}")
 
-    turn_metrics = load_proxy_turn_metrics(source.parent)
+    source_files = full_log_files(source)
+    turn_metrics = load_proxy_turn_metrics(proxy_run_dir(source))
     case_rows: list[dict[str, Any]] = []
     for index, candidate in enumerate(candidates, start=1):
         row = dict(candidate.record)
@@ -207,6 +272,7 @@ def write_outputs(
         row["case_id"] = f"run02-tool-boundary-{index:02d}"
         row["source"] = {
             "full_log": str(source.resolve()),
+            "source_file": display_source_file(source, candidate.source_file),
             "source_line": candidate.source_line,
             "branch": candidate.branch,
             "original_request_id": candidate.request_id,
@@ -230,7 +296,14 @@ def write_outputs(
         "wire_exact_request_body": True,
         "wire_exact_headers": False,
         "source_full_log": str(source.resolve()),
-        "source_full_log_sha256": sha256_file(source),
+        "source_full_log_sha256": full_log_sha256(source, source_files),
+        "source_full_log_files": [
+            {
+                "path": display_source_file(source, path),
+                "sha256": sha256_file(path),
+            }
+            for path in source_files
+        ],
         "branches": branches,
         "case_count": len(case_rows),
         "cases_file": cases_path.name,
@@ -251,21 +324,22 @@ def write_outputs(
         "",
         "## 结论",
         "",
-        f"从 `full_log.jsonl` 抽取 {len(case_rows)} 个 request-body 精确样本。每个样本都是对应分支第一次出现工具 XML 污染、且请求历史中的 assistant 消息尚未出现同类污染的轮次。",
+        f"从 full-log 归档抽取 {len(case_rows)} 个 request-body 精确样本。每个样本都是对应分支第一次出现工具 XML 污染、且请求历史中的 assistant 消息尚未出现同类污染的轮次。",
         "",
         "HTTP headers 未包含在代理归档中；回放脚本会为每个请求生成确定性的 `X-Request-Id`。",
         "",
         "## 样本",
         "",
-        "| Case | Branch | Source line | Messages | Original E2E ms | Prompt tokens | Completion tokens | Reasoning tokens | Content tokens | Leaked functions | Structured tools |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
+        "| Case | Branch | Source part | Line | Messages | Original E2E ms | Prompt tokens | Completion tokens | Reasoning tokens | Content tokens | Leaked functions | Structured tools |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |",
     ]
     for row in case_rows:
         source_info = row["source"]
         lines.append(
-            "| {case} | `{branch}` | {line} | {messages} | {e2e} | {prompt} | {completion} | {reasoning} | {content} | `{leaked}` | `{tools}` |".format(
+            "| {case} | `{branch}` | `{source_file}` | {line} | {messages} | {e2e} | {prompt} | {completion} | {reasoning} | {content} | `{leaked}` | `{tools}` |".format(
                 case=row["case_id"],
                 branch=source_info["branch"],
+                source_file=source_info["source_file"],
                 line=source_info["source_line"],
                 messages=source_info["message_count"],
                 e2e=(source_info["original_proxy_turn"] or {}).get("e2e_ms", "-"),
@@ -296,7 +370,11 @@ def write_outputs(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("full_log", type=Path)
+    parser.add_argument(
+        "full_log",
+        type=Path,
+        help="legacy full_log.jsonl, new full_log/ shard directory, or run directory",
+    )
     parser.add_argument("output_dir", type=Path)
     parser.add_argument(
         "--branch",

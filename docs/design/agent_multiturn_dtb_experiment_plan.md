@@ -1,5 +1,7 @@
 # Agent 多轮调用场景 DTB 参数优化实验方案
 
+> **2026-08-29 日志契约更新**：本文中单体 `full_log.jsonl` 和“一个 proxy session 对应一个任务”的描述只适用于历史 run。新实验使用 `full_log/proxy_session_<id>/part-*.jsonl` 有界分片，并在下载 LightCode session 后通过逐请求 root user prompt 指纹生成 task/主子 agent 关联报告。规范接口、完整性规则和命令以 `proxy/AGENTS.md` 第 4.4-4.5 节为准。
+
 ## 1. 目标与场景定义
 
 ### 1.1 目标

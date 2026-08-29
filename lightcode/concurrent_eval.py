@@ -84,10 +84,11 @@ def query_task_status(task_id, config):
         
         if response.status_code == 200 and result_data.get("success"):
             data = result_data.get("data", {})
+            task_params = data.get("taskParams") or {}
             return {
                 "success": True,
                 "status": data.get("status", "UNKNOWN"),
-                "branch": data.get("taskParams", "").get("branch", ""),
+                "branch": task_params.get("branch", "") if isinstance(task_params, dict) else "",
                 "session_history_url": data.get("sessionHistoryUrl", ""),
                 "error_message": data.get("errorMessage", ""),
                 "create_time": data.get("createTime", ""),
@@ -137,6 +138,8 @@ def _run_attempt(test_case, config, file_name, result_entry, results_dict, outpu
                     if status_info.get("success"):
                         result_entry["session_history_url"] = status_info.get("session_history_url")
                         result_entry["error_message"] = status_info.get("error_message")
+                        result_entry["create_time"] = status_info.get("create_time")
+                        result_entry["start_time"] = status_info.get("start_time")
                         result_entry["end_time"] = status_info.get("end_time")
                     else:
                         result_entry["error"] = status_info.get("error")
@@ -175,7 +178,10 @@ def process_single_case(test_case, config, results_dict, file_lock, output_file)
         "task_id": None,
         "status": "STARTING",
         "response": None,
-        "error": None
+        "error": None,
+        "create_time": "",
+        "start_time": "",
+        "end_time": "",
     }
 
     # 首次启动前的错峰等待
