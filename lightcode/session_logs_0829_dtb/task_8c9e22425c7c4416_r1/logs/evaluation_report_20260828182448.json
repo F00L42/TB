@@ -1,0 +1,70 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "35_DVAIAgentService_00725ad1",
+    "commit": "00725ad136cf306f680ae0c512ae3dd301e9598e",
+    "evaluation_time": "2026-08-28T18:24:48+08:00"
+  },
+  "requirement": {
+    "description": "fix:增加空指针判空&注册事务同步管理器",
+    "files_count": 2,
+    "files_modified": [
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/cluster/IncidentManage.java",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/executor/DelayedIncidentScheduler.java"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "files_generated": [
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/cluster/IncidentManage.java",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/executor/DelayedIncidentScheduler.java"
+    ],
+    "extra_files": [],
+    "missing_files": [],
+    "issues_found": [
+      "handleAlarmTask 方法未正确处理 ServiceException：delayedIncidentScheduler.addIncidentWithDelay() 抛出 ServiceException，但方法签名未声明 throws ServiceException，也不符合 try-catch 规范",
+      "prepareEvents 方法中 incident.getEvents() 为 null 时直接 continue 跳过，与参考实现中跳过事件处理但仍执行 incident.setReasonIds() 的逻辑不一致",
+      "handleTaskSubmissionFailure 方法签名与参考实现不同：AI 实现使用 varargs (String logMessage, Object... args)，参考实现使用独立参数 (String errorType, String errorMessage)"
+    ]
+  },
+  "test_patch_apply": {
+    "method": "not_applied",
+    "reason": "主代码编译失败，未应用测试补丁"
+  },
+  "compilation": {
+    "status": "failed",
+    "error_message": "2 compilation errors:\n1. /tmp/opencode/CodeBenchRepos/service/src/main/java/com/huawei/i2000/dvaiagentservice/cluster/IncidentManage.java:[1138,66] unreported exception com.huawei.bsp.remoteservice.exception.ServiceException; must be caught or declared to be thrown\n2. /tmp/opencode/CodeBenchRepos/service/src/main/java/com/huawei/i2000/dvaiagentservice/cluster/IncidentManage.java:[1142,58] unreported exception com.huawei.bsp.remoteservice.exception.ServiceException; must be caught or declared to be thrown\n\nRoot cause: handleAlarmTask 方法调用 delayedIncidentScheduler.addIncidentWithDelay(incident) 时未处理 ServiceException 受检异常",
+    "line_details": [
+      {
+        "line": 1138,
+        "context": "afterCommit() 回调内直接调用 addIncidentWithDelay，无法抛出受检异常",
+        "code": "delayedIncidentScheduler.addIncidentWithDelay(incident);"
+      },
+      {
+        "line": 1142,
+        "context": "handleAlarmTask else 分支调用 addIncidentWithDelay，方法未声明 throws ServiceException",
+        "code": "delayedIncidentScheduler.addIncidentWithDelay(incident);"
+      }
+    ]
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "主代码编译失败，无法执行测试"
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI 生成的代码在步骤4编译验证阶段失败，无法继续后续评测。\n\n【编译失败原因】\nhandleAlarmTask 方法中调用 delayedIncidentScheduler.addIncidentWithDelay(incident) 时未处理 ServiceException 受检异常。具体问题：\n1. 在 afterCommit() 匿名方法内部调用 addIncidentWithDelay，匿名方法不能抛出受检异常，需要用 try-catch 包裹\n2. handleAlarmTask 方法签名未声明 throws ServiceException，但 else 分支直接调用了抛异常的方法\n\n【正确做法】\n参考实现中 handleAlarmTask 方法声明了 throws ServiceException，且在 afterCommit() 内部使用 try-catch 捕获异常。AI 生成代码遗漏了这两处关键异常处理。\n\n【AI生成代码亮点】\n1. 正确添加了 TransactionSynchronization 和 TransactionSynchronizationManager 的 import\n2. 正确实现了 addIncident 的空值检查和拆分为 prepareEvents、persistData、dispatchTasks 三个私有方法\n3. 正确在 DelayedIncidentScheduler.checkRecoveryStatus 中添加了 null 判空逻辑\n4. 整体方法拆分思路正确，代码结构合理",
+    "failure_step": "步骤4：编译验证主代码"
+  },
+  "completed_steps": [
+    "步骤0：参数解析与Settings文件保存",
+    "步骤1：代码仓克隆与回退到base_commit",
+    "步骤2：从Patch和Test Patch中提取信息",
+    "步骤3：AI代码生成"
+  ],
+  "failed_step": {
+    "step": "步骤4：编译验证主代码",
+    "error_type": "compilation_failed",
+    "details": "2个编译错误，均为 unreported exception ServiceException"
+  }
+}

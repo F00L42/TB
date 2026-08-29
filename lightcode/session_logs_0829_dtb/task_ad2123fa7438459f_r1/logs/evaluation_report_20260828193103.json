@@ -1,0 +1,55 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "37_DVAIAgentService_11718ad6",
+    "commit": "11718ad6e7cc19909e969b988170555b87f8a63b",
+    "evaluation_time": "2026-08-28T19:31:03+08:00"
+  },
+  "requirement": {
+    "description": "【分解给XOps技术组】【智能体】告警的分层标签支撑通用分析知识、领域分析知识，根因告警识别准确率提升",
+    "files_count": 3,
+    "files_generated": [
+      "deployment/src/main/release/pub/knowledges/application.json",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/impl/IncidentServiceDelegateImpl.java",
+      "service/src/main/resources/service-configure.properties"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "git_apply",
+    "manual_applied_files": []
+  },
+  "compilation": {
+    "status": "success",
+    "main_code": "success",
+    "test_code": "success"
+  },
+  "dt_results": {
+    "test_classes": [
+      "ConfigLoadedTest",
+      "EsIndexUtilsTest",
+      "IndicesTest"
+    ],
+    "total_tests": 3,
+    "passed_tests": 2,
+    "failed_tests": 1,
+    "skipped_tests": 0,
+    "pass_rate": "66.7%",
+    "failed_test_details": [
+      {
+        "test_name": "EsIndexUtilsTest.test_getEsIndex_whenNormalRequest_thenReturnIndexList",
+        "error_message": "expected:<[dv_knowledge_incident]> but was:<[archive_klg_index_dv]>。该测试文件在主patch中有修改以更新断言值，但ut_patch未包含此变更，导致测试断言仍使用旧索引名dv_knowledge_incident，而代码已返回新的archive_klg_index_dv",
+        "root_cause": "ut_patch未包含EsIndexUtilsTest.java的断言更新，导致测试期望值与实际返回值不匹配"
+      }
+    ]
+  },
+  "evaluation_conclusion": {
+    "grade": "良好",
+    "summary": "AI成功生成了所有3个主代码文件的修改：1) application.json中删除了dv_knowledge_incident配置项；2) IncidentServiceDelegateImpl.java中更新了ARCHIVED_KNOWLEDGE_INDEX并删除了FIELD_KNOWLEDGE_INDEX；3) service-configure.properties中更新了incident_case_knowledge值。主代码编译和测试代码编译均成功。3个测试中2个通过(ConfigLoadedTest, IndicesTest)，1个失败(EsIndexUtilsTest)。失败原因是EsIndexUtilsTest.java在主patch中有对应的断言更新，但ut_patch未包含此变更，导致测试断言仍期望旧值dv_knowledge_incident。整体通过率66.7%，AI生成的代码逻辑正确，仅测试文件同步更新不完整。"
+  }
+}
