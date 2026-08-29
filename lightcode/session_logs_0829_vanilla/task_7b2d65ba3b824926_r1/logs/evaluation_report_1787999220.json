@@ -1,0 +1,55 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "37_DVAIAgentService_11718ad6",
+    "commit": "11718ad6e7cc19909e969b988170555b87f8a63b",
+    "evaluation_time": "2026-08-29T18:27:00+08:00"
+  },
+  "requirement": {
+    "description": "【分解给XOps技术组】【智能体】告警的分层标签支撑通用分析知识、领域分析知识，根因告警识别准确率提升",
+    "files_count": 3,
+    "files_generated": [
+      "deployment/src/main/release/pub/knowledges/application.json",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/impl/IncidentServiceDelegateImpl.java",
+      "service/src/main/resources/service-configure.properties"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [
+      "application.json末尾增加了换行符（原始文件无换行）"
+    ]
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": [
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/EsIndexUtilsTest.java",
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/IndicesTest.java",
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/impl/ConfigLoadedTest.java",
+      "service/src/test/resources/rest-stubs/mappings/index.json"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": [
+      "ConfigLoadedTest",
+      "IndicesTest",
+      "EsIndexUtilsTest"
+    ],
+    "total_tests": 3,
+    "passed_tests": 3,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "pass_rate": "100%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI生成的代码完全正确，3个功能文件全部准确生成，变更内容为将知识索引从dv_knowledge_incident替换为archive_klg_index_dv，同时删除了FIELD_KNOWLEDGE_INDEX常量。主代码编译通过，3个测试用例全部通过，通过率为100%。唯一格式差异为application.json文件末尾增加了换行符，不影响功能。"
+  }
+}
