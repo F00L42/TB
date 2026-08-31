@@ -145,8 +145,6 @@ class Turn:
 
     # 输出侧
     output_completion_tokens: int = 0
-    output_reasoning_tokens: int = 0
-    output_tool_tokens: int = 0
     output_content_length: int = 0
     output_reasoning_length: int = 0
     has_tool_calls: bool = False
@@ -290,10 +288,8 @@ class SessionManager:
             "total_e2e_ms": sum(t.e2e_ms for t in session.turns),
             "total_prompt_tokens": sum(t.input_prompt_tokens for t in session.turns),
             "total_completion_tokens": sum(t.output_completion_tokens for t in session.turns),
-            "total_reasoning_tokens": sum(t.output_reasoning_tokens for t in session.turns),
             "total_reasoning_tokens_local": sum(t.reasoning_tokens_local for t in session.turns),
             "total_content_tokens_local": sum(t.content_tokens_local for t in session.turns),
-            "total_tool_tokens": sum(t.output_tool_tokens for t in session.turns),
             "avg_thinking_ratio": (sum(t.thinking_ratio for t in session.turns) / len(session.turns)) if session.turns else 0,
             "tool_call_turns": sum(1 for t in session.turns if t.has_tool_calls),
             "tool_result_turns": sum(1 for t in session.turns if t.turn_type == "tool_result"),
@@ -564,8 +560,6 @@ def build_upstream_url(base_url: str, request_path: str) -> str:
 
 # ================= 日志保存 (Token) — 沿用原有格式 =================
 def save_token_record_sync(post_time, receive_time, usage, model_name):
-    reasoning_token = usage.get("reasoning_tokens", 0) or usage.get("reasoning_token", 0)
-    tool_token = usage.get("tool_tokens", 0) or usage.get("tool_token", 0)
 
     record = {
         "post_time": post_time,
@@ -573,8 +567,6 @@ def save_token_record_sync(post_time, receive_time, usage, model_name):
         "model_name": model_name,
         "intput_token": usage.get("prompt_tokens", 0),
         "output_token": usage.get("completion_tokens", 0),
-        "reasoning_token": reasoning_token,
-        "tool_token": tool_token,
         "usage": usage
     }
     append_jsonl_sync(TOKEN_RECORD_FILE, record)
@@ -591,8 +583,6 @@ def full_log_metrics(turn: Turn, usage: dict) -> dict:
         "e2e_ms": turn.e2e_ms,
         "prompt_tokens": turn.input_prompt_tokens,
         "completion_tokens": turn.output_completion_tokens,
-        "reasoning_tokens": turn.output_reasoning_tokens,
-        "tool_tokens": turn.output_tool_tokens,
         "reasoning_tokens_local": turn.reasoning_tokens_local,
         "content_tokens_local": turn.content_tokens_local,
         "has_tool_calls": turn.has_tool_calls,
@@ -769,8 +759,6 @@ async def handle_normal_response(content: bytes, status_code: int, resp_headers,
     receive_dt = datetime.fromisoformat(receive_time)
     turn.e2e_ms = (receive_dt - post_dt).total_seconds() * 1000
     turn.output_completion_tokens = usage.get("completion_tokens", 0)
-    turn.output_reasoning_tokens = usage.get("reasoning_tokens", 0) or usage.get("reasoning_token", 0)
-    turn.output_tool_tokens = usage.get("tool_tokens", 0) or usage.get("tool_token", 0)
     turn.input_prompt_tokens = usage.get("prompt_tokens", 0)
     turn.output_content_length = len(response_content)
     turn.output_reasoning_length = len(response_reasoning) if response_reasoning else 0
@@ -870,8 +858,6 @@ async def handle_stream_response(upstream_resp, client, stream_ctx, resp_headers
         receive_dt = datetime.fromisoformat(receive_time)
         turn.e2e_ms = (receive_dt - post_dt).total_seconds() * 1000
         turn.output_completion_tokens = usage.get("completion_tokens", 0)
-        turn.output_reasoning_tokens = usage.get("reasoning_tokens", 0) or usage.get("reasoning_token", 0)
-        turn.output_tool_tokens = usage.get("tool_tokens", 0) or usage.get("tool_token", 0)
         turn.input_prompt_tokens = usage.get("prompt_tokens", 0)
         turn.output_content_length = len(accumulated_content)
         turn.output_reasoning_length = len(accumulated_reasoning)
