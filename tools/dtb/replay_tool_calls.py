@@ -61,9 +61,22 @@ class ToolCallState:
     arguments: str = ""
 
 
+@dataclass(frozen=True)
+class ReplayCase:
+    line_no: int
+    case_id: str
+    category: str
+    request_body: dict[str, Any]
+    expected_tool_call: bool
+    expected_tool_names: tuple[str, ...]
+    latency_eligible: bool
+
+
 @dataclass
 class Observation:
     line_no: int
+    case_id: str
+    category: str
     attempt: int
     variant: str
     client_request_id: str
@@ -71,6 +84,8 @@ class Observation:
     status_code: int
     elapsed_ms: float
     expected_tool_call: bool
+    expected_tool_names: list[str]
+    latency_eligible: bool
     has_tool_call: bool
     finish_reasons: list[str]
     content: str
@@ -79,6 +94,9 @@ class Observation:
     tool_call_indexes_contiguous: bool
     missing_tool_name_indexes: list[int]
     invalid_argument_indexes: list[int]
+    invalid_schema_indexes: list[int]
+    schema_errors: list[str]
+    unexpected_tool_names: list[str]
     terminal_count: int
     terminal_event_indexes: list[int]
     tool_calls_finish_reason_count: int
@@ -104,8 +122,8 @@ def json_hash(value: Any) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def load_cases(path: Path, start: int, end: int) -> list[tuple[int, dict, bool]]:
-    cases: list[tuple[int, dict, bool]] = []
+def load_cases(path: Path, start: int, end: int) -> list[ReplayCase]:
+    cases: list[ReplayCase] = []
     with path.open("r", encoding="utf-8") as source:
         for line_no, line in enumerate(source, start=1):
             if line_no < start:
@@ -120,12 +138,33 @@ def load_cases(path: Path, start: int, end: int) -> list[tuple[int, dict, bool]]
                 body = json.loads(body)
             if not isinstance(body, dict):
                 raise ValueError(f"line {line_no} has no object request_body")
-            expected = response_has_tool_call(record.get("response_data"))
+            expectation = record.get("replay_expectation") or {}
+            archived_expected = response_has_tool_call(record.get("response_data"))
+            expected_value = expectation.get("expected_tool_call")
+            expected = (
+                expected_value if isinstance(expected_value, bool)
+                else archived_expected
+            )
+            expected_names_value = expectation.get("expected_tool_names") or []
+            if not isinstance(expected_names_value, list) or not all(
+                isinstance(name, str) and name for name in expected_names_value
+            ):
+                raise ValueError(
+                    f"line {line_no} expected_tool_names must be non-empty strings"
+                )
             conversation_errors = validate_conversation(body.get("messages", []))
             if conversation_errors:
                 joined = "; ".join(conversation_errors)
                 raise ValueError(f"line {line_no} invalid conversation: {joined}")
-            cases.append((line_no, body, expected))
+            cases.append(ReplayCase(
+                line_no=line_no,
+                case_id=str(record.get("case_id") or f"line-{line_no}"),
+                category=str(expectation.get("category") or "archived_request"),
+                request_body=body,
+                expected_tool_call=expected,
+                expected_tool_names=tuple(expected_names_value),
+                latency_eligible=bool(expectation.get("latency_eligible", True)),
+            ))
     if not cases:
         raise ValueError("no request cases selected")
     return cases
@@ -178,6 +217,80 @@ def validate_conversation(messages: Any) -> list[str]:
                 f"for {sorted(pending)}"
             )
             pending.clear()
+    return errors
+
+
+def tool_schemas(tools: Any) -> dict[str, dict[str, Any]]:
+    schemas: dict[str, dict[str, Any]] = {}
+    if not isinstance(tools, list):
+        return schemas
+    for tool in tools:
+        if not isinstance(tool, dict) or tool.get("type") != "function":
+            continue
+        function = tool.get("function") or {}
+        name = function.get("name")
+        parameters = function.get("parameters")
+        if isinstance(name, str) and isinstance(parameters, dict):
+            schemas[name] = parameters
+    return schemas
+
+
+def _json_type_matches(value: Any, expected: str) -> bool:
+    if expected == "object":
+        return isinstance(value, dict)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "null":
+        return value is None
+    return True
+
+
+def validate_json_schema(
+    value: Any,
+    schema: dict[str, Any],
+    path: str = "$",
+) -> list[str]:
+    """Validate the JSON-schema subset used by OpenAI function tools."""
+    errors: list[str] = []
+    expected_type = schema.get("type")
+    expected_types = (
+        expected_type if isinstance(expected_type, list) else [expected_type]
+    )
+    expected_types = [item for item in expected_types if isinstance(item, str)]
+    if expected_types and not any(
+        _json_type_matches(value, item) for item in expected_types
+    ):
+        return [
+            f"{path}: expected {'|'.join(expected_types)}, "
+            f"got {type(value).__name__}"
+        ]
+
+    if isinstance(value, dict):
+        required = schema.get("required") or []
+        if isinstance(required, list):
+            for name in required:
+                if isinstance(name, str) and name not in value:
+                    errors.append(f"{path}: missing required property {name!r}")
+        properties = schema.get("properties") or {}
+        if isinstance(properties, dict):
+            for name, child_schema in properties.items():
+                if name in value and isinstance(child_schema, dict):
+                    errors.extend(validate_json_schema(
+                        value[name], child_schema, f"{path}.{name}"
+                    ))
+    elif isinstance(value, list) and isinstance(schema.get("items"), dict):
+        for index, item in enumerate(value):
+            errors.extend(validate_json_schema(
+                item, schema["items"], f"{path}[{index}]"
+            ))
     return errors
 
 
@@ -234,6 +347,11 @@ def assemble_observation(
     elapsed_ms: float,
     expected_tool_call: bool,
     chunks: list[dict],
+    case_id: str = "",
+    category: str = "archived_request",
+    expected_tool_names: tuple[str, ...] = (),
+    request_tools: Any = None,
+    latency_eligible: bool = True,
     error: str = "",
     first_chunk_ms: float = 0.0,
     first_output_ms: float = 0.0,
@@ -293,18 +411,40 @@ def assemble_observation(
     missing_tool_name_indexes = [
         int(call["index"]) for call in tool_calls if not call["name"]
     ]
-    invalid_argument_indexes = []
+    invalid_argument_indexes: list[int] = []
+    invalid_schema_indexes: list[int] = []
+    schema_errors: list[str] = []
+    schemas = tool_schemas(request_tools)
     for call in tool_calls:
         try:
-            json.loads(call["arguments"])
+            arguments = json.loads(call["arguments"])
         except (json.JSONDecodeError, TypeError):
             invalid_argument_indexes.append(int(call["index"]))
+            continue
+        schema = schemas.get(str(call["name"]))
+        if schema is not None:
+            call_errors = validate_json_schema(arguments, schema)
+            if call_errors:
+                invalid_schema_indexes.append(int(call["index"]))
+                schema_errors.extend(
+                    f"tool[{call['index']}] {call['name']}: {message}"
+                    for message in call_errors
+                )
 
     content = "".join(content_parts)
     reasoning = "".join(reasoning_parts)
     leaked_tool_xml = bool(LEAKED_XML_RE.search(content))
     role_tail = bool(ROLE_TAIL_RE.search(content))
     has_tool_call = bool(tool_calls)
+    returned_tool_names = sorted({
+        str(call["name"]) for call in tool_calls if call["name"]
+    })
+    unexpected_tool_names = (
+        returned_tool_names
+        if expected_tool_names
+        and not set(returned_tool_names).intersection(expected_tool_names)
+        else []
+    )
     terminal_count = len(terminal_event_indexes)
     tool_calls_finish_reason_count = finish_reasons.count("tool_calls")
     anomaly_reasons: list[str] = []
@@ -312,6 +452,8 @@ def assemble_observation(
         anomaly_reasons.append("request_error")
     if expected_tool_call and not has_tool_call:
         anomaly_reasons.append("expected_tool_call_missing")
+    if has_tool_call and unexpected_tool_names:
+        anomaly_reasons.append("expected_tool_name_missing")
     if leaked_tool_xml:
         anomaly_reasons.append("tool_xml_leaked_to_content")
     if role_tail:
@@ -320,6 +462,8 @@ def assemble_observation(
         anomaly_reasons.append("content_after_tool_delta")
     if invalid_argument_indexes:
         anomaly_reasons.append("invalid_tool_arguments_json")
+    if invalid_schema_indexes:
+        anomaly_reasons.append("invalid_tool_arguments_schema")
     if missing_tool_name_indexes:
         anomaly_reasons.append("missing_tool_name")
     if not tool_call_indexes_contiguous:
@@ -337,6 +481,8 @@ def assemble_observation(
 
     return Observation(
         line_no=line_no,
+        case_id=case_id or f"line-{line_no}",
+        category=category,
         attempt=attempt,
         variant=variant,
         client_request_id=client_request_id,
@@ -344,6 +490,8 @@ def assemble_observation(
         status_code=status_code,
         elapsed_ms=round(elapsed_ms, 3),
         expected_tool_call=expected_tool_call,
+        expected_tool_names=list(expected_tool_names),
+        latency_eligible=latency_eligible,
         has_tool_call=has_tool_call,
         finish_reasons=finish_reasons,
         content=content,
@@ -352,6 +500,9 @@ def assemble_observation(
         tool_call_indexes_contiguous=tool_call_indexes_contiguous,
         missing_tool_name_indexes=missing_tool_name_indexes,
         invalid_argument_indexes=invalid_argument_indexes,
+        invalid_schema_indexes=invalid_schema_indexes,
+        schema_errors=schema_errors,
+        unexpected_tool_names=unexpected_tool_names,
         terminal_count=terminal_count,
         terminal_event_indexes=terminal_event_indexes,
         tool_calls_finish_reason_count=tool_calls_finish_reason_count,
@@ -378,9 +529,13 @@ async def run_one(
     headers: dict[str, str],
     body: dict,
     line_no: int,
+    case_id: str,
+    category: str,
     attempt: int,
     variant: str,
     expected_tool_call: bool,
+    expected_tool_names: tuple[str, ...],
+    latency_eligible: bool,
     chunks_file,
 ) -> Observation:
     client_request_id = str(body["request_id"])
@@ -456,12 +611,17 @@ async def run_one(
 
     return assemble_observation(
         line_no=line_no,
+        case_id=case_id,
+        category=category,
         attempt=attempt,
         variant=variant,
         client_request_id=client_request_id,
         status_code=status_code,
         elapsed_ms=(time.perf_counter() - started) * 1000,
         expected_tool_call=expected_tool_call,
+        expected_tool_names=expected_tool_names,
+        request_tools=body.get("tools"),
+        latency_eligible=latency_eligible,
         chunks=chunks,
         error=error,
         first_chunk_ms=first_chunk_ms,
@@ -526,6 +686,8 @@ def build_paired_summary(observations: list[Observation]) -> dict[str, Any]:
         rows for rows in pairs
         if not rows["vanilla"].anomaly_reasons
         and not rows["dtb"].anomaly_reasons
+        and rows["vanilla"].latency_eligible
+        and rows["dtb"].latency_eligible
     ]
 
     def paired_metrics(rows: list[dict[str, Observation]]) -> dict[str, Any]:
@@ -552,11 +714,17 @@ def build_paired_summary(observations: list[Observation]) -> dict[str, Any]:
 
     per_case = []
     for line_no in sorted({row.line_no for row in observations}):
+        line_rows = [row for row in observations if row.line_no == line_no]
         case_pairs = [
             rows for (case_line, _), rows in grouped.items()
             if case_line == line_no and "vanilla" in rows and "dtb" in rows
         ]
-        per_case.append({"line_no": line_no, **paired_metrics(case_pairs)})
+        per_case.append({
+            "line_no": line_no,
+            "case_id": line_rows[0].case_id,
+            "category": line_rows[0].category,
+            **paired_metrics(case_pairs),
+        })
 
     return {
         "request_count": len(observations),
@@ -601,7 +769,8 @@ def write_result_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- DTB faster clean pairs: {clean['dtb_faster_pairs']}/{clean['pairs']}",
         f"- Latency ranking valid: {summary['latency_ranking_valid']}",
         "",
-        "Latency ranking is valid only when every pair is free of protocol anomalies.",
+        "Latency ranking is valid only when every latency-eligible pair is free "
+        "of protocol anomalies; run quality probes separately from ranking.",
         "",
     ])
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -652,9 +821,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="override the archived value; default preserves each source request",
     )
     parser.add_argument("--fixed-budget-tokens", type=int, default=20000)
-    parser.add_argument("--fixed-check-length", type=int, default=400)
+    parser.add_argument("--fixed-check-length", type=int, default=850)
     parser.add_argument("--fixed-think-stride", type=int, default=500)
-    parser.add_argument("--fixed-num-thinking", type=int, default=4)
+    parser.add_argument("--fixed-num-thinking", type=int, default=5)
     parser.add_argument("--fixed-min-think-tokens", type=int, default=1)
     parser.add_argument("--fixed-prob-th", type=float, default=0.93)
     return parser.parse_args(argv)
@@ -671,10 +840,10 @@ async def async_main(args: argparse.Namespace) -> int:
     request_id_run = args.request_id_run or timestamp
     if args.list_dtb_request_ids:
         if "dtb" in variants:
-            for line_no, _, _ in cases:
+            for case in cases:
                 for attempt in range(1, args.repetitions + 1):
                     print("chatcmpl-" + build_request_id(
-                        line_no, attempt, "dtb", request_id_run
+                        case.line_no, attempt, "dtb", request_id_run
                     ))
         return 0
     if httpx is None:
@@ -712,6 +881,17 @@ async def async_main(args: argparse.Namespace) -> int:
             if key.startswith("fixed_")
             or key in {"max_tokens", "temperature", "top_p"}
         },
+        "cases": [
+            {
+                "line_no": case.line_no,
+                "case_id": case.case_id,
+                "category": case.category,
+                "expected_tool_call": case.expected_tool_call,
+                "expected_tool_names": list(case.expected_tool_names),
+                "latency_eligible": case.latency_eligible,
+            }
+            for case in cases
+        ],
     }
     manifest_path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
@@ -726,7 +906,8 @@ async def async_main(args: argparse.Namespace) -> int:
         with chunks_path.open("w", encoding="utf-8") as chunks_file, summary_path.open(
             "w", encoding="utf-8"
         ) as summary_file:
-            for line_no, source_body, expected in cases:
+            for case in cases:
+                line_no = case.line_no
                 for attempt in range(1, args.repetitions + 1):
                     attempt_variants = variants
                     if (
@@ -740,7 +921,7 @@ async def async_main(args: argparse.Namespace) -> int:
                             line_no, attempt, variant, request_id_run
                         )
                         body = build_body(
-                            source_body,
+                            case.request_body,
                             variant=variant,
                             client_request_id=request_id,
                             args=args,
@@ -749,6 +930,8 @@ async def async_main(args: argparse.Namespace) -> int:
                             "record_type": "request",
                             "client_request_id": request_id,
                             "line_no": line_no,
+                            "case_id": case.case_id,
+                            "category": case.category,
                             "attempt": attempt,
                             "variant": variant,
                             "request_body_sha256": json_hash(body),
@@ -760,9 +943,13 @@ async def async_main(args: argparse.Namespace) -> int:
                             headers=headers,
                             body=body,
                             line_no=line_no,
+                            case_id=case.case_id,
+                            category=case.category,
                             attempt=attempt,
                             variant=variant,
-                            expected_tool_call=expected,
+                            expected_tool_call=case.expected_tool_call,
+                            expected_tool_names=case.expected_tool_names,
+                            latency_eligible=case.latency_eligible,
                             chunks_file=chunks_file,
                         )
                         observations.append(observation)
@@ -775,7 +962,8 @@ async def async_main(args: argparse.Namespace) -> int:
                         status = "FAIL" if failed else "PASS"
                         reasons = ",".join(observation.anomaly_reasons) or "none"
                         print(
-                            f"{status} line={line_no} attempt={attempt} "
+                            f"{status} case={case.case_id} line={line_no} "
+                            f"attempt={attempt} "
                             f"variant={variant} request_id="
                             f"{observation.server_request_id or request_id} "
                             f"tool_calls={len(observation.tool_calls)} "

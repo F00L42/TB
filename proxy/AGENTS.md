@@ -272,7 +272,45 @@ Agent 身份只接受逐请求 `root_user_message_sha256` 精确等值关联，�
 
 报告只保存索引、摘要和原始 shard 位置，不复制完整 request/response，避免重新制造大文件。
 
-### 4.6 interaction_log.md 格式
+### 4.6 Agent 故障 paired replay
+
+系统可用性故障必须在时延参数搜索前做 paired replay。先分别关联 DTB 与 Vanilla run，
+再用显式 spec 从两个 `requests.jsonl` 账本按 `request_id` 抽取原始记录：
+
+```bash
+python tools/dtb/build_agent_paired_replay.py \
+  --dtb-run <DTB_PROXY_RUN> \
+  --dtb-correlation <DTB_CORRELATION_DIR> \
+  --vanilla-run <VANILLA_PROXY_RUN> \
+  --vanilla-correlation <VANILLA_CORRELATION_DIR> \
+  --spec <REPLAY_SPEC_JSON> \
+  --output-dir <REPLAY_INPUT_DIR>
+```
+
+构建器会为每个语义 pair 输出两条真实上下文：DTB 故障上下文和同 case、同阶段的 Vanilla
+健康上下文。二者用于检查故障是否依赖历史轨迹，但**不能直接互算时延**；真正的 A/B 单元是
+同一条 `request_body` 分别设置 `enable_think_budget=false/true`。回放器保持单并发，并在重复
+次数间交替 Vanilla/DTB 顺序：
+
+```bash
+python tools/dtb/replay_tool_calls.py \
+  --file <REPLAY_INPUT_DIR>/cases.jsonl \
+  --repetitions 30 \
+  --request-id-run <AUDIT_RUN_ID> \
+  --order alternating \
+  --output-dir <REPLAY_OUTPUT_DIR>
+```
+
+正式执行前可加 `--list-dtb-request-ids` 生成 `stream_audit` 精确白名单。回放审计不只检查
+arguments 是否为合法 JSON，还按原请求 `tools[].function.parameters` 校验 required/type，
+并检查预期 tool name、XML 泄漏、tool index、terminal 与 finish reason。协议有任何异常时，
+该 pair 不进入时延排名。
+
+`quality_probe` 只保存代码 mutation turn 的真实上下文和返回工具参数；单轮 HTTP 回放不会
+执行工具、修改代码或编译，因此不得把它当成代码质量裁决。最终系统可用性门仍是同配置
+LightCode smoke 9/9 生成报告，质量结果不低于 Vanilla。
+
+### 4.7 interaction_log.md 格式
 
 ```markdown
 # Session <session_id>
@@ -369,3 +407,4 @@ Agent 身份只接受逐请求 `root_user_message_sha256` 精确等值关联，�
 | 2026-08-26 | 流式 read timeout 从 600s 改为无限（`None`），异常时保存已累积数据 | 实测 vLLM 推理单轮可超 600s，`httpx.ReadTimeout` 导致 ASGI 崩溃且丢失已累积数据 |
 | 2026-08-29 | 将单体 `full_log.jsonl` 改为 proxy session 分区、默认 16 MiB 有界滚动的 schema 2 JSONL part，并让回放抽取器兼容新旧输入 | 单体日志可正常记录但因文件过大且 LFS 禁用而无法上传；同时保留逐请求原子性和定位能力 |
 | 2026-08-29 | 基于 LightCode `task` 工具元数据和 root user prompt 指纹建立 evaluation task → 主/子 agent → proxy segment → request 的离线关联与可读报告 | session-only 分组不能表达一次评测中的主子 agent 拓扑，run-02 实测还存在一个官方 session 对应多个 proxy segment |
+| 2026-08-29 | 增加跨 DTB/Vanilla 精确账本构建的 Agent 故障 paired replay，并把 schema、预期动作和输入一致性纳入门禁 | run-04 出现 arguments 截断、应继续调用工具却 stop，以及有报告但代码质量退化；不同历史上下文不能直接作为时延 pair |

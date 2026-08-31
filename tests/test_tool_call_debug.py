@@ -12,6 +12,8 @@ from tools.dtb.replay_tool_calls import (
     build_body,
     build_paired_summary,
     build_request_id,
+    load_cases,
+    validate_json_schema,
     validate_conversation,
 )
 from tools.dtb.extract_tool_call_replay_cases import (
@@ -84,6 +86,78 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertEqual(observation.terminal_count, 1)
         self.assertTrue(observation.tool_call_indexes_contiguous)
         self.assertEqual(observation.anomaly_reasons, [])
+
+    def test_case_metadata_overrides_archived_missing_tool_call(self) -> None:
+        record = {
+            "case_id": "expected-action",
+            "request_body": {"messages": [], "tools": []},
+            "response_data": {"content": "truncated", "tool_calls": ""},
+            "replay_expectation": {
+                "category": "protocol_failure",
+                "expected_tool_call": True,
+                "expected_tool_names": ["bash"],
+                "latency_eligible": False,
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cases.jsonl"
+            path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            cases = load_cases(path, 1, 0)
+
+        self.assertEqual(len(cases), 1)
+        self.assertEqual(cases[0].case_id, "expected-action")
+        self.assertTrue(cases[0].expected_tool_call)
+        self.assertEqual(cases[0].expected_tool_names, ("bash",))
+        self.assertFalse(cases[0].latency_eligible)
+
+    def test_tool_arguments_are_validated_against_request_schema(self) -> None:
+        chunks = [{"id": "r", "choices": [{
+            "delta": {"tool_calls": [{
+                "index": 0,
+                "id": "call-1",
+                "function": {
+                    "name": "todowrite",
+                    "arguments": '{"todos":"not-an-array"}',
+                },
+            }]},
+            "finish_reason": "tool_calls",
+        }]}]
+        tools = [{
+            "type": "function",
+            "function": {
+                "name": "todowrite",
+                "parameters": {
+                    "type": "object",
+                    "required": ["todos"],
+                    "properties": {"todos": {"type": "array"}},
+                },
+            },
+        }]
+
+        observation = assemble_observation(
+            line_no=1,
+            attempt=1,
+            variant="dtb",
+            client_request_id="client",
+            status_code=200,
+            elapsed_ms=1.0,
+            expected_tool_call=True,
+            expected_tool_names=("todowrite",),
+            request_tools=tools,
+            chunks=chunks,
+        )
+
+        self.assertEqual(observation.invalid_argument_indexes, [])
+        self.assertEqual(observation.invalid_schema_indexes, [0])
+        self.assertIn("invalid_tool_arguments_schema", observation.anomaly_reasons)
+        self.assertIn("expected array", observation.schema_errors[0])
+
+    def test_json_schema_required_property_is_checked(self) -> None:
+        errors = validate_json_schema(
+            {},
+            {"type": "object", "required": ["todos"]},
+        )
+        self.assertEqual(errors, ["$: missing required property 'todos'"])
 
     def test_multiple_sibling_tool_calls_are_valid(self) -> None:
         chunks = [
@@ -259,6 +333,31 @@ class ToolCallReplayTests(unittest.TestCase):
             -20.0,
         )
         self.assertTrue(summary["latency_ranking_valid"])
+
+    def test_paired_summary_excludes_non_latency_probe(self) -> None:
+        terminal = [{"id": "r", "choices": [{
+            "delta": {"content": "done"}, "finish_reason": "stop",
+        }]}]
+        rows = [
+            assemble_observation(
+                line_no=1,
+                attempt=1,
+                variant=variant,
+                client_request_id=variant,
+                status_code=200,
+                elapsed_ms=elapsed,
+                expected_tool_call=False,
+                chunks=terminal,
+                latency_eligible=False,
+            )
+            for variant, elapsed in (("vanilla", 100.0), ("dtb", 80.0))
+        ]
+
+        summary = build_paired_summary(rows)
+
+        self.assertEqual(summary["all_pairs"]["pairs"], 1)
+        self.assertEqual(summary["protocol_clean_pairs"]["pairs"], 0)
+        self.assertFalse(summary["latency_ranking_valid"])
 
     def test_analysis_accepts_one_completion_with_tool_continuation(self) -> None:
         summary = {
