@@ -398,6 +398,160 @@ def _build_minimized_trajectories(
     }
 
 
+def _partition_text(tokenizer: FakeTokenizer, *parts: str) -> list[InputDelta]:
+    return [
+        InputDelta(
+            text=part,
+            token_ids=tuple(tokenizer.encode(part)),
+            finished=index == len(parts) - 1,
+        )
+        for index, part in enumerate(parts)
+    ]
+
+
+def _token_like_parts(text: str) -> list[str]:
+    """Keep Qwen structural special tokens atomic; split other text finely."""
+    special_tokens = ("<tool_call>", "</tool_call>")
+    parts: list[str] = []
+    cursor = 0
+    while cursor < len(text):
+        token = next(
+            (
+                candidate
+                for candidate in special_tokens
+                if text.startswith(candidate, cursor)
+            ),
+            None,
+        )
+        if token is not None:
+            parts.append(token)
+            cursor += len(token)
+        else:
+            parts.append(text[cursor])
+            cursor += 1
+    return parts
+
+
+def _build_burst_regression_fixtures(
+    tokenizer: FakeTokenizer,
+) -> dict[str, dict[str, list[InputDelta]]]:
+    first = (
+        "<tool_call>\n<function=bash>\n"
+        "<parameter=command>\necho one\n</parameter>\n"
+        "</function>\n</tool_call>"
+    )
+    second = (
+        "<tool_call>\n<function=bash>\n"
+        "<parameter=workdir>\n/work\n</parameter>\n"
+        "</function>\n</tool_call>"
+    )
+    pair = first + "\n" + second
+    first_close = "</function>\n</tool_call>"
+    first_without_close = first[:-len(first_close)]
+    return {
+        "single_call": {
+            "token_by_token": _partition_text(
+                tokenizer, *_token_like_parts(first)
+            ),
+            "whole_delta_45439": _partition_text(tokenizer, first),
+            "start_then_body_43074": _partition_text(
+                tokenizer, "<tool_call>", first[len("<tool_call>"):]
+            ),
+            "last_param_and_close_39598_45256": _partition_text(
+                tokenizer,
+                "<tool_call>\n<function=bash>\n",
+                "<parameter=command>\necho one\n</parameter>\n"
+                "</function>\n</tool_call>",
+            ),
+        },
+        "two_calls": {
+            "token_by_token": _partition_text(
+                tokenizer, *_token_like_parts(pair)
+            ),
+            "whole_delta": _partition_text(tokenizer, pair),
+            "first_close_plus_second_45440": _partition_text(
+                tokenizer, first_without_close, first_close + "\n" + second
+            ),
+        },
+    }
+
+
+def _non_streaming_oracle(
+    parser_cls: type,
+    tokenizer: FakeTokenizer,
+    tools: list[Any],
+    request: ChatCompletionRequest,
+    logical_text: str,
+) -> dict[str, Any]:
+    result = parser_cls(tokenizer, tools=tools).extract_tool_calls(
+        logical_text, request
+    )
+    calls = [
+        {
+            "name": call.function.name,
+            "arguments": call.function.arguments,
+        }
+        for call in result.tool_calls
+    ]
+    parsed_arguments = [json.loads(call["arguments"]) for call in calls]
+    return {
+        "content": result.content or "",
+        "tool_calls": calls,
+        "parsed_arguments": parsed_arguments,
+        "invalid_argument_indexes": [],
+    }
+
+
+def _run_burst_regressions(
+    parser_cls: type,
+    tokenizer: FakeTokenizer,
+    tools: list[Any],
+    request: ChatCompletionRequest,
+) -> dict[str, Any]:
+    fixtures = _build_burst_regression_fixtures(tokenizer)
+    results: dict[str, Any] = {}
+    for fixture_name, trajectories in fixtures.items():
+        logical_texts = {
+            name: "".join(delta.text for delta in deltas)
+            for name, deltas in trajectories.items()
+        }
+        if len(set(logical_texts.values())) != 1:
+            raise AssertionError(
+                f"burst fixture {fixture_name} changes logical text"
+            )
+        logical_text = next(iter(logical_texts.values()))
+        oracle = _non_streaming_oracle(
+            parser_cls, tokenizer, tools, request, logical_text
+        )
+        assembled = {
+            name: _run_direct(
+                parser_cls, tokenizer, tools, request, deltas
+            )["assembled"]
+            for name, deltas in trajectories.items()
+        }
+        results[fixture_name] = {
+            "logical_text_sha256": hashlib.sha256(
+                logical_text.encode("utf-8")
+            ).hexdigest(),
+            "oracle": oracle,
+            "trajectories": assembled,
+            "all_partitions_equal": len({
+                json.dumps(value, ensure_ascii=False, sort_keys=True)
+                for value in assembled.values()
+            }) == 1,
+            "all_match_non_streaming": all(
+                value == oracle for value in assembled.values()
+            ),
+        }
+    return {
+        "fixtures": results,
+        "all_pass": all(
+            row["all_partitions_equal"] and row["all_match_non_streaming"]
+            for row in results.values()
+        ),
+    }
+
+
 def _message_dict(message: DeltaMessage | None) -> dict[str, Any] | None:
     if message is None:
         return None
@@ -696,6 +850,12 @@ def run(qwen_parser_source: Path | None = None) -> dict[str, Any]:
         request,
         logical_texts["separate_close"],
     )
+    burst_regressions = _run_burst_regressions(
+        qwen_module.Qwen3CoderToolParser,
+        tokenizer,
+        tools,
+        request,
+    )
     layers: dict[str, dict[str, Any]] = {
         "direct_tool_parser": {},
         "delegating": {},
@@ -829,6 +989,7 @@ def run(qwen_parser_source: Path | None = None) -> dict[str, Any]:
         "controls": {
             "upstream_token_by_token_pattern": token_by_token_control,
         },
+        "burst_regressions": burst_regressions,
         "equivalence": equivalence,
         "layers": layers,
     }
@@ -873,10 +1034,13 @@ def main() -> int:
             for layer, trajectories in layers.items()
         }
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    if args.require_equivalence and not all(
-        row["all_partitions_equal"] for row in result["equivalence"].values()
-    ):
-        return 1
+    if args.require_equivalence:
+        historical_pass = all(
+            row["all_partitions_equal"]
+            for row in result["equivalence"].values()
+        )
+        if not historical_pass or not result["burst_regressions"]["all_pass"]:
+            return 1
     return 0
 
 

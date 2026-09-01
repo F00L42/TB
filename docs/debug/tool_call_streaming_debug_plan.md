@@ -1361,23 +1361,24 @@ test utility。
 语义，任意 serving 支持的 delta 分区都必须重组出相同的 content、tool-call 数量与顺序、函数名、
 arguments 语义和 finish reason。随机生成的 tool-call ID 和 delta 数量不要求逐字相同。
 
-2026-08-29 对上游材料和固定 vLLM `v0.23.0` 源码的逐项映射如下。#45256 是 issue，不是已合入
+2026-08-31 对上游材料和固定 vLLM `v0.23.0` 源码的逐项映射如下。#45256 是 issue，不是已合入
 PR；PR 的 `Closed` 状态也不能单独证明其 diff 已合入目标版本。
 
 | 上游证据 | 最小 burst 形状 | 固定 v0.23.0 失败点 | 当前 patch 覆盖 |
 | --- | --- | --- | --- |
-| [PR #39598](https://github.com/vllm-project/vllm/pull/39598) | 最后 parameter 与 `</function>` 同批；另含 serving 序列化/尾参回填问题 | parameter fragments 后提前 return | **部分覆盖**：只覆盖 parser early return，不包含该 PR 的 serving 层改动 |
-| [PR #43074](https://github.com/vllm-project/vllm/pull/43074) | `<tool_call>` 已在前一批，完整 function header、参数和 close 在下一批 | header 和 JSON-open 各自提前 return | **未覆盖** |
-| [Issue #45256](https://github.com/vllm-project/vllm/issues/45256) | 已分批进入参数，最后 parameter、function close、tool close 同批 | parameter fragments 后提前 return，最终少 `}` | **精确覆盖** |
-| [Issue #45439](https://github.com/vllm-project/vllm/issues/45439) | 完整 `<tool_call>...</tool_call>` 单批 | tool-start 分支设置状态后立即 return | **未覆盖** |
-| [Issue #45440](https://github.com/vllm-project/vllm/issues/45440) | 第一个 call 的 close 与第二个完整 call 同批 | 第一个 call 返回后没有 callback 再推进 index | **未覆盖** |
+| [PR #39598](https://github.com/vllm-project/vllm/pull/39598) | 最后 parameter 与 `</function>` 同批；另含 serving 序列化/尾参回填问题 | parameter fragments 后提前 return | **parser 已覆盖**；该 PR 的独立 serving 层改动仍需服务器门验证 |
+| [PR #43074](https://github.com/vllm-project/vllm/pull/43074) | `<tool_call>` 已在前一批，完整 function header、参数和 close 在下一批 | header 和 JSON-open 各自提前 return | **已覆盖** |
+| [Issue #45256](https://github.com/vllm-project/vllm/issues/45256) | 已分批进入参数，最后 parameter、function close、tool close 同批 | parameter fragments 后提前 return，最终少 `}` | **已覆盖** |
+| [Issue #45439](https://github.com/vllm-project/vllm/issues/45439) | 完整 `<tool_call>...</tool_call>` 单批 | tool-start 分支设置状态后立即 return | **已覆盖** |
+| [Issue #45440](https://github.com/vllm-project/vllm/issues/45440) | 第一个 call 的 close 与第二个完整 call 同批 | 第一个 call 返回后没有 callback 再推进 index | **已覆盖** |
 | [Issue #44873 / PR #45413](https://github.com/vllm-project/vllm/issues/44873) | 通用 multi-token delta | 上游以统一 ParserEngine 把 chunk-size invariance 变成引擎属性 | v0.24.0 起的架构替代，**不在 v0.23.0 patch 中** |
 
-因此修复方案必须从“补一个 return”升级为“**burst drain**”：一次 callback 内只要已有输入还能完成
-grammar transition，就继续推进 tool-start → header → JSON-open → parameter → function-close →
-tool-close → next-call，并把本 callback 的 0～N 个 `DeltaToolCall` 聚合到一个 `DeltaMessage`。只有遇到
-不完整 delimiter、需要更多模型输入或当前 callback 已完全消费时才返回。实现必须使用单调消费位置
-或等价的不重复消费不变量，不能靠下一次 EOS callback 重放已到达的文本。
+当前 v0.23.0 patch 已从“补一个 return”升级为完整 burst drain。实现不再在每个 parameter grammar
+transition 后提前返回，而是从累计 parser 前文本中发现 0～N 个完整 function：header 完整时先发名称，
+`</function>` 到达后一次发送由非流式 XML parser 得到的 canonical JSON arguments。这样，同一 callback
+包含 whole call 或第一个 close 加第二个 call 时都能一次聚合多个 `DeltaToolCall`，且不为未完整生成的
+XML 人工补 close。代价是 arguments 不再逐 parameter 提前发送；这不改变 OpenAI tool-call 重组语义，
+并避免 incomplete value 在后续 delta 扩展时破坏已发送 JSON 前缀。
 
 固定 v0.23.0 的近期方案仍应在 legacy parser 层完成 burst drain，不在 DTB 层重分片、补 XML 或
 人工添加 `}`。直接回移上游 ParserEngine 是另一个版本升级项目：它结构上更符合分区不变性，但
@@ -1403,10 +1404,11 @@ tool-close → next-call，并把本 callback 的 0～N 个 `DeltaToolCall` 聚�
 6. **LightCode 门**：只有前五门通过后，才回到单并发 9 场景 DTB/Vanilla 配对实验评估正确率和端到端
    时延，避免把 parser hard failure 混入 DTB 参数搜索。
 
-当前 [`parser_partition_equivalence.py`](../../tools/dtb/parser_partition_equivalence.py) 只覆盖
-parameter-close 的三种 terminal 分区，应保留为历史反事实，但不能再命名或解释为全 grammar
-partition equivalence。下一版工具必须输出 fixture 级 pass/fail、归一化重组结果、失败状态迁移和
-源文件 hash，并允许在同一命令中比较 unpatched、当前 patch 与候选 patch。
+[`parser_partition_equivalence.py`](../../tools/dtb/parser_partition_equivalence.py) 现保留历史
+parameter-close 三分区反事实，并新增 single-call 与 two-call fixture：逐 token-like 分区、whole delta、
+start+whole body、last parameter+close 和 first close+second call。工具输出 fixture 级 pass/fail、
+归一化重组结果和源文件 hash，以非流式 parser 为 oracle；候选 patch 本地全部通过。该结果仍只是
+无模型 parser 级验证，不能替代 vLLM serving 和目标 NPU 的服务器回放。
 
 ### 9.4 证据演进与最终实测
 
@@ -1419,6 +1421,8 @@ partition equivalence。下一版工具必须输出 fixture 级 pass/fail、归�
 | `run_after_parser_fix*` | 180 对真实 Vanilla/DTB replay；已生成 tool call 的 DTB 流无 JSON 截断或协议异常 | DTB 契约修复与 parser patch 组合在真实 MTP 环境命中并解决原故障 |
 | `run-03`（commit `d7e84c2`） | 5 个独立 completion 的 SSE arguments 均为 `{"description": ...` 且缺最终 `}` | hard failure 复现；因缺 parser 前 raw 和服务器 patch 身份，只能重新打开可靠性门，不能直接定责 |
 | 上游 burst 缺陷族审计 | 当前 patch 只覆盖 parameter-close 家族；#43074/#45439/#45440 的 early return 保持不变 | 排除“一个回归用例代表完整分区不变性”；下一版必须采用 burst drain 与多 fixture 门禁 |
+| `agent_tool_call_run04_paired_replay/run_server_01` | 600 请求；DTB 133 次 invalid JSON，其中 132 次 parser 前 XML 不完整、1 次完整 XML 被 parser 截断；132 个 final-answer 子请求以 `</think>` stop 结束（其中 131 个属于不完整 XML） | 主要故障不是 parser 补 `}` 问题，而是 final-answer 错误继承思考 stop；另确认 1 个 multi-call burst parser 缺陷 |
+| v0.23.0 burst-drain 离线门 | historical fixture、single-call 和 two-call 的所有分区均与非流式 parser oracle 等价 | parser 候选覆盖 #39598/#43074/#45256/#45439/#45440 的 parser 形状；服务器 serving/finalization 尚待验证 |
 
 commit `0b641fd` 的最终批量结果包括：
 
@@ -1475,7 +1479,8 @@ MR 和后续回归统一使用以下分类，避免再次用“有没有任意 t
 | 直接 `<tool_call>` reasoning boundary 未命中 | 4 组 smoke 的 `tool_call_boundary_covered=0` | 新增状态分支只有无模型测试，没有真实模型覆盖 | MR 保留单元测试；发布前构造定向 prompt 或受控 engine fixture 覆盖 |
 | 非流式协议未做同批服务器矩阵 | 本轮归档均为 SSE | 不能从流式成功外推完整响应 parser | 增加 `stream=false` paired smoke，核对 message.tool_calls/content/finish |
 | parser patch 与上游版本耦合 | patch 固定 `v0.23.0` SHA | 升级或服务器私改会 apply 冲突或静默加载错误文件 | 部署强制 SHA、import path、apply-check、diff 和离线等价门；升级时重做 patch |
-| parser patch 只覆盖 parameter-close 家族 | 固定源码仍在 tool-start、header、JSON-open 和 call-advance 处 early return | 完整 call 单批或多 call 共批时仍可能丢调用、空参数或状态不推进 | 实现 burst drain；加入 #39598/#43074/#45256/#45439/#45440 精确 fixture 与分区属性测试 |
+| burst-drain patch 尚未做目标服务器验证 | 无模型离线 fixture 全部通过；目标 v0.23.0 + vLLM-Ascend 尚未部署本候选 | serving 尾参回填、finish reason 或运行时分片仍可能暴露集成问题 | 部署记录源码/patch SHA；执行 stream true/false、interval 1/3/8/20 的 Vanilla/DTB paired replay |
+| final-answer 把 `</think>` 当 stop | run04 replay 中 132 个 invalid-JSON final child 以该 stop 结束；源码 `configure_final_answer_stop()` 明确追加该值 | 工具参数或报告正文只要出现字面 `</think>` 就会在 XML 中间终止 | final-answer 不再追加控制器 stop；保留原请求 sampling stop，新增状态机断言和定向 literal-marker replay |
 | 服务器 patch 身份不可审计 | `run-03` 只有 `system_fingerprint=vllm-0.23.0-tp8-f063d18e`，没有 parser path/source hash/patch hash | hard failure 后无法区分未部署、错误 import path、raw XML 缺失和剩余 parser bug | manifest 与启动日志强制记录完整身份；stream audit 保存失败 request 的 parser 前 raw/forwarded 证据 |
 | `run-03` 连续缺 `}` | 5 个独立 completion 在客户端均以 `tool_calls` 结束但 arguments JSON 不完整 | agent 工具无法执行，直接影响 LightCode 正确率 | parser 门关闭；先做定向 burst 回放定责，通过后再进行 DTB 参数及时延排名 |
 | schema-validity 未纳入分析器 | attempt 13 被现有工具判为 pass | JSON 可解析但实际工具无法消费 | 后续增强 replay/analyzer，按 request tools 校验 required/type；保存 raw XML 定责 |

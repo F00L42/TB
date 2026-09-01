@@ -782,6 +782,90 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertEqual(
             analysis["diagnosis"], "controller_input_text_token_gap")
 
+    def test_analysis_identifies_final_answer_stop_collision(self) -> None:
+        summary = {
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": ["invalid_tool_arguments_json"],
+        }
+        records = [
+            {
+                "schema": 2,
+                "event": "delta",
+                "phase": "final_answer",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "raw_text": (
+                    "<tool_call><function=write><parameter=content>"
+                    "literal "
+                ),
+                "source_stop_reason": "</think>",
+            },
+            {
+                "schema": 2,
+                "event": "terminal_flush",
+                "phase": "final_answer",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "terminal_flush": True,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(
+            analysis["diagnosis"],
+            "controller_final_answer_stop_collision",
+        )
+        self.assertTrue(analysis["final_answer_stopped_on_think_end"])
+        self.assertFalse(analysis["raw_has_complete_tool_call"])
+
+    def test_analysis_identifies_complete_xml_parser_failure(self) -> None:
+        summary = {
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": ["invalid_tool_arguments_json"],
+        }
+        records = [
+            {
+                "schema": 2,
+                "event": "delta",
+                "phase": "final_answer",
+                "sequence": 1,
+                "completion_epoch": 1,
+                "raw_text": (
+                    "<tool_call><function=write>"
+                    "<parameter=content>ok</parameter>"
+                    "</function></tool_call>"
+                ),
+            },
+            {
+                "schema": 2,
+                "event": "terminal_flush",
+                "phase": "final_answer",
+                "sequence": 2,
+                "completion_epoch": 1,
+                "terminal_flush": True,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(analysis["diagnosis"], "downstream_parser_failure")
+        self.assertTrue(analysis["raw_has_complete_tool_call"])
+
+    def test_analysis_separates_tool_choice_from_protocol_failure(self) -> None:
+        analysis = classify({
+            "variant": "vanilla",
+            "has_tool_call": True,
+            "anomaly_reasons": ["expected_tool_name_missing"],
+        }, [])
+
+        self.assertEqual(
+            analysis["diagnosis"],
+            "vanilla_semantic_tool_choice_mismatch",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

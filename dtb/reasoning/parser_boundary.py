@@ -28,11 +28,6 @@ def configure_thinking_stop(params: Any) -> None:
     params.include_stop_str_in_output = True
 
 
-def configure_final_answer_stop(params: Any) -> None:
-    _append_stops(params, THINK_END_TAG)
-    params.include_stop_str_in_output = False
-
-
 def _last_chunk_contains_boundary(
     last_chunk: object, boundary: ReasoningBoundary
 ) -> bool:

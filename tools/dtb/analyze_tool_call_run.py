@@ -128,8 +128,22 @@ def classify(
         if not row.get("terminal_flush")
     )
     raw_has_start = "<tool_call>" in raw_text
+    raw_has_complete_call = (
+        "</function>" in raw_text and "</tool_call>" in raw_text
+    )
     sse_has_tool_call = bool(summary.get("has_tool_call"))
     anomaly_reasons = list(summary.get("anomaly_reasons") or [])
+    anomaly_reason_set = set(anomaly_reasons)
+    semantic_name_only = (
+        bool(anomaly_reason_set)
+        and anomaly_reason_set <= {"expected_tool_name_missing"}
+        and sse_has_tool_call
+    )
+    final_answer_stopped_on_think_end = any(
+        row.get("phase") == "final_answer"
+        and row.get("source_stop_reason") == "</think>"
+        for row in visible_records
+    )
 
     boundary_records = [
         row for row in records
@@ -241,9 +255,14 @@ def classify(
     )
 
     if summary.get("variant") == "vanilla":
-        diagnosis = (
-            "vanilla_pass" if not anomaly_reasons else "vanilla_sse_failure"
-        )
+        if not anomaly_reasons:
+            diagnosis = "vanilla_pass"
+        elif semantic_name_only:
+            diagnosis = "vanilla_semantic_tool_choice_mismatch"
+        elif anomaly_reason_set <= {"expected_tool_call_missing"}:
+            diagnosis = "vanilla_missing_expected_tool"
+        else:
+            diagnosis = "vanilla_sse_failure"
     elif not records:
         diagnosis = "missing_server_trace"
     elif invalid_boundary_alignments:
@@ -256,8 +275,26 @@ def classify(
         diagnosis = "controller_completion_lifecycle_failure"
     elif sse_has_tool_call and not anomaly_reasons:
         diagnosis = "pass"
+    elif semantic_name_only:
+        diagnosis = "semantic_tool_choice_mismatch"
     elif tool_boundary is not None and not raw_has_start:
         diagnosis = "controller_input_text_token_gap"
+    elif (
+        "invalid_tool_arguments_json" in anomaly_reason_set
+        and raw_has_complete_call
+    ):
+        diagnosis = "downstream_parser_failure"
+    elif (
+        "invalid_tool_arguments_json" in anomaly_reason_set
+        and raw_has_start
+        and final_answer_stopped_on_think_end
+    ):
+        diagnosis = "controller_final_answer_stop_collision"
+    elif (
+        "invalid_tool_arguments_json" in anomaly_reason_set
+        and raw_has_start
+    ):
+        diagnosis = "model_or_controller_truncated_tool_xml"
     elif raw_has_start and (not sse_has_tool_call or anomaly_reasons):
         diagnosis = "downstream_parser_or_finish_failure"
     elif not raw_has_start and not sse_has_tool_call:
@@ -311,6 +348,10 @@ def classify(
         "server_record_count": len(records),
         "visible_record_count": len(visible_records),
         "raw_has_tool_call_start": raw_has_start,
+        "raw_has_complete_tool_call": raw_has_complete_call,
+        "final_answer_stopped_on_think_end": (
+            final_answer_stopped_on_think_end
+        ),
         "raw_visible_text": raw_text,
         "first_boundary_sequence": first_boundary_sequence,
         "reasoning_boundaries": [

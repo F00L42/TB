@@ -104,6 +104,8 @@ class Observation:
     role_tail: bool
     content_after_tool_delta: bool
     chunk_after_terminal: bool
+    protocol_anomaly_reasons: list[str]
+    semantic_anomaly_reasons: list[str]
     anomaly_reasons: list[str]
     error: str = ""
     first_chunk_ms: float = 0.0
@@ -478,6 +480,19 @@ def assemble_observation(
         )
     if chunk_after_terminal:
         anomaly_reasons.append("chunk_after_terminal")
+    semantic_reason_names = {
+        "expected_tool_call_missing",
+        "expected_tool_name_missing",
+        "invalid_tool_arguments_schema",
+    }
+    semantic_anomaly_reasons = [
+        reason for reason in anomaly_reasons
+        if reason in semantic_reason_names
+    ]
+    protocol_anomaly_reasons = [
+        reason for reason in anomaly_reasons
+        if reason not in semantic_reason_names
+    ]
 
     return Observation(
         line_no=line_no,
@@ -510,6 +525,8 @@ def assemble_observation(
         role_tail=role_tail,
         content_after_tool_delta=content_after_tool_delta,
         chunk_after_terminal=chunk_after_terminal,
+        protocol_anomaly_reasons=protocol_anomaly_reasons,
+        semantic_anomaly_reasons=semantic_anomaly_reasons,
         anomaly_reasons=anomaly_reasons,
         error=error,
         first_chunk_ms=round(first_chunk_ms, 3),
@@ -662,8 +679,20 @@ def build_paired_summary(observations: list[Observation]) -> dict[str, Any]:
         rows = [row for row in observations if row.variant == variant]
         variants[variant] = {
             "requests": len(rows),
-            "protocol_passes": sum(not row.anomaly_reasons for row in rows),
-            "protocol_failures": sum(bool(row.anomaly_reasons) for row in rows),
+            "protocol_passes": sum(
+                not row.protocol_anomaly_reasons for row in rows
+            ),
+            "protocol_failures": sum(
+                bool(row.protocol_anomaly_reasons) for row in rows
+            ),
+            "semantic_clean": sum(
+                not row.semantic_anomaly_reasons for row in rows
+            ),
+            "semantic_deviations": sum(
+                bool(row.semantic_anomaly_reasons) for row in rows
+            ),
+            "overall_passes": sum(not row.anomaly_reasons for row in rows),
+            "overall_failures": sum(bool(row.anomaly_reasons) for row in rows),
             "request_errors": sum(bool(row.error) for row in rows),
             "elapsed_ms": metric_summary([row.elapsed_ms for row in rows]),
             "first_output_ms": metric_summary([
@@ -682,10 +711,17 @@ def build_paired_summary(observations: list[Observation]) -> dict[str, Any]:
         rows for rows in grouped.values()
         if "vanilla" in rows and "dtb" in rows
     ]
-    clean_pairs = [
+    protocol_clean_pairs = [
         rows for rows in pairs
-        if not rows["vanilla"].anomaly_reasons
-        and not rows["dtb"].anomaly_reasons
+        if not rows["vanilla"].protocol_anomaly_reasons
+        and not rows["dtb"].protocol_anomaly_reasons
+        and rows["vanilla"].latency_eligible
+        and rows["dtb"].latency_eligible
+    ]
+    fully_clean_pairs = [
+        rows for rows in protocol_clean_pairs
+        if not rows["vanilla"].semantic_anomaly_reasons
+        and not rows["dtb"].semantic_anomaly_reasons
         and rows["vanilla"].latency_eligible
         and rows["dtb"].latency_eligible
     ]
@@ -730,9 +766,12 @@ def build_paired_summary(observations: list[Observation]) -> dict[str, Any]:
         "request_count": len(observations),
         "variants": variants,
         "all_pairs": paired_metrics(pairs),
-        "protocol_clean_pairs": paired_metrics(clean_pairs),
+        "protocol_clean_pairs": paired_metrics(protocol_clean_pairs),
+        "fully_clean_pairs": paired_metrics(fully_clean_pairs),
         "per_case": per_case,
-        "latency_ranking_valid": bool(pairs) and len(clean_pairs) == len(pairs),
+        "latency_ranking_valid": (
+            bool(pairs) and len(fully_clean_pairs) == len(pairs)
+        ),
     }
 
 
@@ -742,31 +781,35 @@ def write_result_markdown(path: Path, summary: dict[str, Any]) -> None:
         "",
         "## Protocol",
         "",
-        "| Variant | Requests | Pass | Failure | E2E median ms | E2E P95 ms | First output median ms |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Variant | Requests | Protocol pass | Protocol failure | Semantic deviation | Overall failure | E2E median ms | E2E P95 ms | First output median ms |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for variant, values in summary["variants"].items():
         lines.append(
-            "| {variant} | {requests} | {passes} | {failures} | {median} | {p95} | {first} |".format(
+            "| {variant} | {requests} | {passes} | {failures} | {semantic} | {overall} | {median} | {p95} | {first} |".format(
                 variant=variant,
                 requests=values["requests"],
                 passes=values["protocol_passes"],
                 failures=values["protocol_failures"],
+                semantic=values["semantic_deviations"],
+                overall=values["overall_failures"],
                 median=values["elapsed_ms"]["median"],
                 p95=values["elapsed_ms"]["p95"],
                 first=values["first_output_ms"]["median"],
             )
         )
     clean = summary["protocol_clean_pairs"]
+    fully_clean = summary["fully_clean_pairs"]
     lines.extend([
         "",
         "## Paired latency",
         "",
         f"- All pairs: {summary['all_pairs']['pairs']}",
         f"- Protocol-clean pairs: {clean['pairs']}",
-        f"- Median DTB minus Vanilla: {clean['dtb_minus_vanilla_ms']['median']} ms",
-        f"- Median DTB speedup: {clean['dtb_speedup_percent']['median']}%",
-        f"- DTB faster clean pairs: {clean['dtb_faster_pairs']}/{clean['pairs']}",
+        f"- Fully clean pairs: {fully_clean['pairs']}",
+        f"- Median DTB minus Vanilla: {fully_clean['dtb_minus_vanilla_ms']['median']} ms",
+        f"- Median DTB speedup: {fully_clean['dtb_speedup_percent']['median']}%",
+        f"- DTB faster fully clean pairs: {fully_clean['dtb_faster_pairs']}/{fully_clean['pairs']}",
         f"- Latency ranking valid: {summary['latency_ranking_valid']}",
         "",
         "Latency ranking is valid only when every latency-eligible pair is free "

@@ -553,6 +553,8 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("<tool_call>", engine.calls[0]["stop"])
         self.assertIn("</think>", engine.calls[0]["stop"])
         self.assertTrue(engine.calls[0]["include_stop_str_in_output"])
+        self.assertNotIn("</think>", engine.calls[1]["stop"])
+        self.assertFalse(engine.calls[1]["include_stop_str_in_output"])
         self.assertEqual(
             engine.calls[1]["prompt_token_ids"],
             [60, *boundary_ids],

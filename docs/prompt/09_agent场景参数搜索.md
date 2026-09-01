@@ -30,3 +30,15 @@ docs\design\agent_multiturn_dtb_experiment_plan.md
 docs\log\perf\agent_tool_call_run02_replay\run_server_01是runbook执行结果，没有发现问题
 回顾目标和思维连分布特征，我认为answer cue的修改对tool_call成功率和时延的影响嫌疑大，分析：对于短思维链（十几个token）开启dtb的场景，模型在输出</think>或者<tool_call>后，要先看一遍十几个token的诱导prompt再续写，带来额外的首字时延消耗和语义偏移
 找到并展示源码里相关的证据，分析这一猜想的证据是否准确，评估实际影响会有多大
+
+---
+
+已执行回放实验，共196个异常，结果位于docs\log\perf\agent_tool_call_run04_paired_replay\run_server_01
+其中有测试结果，服务器日志提取结果、metrics等，manifest未提及修改则一律复用模板
+1. 测试结果分析
+   1. 当前回放是否复现了端到端测试中的报错
+   2. 一共有多少种报错，有多少vanilla和dtb都存在的报错
+2. 解决报错
+   1. 问题原因定位
+   2. 参考社区PR（docs\debug\tool_call_streaming_debug_plan.md: 1358 上游缺陷族审计与修订方案），制作023版本的parser完整修复patch
+   3. 验证dtb和vanilla同一表现的完整paired replay方案

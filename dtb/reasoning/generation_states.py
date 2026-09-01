@@ -15,7 +15,6 @@ from dtb.reasoning.parser_boundary import (
     THINK_END_TAG,
     TOOL_CALL_START_TAG,
     align_stop_boundary_delta,
-    configure_final_answer_stop,
     configure_thinking_stop,
     detect_reasoning_boundary,
     emit_reasoning_boundary_once,
@@ -707,7 +706,6 @@ class _FinalAnswerState(_BaseState):
 
         params = context.request.to_sampling_params(
             answer_limit, context.default_sampling_params)
-        configure_final_answer_stop(params)
         output_kind = _output_kind_name(
             getattr(params, "output_kind", None))
         prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
