@@ -26,9 +26,9 @@ from collections.abc import Generator
 from typing import Any
 
 
-ROOT = Path(__file__).resolve().parents[2]
-VLLM_ROOT = ROOT / "third_party" / "vllm" / "vllm"
-VLLM_TESTS_ROOT = ROOT / "third_party" / "vllm" / "tests"
+ROOT = Path("/")
+VLLM_ROOT = ROOT / "vllm-workspace" / "vllm" / "vllm"
+VLLM_TESTS_ROOT = ROOT / "vllm-workspace" / "vllm" / "tests"
 
 
 def _package(name: str, path: Path | None = None) -> types.ModuleType:
