@@ -111,10 +111,10 @@ clean 子集上 DTB 仅快 43/128，中位 `DTB - Vanilla = +546.507 ms`，即 D
 
 使用本轮同一 10 个真实多轮输入，单并发、每 case 每 variant 30 次、Vanilla/DTB 交替；补一个明确在
 tool argument 中包含字面 `</think>` 的最小 canary，以及完整 single-call/two-call burst canary。
-分别执行：
+服务器保持生产默认 `stream_interval=1`，不把 interval 作为实验变量，分别执行：
 
-- `stream=true`，`stream_interval=1/3/8/20`；
-- `stream=false`，验证原生完整响应 parser；
+- `stream=true` 定向回放；
+- `stream=false` 协议 smoke，验证原生完整响应 parser；
 - DTB 固定参数保持本轮值，Vanilla 保持原生路径；请求采样、seed、到达节奏和 cache 策略相同。
 
 仅对这些 request ID 开 `stream_audit`，每个失败样本保存 parser 前 raw、forwarded text/token IDs、
@@ -139,8 +139,8 @@ Vanilla/DTB 单并发性能实验。该性能 run 再做 E2E、completion token�
 
 以下命令以 Linux 服务器、仓库 `/opt/p00906181/TB-main`、同一服务端口 9000 为例。`VLLM_ROOT`
 必须指向实际运行服务加载的固定 vLLM `v0.23.0` 源码。唯一无法由仓库给出的命令是服务器模板的完整
-启停命令；它必须从上一轮 manifest 原样复用，只允许为四个流式子 run 分别设置
-`--stream-interval 1/3/8/20`。不能用一个新写的简化 `vllm serve` 命令替代生产模板。
+启停命令；它必须从上一轮 manifest 原样复用并保持生产默认 `stream_interval=1`。不能用一个新写的
+简化 `vllm serve` 命令替代生产模板，也不需要增加 `--stream-interval` 参数。
 
 ### 1. 定义路径并验证代码和 patch
 
@@ -208,18 +208,15 @@ print(f"parser_sha256={hashlib.sha256(path.read_bytes()).hexdigest()}")
 PY
 ```
 
-### 2. 一次生成五个子 run 的 stream-audit 白名单
+### 2. 一次生成两个子 run 的 stream-audit 白名单
 
-四个流式子 run 和一个非流式子 run 使用不同的 request-id suffix，避免日志串 run。每个 suffix
-产生 300 个 DTB ID，共 1500 个 ID：
+流式子 run 和非流式子 run 使用不同的 request-id suffix，避免日志串 run。每个 suffix 产生 600 个
+Vanilla/DTB ID，共 1200 个 ID：
 
 ```bash
 cd "$TB_ROOT"
 for RUN_ID in \
-  run04-fix-s1 \
-  run04-fix-s3 \
-  run04-fix-s8 \
-  run04-fix-s20 \
+  run04-fix-stream \
   run04-fix-nonstream
 do
   python tools/dtb/replay_tool_calls.py \
@@ -228,10 +225,10 @@ do
     --mode both \
     --repetitions 30 \
     --request-id-run "$RUN_ID" \
-    --list-dtb-request-ids
+    --list-request-ids
 done | sort -u > "$ALLOWLIST"
 
-test "$(wc -l < "$ALLOWLIST")" -eq 1500
+test "$(wc -l < "$ALLOWLIST")" -eq 1200
 head "$ALLOWLIST"
 tail "$ALLOWLIST"
 ```
@@ -252,7 +249,7 @@ ids_path = Path(sys.argv[2])
 config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 request_ids = [line.strip() for line in ids_path.read_text(
     encoding="utf-8").splitlines() if line.strip()]
-assert len(request_ids) == 1500
+assert len(request_ids) == 1200
 config["OBSERVABILITY"]["mode"] = "stream_audit"
 config["OBSERVABILITY"]["stream_request_ids"] = request_ids
 config_path.write_text(
@@ -295,8 +292,7 @@ cd "$TB_ROOT"
 run_replay () {
   RUN_ID="$1"
   RESPONSE_FLAG="$2"
-  STREAM_INTERVAL="$3"
-  SERVER_LOG="$4"
+  SERVER_LOG="$3"
   OUT="$RUN_ROOT/$RUN_ID"
   BEFORE="$RUN_ROOT/$RUN_ID.metrics.before.prom"
 
@@ -327,8 +323,8 @@ run_replay () {
   curl -fsS "$METRICS_URL" -o "$OUT/metrics.after.prom"
   cp "$RUN_ROOT/deployment_identity.txt" "$OUT/"
   cp "$RUN_ROOT/budget_config.stream_audit.yaml" "$OUT/"
-  printf 'response_flag=%s\nstream_interval=%s\nreplay_exit=%s\n' \
-    "$RESPONSE_FLAG" "$STREAM_INTERVAL" "$REPLAY_RC" \
+  printf 'response_flag=%s\nstream_interval=1(default)\nreplay_exit=%s\n' \
+    "$RESPONSE_FLAG" "$REPLAY_RC" \
     > "$OUT/server_variant.txt"
 
   set +e
@@ -341,72 +337,31 @@ run_replay () {
 }
 ```
 
-### 5. 按 stream interval 重启并执行四个流式子 run
+### 5. 使用生产默认配置执行流式子 run
 
-每一组都必须先停止上一服务，再用上一轮 manifest 的**完整模板启动命令**重启。以下四行中的
-`<TEMPLATE_START_COMMAND>` 是必须替换的唯一命令占位符；除末尾 `--stream-interval` 外，模型、TP/DP、
-MTP、cache、端口和所有环境变量保持模板不变。让模板分别把完整 stdout/stderr 写到给定日志；健康检查
-通过后在另一个终端的同一 shell 中执行对应 `run_replay`。若模板已经带 `--stream-interval`，替换其值，
-不要再追加第二个同名参数：
+用上一轮 manifest 的**完整模板启动命令**启动一次服务，保持默认 `stream_interval=1`，不增加 interval
+参数。模型、TP/DP、MTP、cache、端口和环境变量全部复用生产模板：
 
 ```bash
-# 服务终端：interval=1
-<TEMPLATE_START_COMMAND> --stream-interval 1 \
-  2>&1 | tee "$RUN_ROOT/server.s1.log"
+# 服务终端
+<TEMPLATE_START_COMMAND> 2>&1 | tee "$RUN_ROOT/server.log"
 ```
 
 ```bash
 # 回放终端
 until curl -fsS http://127.0.0.1:9000/v1/models >/dev/null; do sleep 2; done
-run_replay run04-fix-s1 --stream 1 "$RUN_ROOT/server.s1.log"
+run_replay run04-fix-stream --stream "$RUN_ROOT/server.log"
 ```
 
-停止服务后依次重复：
+### 6. 在同一服务上执行非流式协议 smoke
 
-```bash
-# 服务终端：interval=3
-<TEMPLATE_START_COMMAND> --stream-interval 3 \
-  2>&1 | tee "$RUN_ROOT/server.s3.log"
-```
-
-```bash
-until curl -fsS http://127.0.0.1:9000/v1/models >/dev/null; do sleep 2; done
-run_replay run04-fix-s3 --stream 3 "$RUN_ROOT/server.s3.log"
-```
-
-```bash
-# 服务终端：interval=8
-<TEMPLATE_START_COMMAND> --stream-interval 8 \
-  2>&1 | tee "$RUN_ROOT/server.s8.log"
-```
-
-```bash
-until curl -fsS http://127.0.0.1:9000/v1/models >/dev/null; do sleep 2; done
-run_replay run04-fix-s8 --stream 8 "$RUN_ROOT/server.s8.log"
-```
-
-```bash
-# 服务终端：interval=20
-<TEMPLATE_START_COMMAND> --stream-interval 20 \
-  2>&1 | tee "$RUN_ROOT/server.s20.log"
-```
-
-```bash
-until curl -fsS http://127.0.0.1:9000/v1/models >/dev/null; do sleep 2; done
-run_replay run04-fix-s20 --stream 20 "$RUN_ROOT/server.s20.log"
-```
-
-### 6. 在 interval=20 服务上执行非流式子 run
-
-非流式请求不依赖客户端 SSE 分片，但仍经过 DTB final-answer 和 vLLM 原生完整响应 parser。无需再次
-重启 interval=20 服务：
+非流式请求不依赖客户端 SSE 分片，但仍经过 DTB final-answer 和 vLLM 原生完整响应 parser，无需重启：
 
 ```bash
 run_replay \
   run04-fix-nonstream \
   --no-stream \
-  20 \
-  "$RUN_ROOT/server.s20.log"
+  "$RUN_ROOT/server.log"
 ```
 
 ### 7. 自动执行硬门检查
@@ -423,10 +378,7 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 run_ids = (
-    "run04-fix-s1",
-    "run04-fix-s3",
-    "run04-fix-s8",
-    "run04-fix-s20",
+    "run04-fix-stream",
     "run04-fix-nonstream",
 )
 allowed_semantic = {"expected_tool_name_missing"}
@@ -517,6 +469,6 @@ sha256sum "$DTB_CONFIG"
 grep -A4 '^OBSERVABILITY:' "$DTB_CONFIG"
 ```
 
-若任一硬门失败，保留五个子目录和对应 server log，不执行 9 场景时延排名；先按 request ID 从
-`analysis.json` 回到 parser 前 raw 和 source stop/terminal 定责。五个子 run 全部通过后，才执行同
+若任一硬门失败，保留两个子目录和对应 server log，不执行 9 场景时延排名；先按 request ID 从
+`analysis.json` 回到 parser 前 raw 和 source stop/terminal 定责。两个子 run 全部通过后，才执行同
 commit、同模型、单并发、`observability=off` 的 LightCode 9/9 可用性门与独立性能 run。

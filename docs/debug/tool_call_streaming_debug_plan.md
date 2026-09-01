@@ -1391,16 +1391,18 @@ XML 人工补 close。代价是 arguments 不再逐 parameter 提前发送；这
 1. **部署身份门**：记录 vLLM/vLLM-Ascend commit、实际 import path、parser 源码 SHA、patch SHA
    和启动时加载类；任何一项缺失都不能声明目标 patch 已部署；
 2. **上游精确回归门**：把 #39598/#43074/#45256/#45439/#45440 的原始 delta 形状作为独立 fixture，
-   当前 patch 的预期基线是只通过 parameter-close 家族（#39598 的 parser case 与 #45256），候选
+   修订前 patch 的预期基线是只通过 parameter-close 家族（#39598 的 parser case 与 #45256），候选
    burst-drain patch 必须全部通过，并单列 #39598 的 serving 序列化/尾参回填检查；
 3. **分区属性门**：对相同完整 XML 覆盖单字符/单 token、完整单批、每个 grammar boundary 相邻合批、
    两个及以上 tool calls 共批和固定 seed 随机分区；以非流式 parser 与逐 token streaming 重组语义
    为双 oracle；
 4. **终止与异常门**：覆盖非空 terminal、空 EOS、`length`、stop string、partial delimiter 和 malformed
    XML；不得为模型未生成的 close 做合成恢复；
-5. **服务器 burst 门**：在目标 v0.23.0 + vLLM-Ascend + MTP 上对 `stream_interval=1/3/8/20` 做
-   `stream=true/false` 定向回放，开启精确 request allowlist 的 parser 前 audit，要求 missing call、
-   invalid JSON、XML 泄漏、index 不连续、错误 finish reason 和 terminal 后 chunk 全为 0；
+5. **服务器集成门**：目标 v0.23.0 + vLLM-Ascend + MTP 保持生产默认 `stream_interval=1`，不再把
+   interval 作为实验变量。对定向请求做 `stream=true` 回放和一组 `stream=false` 协议 smoke，开启精确
+   request allowlist 的 parser 前 audit，要求新 parser 不增加 Vanilla 的 missing call、invalid JSON、
+   XML 泄漏、index 不连续、错误 finish reason 或 terminal 后 chunk；burst 分区形状由第 2、3 门的
+   确定性 parser fixture 覆盖，不依靠修改生产 interval 制造；
 6. **LightCode 门**：只有前五门通过后，才回到单并发 9 场景 DTB/Vanilla 配对实验评估正确率和端到端
    时延，避免把 parser hard failure 混入 DTB 参数搜索。
 
@@ -1420,9 +1422,10 @@ start+whole body、last parameter+close 和 first close+second call。工具输�
 | 离线分片反事实 | 未修改 parser 的 bundled close 三层均失败；patch 后三层均等价且 JSON 有效 | 证明缺 `}` 是 parser 合法分片敏感性，不是模型 JSON 内容缺失 |
 | `run_after_parser_fix*` | 180 对真实 Vanilla/DTB replay；已生成 tool call 的 DTB 流无 JSON 截断或协议异常 | DTB 契约修复与 parser patch 组合在真实 MTP 环境命中并解决原故障 |
 | `run-03`（commit `d7e84c2`） | 5 个独立 completion 的 SSE arguments 均为 `{"description": ...` 且缺最终 `}` | hard failure 复现；因缺 parser 前 raw 和服务器 patch 身份，只能重新打开可靠性门，不能直接定责 |
-| 上游 burst 缺陷族审计 | 当前 patch 只覆盖 parameter-close 家族；#43074/#45439/#45440 的 early return 保持不变 | 排除“一个回归用例代表完整分区不变性”；下一版必须采用 burst drain 与多 fixture 门禁 |
+| 上游 burst 缺陷族审计（修订前 patch） | 修订前 patch 只覆盖 parameter-close 家族；#43074/#45439/#45440 的 early return 保持不变 | 排除“一个回归用例代表完整分区不变性”；下一版必须采用 burst drain 与多 fixture 门禁 |
 | `agent_tool_call_run04_paired_replay/run_server_01` | 600 请求；DTB 133 次 invalid JSON，其中 132 次 parser 前 XML 不完整、1 次完整 XML 被 parser 截断；132 个 final-answer 子请求以 `</think>` stop 结束（其中 131 个属于不完整 XML） | 主要故障不是 parser 补 `}` 问题，而是 final-answer 错误继承思考 stop；另确认 1 个 multi-call burst parser 缺陷 |
 | v0.23.0 burst-drain 离线门 | historical fixture、single-call 和 two-call 的所有分区均与非流式 parser oracle 等价 | parser 候选覆盖 #39598/#43074/#45256/#45439/#45440 的 parser 形状；服务器 serving/finalization 尚待验证 |
+| `agent_tool_call_run04_paired_replay/run_server_02` | 实验声明部署完整修复后共 600 请求；DTB invalid JSON 133→0，DTB hard failure 仅余 1 个 silent no-terminal；Vanilla 有 2 个 header-only/empty-arguments hard failure；144 个 DTB final raw 含 442 次字面量 `</think>` 且 final source stop 命中为 0 | final-answer 错误 stop 已在目标服务实测修复；Vanilla no-harm 因缺 parser 前 raw 仍未定责；真实 delta 未命中新增 burst 形状，且缺实际 import path/source SHA，不能关闭部署身份和默认配置服务器集成门 |
 
 commit `0b641fd` 的最终批量结果包括：
 
@@ -1479,22 +1482,24 @@ MR 和后续回归统一使用以下分类，避免再次用“有没有任意 t
 | 直接 `<tool_call>` reasoning boundary 未命中 | 4 组 smoke 的 `tool_call_boundary_covered=0` | 新增状态分支只有无模型测试，没有真实模型覆盖 | MR 保留单元测试；发布前构造定向 prompt 或受控 engine fixture 覆盖 |
 | 非流式协议未做同批服务器矩阵 | 本轮归档均为 SSE | 不能从流式成功外推完整响应 parser | 增加 `stream=false` paired smoke，核对 message.tool_calls/content/finish |
 | parser patch 与上游版本耦合 | patch 固定 `v0.23.0` SHA | 升级或服务器私改会 apply 冲突或静默加载错误文件 | 部署强制 SHA、import path、apply-check、diff 和离线等价门；升级时重做 patch |
-| burst-drain patch 尚未做目标服务器验证 | 无模型离线 fixture 全部通过；目标 v0.23.0 + vLLM-Ascend 尚未部署本候选 | serving 尾参回填、finish reason 或运行时分片仍可能暴露集成问题 | 部署记录源码/patch SHA；执行 stream true/false、interval 1/3/8/20 的 Vanilla/DTB paired replay |
-| final-answer 把 `</think>` 当 stop | run04 replay 中 132 个 invalid-JSON final child 以该 stop 结束；源码 `configure_final_answer_stop()` 明确追加该值 | 工具参数或报告正文只要出现字面 `</think>` 就会在 XML 中间终止 | final-answer 不再追加控制器 stop；保留原请求 sampling stop，新增状态机断言和定向 literal-marker replay |
+| burst-drain patch 的目标服务器分支未自然命中 | `run_server_02` 记录了候选 patch SHA 和预期 dirty 文件，但缺实际 import path/source SHA；默认 `stream_interval=1` 下的 79,912 个 DTB final-answer delta 中，完整 call 同批、parameter-close 同批和 first-close+second-call 同批命中均为 0 | 不能把该 run 当成新增 drain 分支的服务器命中证据，但无需为此修改生产 interval | 补齐加载身份和 Vanilla/DTB parser allowlist audit；生产默认 interval 下做定向 no-harm replay，burst 形状继续由上游精确 fixture 与分区属性门确定性覆盖 |
+| final-answer 把 `</think>` 当 stop | `run_server_01` 中 132 个 invalid-JSON final child 以该 stop 结束；`run_server_02` 中 144 个 final raw 含 442 次字面量 `</think>`，source stop 命中为 0 且 DTB invalid JSON 为 0 | 原故障会在工具参数或正文包含字面 marker 时截断 | **本轮实测关闭**；保留原请求 sampling stop、状态机断言和 literal-marker 回归，不再把它列为未修复 blocker |
 | 服务器 patch 身份不可审计 | `run-03` 只有 `system_fingerprint=vllm-0.23.0-tp8-f063d18e`，没有 parser path/source hash/patch hash | hard failure 后无法区分未部署、错误 import path、raw XML 缺失和剩余 parser bug | manifest 与启动日志强制记录完整身份；stream audit 保存失败 request 的 parser 前 raw/forwarded 证据 |
 | `run-03` 连续缺 `}` | 5 个独立 completion 在客户端均以 `tool_calls` 结束但 arguments JSON 不完整 | agent 工具无法执行，直接影响 LightCode 正确率 | parser 门关闭；先做定向 burst 回放定责，通过后再进行 DTB 参数及时延排名 |
-| schema-validity 未纳入分析器 | attempt 13 被现有工具判为 pass | JSON 可解析但实际工具无法消费 | 后续增强 replay/analyzer，按 request tools 校验 required/type；保存 raw XML 定责 |
+| schema-validity 与 parser failure 混淆 | analyzer 已校验 request tools 的 required/type，但此前把 schema failure 归入 SSE/parser failure；`run_server_02` 两侧各 1 个完整 JSON schema failure | 把模型参数语义问题错误归因于 parser | analyzer 独立输出 `tool_call_semantic_schema_failure`；继续保存 raw XML 并与 hard failure 分表 |
 | 模型不调用工具与 parser 丢调用可能混淆 | 8 个 smoke 有 raw 证据；完整 100 次的 2 个无 analysis | 错把 hard failure 当模型选择，或反向误报 | 只有 `raw_has_tool_call_start=false` 才能豁免；缺 telemetry 标记为证据不足 |
 | final-answer 默认 2048 cap | 第 11 条此前 5/5 `length` 截断 | 长多工具序列仍可能偏离原生 completion budget | 作为独立问题跟踪；是声明“全局原生等价”的 blocker，不把它归到 parser patch |
 | 真实 `length` 被改写为 `tool_calls` | 与 final cap 样本同时发现 | 客户端无法区分完成与截断 | 独立修复并加入 finish reason 回归；本 MR 不声称已解决 |
-| patch 是 server-wide | Vanilla 也使用修改后 parser；本轮无回归 | 影响所有 Qwen3Coder 工具请求 | 保留 Vanilla paired、上游定向测试和快速 reverse；长期优先推动上游修复 |
+| patch 是 server-wide | Vanilla 也使用修改后 parser；`run_server_02` 新见 2/300 header-only/empty-arguments hard failure，但没有 Vanilla parser 前 raw，单侧 Fisher `p=0.2496` | 可能影响所有 Qwen3Coder 工具请求；现有样本既不能证明伤害，也不能证明非劣 | 先对相同 parser 前 raw 做旧/新 parser 因果 A/B，再按预声明 margin/样本量做 Vanilla 非劣；保留快速 reverse并长期推动上游修复 |
 | telemetry 含模型/工具正文 | debug 日志可含命令和参数 | 数据泄露与日志膨胀 | `OBSERVABILITY.mode` 默认 `off`；`stream_audit` 只在隔离窗口开启并精确 allowlist request ID |
 | 排障分支包含大量原始 JSONL | `debug_tool_call` 相对 main 约 36 万新增行，多数为调试证据 | 审阅噪声、仓库体积和后续维护成本 | 原始 chunks/analysis 固定在归档分支；MR 从 main 重构，只保留聚合结论、工具、测试和复现命令 |
 
-前三轮 DTB 流契约修复仍由历史证据支持，但 parser 生产可靠性已因上游缺陷族和 `run-03` 重新
-打开，不能再以“目标故障已修复”结束整个工具调用议题。特别是 general partition invariance、
-final-answer cap 和真实 finish reason 都是声明全局原生等价的 blocker；若 MR 不包含相应修复，必须
-在描述中显式列为非目标并关联后续工作。
+前三轮 DTB 流契约修复仍由历史证据支持，`run_server_02` 也已关闭错误 `</think>` final stop 这个
+本轮主回归；但 parser 生产可靠性不能只凭“DTB invalid JSON 归零”一并关闭。两次 Vanilla
+empty-arguments failure 缺 parser 前 raw，新增 burst-drain 分支在真实 delta 中又一次都未命中，因此
+Vanilla no-harm 和默认配置服务器集成门仍保持打开。general partition invariance、final-answer cap、
+真实 finish reason 与 silent no-terminal lifecycle 都是声明全局原生等价的 blocker；若 MR 不包含相应
+修复，必须在描述中显式列为非目标并关联后续工作。
 
 ### 9.7 主分支 MR 交付范围与准入
 
@@ -1517,12 +1522,13 @@ MR 创建前至少完成：
 除统一 diff 载荷本身必需的空 context 前缀外，git diff --check 通过
 DTB 无模型测试通过或明确记录环境性 skip
 未修改 parser 的离线等价测试按预期失败
-当前 patch 只通过 parameter-close 精确 fixture，且按预期不能通过其他 burst fixture
-候选 burst-drain patch 通过全部上游精确 fixture、分区属性和异常终止测试
+修订前 patch 只通过 parameter-close 精确 fixture，且按预期不能通过其他 burst fixture
+当前 burst-drain patch 通过全部上游精确 fixture、分区属性和异常终止测试
 patch 对固定 vLLM SHA 执行 git apply --check 成功
 third_party/vllm 工作树干净
 OBSERVABILITY.mode 默认 off，stream_request_ids 默认空
-MR 描述列出已通过范围、未覆盖风险、服务器证据 commit 0b641fd 和 run-03 未定责 hard failure
+MR 描述列出已通过范围、未覆盖风险、服务器证据 commit 0b641fd、run-03 与
+run_server_01/run_server_02 的证据演进，以及 Vanilla no-harm 未定责状态
 ```
 
 MR 整理分支不包含 36 万行原始测试归档。精简不是删除证据：完整 chunks、request IDs、
@@ -1533,8 +1539,9 @@ summary/analysis 和服务器 patch 结果由 `debug_tool_call` 归档分支及�
 
 生产部署必须同时包含兼容的 DTB 代码和通过 burst 门禁的 parser patch。只部署 DTB 会重新暴露
 合法分片缺 `}`；只部署 parser patch 不能修复历史终止语义、text/token IDs 交接和 terminal 绑定
-错误。当前 parameter-close patch 可以继续作为精确回归和因果实验资产，但在一般工具流量上不能
-单独作为“分区不变”发布依据。
+错误。修订前 parameter-close patch 继续作为精确回归和 A/B 基线资产；当前 burst-drain patch 已
+通过离线门，`run_server_02` 也记录了目标 patch SHA，但缺实际加载身份且真实 burst 分支命中为 0。
+在完成相同 raw 的 Vanilla A/B 与默认生产配置服务器集成门前，仍不能单独作为“生产分区不变”发布依据。
 
 部署顺序为：确认 vLLM SHA、import path 和未修改 parser hash → apply-check/parser patch → 应用 patch
 → 记录应用后 parser/patch hash → 运行上游精确 fixture 与分区属性测试 → 启动服务 →
@@ -1542,7 +1549,8 @@ Vanilla/DTB burst smoke → 检查 telemetry 默认关闭。回滚时先停止�
 `git apply --reverse --check` 精确撤销 parser patch，再回滚相匹配的 TB 版本；不得使用 reset 覆盖
 服务器上的其他集成修改。若上线后出现工具协议 hard failure，应先隔离工具流量并对白名单请求保留
 parser 前 raw、forwarded 和服务器身份；禁用 DTB 只能用于区分控制器路径，不能规避 server-wide
-parser 缺陷。`stream_interval=1` 或暂时关闭 MTP 只能作为定责/应急降级，不能作为最终验收方案。
+parser 缺陷。生产保持默认 `stream_interval=1`；暂时关闭 MTP 只能作为定责/应急降级，不能作为最终
+验收方案。
 
 ## 10. 变更历史
 
@@ -1563,3 +1571,5 @@ parser 缺陷。`stream_interval=1` 或暂时关闭 MTP 只能作为定责/应�
 | 2026-08-19 | 从 `main` 重构 MR 整理分支，保留默认关闭的 schema 4 telemetry 并锁定关闭态 fast path；原始 `run_after_*` 结果留在 `debug_tool_call` 归档分支 | 长期保留 parser 前诊断能力，同时避免 telemetry 构造/I/O 进入正常请求路径，并阻止 36 万行含正文实验数据进入主干历史 |
 | 2026-08-28 | 修正 analyzer 对生产 `DTB_STREAM_AUDIT` schema 1 的契约识别，并将其普通 delta 纳入 raw/forwarded digest 检查 | `run_server_01` 的 40 个 DTB 请求都满足 source-terminal 字段，却因沿用历史 schema 1 的 `terminal_flush` 门槛被误报为生命周期失败；同一分支还会漏检生产 delta 变异 |
 | 2026-08-29 | 根据 #39598/#43074/#45256/#45439/#45440 与 ParserEngine 方案重新审计固定 v0.23.0 patch；把结论收紧为“只覆盖 parameter-close 家族”，引入 burst drain、全 grammar 分区门禁、部署身份门和分阶段服务器/LightCode 准入 | 当前 patch 保留多个 early return；commit `d7e84c2` 的 `run-03` 又有 5 个缺 `}` hard failure 且缺 parser 前 raw 与服务器 patch 身份，不能继续声称一般工具调用可靠性已通过 |
+| 2026-09-01 | 分析部署完整修复后的 `run_server_02`：DTB invalid JSON 133→0，错误 final `</think>` stop 由 literal-marker canary 关闭；同时把 2 个 Vanilla empty-arguments 与 1 个 DTB silent no-terminal 保持为未定责/未关闭，并要求相同 raw parser A/B 与默认生产配置集成门通过后再进入 LightCode | patch 的目标不是消灭模型全部错误，而是不能新增 Vanilla 故障；本轮没有统计证据证明伤害，但缺 Vanilla parser 前 raw，不能据此声明 no-harm 或服务器集成通过 |
+| 2026-09-01 | 将服务器集成实验固定为生产默认 `stream_interval=1`，删除多 interval 矩阵；新增按源数据精确行号选择的定向 replay 参数 | interval 不是本轮实验变量；上游 burst 形状由确定性 parser fixture 覆盖，服务器只验证默认生产配置下不新增 Vanilla 故障 |

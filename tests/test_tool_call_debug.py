@@ -6,7 +6,10 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from tools.dtb.analyze_tool_call_run import classify
+from tools.dtb.analyze_tool_call_run import (
+    classify,
+    extract_server_record_parts,
+)
 from tools.dtb.replay_tool_calls import (
     assemble_observation,
     build_body,
@@ -14,6 +17,7 @@ from tools.dtb.replay_tool_calls import (
     build_request_id,
     load_cases,
     normalize_nonstream_response,
+    parse_line_selection,
     validate_json_schema,
     validate_conversation,
 )
@@ -27,6 +31,41 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ToolCallReplayTests(unittest.TestCase):
+    def test_analysis_merges_split_server_logs_by_sequence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            directory = Path(temporary_dir)
+            first = directory / "server_filtered_part_01"
+            second = directory / "server_filtered_part_02"
+            first.write_text(
+                "DTB_STREAM_AUDIT "
+                + json.dumps({
+                    "parent_request_id": "request-1",
+                    "sequence": 2,
+                })
+                + "\n",
+                encoding="utf-8",
+            )
+            second.write_text(
+                "DTB_STREAM_AUDIT {invalid\n"
+                + "DTB_STREAM_AUDIT "
+                + json.dumps({
+                    "parent_request_id": "request-1",
+                    "sequence": 1,
+                })
+                + "\n",
+                encoding="utf-8",
+            )
+
+            records, invalid = extract_server_record_parts(
+                [first, second], {"request-1"}
+            )
+
+        self.assertEqual(invalid, 1)
+        self.assertEqual(
+            [row["sequence"] for row in records["request-1"]],
+            [1, 2],
+        )
+
     def test_request_id_is_deterministic_for_stream_audit_allowlist(self) -> None:
         self.assertEqual(
             build_request_id(4, 2, "dtb", "audit-01"),
@@ -110,6 +149,26 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertTrue(cases[0].expected_tool_call)
         self.assertEqual(cases[0].expected_tool_names, ("bash",))
         self.assertFalse(cases[0].latency_eligible)
+
+    def test_exact_replay_lines_form_a_targeted_dataset(self) -> None:
+        records = [
+            {
+                "case_id": f"case-{line_no}",
+                "request_body": {"messages": [], "tools": []},
+                "replay_expectation": {"expected_tool_call": False},
+            }
+            for line_no in range(1, 4)
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cases.jsonl"
+            path.write_text(
+                "\n".join(json.dumps(record) for record in records) + "\n",
+                encoding="utf-8",
+            )
+            cases = load_cases(path, 1, 0, selected_lines={1, 3})
+
+        self.assertEqual([case.line_no for case in cases], [1, 3])
+        self.assertEqual(parse_line_selection("10,5,10"), (5, 10))
 
     def test_tool_arguments_are_validated_against_request_schema(self) -> None:
         chunks = [{"id": "r", "choices": [{
@@ -237,6 +296,7 @@ class ToolCallReplayTests(unittest.TestCase):
             max_tokens=100,
             temperature=0.0,
             top_p=0.95,
+            seed=42,
             fixed_budget_tokens=10,
             fixed_check_length=2,
             fixed_think_stride=2,
@@ -265,8 +325,10 @@ class ToolCallReplayTests(unittest.TestCase):
 
         self.assertFalse(vanilla["enable_think_budget"])
         self.assertNotIn("fixed_budget_tokens", vanilla)
+        self.assertEqual(vanilla["seed"], 42)
         self.assertTrue(dtb["enable_think_budget"])
         self.assertEqual(dtb["fixed_budget_tokens"], 10)
+        self.assertEqual(dtb["seed"], 42)
 
     def test_nonstream_body_and_response_use_shared_protocol_audit(self) -> None:
         args = SimpleNamespace(
@@ -924,6 +986,18 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertEqual(
             analysis["diagnosis"],
             "vanilla_semantic_tool_choice_mismatch",
+        )
+
+    def test_analysis_separates_schema_failure_from_parser_failure(self) -> None:
+        analysis = classify({
+            "variant": "vanilla",
+            "has_tool_call": True,
+            "anomaly_reasons": ["invalid_tool_arguments_schema"],
+        }, [])
+
+        self.assertEqual(
+            analysis["diagnosis"],
+            "vanilla_tool_call_semantic_schema_failure",
         )
 
 

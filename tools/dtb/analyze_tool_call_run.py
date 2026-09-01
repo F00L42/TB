@@ -107,6 +107,25 @@ def extract_server_records(
     return grouped, invalid
 
 
+def extract_server_record_parts(
+    server_logs: list[Path],
+    request_ids: set[str],
+) -> tuple[dict[str, list[dict[str, Any]]], int]:
+    """Merge ordered split logs and restore per-request sequence order."""
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    invalid = 0
+    for server_log in server_logs:
+        part_records, part_invalid = extract_server_records(
+            server_log, request_ids
+        )
+        invalid += part_invalid
+        for request_id, rows in part_records.items():
+            grouped[request_id].extend(rows)
+    for rows in grouped.values():
+        rows.sort(key=lambda row: int(row.get("sequence") or 0))
+    return grouped, invalid
+
+
 def classify(
     summary: dict[str, Any],
     records: list[dict[str, Any]],
@@ -138,6 +157,10 @@ def classify(
         bool(anomaly_reason_set)
         and anomaly_reason_set <= {"expected_tool_name_missing"}
         and sse_has_tool_call
+    )
+    semantic_schema_failure = (
+        "invalid_tool_arguments_schema" in anomaly_reason_set
+        and "invalid_tool_arguments_json" not in anomaly_reason_set
     )
     final_answer_stopped_on_think_end = any(
         row.get("phase") == "final_answer"
@@ -259,6 +282,8 @@ def classify(
             diagnosis = "vanilla_pass"
         elif semantic_name_only:
             diagnosis = "vanilla_semantic_tool_choice_mismatch"
+        elif semantic_schema_failure:
+            diagnosis = "vanilla_tool_call_semantic_schema_failure"
         elif anomaly_reason_set <= {"expected_tool_call_missing"}:
             diagnosis = "vanilla_missing_expected_tool"
         else:
@@ -277,6 +302,8 @@ def classify(
         diagnosis = "pass"
     elif semantic_name_only:
         diagnosis = "semantic_tool_choice_mismatch"
+    elif semantic_schema_failure:
+        diagnosis = "tool_call_semantic_schema_failure"
     elif tool_boundary is not None and not raw_has_start:
         diagnosis = "controller_input_text_token_gap"
     elif (
@@ -397,7 +424,12 @@ def classify(
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_dir", type=Path)
-    parser.add_argument("server_log", type=Path)
+    parser.add_argument(
+        "server_logs",
+        type=Path,
+        nargs="+",
+        help="one server log or ordered server_filtered_part_* files",
+    )
     parser.add_argument("--output", type=Path)
     return parser.parse_args(argv)
 
@@ -410,7 +442,9 @@ def main(argv: list[str] | None = None) -> int:
         str(row.get("server_request_id") or row.get("client_request_id") or "")
         for row in summaries
     }
-    records, invalid = extract_server_records(args.server_log, request_ids)
+    records, invalid = extract_server_record_parts(
+        args.server_logs, request_ids
+    )
     analyses = []
     for summary in summaries:
         request_id = str(

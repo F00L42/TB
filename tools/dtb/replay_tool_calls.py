@@ -124,14 +124,23 @@ def json_hash(value: Any) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def load_cases(path: Path, start: int, end: int) -> list[ReplayCase]:
+def load_cases(
+    path: Path,
+    start: int,
+    end: int,
+    selected_lines: set[int] | None = None,
+) -> list[ReplayCase]:
     cases: list[ReplayCase] = []
     with path.open("r", encoding="utf-8") as source:
         for line_no, line in enumerate(source, start=1):
-            if line_no < start:
-                continue
-            if end > 0 and line_no > end:
-                break
+            if selected_lines is not None:
+                if line_no not in selected_lines:
+                    continue
+            else:
+                if line_no < start:
+                    continue
+                if end > 0 and line_no > end:
+                    break
             if not line.strip():
                 continue
             record = json.loads(line)
@@ -167,6 +176,11 @@ def load_cases(path: Path, start: int, end: int) -> list[ReplayCase]:
                 expected_tool_names=tuple(expected_names_value),
                 latency_eligible=bool(expectation.get("latency_eligible", True)),
             ))
+    if selected_lines is not None:
+        loaded_lines = {case.line_no for case in cases}
+        missing_lines = sorted(selected_lines - loaded_lines)
+        if missing_lines:
+            raise ValueError(f"selected lines not found: {missing_lines}")
     if not cases:
         raise ValueError("no request cases selected")
     return cases
@@ -320,6 +334,9 @@ def build_body(
         body["temperature"] = args.temperature
     if args.top_p is not None:
         body["top_p"] = args.top_p
+    seed = getattr(args, "seed", None)
+    if seed is not None:
+        body["seed"] = seed
 
     if variant == "dtb":
         body["enable_think_budget"] = True
@@ -915,11 +932,33 @@ def write_result_markdown(path: Path, summary: dict[str, Any]) -> None:
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def parse_line_selection(value: str) -> tuple[int, ...]:
+    try:
+        lines = tuple(sorted({
+            int(item.strip()) for item in value.split(",") if item.strip()
+        }))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "--lines must be comma-separated positive integers"
+        ) from exc
+    if not lines or any(line <= 0 for line in lines):
+        raise argparse.ArgumentTypeError(
+            "--lines must be comma-separated positive integers"
+        )
+    return lines
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--file", type=Path, required=True)
     parser.add_argument("--start", type=int, default=1)
     parser.add_argument("--end", type=int, default=0, help="0 means EOF")
+    parser.add_argument(
+        "--lines",
+        type=parse_line_selection,
+        default=(),
+        help="select exact source lines, for example --lines 5,10",
+    )
     parser.add_argument("--repetitions", type=int, default=20)
     parser.add_argument(
         "--request-id-run",
@@ -930,6 +969,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--list-dtb-request-ids",
         action="store_true",
         help="print deterministic DTB request IDs and exit without sending",
+    )
+    parser.add_argument(
+        "--list-request-ids",
+        action="store_true",
+        help="print deterministic request IDs for all selected variants and exit",
     )
     parser.add_argument(
         "--mode", choices=("both", "dtb", "vanilla"), default="both"
@@ -965,17 +1009,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--top-p", type=float, default=None,
         help="override the archived value; default preserves each source request",
     )
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help="override the archived seed; default preserves each source request",
+    )
     parser.add_argument("--fixed-budget-tokens", type=int, default=20000)
     parser.add_argument("--fixed-check-length", type=int, default=850)
     parser.add_argument("--fixed-think-stride", type=int, default=500)
     parser.add_argument("--fixed-num-thinking", type=int, default=5)
     parser.add_argument("--fixed-min-think-tokens", type=int, default=1)
     parser.add_argument("--fixed-prob-th", type=float, default=0.93)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.lines and (args.start != 1 or args.end != 0):
+        parser.error("--lines cannot be combined with --start or --end")
+    return args
 
 
 async def async_main(args: argparse.Namespace) -> int:
-    cases = load_cases(args.file, args.start, args.end)
+    selected_lines = set(args.lines) if args.lines else None
+    cases = load_cases(
+        args.file, args.start, args.end, selected_lines=selected_lines
+    )
     variants = (
         ("vanilla", "dtb")
         if args.mode == "both"
@@ -983,12 +1037,17 @@ async def async_main(args: argparse.Namespace) -> int:
     )
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     request_id_run = args.request_id_run or timestamp
-    if args.list_dtb_request_ids:
-        if "dtb" in variants:
-            for case in cases:
-                for attempt in range(1, args.repetitions + 1):
+    if args.list_request_ids or args.list_dtb_request_ids:
+        listed_variants = (
+            variants if args.list_request_ids else ("dtb",)
+        )
+        for case in cases:
+            for attempt in range(1, args.repetitions + 1):
+                for variant in listed_variants:
+                    if variant not in variants:
+                        continue
                     print("chatcmpl-" + build_request_id(
-                        case.line_no, attempt, "dtb", request_id_run
+                        case.line_no, attempt, variant, request_id_run
                     ))
         return 0
     if httpx is None:
@@ -1013,7 +1072,8 @@ async def async_main(args: argparse.Namespace) -> int:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "input_file": str(args.file.resolve()),
         "input_sha256": hashlib.sha256(args.file.read_bytes()).hexdigest(),
-        "line_range": [args.start, args.end],
+        "line_range": None if args.lines else [args.start, args.end],
+        "selected_lines": list(args.lines) if args.lines else None,
         "repetitions": args.repetitions,
         "request_id_run": request_id_run,
         "variants": list(variants),
@@ -1027,7 +1087,7 @@ async def async_main(args: argparse.Namespace) -> int:
             key: value
             for key, value in vars(args).items()
             if key.startswith("fixed_")
-            or key in {"max_tokens", "temperature", "top_p"}
+            or key in {"max_tokens", "temperature", "top_p", "seed"}
         },
         "cases": [
             {

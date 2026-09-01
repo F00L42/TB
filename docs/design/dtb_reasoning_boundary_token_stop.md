@@ -48,6 +48,9 @@ explicit-end `248069` 可以先迁移；tool-start `248058` 必须在工具 pars
    speculative 后缀；token-stop 路径保持 source text/token IDs，不按 marker 文本做必要性判断。
 7. DTB 不应内置“所有模型都用 `</think>`”这一前提。边界 ID、边界类型和控制器强制关闭
    reasoning 的 token 序列必须由当前活动 parser 的模型协议适配器提供。
+8. continuation 主 prompt 应采用 **token-authoritative** 表示：`prompt_token_ids` 是唯一可变
+   事实源，初始 `prompt_text` 只作为路由/诊断的不可变可选视图，不再随 thinking、cue 和
+   boundary 反复拼接。该调整与 token-stop 兼容，但应作为独立优化阶段实施和计量。
 
 因此，这是一个**受 parser 能力约束的分阶段正确性加固**，不是修复 final-answer 截断的替代方案，
 也不应被宣称为独立的显著时延优化。当前对齐器已经缓解字符串 stop 的已知后缀问题；迁移的
@@ -127,6 +130,30 @@ boundary stop 隐式承担。
 vLLM 0.23 只检查 `stop_token_ids` 的元素是整数，没有检查其落在当前 tokenizer/model vocab
 范围内。错误硬编码 ID 还可能在 `min_tokens` logits mask 路径进入设备端索引。因此控制器必须
 在生成请求进入 engine 前自行校验，不能把来自另一个 Qwen 版本的数字直接复用。
+
+### 3.6 当前 prompt 已是双表示，额外成本来自文本镜像
+
+当前 `DtbRequestContext.engine_prompt` 并非只保存字符。它直接引用 serving 产生的
+`engine_inputs[0]`，其中已有 `prompt_token_ids`，并可能同时有 `prompt`；context 又单独保存
+`prompt_text`。现有 continuation 路径实际上已经以 token IDs 驱动模型：
+
+- `append_thinking()` 直接扩展 `engine_prompt["prompt_token_ids"]`；
+- `append_prompt_suffix()` 先编码 suffix，再扩展 token IDs；
+- `child_prompt()` 用主 prompt token IDs 加已缓存的 suffix token IDs 构造隐藏 child。
+
+但三个方法还会同步拼接 `prompt_text` 并覆盖 `engine_prompt["prompt"]`。此外
+`request_controller.py` 在做 scene/budget 分类前，无论 `conversation` 中是否已经存在最新用户
+文本，都会对完整 `prompt_token_ids` 执行一次
+`tokenizer.decode(..., skip_special_tokens=True)`。正常 chat 请求随后由
+`visible_user_text()` 选择用户消息，因此这次
+整 prompt decode 通常没有参与分类结果。
+
+vLLM `v0.23.0` 的 `TokensPrompt` 明确只要求 `prompt_token_ids`，`prompt` 是可选字段；engine
+请求、prefill、KV cache 和 token 预算使用 token IDs。可选文本会进入本地
+`RequestOutput.prompt`，普通 chat 生成不依赖它，但 `return_prompt_text=true` 会把它返回 API。
+由此可以移除 continuation 热路径的文本镜像，却必须在响应边界保留外部 prompt 文本契约；也
+不能据此关闭生成结果的 detokenize，OpenAI 响应以及 reasoning/tool parser 仍需消费 child
+生成的增量 text 与 token IDs。
 
 ## 4. 设计逻辑
 
@@ -277,13 +304,94 @@ tool_call_start_token_id: 248058
 revision，而不是仅使用 API 的 served-model alias；实际 token ID仍从 tokenizer 解析并与配置
 断言比较。
 
+### 4.7 continuation prompt 的 token-authoritative 设计
+
+#### 4.7.1 状态结构
+
+`DtbRequestContext` 应把“模型输入账本”和“可选文本视图”分开。可以新增一个轻量
+`ContinuationPrompt`，也可以先在现有字段上保持同一不变量：
+
+```python
+@dataclass
+class ContinuationPrompt:
+    engine_fields: dict[str, Any]       # multimodal/cache 等非文本字段
+    token_ids: list[int]                # 唯一可变事实源
+    initial_text: str | None = None     # 不可变；仅供路由、诊断或兼容输出
+
+    def append_tokens(self, token_ids: Sequence[int]) -> None: ...
+    def fork(self, suffix_ids: Sequence[int]) -> dict[str, Any]: ...
+    def engine_input(self) -> dict[str, Any]: ...
+```
+
+必须保持以下不变量：
+
+1. thinking child 返回的 token IDs、自然 boundary token、forced-close token 和 cue 编码结果只
+   追加到 `token_ids`；不得再通过生成文本重编码来恢复主 prompt；
+2. cue 等静态字符串仍可在请求级缓存中编码一次；改为 token prompt 不等于模型不再接收 cue；
+3. 每个 child 传入 vLLM 的字典保留原 `engine_inputs` 中仍适用的 multimodal、cache 等字段，
+   但删除已经随 continuation 失效的 `prompt` 字段，避免 text 与 token IDs 不一致；
+4. hidden probe 使用 fork 后的新 token list，不得与主账本共享可变 list；
+5. `initial_text` 不随 thinking 增长，不作为模型 prompt 的权威表示；需要完整 continuation 文本
+   的隔离审计才允许惰性 decode，并必须单独计入 controller CPU；
+6. prompt token 数、外部剩余额度和 phase telemetry 均直接读取 token ledger 长度。
+
+`prompt_text=None` 不会阻止 vLLM 处理 `TokensPrompt`。在当前 `AsyncLLM.add_request()` 路径中，
+vLLM 会从实际 prompt 字典重新提取可选文本；纯 token prompt 的 `RequestOutput.prompt` 将为
+`None`。普通 DTB chat 输出不依赖这个字段，但 `return_prompt_text=true` 依赖它。响应适配层应在
+该选项启用时按原生外部请求语义提供 `initial_text`，而不是返回含隐藏 probe、thinking、cue 或
+synthetic boundary 的内部 child prompt；还应检查服务日志或自定义插件是否读取
+`RequestOutput.prompt`。不能只保留一个与 token IDs 已不一致的初始字符串并继续随 child
+传给 engine。
+
+#### 4.7.2 分类文本与 fallback
+
+scene/budget 分类的优先级应改为：
+
+```text
+最新可见 user message
+> serving 已有的 prompt_components.text
+> 仅在两者都缺失时惰性 decode prompt_token_ids
+```
+
+这能直接删除正常 chat 请求当前必做的一次完整 prompt decode。需要保留 fallback 是因为未来
+可能存在 conversation 缺失、非标准输入或兼容入口；fallback 触发次数和 decode wall 应进入
+phase telemetry，不能静默退回每请求 decode。
+
+#### 4.7.3 能省与不能省的开销
+
+该设计能够减少：
+
+- scene/budget 决策前一次通常无用的完整 prompt decode；
+- 每次 thinking/cue/boundary 追加时 Python 长字符串的复制和双份 prompt 常驻内存；
+- text/token 双写不一致导致的兼容分支和检查成本。
+
+该设计不能减少：
+
+- serving 首次把 chat template 转成 token IDs 的必要 tokenization；进入 DTB 时这一步已经完成；
+- 模型的 prefill/decode 计算量，prompt token 序列没有因此变短；
+- child 输出为了 OpenAI 响应及原生 reasoning/tool parser 所做的增量 detokenize；
+- token-stop 本身减少的 speculative boundary overshoot；那是另一个收益来源。
+
+因此预期收益首先体现在 `decision.decode_prompt`、`controller_cpu` 和内存分配，端到端收益大概率
+小于模型 phase wall。必须实测，不应把“prompt 改存 token IDs”描述为减少模型 decode token。
+
+#### 4.7.4 分阶段实施
+
+为保证归因，建议顺序为：
+
+1. 先把分类 decode 改为上述惰性 fallback，不改变 context 的双表示；
+2. 再将 continuation 账本改成 token-authoritative，停止维护可变 prompt text；
+3. 最后与 4.1—4.5 的 boundary token-stop 合并验证；性能报告仍分别列出
+   `lazy_prompt_text` 与 `boundary_token_stop` 的增量收益。
+
 ## 5. 对现有实现的影响
 
 | 位置 | 修改 | 影响 |
 | --- | --- | --- |
 | `dtb/reasoning/parser_boundary.py` | 增加 parser-backed protocol；thinking stop 改为追加 IDs；token boundary 原样透传 | 核心修改 |
-| `dtb/reasoning/request_context.py` | 缓存 protocol；提供 ID→boundary 查询；关闭 reasoning 时追加协议 token | 去除固定 marker 假设 |
-| `dtb/request_controller.py` | 把 serving 已构造的 unified `response_parser` 保存在 context，并据此建立 protocol | 不依赖 parser 私有字段 |
+| `dtb/reasoning/request_context.py` | 缓存 protocol；提供 ID→boundary 查询；关闭 reasoning 时追加协议 token；prompt token ledger 成为唯一可变事实源，文本只保留不可变/惰性视图 | 去除固定 marker 假设；减少字符串复制并消除双写漂移 |
+| `dtb/request_controller.py` | 把 serving 已构造的 unified `response_parser` 保存在 context，并据此建立 protocol；分类优先使用 conversation/已有文本，只在缺失时 decode | 不依赖 parser 私有字段；去除正常 chat 的整 prompt decode |
+| `dtb/integration/vllm/response_adapter.py` | `return_prompt_text=true` 时按外部请求语义恢复初始 prompt text | 避免泄漏内部 continuation 或返回空 prompt |
 | `dtb/reasoning/generation_states.py` | thinking 使用 token stop；probe 删除 controller marker stop | final answer 保持无 controller stop |
 | `GUIDED_FINAL_PROMPT_V1` / `emit_reasoning_boundary_once()` | cue 与 protocol close 分离；Qwen synthetic boundary 为 empty text + ID | 支持非 `</think>` 模型 |
 | `detect_reasoning_boundary()` | 委托 protocol 识别 marker token ID、整数 stop reason | text marker 不再是必要证据 |
@@ -338,7 +446,14 @@ parser 所需的逻辑序列。completion token 账本继续把该 token 计入�
    `<function=...>`；
 6. token stop terminal 后若仍有 token，状态机 fail closed；
 7. string-stop legacy fixture 继续通过现有 speculative suffix 对齐测试；
-8. 流式 DELTA、非流式 FINAL_ONLY、一次 speculative batch 跨边界都覆盖。
+8. token-authoritative prompt 与旧实现对所有 final-answer reason 产生完全相同的 child
+   `prompt_token_ids`，hidden fork 不修改主账本；
+9. conversation 有用户文本或 serving 已提供文本时 mock tokenizer 的 `decode()` 调用数为 0；
+   两者缺失时只 fallback 一次；
+10. 纯 token prompt 的流式 DELTA、非流式 FINAL_ONLY、原生 parser、multimodal 字段保留和一次
+    speculative batch 跨边界都覆盖；
+11. `return_prompt_text=false` 不产生完整 continuation 文本，`true` 时返回值与同一外部 Vanilla
+    请求的 prompt text 语义一致，且不包含隐藏 probe、内部 cue 或 synthetic boundary。
 
 ### 7.2 目标服务器定向实验
 
@@ -353,6 +468,9 @@ parser 所需的逻辑序列。completion token 账本继续把该 token 计入�
 stream audit 至少记录：parser/protocol identity、configured stop strings/IDs、raw stop reason、
 boundary、source text 和 token IDs、边界后 token 数、parser 输出、final terminal。Qwen explicit-end
 样本必须包含实测形状 `stop_reason=248069`、terminal text 为空、前一 text delta 为 `"\n"`。
+prompt 表示实验还应记录 `prompt_text_source`、`prompt_decode_fallback_count`、
+`decision.decode_prompt` wall、controller CPU 和各 child prompt token 数；不得用 E2E 噪声替代
+对被删除 decode 的直接验证。
 
 通过条件：
 
@@ -386,3 +504,4 @@ LightCode 端到端时延。
 | 2026-09-01 | 首版：确定仅迁移 thinking boundary，定义 token-stop 输出规范化、配置校验和 paired replay 门禁 | Qwen3.6 两个 reasoning marker 均为单 special token，且 string stop 已出现 speculative text/token 不一致 |
 | 2026-09-01 | 修订为 parser-backed 模型协议；禁止用 text marker 证明或补写边界；协议化 forced close | 服务器实测 `stop_reason=248069` 时 terminal delta 为空且 SSE 不含 `</think>`；不同模型结束协议不固定 |
 | 2026-09-01 | 改为两阶段迁移：先 explicit-end 248069，tool-start 248058 等待 token-only parser 适配 | 当前 Qwen parser patch 通过 marker text 建立 tool span，不能消费空 text 的 tool-start boundary |
+| 2026-09-01 | 增加 continuation prompt 的 token-authoritative 设计、惰性文本 fallback、成本边界和独立验证 | 当前实现已经使用 prompt token IDs，但仍无条件 decode 初始 prompt 并持续维护可变文本镜像 |
