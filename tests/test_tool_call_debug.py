@@ -13,6 +13,7 @@ from tools.dtb.replay_tool_calls import (
     build_paired_summary,
     build_request_id,
     load_cases,
+    normalize_nonstream_response,
     validate_json_schema,
     validate_conversation,
 )
@@ -266,6 +267,65 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertNotIn("fixed_budget_tokens", vanilla)
         self.assertTrue(dtb["enable_think_budget"])
         self.assertEqual(dtb["fixed_budget_tokens"], 10)
+
+    def test_nonstream_body_and_response_use_shared_protocol_audit(self) -> None:
+        args = SimpleNamespace(
+            stream=False,
+            model="",
+            max_tokens=None,
+            temperature=None,
+            top_p=None,
+            fixed_budget_tokens=10,
+            fixed_check_length=2,
+            fixed_think_stride=2,
+            fixed_num_thinking=2,
+            fixed_min_think_tokens=1,
+            fixed_prob_th=0.9,
+        )
+        body = build_body(
+            {"messages": [], "stream_options": {"include_usage": True}},
+            variant="dtb",
+            client_request_id="r",
+            args=args,
+        )
+        self.assertFalse(body["stream"])
+        self.assertNotIn("stream_options", body)
+
+        chunk = normalize_nonstream_response({
+            "id": "response-id",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [{
+                        "index": 0,
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {
+                            "name": "bash",
+                            "arguments": '{"command":"pwd"}',
+                        },
+                    }],
+                },
+                "finish_reason": "tool_calls",
+            }],
+            "usage": {"completion_tokens": 4},
+        })
+        observation = assemble_observation(
+            line_no=1,
+            attempt=1,
+            variant="dtb",
+            client_request_id="r",
+            status_code=200,
+            elapsed_ms=1.0,
+            expected_tool_call=True,
+            expected_tool_names=("bash",),
+            chunks=[chunk],
+        )
+        self.assertEqual(observation.anomaly_reasons, [])
+        self.assertEqual(observation.server_request_id, "response-id")
+        self.assertEqual(observation.usage["completion_tokens"], 4)
 
     def test_full_log_extractor_selects_wire_exact_clean_case(self) -> None:
         record = {

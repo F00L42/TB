@@ -304,8 +304,12 @@ def build_body(
     args: argparse.Namespace,
 ) -> dict:
     body = copy.deepcopy(source)
-    body["stream"] = True
-    body["stream_options"] = {"include_usage": True}
+    stream = bool(getattr(args, "stream", True))
+    body["stream"] = stream
+    if stream:
+        body["stream_options"] = {"include_usage": True}
+    else:
+        body.pop("stream_options", None)
     body["request_id"] = client_request_id
     if args.model:
         body["model"] = args.model
@@ -337,6 +341,25 @@ def parse_sse_data(line: str) -> dict | None:
     if not payload or payload == "[DONE]":
         return None
     return json.loads(payload)
+
+
+def normalize_nonstream_response(payload: dict[str, Any]) -> dict[str, Any]:
+    """Map one ChatCompletion response onto the streaming observation shape."""
+    choices = []
+    for choice in payload.get("choices") or []:
+        message = dict(choice.get("message") or {})
+        if "reasoning" not in message and "reasoning_content" in message:
+            message["reasoning"] = message.get("reasoning_content")
+        choices.append({
+            "index": choice.get("index", 0),
+            "delta": message,
+            "finish_reason": choice.get("finish_reason"),
+        })
+    return {
+        "id": payload.get("id"),
+        "choices": choices,
+        "usage": payload.get("usage"),
+    }
 
 
 def assemble_observation(
@@ -565,6 +588,79 @@ async def run_one(
     first_reasoning_ms = 0.0
     first_content_ms = 0.0
     first_tool_call_ms = 0.0
+    if not body.get("stream", True):
+        try:
+            request_headers = dict(headers)
+            request_headers["X-Request-Id"] = client_request_id
+            response = await client.post(
+                url, json=body, headers=request_headers
+            )
+            status_code = response.status_code
+            if status_code != 200:
+                error = response.content.decode("utf-8", errors="replace")
+            else:
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                payload: dict[str, Any] | str
+                try:
+                    response_payload = response.json()
+                    if not isinstance(response_payload, dict):
+                        raise ValueError("expected a JSON object response")
+                    payload = response_payload
+                    parsed = normalize_nonstream_response(payload)
+                except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                    payload = response.text
+                    parsed = None
+                    error = f"invalid response JSON: {exc}"
+                chunks_file.write(json.dumps({
+                    "client_request_id": client_request_id,
+                    "line_no": line_no,
+                    "attempt": attempt,
+                    "variant": variant,
+                    "event_index": 1,
+                    "raw_response": payload,
+                    "chunk": parsed,
+                    "parse_error": error,
+                }, ensure_ascii=False) + "\n")
+                chunks_file.flush()
+                if parsed is not None:
+                    chunks.append(parsed)
+                    first_chunk_ms = elapsed_ms
+                    for choice in parsed.get("choices") or []:
+                        delta = choice.get("delta") or {}
+                        reasoning = delta.get("reasoning")
+                        content = delta.get("content")
+                        tool_calls = delta.get("tool_calls")
+                        if reasoning or content or tool_calls:
+                            first_output_ms = elapsed_ms
+                        if reasoning:
+                            first_reasoning_ms = elapsed_ms
+                        if content:
+                            first_content_ms = elapsed_ms
+                        if tool_calls:
+                            first_tool_call_ms = elapsed_ms
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+        return assemble_observation(
+            line_no=line_no,
+            case_id=case_id,
+            category=category,
+            attempt=attempt,
+            variant=variant,
+            client_request_id=client_request_id,
+            status_code=status_code,
+            elapsed_ms=(time.perf_counter() - started) * 1000,
+            expected_tool_call=expected_tool_call,
+            expected_tool_names=expected_tool_names,
+            request_tools=body.get("tools"),
+            latency_eligible=latency_eligible,
+            chunks=chunks,
+            error=error,
+            first_chunk_ms=first_chunk_ms,
+            first_output_ms=first_output_ms,
+            first_reasoning_ms=first_reasoning_ms,
+            first_content_ms=first_content_ms,
+            first_tool_call_ms=first_tool_call_ms,
+        )
     try:
         request_headers = dict(headers)
         request_headers["X-Request-Id"] = client_request_id
@@ -852,6 +948,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=600.0)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument(
+        "--stream",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="use SSE streaming (default); --no-stream uses one JSON response",
+    )
+    parser.add_argument(
         "--max-tokens", type=int, default=None,
         help="override the archived value; default preserves each source request",
     )
@@ -900,7 +1002,9 @@ async def async_main(args: argparse.Namespace) -> int:
     manifest_path = output_dir / "manifest.json"
     headers = {
         "Content-Type": "application/json",
-        "Accept": "text/event-stream",
+        "Accept": (
+            "text/event-stream" if args.stream else "application/json"
+        ),
     }
     if args.api_key:
         headers["Authorization"] = f"Bearer {args.api_key}"
@@ -917,6 +1021,7 @@ async def async_main(args: argparse.Namespace) -> int:
         "request_id_header": "X-Request-Id",
         "stream_audit_parent_request_id_prefix": "chatcmpl-",
         "url": args.url,
+        "stream": args.stream,
         "model_override": args.model or None,
         "request_overrides": {
             key: value
