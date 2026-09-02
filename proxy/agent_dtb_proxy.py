@@ -64,13 +64,13 @@ def count_tokens(text: str) -> int:
 
 
 # ================= 配置区 =================
-RESULTS_DIR = "results/qwen/local-task29/local-apiserver/dtb/run-04"
+RESULTS_DIR = "results/qwen/local-task29/local-apiserver/dtb/run-05"
 
 TARGET_BASE_URL = "http://10.44.160.79:9001"
 LISTEN_PORT = 9000
 
 # DTB 参数配置名称（用于日志标识，非功能用途）
-DTB_CONFIG_NAME = "dtb"
+DTB_CONFIG_NAME = "dtb_moderate"
 
 # DTB 固定参数注入 — 修改此字典即可切换实验组
 # Vanilla 基线：不注入任何 DTB 参数
