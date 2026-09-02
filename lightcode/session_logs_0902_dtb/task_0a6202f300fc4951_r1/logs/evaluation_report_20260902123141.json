@@ -1,0 +1,66 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "2_DataSmartCubeService_ece9bf60",
+    "commit": "ece9bf60d190e3d99b5855c06229fc59898bb97c",
+    "evaluation_time": "20260902123141"
+  },
+  "requirement": {
+    "description": "模板名称唯一性校验和已发布模板修改限制功能",
+    "files_count": 7,
+    "files_expected": [
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/impl/IntelligentTemplateDelegateImpl.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/input/reporttemplate/CheckErrorCode.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDao.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/mapper/ReportTemplateMapper.java",
+      "service/src/main/resources/i18n/errorcode_en_US.properties",
+      "service/src/main/resources/i18n/errorcode_zh_CN.properties",
+      "service/src/main/resources/mybatis/zenith/ReportTemplateMapper.xml"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "files_generated": 7,
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "code_issues": [
+      {
+        "file": "IntelligentTemplateDelegateImpl.java",
+        "line": 73,
+        "issue": "使用了 template.getBasicInfo().getStatus() 应为 template.getStatus()，BasicInfo 类没有 getStatus() 方法"
+      },
+      {
+        "file": "IntelligentTemplateDelegateImpl.java",
+        "line": "82-85",
+        "issue": "缺少 reportTemplateDao.selectByTemplateId(reportTemplatePO.getTemplateId()) 调用，该调用应在 setModifier 之后、insert 之前"
+      }
+    ]
+  },
+  "test_patch_apply": {
+    "method": "not_applied",
+    "reason": "主代码编译失败，未执行test_patch应用",
+    "manual_applied_files": []
+  },
+  "compilation": {
+    "status": "failed",
+    "error_message": "Compilation failure: /app/code/CodeBenchRepos/service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/impl/IntelligentTemplateDelegateImpl.java:[73,58] cannot find symbol; symbol: method getStatus(); location: class com.huawei.ncedatacubeplus.nl2report.model.report.BasicInfo",
+    "error_details": "子agent 在 generateReportTemplate 方法中错误地调用了 template.getBasicInfo().getStatus()，应为 template.getStatus()。ReportTemplate 类有直接的 getStatus() 方法，而非嵌套在 BasicInfo 中。"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行DT",
+    "test_classes": [],
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "pass_rate": "0%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "编译失败。子agent生成的代码存在2处错误：1) generateReportTemplate方法中错误地调用了template.getBasicInfo().getStatus()而非template.getStatus()；2) 缺少reportTemplateDao.selectByTemplateId()调用。代码无法通过编译，未执行test_patch应用和DT测试。",
+    "failure_step": "步骤4：编译验证"
+  }
+}

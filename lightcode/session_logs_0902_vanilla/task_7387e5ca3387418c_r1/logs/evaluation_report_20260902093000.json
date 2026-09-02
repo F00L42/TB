@@ -1,0 +1,62 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "29_ExperienceAssuranceService_cfd6a6f0",
+    "commit": "cfd6a6f09a3ca5e2edace283cdc3a16f9afb4588",
+    "evaluation_time": "20260902093000"
+  },
+  "requirement": {
+    "description": "在体验保障服务中引入分布式锁机制，解决场景创建和任务创建的高并发调用问题。通过数据库层面实现分布式锁，锁超时处理，定时恢复等方案保证操作的原子性和有序性。",
+    "files_count": 8,
+    "files_generated": [
+      "ScenesMgrDBMapper.java",
+      "SceneTaskLockRecoveryScheduler.java",
+      "SceneTaskLockServiceImpl.java",
+      "SceneTaskManageServiceImpl.java",
+      "ScenesMgrServiceImpl.java",
+      "ScenesMgrDBMapper.xml",
+      "LocaleMsg_en_US.properties",
+      "LocaleMsg_zh_CN.properties"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "mixed",
+    "manual_applied_files": [
+      "SceneTaskManageServiceImplTest.java",
+      "ScenesMgrServiceImplTest.java"
+    ],
+    "git_applied_files": [
+      "SceneTaskLockRecoverySchedulerTest.java",
+      "SceneTaskLockServiceImplTest.java"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": [
+      "ScenesMgrServiceImplTest",
+      "SceneTaskManageServiceImplTest",
+      "SceneTaskLockServiceImplTest",
+      "SceneTaskLockRecoverySchedulerTest"
+    ],
+    "total_tests": 87,
+    "passed_tests": 87,
+    "failed_tests": 0,
+    "errors": 0,
+    "skipped_tests": 0,
+    "pass_rate": "100%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI代码生成质量优秀。8个目标文件全部正确生成/修改，无多余或缺失文件。主代码编译一次通过，测试代码编译一次通过。4个测试类共87个测试用例全部通过，通过率100%。分布式锁机制的核心功能（ScenesMgrDBMapper新增3个锁操作方法、SceneTaskLockRecoveryScheduler定时任务调度器、SceneTaskLockServiceImpl锁管理服务）及集成点（SceneTaskManageServiceImpl.addSceneTasks和ScenesMgrServiceImpl.addScene中的锁获取/释放逻辑）均正确实现，国际化错误提示也已正确添加。"
+  }
+}

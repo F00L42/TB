@@ -1,0 +1,60 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "2_DataSmartCubeService_ece9bf60",
+    "commit": "ece9bf60d190e3d99b5855c06229fc59898bb97c",
+    "evaluation_time": "2026-09-02T10:22:52+08:00"
+  },
+  "requirement": {
+    "description": "功能需求:\n1. 模板名称唯一性校验 - 创建/修改模板时校验名称唯一性,排除当前模板\n2. 已发布模板修改限制 - 禁止修改Deployed状态模板\n\n技术规格:\n1. 新增TEMPLATE_NAME_EXISTS错误码及中英文i18n消息\n2. 新增按模板名称查询的DAO方法及Mapper+SQL实现\n3. 补充单元测试覆盖名称冲突、已发布模板修改等场景",
+    "files_count": 7,
+    "files_generated": [
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/impl/IntelligentTemplateDelegateImpl.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/input/reporttemplate/CheckErrorCode.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDao.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/mapper/ReportTemplateMapper.java",
+      "service/src/main/resources/i18n/errorcode_en_US.properties",
+      "service/src/main/resources/i18n/errorcode_zh_CN.properties",
+      "service/src/main/resources/mybatis/zenith/ReportTemplateMapper.xml"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "files_modified": 7,
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": [
+      "service/src/test/java/com/huawei/ncedatacubeplus/datasmartcubeservice/impl/IntelligentTemplateDelegateImplTest.java",
+      "service/src/test/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDaoTest.java"
+    ],
+    "note": "git apply对ReportTemplateDaoTest.java失败,IntelligentTemplateDelegateImplTest部分已由subagent修改,剩余变更手动应用"
+  },
+  "compilation": {
+    "status": "success",
+    "main_code": "BUILD SUCCESS",
+    "test_code": "BUILD SUCCESS",
+    "build_command": "mvn clean compile -Dpackage.type=container -s /app/code/settings.xml -DskipTests",
+    "test_build_command": "mvn test-compile -Dpackage.type=container -s /app/code/settings.xml"
+  },
+  "dt_results": {
+    "test_classes": [
+      "IntelligentTemplateDelegateImplTest",
+      "ReportTemplateDaoTest"
+    ],
+    "total_tests": 44,
+    "passed_tests": 44,
+    "failed_tests": 0,
+    "errors": 0,
+    "skipped_tests": 0,
+    "pass_rate": "100.0%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI生成了7个文件的全部修改代码,主代码和测试代码均编译通过。44个单元测试全部通过,通过率为100%。新增功能包括:模板名称唯一性校验(创建/修改场景)、已发布模板修改限制、TEMPLATE_NAME_EXISTS错误码及i18n消息、按名称查询模板的DAO/Mapper/SQL实现。code_generation阶段代码生成准确,test_patch通过手动方式应用,整体评测结果为优秀。"
+  }
+}

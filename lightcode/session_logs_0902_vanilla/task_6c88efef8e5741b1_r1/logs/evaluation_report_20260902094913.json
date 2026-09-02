@@ -1,0 +1,56 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "36_DVAIAgentService_ed9292b4",
+    "commit": "ed9292b495e45ff380b8fc7acf769b9e1a27f136",
+    "evaluation_time": "2026-09-02T09:49:13+08:00"
+  },
+  "requirement": {
+    "description": "java异常日志等问题发现1个，fix:修复大模型返回null导致的空指针",
+    "files_count": 1,
+    "files_expected": [
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/business/llm/LlmInvokeApi.java"
+    ],
+    "files_generated": [
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/business/llm/LlmInvokeApi.java"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "code_differences_from_patch": [
+      "方法签名缺少 throws LLMFixException 声明：AI生成代码使用 orElse(null) + 手动 throw 模式，未在方法签名上添加 throws LLMFixException",
+      "AI使用 choices.get(0) 而非 List::getFirst",
+      "AI使用 firstIndex 而非 thinkEndIndex 作为变量名"
+    ]
+  },
+  "test_patch_apply": {
+    "method": "not_executed",
+    "reason": "编译失败，未执行test_patch应用"
+  },
+  "compilation": {
+    "status": "failed",
+    "error_type": "checked_exception_not_declared",
+    "error_message": "/app/code/CodeBenchRepos/service/src/main/java/com/huawei/i2000/dvaiagentservice/business/llm/LlmInvokeApi.java:[205,13] unreported exception com.huawei.i2000.dvaiagentservice.exception.LLMFixException; must be caught or declared to be thrown",
+    "error_line": 205,
+    "root_cause": "parseAndCleanContent方法中throw new LLMFixException()未声明throws LLMFixException。LLMFixException继承ServiceException是检查型异常，Java编译器要求必须声明或捕获。正确做法是在方法签名添加 throws LLMFixException，或使用orElseThrow()将异常包含在Optional链中。"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行DT"
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI生成的代码存在编译错误：parseAndCleanContent方法抛出检查型异常LLMFixException，但方法签名未声明throws LLMFixException。根本原因是AI采用了orElse(null)+手动throw模式而非orElseThrow()模式，遗漏了throws声明。代码逻辑和结构基本正确，但缺少关键的throws声明导致无法编译，DT无法执行。",
+    "failure_step": "步骤4：编译验证"
+  },
+  "completed_steps": [
+    "步骤0：参数解析与Settings文件保存",
+    "步骤1：代码仓克隆与回退",
+    "步骤2：Patch信息提取",
+    "步骤3：AI代码生成",
+    "步骤4：编译验证（失败）"
+  ]
+}
