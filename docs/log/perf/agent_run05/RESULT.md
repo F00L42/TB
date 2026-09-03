@@ -337,6 +337,70 @@ DTB 更快，且该 replay 的 `quality_eligible=false`，只验证工具协议�
 质量。因此下一步阈值实验应优先复用上述正样例，同时加入同 prompt 的多次交替重复，检验收益
 概率和均值，而不是只保存最快的一次。
 
+### 8.6 历史重复证据：短/长是单次采样属性
+
+如果 deferred intervention 的短路径实现为 same-child passthrough，那么对**本次采样中**在阈值前
+自然出现 reasoning boundary 的请求，模型输出、parser-facing token、工具调用和 terminal 应直接
+来自同一个原生 child；这一分支应是原生等价，而不只是近似原生。但整段 agent 轨迹只能期望在
+分布上比 always-on DTB 更接近 Vanilla，不能要求重复某一次 Vanilla 轨迹：同一 prompt 再次生成时
+可能由短变长，也可能改变下一步工具；任意一轮超过阈值后，DTB 介入又会改变后续 messages 和工具
+结果，放大为任务级轨迹分叉。
+
+#### 相同完整请求的 30 次 Vanilla 重放
+
+`agent_tool_call_run04_paired_replay/run_server_02` 对 10 个归档 request body 各重复 30 次
+Vanilla/DTB。仅查看 Vanilla，已经观察到以下分布。reasoning 使用 `summary.jsonl` 中响应文本字符数，
+不是 tokenizer token；completion token 来自响应 usage。
+
+| 输入 | Vanilla reasoning 字符 Min / P50 / Max | Completion token Min / P50 / Max | 30 次下一工具 |
+| ---: | ---: | ---: | --- |
+| line 1 | 127 / 313.5 / 1,131 | 854 / 3,228 / 3,754 | 全部为 `task` |
+| line 4 | 48 / 238.5 / 1,885 | 756 / 1,028 / 3,737 | 全部为 `task` |
+| line 2 | 47 / 239 / 988 | 94 / 1,026.5 / 3,550 | `bash` 或 `task` |
+| line 5 | 32 / 91 / 210 | 77 / 805 / 3,407 | `bash`、`task`、`write` 或无效调用 |
+
+line 1 和 line 4 在下一工具始终相同的情况下，reasoning 长度仍相差约 8.9 倍和 39.3 倍；
+line 2 和 line 5 进一步表明同一输入可能改变下一动作。因此，同一个 recorded prompt 的某一次长
+reasoning 不能被视为必然长度，多次重放确实可能得到短得多的轨迹；反方向同样成立。
+
+该 replay 的 manifest 没有固定或记录 temperature、top-p 和 seed。上述结果是“当前实际服务配置下
+相同输入会产生不同输出”的直接实测，但不是每个 prompt 的短链概率估计，也不能把具体差值全部归为
+某一个 sampling 参数。
+
+#### 相同 9 场景的跨轮端到端变化
+
+run-04 与 run-05 的 Vanilla、DTB 四组关联数据中，9/9 个 case 的主 agent 首个 user prompt SHA-256
+完全相同。排除 title 等 auxiliary 请求后，Vanilla 核心请求从 run-04 的 370 个下降到 run-05 的
+297 个，但变化并非单向：
+
+| Case | Vanilla run-04 核心请求 | Vanilla run-05 核心请求 | 变化 |
+| ---: | ---: | ---: | ---: |
+| 2 | 50 | 42 | -8（-16.0%） |
+| 3 | 36 | 44 | +8（+22.2%） |
+| 26 | 36 | 23 | -13（-36.1%） |
+| 28 | 55 | 40 | -15（-27.3%） |
+| 35 | 41 | 25 | -16（-39.0%） |
+
+单次 Vanilla 观察到的 `>850` 集合也不稳定：case 36 在 run-04 有 1 个 `>850` 请求、最大
+1,414 token，而 run-05 为 0 个、最大 392；case 26 则从 run-04 的 0 个、最大 471，变为
+run-05 的 1 个、最大 927。DTB 也呈现双向变化，例如 case 2 的核心请求从 47 降到 24，case 28
+却从 36 增至 126，case 29 从 27 增至 56。run-04 的 case 35/36 存在提前终止，因此这些跨轮数字
+只用于证明轨迹并非固定，不能作为 DTB 性能优劣的因果比较。
+
+更早的 Vanilla 基线中，同一 `4_DataSmartCubeService_63efcc07` branch 三次重试分别执行
+20/27/24 turns，reasoning 总量为 1,779/4,631/1,872 token，也提供了较弱但方向一致的历史证据；
+由于三次重试进入的管线步骤不同，它不能替代相同 request body 的受控重放。
+
+因此不能根据一次历史运行把 prompt 或 scene 静态标记为“短链”。阈值应是运行时、逐次采样的条件：
+
+1. 固定 seed 的等价性实验中，同 seed Vanilla 若在阈值内自然结束，deferred DTB 必须满足
+   `child_generate_calls=1`、probe=0、fresh-final=0，并与 Vanilla 的 parser-facing token、工具调用和
+   terminal 完全一致；
+2. 多 seed/未固定 seed 的重复实验统计自然短链概率、阈值触发率、reasoning 长度 CDF 和下一工具
+   分布，比较的是分布而非某一条轨迹；
+3. 任务级至少执行两轮相反顺序 A/B，并同时检查质量和 hard failure。请求更少可能来自有效缩短，
+   也可能来自提前终止，不能单独判为收益。
+
 ## 9. Deferred intervention 设计
 
 ### 9.1 目标行为
@@ -441,5 +505,6 @@ D  deferred intervention, threshold=850
 
 | 日期 | 变更 |
 | --- | --- |
+| 2026-09-03 | 补充相同完整 prompt 的 30 次 Vanilla 重放、run-04/run-05 同场景轨迹变化和早期重试证据；明确短/长是单次采样属性，短路径追求请求级原生等价，任务级只能做分布比较。 |
 | 2026-09-03 | 补充 9 场景 Vanilla 请求级/逐场景 reasoning 分布；用 run_server_02 natural-short paired replay 校准当前 stop + fresh-final 成本，并映射到全量及排除 case 36 的 E2E 劣化范围。 |
 | 2026-09-02 | 首版：完成 run-05 LightCode↔proxy 关联、排除 stop 碰撞后的质量/时延复算、输出归因和 deferred-intervention 下一轮设计。 |
