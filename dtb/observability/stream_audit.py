@@ -65,6 +65,15 @@ class DtbStreamAudit:
             else []
         )
         state = context.request_state
+        protocol = getattr(context, "reasoning_protocol", None)
+        protocol_boundaries = (
+            {
+                spec.boundary.value: spec.token_id
+                for spec in protocol.natural_boundaries
+            }
+            if protocol is not None
+            else {}
+        )
         record = {
             "schema": 1,
             "source": "controller_pre_parser",
@@ -79,6 +88,36 @@ class DtbStreamAudit:
             ),
             "controller_state": controller_state,
             "next_state": next_state,
+            "boundary_stop_mode": (
+                "token"
+                if getattr(context.request, "stream", False)
+                else "legacy_string"
+            ),
+            "reasoning_protocol_adapter": (
+                protocol.adapter.value if protocol is not None else "none"
+            ),
+            "reasoning_protocol_bindings": (
+                {
+                    "tokenizer_class": protocol.tokenizer_class,
+                    "reasoning_parser_class": (
+                        protocol.reasoning_parser_class
+                    ),
+                    "response_parser_class": protocol.response_parser_class,
+                    "tool_parser_class": protocol.tool_parser_class,
+                }
+                if protocol is not None
+                else {}
+            ),
+            "reasoning_protocol_boundary_token_ids": protocol_boundaries,
+            "configured_stop_token_ids": list(
+                getattr(context, "thinking_stop_token_ids", ())
+            ),
+            "configured_stop_strings": list(
+                getattr(context, "thinking_stop_strings", ())
+            ),
+            "include_stop_str_in_output": getattr(
+                context, "thinking_include_stop_str_in_output", None
+            ),
             "raw_text": raw_text,
             "raw_text_sha256": self._text_digest(raw_text),
             "token_ids": raw_token_ids,
@@ -86,6 +125,7 @@ class DtbStreamAudit:
             "source_finish_reason": getattr(source_output, "finish_reason", None),
             "source_stop_reason": getattr(source_output, "stop_reason", None),
             "raw_finished": getattr(source_result, "finished", None),
+            "forwarded_text": forwarded_text,
             "forwarded_text_sha256": self._text_digest(forwarded_text),
             "forwarded_text_length": len(forwarded_text),
             "forwarded_token_ids_sha256": self._token_digest(forwarded_token_ids),

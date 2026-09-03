@@ -26,9 +26,15 @@ from collections.abc import Generator
 from typing import Any
 
 
-ROOT = Path("/")
-VLLM_ROOT = ROOT / "vllm-workspace" / "vllm" / "vllm"
-VLLM_TESTS_ROOT = ROOT / "vllm-workspace" / "vllm" / "tests"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+LOCAL_VLLM_CHECKOUT = REPO_ROOT / "third_party" / "vllm"
+VLLM_CHECKOUT = (
+    LOCAL_VLLM_CHECKOUT
+    if LOCAL_VLLM_CHECKOUT.is_dir()
+    else Path("/vllm-workspace/vllm")
+)
+VLLM_ROOT = VLLM_CHECKOUT / "vllm"
+VLLM_TESTS_ROOT = VLLM_CHECKOUT / "tests"
 
 
 def _package(name: str, path: Path | None = None) -> types.ModuleType:
@@ -233,6 +239,22 @@ def _coerce_to_schema_type(value: str, param_types: list[str]) -> Any:
 def _install_import_boundary() -> None:
     """Install only dependencies required to execute the native parser files."""
     sys.modules["regex"] = re
+    if "pydantic" not in sys.modules:
+        class ValidationError(Exception):
+            pass
+
+        class TypeAdapter:
+            def __init__(self, *_: Any, **__: Any) -> None:
+                pass
+
+            def validate_json(self, *_: Any, **__: Any) -> Any:
+                raise ValidationError("unused parser-equivalence stub")
+
+        _module(
+            "pydantic",
+            TypeAdapter=TypeAdapter,
+            ValidationError=ValidationError,
+        )
 
     _package("openai")
     _package("openai.types")
@@ -552,6 +574,89 @@ def _run_burst_regressions(
     }
 
 
+def _run_token_backed_prefix_regression(
+    parser_cls: type,
+    tokenizer: FakeTokenizer,
+    tools: list[Any],
+    request: ChatCompletionRequest,
+    delegating_cls: type,
+) -> dict[str, Any]:
+    """Prove token-only and text-bearing tool starts are parser-equivalent."""
+    marker = "<tool_call>"
+    marker_id = tokenizer.get_vocab()[marker]
+    body = (
+        "\n<function=bash>\n"
+        "<parameter=command>\necho ok\n</parameter>\n"
+        "</function>\n</tool_call>"
+    )
+    body_ids = tuple(tokenizer.encode(body))
+    trajectories = {
+        "token_only_then_body": [
+            InputDelta("", (marker_id,)),
+            InputDelta(body, body_ids, finished=True),
+        ],
+        "token_only_with_body": [
+            InputDelta(body, (marker_id, *body_ids), finished=True),
+        ],
+        "marker_text_with_body": [
+            InputDelta(
+                marker + body,
+                tuple(tokenizer.encode(marker + body)),
+                finished=True,
+            ),
+        ],
+    }
+    oracle = _non_streaming_oracle(
+        parser_cls, tokenizer, tools, request, marker + body
+    )
+    layers = {
+        "direct_tool_parser": {
+            name: _run_direct(
+                parser_cls, tokenizer, tools, request, deltas
+            )
+            for name, deltas in trajectories.items()
+        },
+        "delegating": {
+            name: _run_delegating(
+                delegating_cls,
+                parser_cls,
+                tokenizer,
+                tools,
+                request,
+                deltas,
+            )
+            for name, deltas in trajectories.items()
+        },
+    }
+    results: dict[str, Any] = {}
+    for layer_name, layer in layers.items():
+        assembled = {
+            name: result["assembled"] for name, result in layer.items()
+        }
+        results[layer_name] = {
+            "trajectories": assembled,
+            "all_partitions_equal": len({
+                json.dumps(value, ensure_ascii=False, sort_keys=True)
+                for value in assembled.values()
+            }) == 1,
+            "all_match_non_streaming": all(
+                value == oracle for value in assembled.values()
+            ),
+            "token_only_first_delta": asdict(
+                trajectories["token_only_then_body"][0]
+            ),
+        }
+    return {
+        "tool_call_begin_token_id": marker_id,
+        "oracle": oracle,
+        "layers": results,
+        "all_pass": all(
+            row["all_partitions_equal"] and row["all_match_non_streaming"]
+            for row in results.values()
+        ),
+    }
+
+
 def _message_dict(message: DeltaMessage | None) -> dict[str, Any] | None:
     if message is None:
         return None
@@ -580,6 +685,9 @@ def _state_dict(tool_parser: Any) -> dict[str, Any]:
         "prev_arguments": [
             item.get("arguments") for item in tool_parser.prev_tool_call_arr
         ],
+        "token_backed_tool_prefix": getattr(
+            tool_parser, "token_backed_tool_prefix", None
+        ),
     }
 
 
@@ -762,7 +870,7 @@ def _sha256(path: Path) -> str:
 
 def _display_path(path: Path) -> str:
     try:
-        return str(path.resolve().relative_to(ROOT.resolve()))
+        return str(path.resolve().relative_to(REPO_ROOT.resolve()))
     except ValueError:
         return str(path.resolve())
 
@@ -856,6 +964,13 @@ def run(qwen_parser_source: Path | None = None) -> dict[str, Any]:
         tools,
         request,
     )
+    token_backed_prefix_regression = _run_token_backed_prefix_regression(
+        qwen_module.Qwen3CoderToolParser,
+        tokenizer,
+        tools,
+        request,
+        delegating_module.DelegatingParser,
+    )
     layers: dict[str, dict[str, Any]] = {
         "direct_tool_parser": {},
         "delegating": {},
@@ -945,7 +1060,7 @@ def run(qwen_parser_source: Path | None = None) -> dict[str, Any]:
     return {
         "source_files": {
             "abstract_tool_parser": {
-                "path": str(base_path.relative_to(ROOT)),
+                "path": _display_path(base_path),
                 "sha256": _sha256(base_path),
             },
             "qwen3coder_tool_parser": {
@@ -953,15 +1068,15 @@ def run(qwen_parser_source: Path | None = None) -> dict[str, Any]:
                 "sha256": _sha256(qwen_path),
             },
             "delegating_parser": {
-                "path": str(delegating_path.relative_to(ROOT)),
+                "path": _display_path(delegating_path),
                 "sha256": _sha256(delegating_path),
             },
             "upstream_test_utility": {
-                "path": str(test_utils_path.relative_to(ROOT)),
+                "path": _display_path(test_utils_path),
                 "sha256": _sha256(test_utils_path),
             },
             "upstream_stream_generator": {
-                "path": str(qwen_test_path.relative_to(ROOT)),
+                "path": _display_path(qwen_test_path),
                 "sha256": _sha256(qwen_test_path),
                 "definition": "stream_delta_message_generator",
             },
@@ -990,6 +1105,7 @@ def run(qwen_parser_source: Path | None = None) -> dict[str, Any]:
             "upstream_token_by_token_pattern": token_by_token_control,
         },
         "burst_regressions": burst_regressions,
+        "token_backed_prefix_regression": token_backed_prefix_regression,
         "equivalence": equivalence,
         "layers": layers,
     }
@@ -1039,7 +1155,11 @@ def main() -> int:
             row["all_partitions_equal"]
             for row in result["equivalence"].values()
         )
-        if not historical_pass or not result["burst_regressions"]["all_pass"]:
+        if (
+            not historical_pass
+            or not result["burst_regressions"]["all_pass"]
+            or not result["token_backed_prefix_regression"]["all_pass"]
+        ):
             return 1
     return 0
 

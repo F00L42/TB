@@ -9,11 +9,19 @@ silently diverge from the applied vLLM code.
 Apply patches from the fixed upstream checkout in this order:
 
 ```bash
-git apply --reject --whitespace=fix \
+git apply --check \
   /path/to/TB/patches/vllm/v0.23.0/dtb_serving.patch
-git apply --reject --whitespace=fix \
+git apply --check \
+  /path/to/TB/patches/vllm/v0.23.0/qwen3_coder_parser.patch
+git apply --whitespace=fix \
+  /path/to/TB/patches/vllm/v0.23.0/dtb_serving.patch
+git apply --whitespace=fix \
   /path/to/TB/patches/vllm/v0.23.0/qwen3_coder_parser.patch
 ```
+
+If either check fails, stop and reconcile the checkout/patch version. Do not
+continue with `--reject`, because a partially applied serving/parser contract
+is not a valid DTB deployment.
 
 - `dtb_serving.patch` adds the external `enable_think_budget` protocol field
   and routes enabled requests to `DtbRequestController`. A false request flag
@@ -24,8 +32,12 @@ git apply --reject --whitespace=fix \
   parameter state machine with a v0.23.0 backport that parses each completed
   function from cumulative text and emits its canonical JSON arguments once.
   It covers parameter+close, whole-body, whole-call and adjacent multi-call
-  bursts without inventing close tags for incomplete model output. The tradeoff
-  is intentional: arguments are emitted when `</function>` arrives rather than
+  bursts without inventing close tags for incomplete model output. It also
+  consumes a Qwen tool-start delta whose `token_ids` contains the parser's own
+  `tool_call_start_token_id` while `text` is empty: the parser maintains one
+  request-local logical `<tool_call>` prefix without writing that text back to
+  content, SSE, token accounting, or the continuation prompt. The tradeoff is
+  intentional: arguments are emitted when `</function>` arrives rather than
   parameter by parameter; tool names may still be emitted as soon as the header
   is complete.
 
@@ -47,7 +59,9 @@ python tools/dtb/parser_partition_equivalence.py \
   --summary-only --require-equivalence
 ```
 
-The gate compares the historical parameter-close fixture plus exact burst
-shapes for upstream #39598/#43074/#45256/#45439/#45440 against the non-streaming
-parser oracle. Target-server streaming and non-streaming replay remain required;
-this local gate does not validate vLLM serving finalization or NPU runtime code.
+The gate compares the historical parameter-close fixture, exact burst shapes
+for upstream #39598/#43074/#45256/#45439/#45440, and marker-present versus
+token-only `248058` starts against the non-streaming parser oracle. Both the
+direct tool parser and unified delegating parser must be partition-equivalent.
+Target-server streaming and non-streaming replay remain required; this local
+gate does not validate vLLM serving finalization or NPU runtime code.

@@ -13,6 +13,25 @@ PREFIXES = ("DTB_STREAM_AUDIT ", "TB_TOOL_STREAM ")
 PRODUCTION_STREAM_AUDIT_SOURCE = "controller_pre_parser"
 
 
+def has_bound_reasoning_protocol(record: dict[str, Any]) -> bool:
+    bindings = record.get("reasoning_protocol_bindings")
+    required = {
+        "tokenizer_class",
+        "reasoning_parser_class",
+        "response_parser_class",
+        "tool_parser_class",
+    }
+    return (
+        isinstance(bindings, dict)
+        and required.issubset(bindings)
+        and all(
+            isinstance(bindings[name], str)
+            and bindings[name] not in {"", "none", "unknown"}
+            for name in required
+        )
+    )
+
+
 def uses_source_terminal_contract(records: list[dict[str, Any]]) -> bool:
     """Detect audit formats that bind completion to the source terminal.
 
@@ -146,7 +165,25 @@ def classify(
         str(row.get("raw_text") or "") for row in visible_records
         if not row.get("terminal_flush")
     )
-    raw_has_start = "<tool_call>" in raw_text
+    protocol_boundary_ids: dict[str, int] = {}
+    for row in records:
+        configured = row.get("reasoning_protocol_boundary_token_ids")
+        if not isinstance(configured, dict):
+            continue
+        for role, token_id in configured.items():
+            if isinstance(role, str) and isinstance(token_id, int):
+                protocol_boundary_ids[role] = token_id
+    think_end_token_id = protocol_boundary_ids.get("think_end")
+    tool_call_token_id = protocol_boundary_ids.get("tool_call")
+    raw_has_start_text = "<tool_call>" in raw_text
+    raw_has_start_token = bool(
+        tool_call_token_id is not None
+        and any(
+            tool_call_token_id in list(row.get("token_ids") or [])
+            for row in visible_records
+        )
+    )
+    raw_has_start = raw_has_start_text or raw_has_start_token
     raw_has_complete_call = (
         "</function>" in raw_text and "</tool_call>" in raw_text
     )
@@ -164,7 +201,9 @@ def classify(
     )
     final_answer_stopped_on_think_end = any(
         row.get("phase") == "final_answer"
-        and row.get("source_stop_reason") == "</think>"
+        and row.get("source_stop_reason") in {
+            "</think>", think_end_token_id,
+        }
         for row in visible_records
     )
 
@@ -177,6 +216,48 @@ def classify(
         )
         and row.get("next_state") == "free_final_answer"
     ]
+    stop_contract_records = [
+        row for row in records
+        if row.get("configured_stop_token_ids")
+    ]
+    stop_contract_violations = [
+        int(row.get("sequence") or 0)
+        for row in stop_contract_records
+        if (
+            row.get("boundary_stop_mode") != "token"
+            or row.get("reasoning_protocol_adapter") != "qwen3"
+            or not has_bound_reasoning_protocol(row)
+            or not {
+                think_end_token_id,
+                tool_call_token_id,
+            }.issubset(set(row.get("configured_stop_token_ids") or []))
+            or "</think>" in (row.get("configured_stop_strings") or [])
+            or "<tool_call>" in (row.get("configured_stop_strings") or [])
+            or row.get("include_stop_str_in_output") is not False
+        )
+    ]
+    token_protocol_active = bool(protocol_boundary_ids) or any(
+        row.get("boundary_stop_mode") == "token" for row in records
+    )
+    boundary_token_contract_violations: list[int] = []
+    if token_protocol_active:
+        for row in boundary_records:
+            role = row.get("reasoning_boundary")
+            expected_id = protocol_boundary_ids.get(str(role))
+            forwarded_ids = list(row.get("forwarded_token_ids") or [])
+            natural_boundary = row.get("event") != "synthetic_boundary"
+            if (
+                expected_id is None
+                or not forwarded_ids
+                or forwarded_ids[-1] != expected_id
+                or (
+                    natural_boundary
+                    and row.get("source_stop_reason") != expected_id
+                )
+            ):
+                boundary_token_contract_violations.append(
+                    int(row.get("sequence") or 0)
+                )
     first_boundary = boundary_records[0] if boundary_records else None
     first_boundary_sequence = int(
         (first_boundary or {}).get("sequence") or 0)
@@ -275,6 +356,8 @@ def classify(
         or duplicate_reasoning_boundary > 0
         or fresh_final_after_tool_boundary > 0
         or thinking_or_probe_after_tool_boundary > 0
+        or bool(stop_contract_violations)
+        or bool(boundary_token_contract_violations)
     )
 
     if summary.get("variant") == "vanilla":
@@ -296,6 +379,8 @@ def classify(
         diagnosis = "controller_terminal_binding_failure"
     elif passthrough_violations:
         diagnosis = "controller_passthrough_violation"
+    elif stop_contract_violations or boundary_token_contract_violations:
+        diagnosis = "controller_token_boundary_contract_failure"
     elif lifecycle_failures:
         diagnosis = "controller_completion_lifecycle_failure"
     elif sse_has_tool_call and not anomaly_reasons:
@@ -375,6 +460,8 @@ def classify(
         "server_record_count": len(records),
         "visible_record_count": len(visible_records),
         "raw_has_tool_call_start": raw_has_start,
+        "raw_has_tool_call_start_text": raw_has_start_text,
+        "raw_has_tool_call_start_token": raw_has_start_token,
         "raw_has_complete_tool_call": raw_has_complete_call,
         "final_answer_stopped_on_think_end": (
             final_answer_stopped_on_think_end
@@ -389,6 +476,12 @@ def classify(
             }
             for row in boundary_records
         ],
+        "reasoning_protocol_boundary_token_ids": protocol_boundary_ids,
+        "token_stop_contract_record_count": len(stop_contract_records),
+        "token_stop_contract_violation_sequences": stop_contract_violations,
+        "boundary_token_contract_violation_sequences": (
+            boundary_token_contract_violations
+        ),
         "completion_epoch_count": completion_epoch_count,
         "terminal_flush_count": terminal_flush_count,
         "final_source_terminal_count": final_source_terminal_count,
@@ -532,6 +625,18 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "no_invalid_stop_boundary_alignment": sum(
                     not row["invalid_stop_boundary_alignment_sequences"]
+                    for row in dtb_analyses
+                ),
+                "token_stop_contract_covered": sum(
+                    row["token_stop_contract_record_count"] > 0
+                    for row in dtb_analyses
+                ),
+                "token_stop_contract_valid": sum(
+                    row["token_stop_contract_record_count"] > 0
+                    and not row["token_stop_contract_violation_sequences"]
+                    and not row[
+                        "boundary_token_contract_violation_sequences"
+                    ]
                     for row in dtb_analyses
                 ),
                 "stop_boundary_alignment_covered": sum(

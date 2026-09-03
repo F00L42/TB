@@ -1,5 +1,5 @@
 diff --git a/vllm/tool_parsers/qwen3coder_tool_parser.py b/vllm/tool_parsers/qwen3coder_tool_parser.py
-index 7457590..2fdc0e2 100644
+index 7457590..eb09d0f 100644
 --- a/vllm/tool_parsers/qwen3coder_tool_parser.py
 +++ b/vllm/tool_parsers/qwen3coder_tool_parser.py
 @@ -118,6 +118,9 @@ class Qwen3CoderToolParser(ToolParser):
@@ -12,11 +12,12 @@ index 7457590..2fdc0e2 100644
          self.streaming_request = None
  
      def _convert_param_value(
-@@ -241,353 +244,174 @@ class Qwen3CoderToolParser(ToolParser):
+@@ -241,353 +244,192 @@ class Qwen3CoderToolParser(ToolParser):
          delta_token_ids: Sequence[int],
          request: ChatCompletionRequest,
      ) -> DeltaMessage | None:
 -        # Store request for type conversion
+-        if not previous_text:
 +        """Extract complete calls independently of engine delta partitioning.
 +
 +        Qwen XML parameters cannot be streamed safely until ``</function>``
@@ -26,11 +27,29 @@ index 7457590..2fdc0e2 100644
 +        canonical JSON arguments once.  This deliberately trades progressive
 +        per-parameter deltas for partition-invariant OpenAI tool-call deltas.
 +        """
-         if not previous_text:
++        if not getattr(self, "streaming_initialized", False):
              self._reset_streaming_state()
++            self.streaming_initialized = True
++            self.token_backed_tool_prefix = False
              self.streaming_request = request
 -
++        # Observe a token-backed start before the empty-text early return.
 -        # If no delta text, return None unless it's an EOS token after tools
++        if (
++            self.tool_call_start_token_id in delta_token_ids
++            and self.tool_call_start_token not in current_text
++        ):
++            self.token_backed_tool_prefix = True
++            self.is_tool_call_started = True
++
++        # The unified reasoning parser can preserve the structural token ID
++        # while the detokenized marker text is empty.  Build a parser-local XML
++        # view so the cumulative span parser sees exactly one logical start;
++        # never write this prefix back to the OpenAI delta or token stream.
++        if self.token_backed_tool_prefix:
++            previous_text = self.tool_call_start_token + previous_text
++            current_text = self.tool_call_start_token + current_text
++
          if not delta_text:
 -            # Check if this is an EOS token after all tool calls are complete
 -            # Check for tool calls in text even if is_tool_call_started

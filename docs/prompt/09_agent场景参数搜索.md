@@ -42,3 +42,18 @@ docs\log\perf\agent_tool_call_run02_replay\run_server_01是runbook执行结果�
    1. 问题原因定位
    2. 参考社区PR（docs\debug\tool_call_streaming_debug_plan.md: 1358 上游缺陷族审计与修订方案），制作023版本的parser完整修复patch
    3. 验证dtb和vanilla同一表现的完整paired replay方案
+
+---
+
+run-05端到端实验结果
+* vanilla
+  * 透传日志proxy\results\qwen\local-task29\local-apiserver\vanilla\run-05
+  * 评测结果lightcode\session_logs_0902_vanilla
+* dtb
+  * 透传日志proxy\results\qwen\local-task29\local-apiserver\dtb\run-05
+  * 评测结果lightcode\session_logs_0902_dtb
+1. 分析实验结果：正确率，端到端时延，总评测时延（如session_logs_0902_dtb\evaluation_results.json中每个任务的"start_time"-"end_time"）
+   1. 对已知由于stop="</think>"停止参数导致的任务执行失败，后续的stop_token_ids重构计划可以解决，暂时不计入统计
+   2. 输出结果分析
+2. 规划下一步计划，如继续搜索参数或配置新场景或实验
+   1. 考虑到每次在思维链结束后stop会造成额外的首字开销，是否有方法在较短的思维链场景中不触发停止？（即原生输出，只有当思维链长度超过一定阈值才停下来检验）

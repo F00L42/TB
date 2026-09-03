@@ -15,6 +15,7 @@ from dtb.config.schema import (
     DtbAlgorithmPolicy,
     DtbTelemetryMode,
     POLICY_VERSION,
+    ReasoningProtocolAdapter,
 )
 from dtb.request_controller import DtbRequestController
 
@@ -46,6 +47,18 @@ class DtbConfigTests(unittest.TestCase):
         self.assertEqual(service.algorithm.check_length, 200)
         self.assertFalse(service.algorithm.enable_history_budget)
         self.assertFalse(service.algorithm.enable_difficulty_estimator)
+        self.assertIs(
+            service.reasoning_protocol.adapter,
+            ReasoningProtocolAdapter.QWEN3,
+        )
+        self.assertEqual(
+            service.reasoning_protocol.think_end_token_id,
+            248069,
+        )
+        self.assertEqual(
+            service.reasoning_protocol.tool_call_begin_token_id,
+            248058,
+        )
         self.assertIs(service.observability.mode, DtbTelemetryMode.OFF)
         self.assertEqual(
             Path(service.history_store.path).parts[-4:],
@@ -60,6 +73,36 @@ class DtbConfigTests(unittest.TestCase):
             path.write_text("RUNTIME: [invalid]", encoding="utf-8")
             with self.assertRaises(ValueError):
                 load_dtb_service_config(path)
+        clear_dtb_config_cache()
+
+    def test_reasoning_protocol_rejects_ambiguous_or_invalid_ids(self) -> None:
+        original = (
+            Path(__file__).parents[1] / "dtb/config/budget_config.yaml"
+        ).read_text(encoding="utf-8")
+        variants = {
+            "missing": original.replace(
+                "  tool_call_begin_token_id: 248058\n", ""
+            ),
+            "unknown": original.replace(
+                "  adapter: \"qwen3\"\n",
+                "  adapter: \"other\"\n",
+            ),
+            "boolean": original.replace(
+                "  think_end_token_id: 248069\n",
+                "  think_end_token_id: true\n",
+            ),
+            "duplicate": original.replace(
+                "  tool_call_begin_token_id: 248058\n",
+                "  tool_call_begin_token_id: 248069\n",
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            for name, text in variants.items():
+                with self.subTest(name=name):
+                    path = Path(directory) / f"{name}.yaml"
+                    path.write_text(text, encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        load_dtb_service_config(path)
         clear_dtb_config_cache()
 
     def test_stream_audit_requires_request_allowlist(self) -> None:

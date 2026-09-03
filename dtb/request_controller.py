@@ -26,6 +26,7 @@ from dtb.integration.vllm.response_adapter import (
     stream_queue,
 )
 from dtb.observability.config import DtbObservabilityRuntime
+from dtb.reasoning.parser_boundary import bind_reasoning_boundary_protocol
 from dtb.reasoning.request_context import DtbRequestContext
 from dtb.reasoning.request_state import DtbRequestState
 from dtb.reasoning.state_machine import DtbStateMachine
@@ -94,6 +95,7 @@ class DtbRequestController:
         self.observability = observability or DtbObservabilityRuntime(
             self.service_config.observability
         )
+        self._reasoning_protocol_tokenizer: Any = None
         self.history_recorder = history_recorder
         if (
             self.history_recorder is None
@@ -289,6 +291,30 @@ class DtbRequestController:
                 "completion token limit"
             )
 
+        reasoning_protocol = None
+        if request.stream:
+            try:
+                validate_tokenizer_vocab = (
+                    tokenizer is not self._reasoning_protocol_tokenizer
+                )
+                reasoning_protocol = bind_reasoning_boundary_protocol(
+                    self.service_config.reasoning_protocol,
+                    tokenizer,
+                    reasoning_parser,
+                    response_parser,
+                    validate_tokenizer_vocab=validate_tokenizer_vocab,
+                )
+                if validate_tokenizer_vocab:
+                    # The service config and tokenizer are startup-scoped.  Do
+                    # not rebuild a full vocabulary-ID set for every request;
+                    # parser instances and their bound IDs are still checked
+                    # on every streaming DTB request.
+                    self._reasoning_protocol_tokenizer = tokenizer
+            except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                return serving_chat.create_error_response(
+                    f"DTB reasoning protocol binding failed: {exc}"
+                )
+
         phase_recorder = self.observability.create_phase_recorder(policy.version)
         prompt_token_ids = engine_inputs[0].get("prompt_token_ids", [])
         try:
@@ -373,6 +399,7 @@ class DtbRequestController:
             reasoning_ended=reasoning_ended,
             reasoning_parser_kwargs=reasoning_parser_kwargs,
             reasoning_parser=reasoning_parser,
+            reasoning_protocol=reasoning_protocol,
             chat_template_kwargs=chat_template_kwargs,
             result_queue=asyncio.Queue(),
             budget_start_time=time.time(),

@@ -5,8 +5,10 @@ from dtb.config.schema import (
     DtbAlgorithmPolicy,
     DtbHistoryStoreConfig,
     DtbObservabilityConfig,
+    DtbReasoningProtocolConfig,
     DtbServiceConfig,
     DtbTelemetryMode,
+    ReasoningProtocolAdapter,
 )
 
 __all__ = [
@@ -14,7 +16,9 @@ __all__ = [
     "DtbAlgorithmPolicy",
     "DtbHistoryStoreConfig",
     "DtbObservabilityConfig",
+    "DtbReasoningProtocolConfig",
     "DtbServiceConfig",
     "DtbTelemetryMode",
+    "ReasoningProtocolAdapter",
     "load_dtb_service_config",
 ]

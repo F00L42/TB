@@ -17,6 +17,7 @@ from dtb.reasoning.request_state import (
 if TYPE_CHECKING:
     from dtb.observability.phase_recorder import DtbPhaseRecorder
     from dtb.observability.stream_audit import DtbStreamAudit
+    from dtb.reasoning.parser_boundary import ReasoningBoundaryProtocol
     from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
     from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
     from vllm.outputs import RequestOutput
@@ -42,6 +43,7 @@ class DtbRequestContext:
     reasoning_ended: Optional[bool] = None
     reasoning_parser_kwargs: Optional[dict[str, Any]] = None
     reasoning_parser: Any = None
+    reasoning_protocol: ReasoningBoundaryProtocol | None = None
     chat_template_kwargs: Optional[dict[str, Any]] = None
     result_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     last_chunk: Optional[RequestOutput] = None
@@ -56,6 +58,9 @@ class DtbRequestContext:
     orchestration_error: Optional[str] = None
     budget_start_time: float = field(default_factory=time.time)
     question_text: str = ""
+    thinking_stop_token_ids: tuple[int, ...] = ()
+    thinking_stop_strings: tuple[str, ...] = ()
+    thinking_include_stop_str_in_output: bool | None = None
 
     @property
     def engine_client(self):
@@ -71,6 +76,14 @@ class DtbRequestContext:
         if decision is None:
             raise RuntimeError("DTB budget decision was not attached to request state")
         return decision
+
+    def require_reasoning_protocol(self) -> ReasoningBoundaryProtocol:
+        protocol = self.reasoning_protocol
+        if protocol is None:
+            raise RuntimeError(
+                "streaming DTB request has no bound reasoning protocol"
+            )
+        return protocol
 
     def engine_request_kwargs(
         self,
@@ -245,6 +258,19 @@ class DtbRequestContext:
             self.prompt_text += suffix_text
             self.engine_prompt["prompt"] = self.prompt_text
 
+    def append_prompt_token_ids(
+        self,
+        token_ids: tuple[int, ...] | list[int],
+        text_hint: str = "",
+    ) -> None:
+        """Append protocol-owned tokens without deriving them from marker text."""
+        if not token_ids:
+            raise ValueError("protocol token suffix must not be empty")
+        self.engine_prompt["prompt_token_ids"].extend(token_ids)
+        if self.prompt_text is not None and text_hint:
+            self.prompt_text += text_hint
+            self.engine_prompt["prompt"] = self.prompt_text
+
     def append_thinking(
         self,
         token_ids: list[int],
@@ -262,21 +288,36 @@ class DtbRequestContext:
         thinking_token_count = len(token_ids)
         final_token_count = 0
         if reasoning_boundary is not None:
-            marker_ids = list(self.encode_prompt_suffix(reasoning_boundary.marker))
-            marker_index = self._find_token_subsequence(token_ids, marker_ids)
-            if marker_index is None:
-                text_index = text.find(reasoning_boundary.marker)
-                if text_index < 0:
+            if getattr(self.request, "stream", False):
+                boundary_id = self.require_reasoning_protocol().spec_for(
+                    reasoning_boundary
+                ).token_id
+                try:
+                    marker_index = token_ids.index(boundary_id)
+                except ValueError as exc:
                     raise RuntimeError(
-                        "reasoning boundary was reported without parser-facing "
-                        f"text/token ids: {reasoning_boundary.marker}"
-                    )
-                marker_index = min(
-                    len(token_ids),
-                    len(self.tokenizer.encode(
-                        text[:text_index], add_special_tokens=False
-                    )),
+                        "streaming reasoning boundary is absent from token ids: "
+                        f"role={reasoning_boundary.value} id={boundary_id}"
+                    ) from exc
+            else:
+                marker_ids = list(
+                    self.encode_prompt_suffix(reasoning_boundary.marker)
                 )
+                marker_index = self._find_token_subsequence(token_ids, marker_ids)
+                if marker_index is None:
+                    text_index = text.find(reasoning_boundary.marker)
+                    if text_index < 0:
+                        raise RuntimeError(
+                            "reasoning boundary was reported without "
+                            "parser-facing text/token ids: "
+                            f"{reasoning_boundary.marker}"
+                        )
+                    marker_index = min(
+                        len(token_ids),
+                        len(self.tokenizer.encode(
+                            text[:text_index], add_special_tokens=False
+                        )),
+                    )
             thinking_token_count = marker_index
             final_token_count = len(token_ids) - marker_index
             state.reasoning_boundary = reasoning_boundary
@@ -299,16 +340,31 @@ class DtbRequestContext:
                 return index
         return None
 
-    def close_reasoning(self, prompt_suffix: str = "</think>") -> bool:
-        """Close once using the final-answer-selected model prompt suffix."""
+    def close_reasoning(
+        self,
+        prompt_prefix: str = "</think>",
+        trailing_text: str = "",
+    ) -> bool:
+        """Close once with either the bound token protocol or legacy text."""
         state = self.request_state
         if state.reasoning_state is ReasoningState.CLOSED:
             return False
-        if prompt_suffix.count("</think>") != 1:
-            raise ValueError(
-                "reasoning close suffix must contain exactly one </think>"
+        if getattr(self.request, "stream", False):
+            protocol = self.require_reasoning_protocol()
+            self.append_prompt_suffix(prompt_prefix)
+            self.append_prompt_token_ids(
+                protocol.forced_close_token_ids,
+                protocol.forced_close_text,
             )
-        self.append_prompt_suffix(prompt_suffix)
+            self.append_prompt_suffix(trailing_text)
+        else:
+            prompt_suffix = prompt_prefix + trailing_text
+            if prompt_suffix.count("</think>") != 1:
+                raise ValueError(
+                    "legacy reasoning close suffix must contain exactly one "
+                    "</think>"
+                )
+            self.append_prompt_suffix(prompt_suffix)
         state.reasoning_state = ReasoningState.CLOSED
         state.reasoning_boundary = ReasoningBoundary.THINK_END
         return True

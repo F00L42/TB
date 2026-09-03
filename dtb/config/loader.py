@@ -13,8 +13,10 @@ from dtb.config.schema import (
     DtbAlgorithmConfig,
     DtbHistoryStoreConfig,
     DtbObservabilityConfig,
+    DtbReasoningProtocolConfig,
     DtbServiceConfig,
     DtbTelemetryMode,
+    ReasoningProtocolAdapter,
 )
 
 
@@ -59,7 +61,8 @@ def load_dtb_service_config(path: str | Path = DEFAULT_CONFIG_PATH) -> DtbServic
         ) from exc
     root = _mapping(raw, "top-level value")
     allowed_top_level = {
-        "RUNTIME", "OBSERVABILITY", "SCENES", "SCENE_PRIORITY",
+        "RUNTIME", "REASONING_PROTOCOL", "OBSERVABILITY",
+        "SCENES", "SCENE_PRIORITY",
         "DIFFICULTY_TIERS", "HISTORY_STORE", "HISTORY_NEW_TASK",
         "HISTORY_WARM_START", "HISTORY_HOT_START",
     }
@@ -86,6 +89,36 @@ def load_dtb_service_config(path: str | Path = DEFAULT_CONFIG_PATH) -> DtbServic
         for name, value in runtime.items()
     }
     algorithm = DtbAlgorithmConfig(**algorithm_values)
+
+    protocol_values = _mapping(
+        root.get("REASONING_PROTOCOL"), "REASONING_PROTOCOL"
+    )
+    allowed_protocol = {
+        "adapter", "think_end_token_id", "tool_call_begin_token_id"
+    }
+    unknown_protocol = set(protocol_values) - allowed_protocol
+    if unknown_protocol:
+        raise ValueError(
+            "unknown REASONING_PROTOCOL keys: "
+            + ", ".join(sorted(unknown_protocol))
+        )
+    missing_protocol = allowed_protocol - set(protocol_values)
+    if missing_protocol:
+        raise ValueError(
+            "missing REASONING_PROTOCOL keys: "
+            + ", ".join(sorted(missing_protocol))
+        )
+    try:
+        protocol_adapter = ReasoningProtocolAdapter(protocol_values["adapter"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "REASONING_PROTOCOL.adapter must be qwen3"
+        ) from exc
+    reasoning_protocol = DtbReasoningProtocolConfig(
+        adapter=protocol_adapter,
+        think_end_token_id=protocol_values["think_end_token_id"],
+        tool_call_begin_token_id=protocol_values["tool_call_begin_token_id"],
+    )
 
     observability_values = _mapping(
         root.get("OBSERVABILITY", {}), "OBSERVABILITY"
@@ -149,6 +182,7 @@ def load_dtb_service_config(path: str | Path = DEFAULT_CONFIG_PATH) -> DtbServic
     )
     return DtbServiceConfig(
         algorithm=algorithm,
+        reasoning_protocol=reasoning_protocol,
         observability=observability,
         history_store=history_store,
         scenes=_frozen_mapping({

@@ -15,6 +15,7 @@ from dtb.config.schema import (
     DtbAlgorithmConfig,
     DtbAlgorithmPolicy,
     POLICY_VERSION,
+    ReasoningProtocolAdapter,
 )
 from dtb.integration.vllm.response_adapter import (
     aggregate_queue,
@@ -25,10 +26,39 @@ from dtb.observability.stream_audit import DtbStreamAudit
 from dtb.reasoning.request_context import DtbRequestContext
 from dtb.reasoning.request_state import (
     FinalAnswerReason,
+    ReasoningBoundary,
     DtbRequestState,
 )
 from dtb.reasoning.generation_states import _BaseState
-from dtb.reasoning.parser_boundary import emit_reasoning_boundary_once
+from dtb.reasoning.parser_boundary import (
+    BoundaryTokenSpec,
+    ReasoningBoundaryProtocol,
+    emit_reasoning_boundary_once,
+)
+
+
+THINK_END_ID = 1002
+TOOL_CALL_BEGIN_ID = 1000
+
+
+def fake_reasoning_protocol() -> ReasoningBoundaryProtocol:
+    return ReasoningBoundaryProtocol(
+        adapter=ReasoningProtocolAdapter.QWEN3,
+        natural_boundaries=(
+            BoundaryTokenSpec(
+                ReasoningBoundary.THINK_END,
+                THINK_END_ID,
+                "</think>",
+            ),
+            BoundaryTokenSpec(
+                ReasoningBoundary.TOOL_CALL,
+                TOOL_CALL_BEGIN_ID,
+                "<tool_call>",
+            ),
+        ),
+        forced_close_token_ids=(THINK_END_ID,),
+        forced_close_text="",
+    )
 
 
 class FakeTokenizer:
@@ -58,9 +88,9 @@ class StructuralTokenizer(FakeTokenizer):
         return "".join(pieces.get(token_id, chr(token_id)) for token_id in token_ids)
 
 
-def make_context() -> DtbRequestContext:
+def make_context(*, stream: bool = False) -> DtbRequestContext:
     tokenizer = FakeTokenizer()
-    request = SimpleNamespace(priority=7)
+    request = SimpleNamespace(priority=7, stream=stream)
     serving = SimpleNamespace(engine_client=object(), default_sampling_params={})
     plan = DtbBudgetDecision(
         scene="general",
@@ -95,6 +125,7 @@ def make_context() -> DtbRequestContext:
         prompt_text="base",
         reasoning_ended=False,
         reasoning_parser_kwargs={"chat_template_kwargs": {"x": 1}},
+        reasoning_protocol=fake_reasoning_protocol() if stream else None,
     )
 
 
@@ -174,6 +205,23 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(queued.prompt_token_ids, original.prompt_token_ids)
         self.assertEqual(queued.outputs[0].text, "</think>")
         self.assertEqual(original_output.text, "reasoning")
+
+    async def test_streaming_emit_uses_empty_text_and_structural_token(self) -> None:
+        context = make_context(stream=True)
+        original_output = SimpleNamespace(text="reasoning", token_ids=[10])
+        original = SimpleNamespace(outputs=[original_output])
+        context.last_chunk = original
+
+        emitted = await emit_reasoning_boundary_once(context)
+        queued = await context.result_queue.get()
+
+        self.assertTrue(emitted)
+        self.assertEqual(queued.outputs[0].text, "")
+        self.assertEqual(queued.outputs[0].token_ids, [THINK_END_ID])
+        self.assertIsNone(queued.outputs[0].finish_reason)
+        self.assertIsNone(queued.outputs[0].stop_reason)
+        self.assertEqual(original_output.text, "reasoning")
+        self.assertEqual(original_output.token_ids, [10])
 
     async def test_consumer_preserves_terminal_reason_without_mutating_source(
         self,
@@ -315,6 +363,7 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(record["schema"], 1)
         self.assertEqual(record["source"], "controller_pre_parser")
         self.assertEqual(record["raw_text"], "f")
+        self.assertEqual(record["forwarded_text"], "f")
         self.assertEqual(
             record["raw_text_sha256"], record["forwarded_text_sha256"])
         self.assertEqual(
@@ -330,6 +379,57 @@ class ThinkEndCopyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(record["terminal_origin"], "none")
         self.assertFalse(record["final_terminal_passthrough"])
         self.assertFalse(record["synthetic_terminal"])
+
+    async def test_stream_audit_exposes_token_stop_contract(self) -> None:
+        context = make_context(stream=True)
+        context.thinking_stop_token_ids = (
+            77,
+            THINK_END_ID,
+            TOOL_CALL_BEGIN_ID,
+        )
+        context.thinking_stop_strings = ("USER_STOP",)
+        context.thinking_include_stop_str_in_output = False
+        writer, lines = enable_stream_audit(context)
+        source = SimpleNamespace(outputs=[SimpleNamespace(
+            text="",
+            token_ids=[THINK_END_ID],
+            finish_reason=None,
+            stop_reason=None,
+        )])
+        try:
+            await context.stream_output(
+                source,
+                phase="reasoning_boundary",
+                child_request_id="boundary-1",
+                event="synthetic_boundary",
+                reasoning_boundary=ReasoningBoundary.THINK_END,
+            )
+            self.assertTrue(writer.flush())
+        finally:
+            writer.close()
+
+        record = json.loads(lines[0].split(" ", 1)[1])
+        self.assertEqual(record["boundary_stop_mode"], "token")
+        self.assertEqual(record["reasoning_protocol_adapter"], "qwen3")
+        self.assertEqual(record["reasoning_protocol_bindings"], {
+            "tokenizer_class": "unknown",
+            "reasoning_parser_class": "unknown",
+            "response_parser_class": "unknown",
+            "tool_parser_class": "unknown",
+        })
+        self.assertEqual(
+            record["reasoning_protocol_boundary_token_ids"],
+            {"think_end": THINK_END_ID, "tool_call": TOOL_CALL_BEGIN_ID},
+        )
+        self.assertEqual(
+            record["configured_stop_token_ids"],
+            [77, THINK_END_ID, TOOL_CALL_BEGIN_ID],
+        )
+        self.assertEqual(record["configured_stop_strings"], ["USER_STOP"])
+        self.assertFalse(record["include_stop_str_in_output"])
+        self.assertEqual(record["raw_text"], "")
+        self.assertEqual(record["forwarded_text"], "")
+        self.assertEqual(record["forwarded_token_ids"], [THINK_END_ID])
 
     async def test_stream_audit_records_stop_boundary_token_alignment(
         self,

@@ -26,6 +26,37 @@ class DtbTelemetryMode(str, Enum):
     STREAM_AUDIT = "stream_audit"
 
 
+class ReasoningProtocolAdapter(str, Enum):
+    """Model/parser protocol adapters supported by the DTB controller."""
+
+    QWEN3 = "qwen3"
+
+
+@dataclass(frozen=True)
+class DtbReasoningProtocolConfig:
+    """Startup-only structural token contract for one model deployment."""
+
+    adapter: ReasoningProtocolAdapter
+    think_end_token_id: int
+    tool_call_begin_token_id: int
+
+    def __post_init__(self) -> None:
+        for name in ("think_end_token_id", "tool_call_begin_token_id"):
+            value = getattr(self, name)
+            if (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value < 0
+            ):
+                raise ValueError(
+                    f"reasoning_protocol.{name} must be a non-negative integer"
+                )
+        if self.think_end_token_id == self.tool_call_begin_token_id:
+            raise ValueError(
+                "reasoning protocol boundary token ids must be distinct"
+            )
+
+
 @dataclass(frozen=True)
 class DtbObservabilityConfig:
     """Process-level telemetry configuration; requests cannot override it."""
@@ -69,6 +100,7 @@ class DtbServiceConfig:
     """Immutable startup snapshot of YAML configuration."""
 
     algorithm: "DtbAlgorithmConfig"
+    reasoning_protocol: DtbReasoningProtocolConfig
     observability: DtbObservabilityConfig
     history_store: DtbHistoryStoreConfig
     scenes: Mapping[str, Mapping[str, Any]]

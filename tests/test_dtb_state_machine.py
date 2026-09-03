@@ -14,20 +14,52 @@ from dtb.config.schema import (
     DtbAlgorithmConfig,
     DtbAlgorithmPolicy,
     POLICY_VERSION,
+    ReasoningProtocolAdapter,
+)
+from dtb.reasoning.parser_boundary import (
+    BoundaryTokenSpec,
+    ReasoningBoundaryProtocol,
 )
 from dtb.reasoning.request_context import DtbRequestContext
 from dtb.reasoning.request_state import (
     FinalAnswerReason,
+    ReasoningBoundary,
     ReasoningState,
     DtbRequestState,
 )
 from dtb.reasoning.generation_states import (
     BUDGET_EXHAUSTED_FINAL_PROMPT,
+    GUIDED_FINAL_CUE_V1,
     GUIDED_FINAL_PROMPT_V1,
+    GUIDED_FINAL_SEPARATOR,
     TRIAL_PROMPT,
     controller_final_suffix,
 )
 from dtb.reasoning.state_machine import DtbStateMachine
+
+
+THINK_END_ID = 9001
+TOOL_CALL_BEGIN_ID = 9002
+
+
+def fake_reasoning_protocol() -> ReasoningBoundaryProtocol:
+    return ReasoningBoundaryProtocol(
+        adapter=ReasoningProtocolAdapter.QWEN3,
+        natural_boundaries=(
+            BoundaryTokenSpec(
+                ReasoningBoundary.THINK_END,
+                THINK_END_ID,
+                "</think>",
+            ),
+            BoundaryTokenSpec(
+                ReasoningBoundary.TOOL_CALL,
+                TOOL_CALL_BEGIN_ID,
+                "<tool_call>",
+            ),
+        ),
+        forced_close_token_ids=(THINK_END_ID,),
+        forced_close_text="",
+    )
 
 
 class CaptureRecorder:
@@ -63,7 +95,10 @@ class FakeRequest:
     def to_sampling_params(self, max_tokens, default_sampling_params):
         return SimpleNamespace(
             max_tokens=max_tokens,
-            stop=[],
+            stop=["USER_STOP"],
+            stop_token_ids=[777],
+            _all_stop_token_ids={777, 888},
+            min_tokens=5,
             logprobs=None,
             include_stop_str_in_output=False,
             output_kind=SimpleNamespace(name="DELTA"),
@@ -123,6 +158,10 @@ class ScriptedEngine:
             "stop": list(params.stop or []),
             "include_stop_str_in_output": (
                 params.include_stop_str_in_output),
+            "stop_token_ids": list(params.stop_token_ids or []),
+            "all_stop_token_ids": set(params._all_stop_token_ids),
+            "min_tokens": params.min_tokens,
+            "logprobs": params.logprobs,
             "prompt_token_ids": list(prompt["prompt_token_ids"]),
             "kwargs": kwargs,
         })
@@ -184,6 +223,7 @@ def make_context(
         ),
         prompt_text="<think>",
         phase_recorder=CaptureRecorder(),
+        reasoning_protocol=fake_reasoning_protocol(),
     )
     return context, engine
 
@@ -283,7 +323,23 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(engine.calls[0]["max_tokens"], 5)
         self.assertEqual(engine.calls[1]["max_tokens"], 50)
-        self.assertEqual(engine.calls[2]["max_tokens"], 91)
+        self.assertEqual(engine.calls[2]["max_tokens"], 98)
+        self.assertEqual(engine.calls[0]["stop"], ["USER_STOP"])
+        self.assertEqual(
+            engine.calls[0]["stop_token_ids"],
+            [777, THINK_END_ID, TOOL_CALL_BEGIN_ID],
+        )
+        self.assertEqual(
+            engine.calls[0]["all_stop_token_ids"],
+            {777, 888, THINK_END_ID, TOOL_CALL_BEGIN_ID},
+        )
+        self.assertEqual(engine.calls[0]["min_tokens"], 0)
+        self.assertFalse(engine.calls[0]["include_stop_str_in_output"])
+        self.assertEqual(engine.calls[1]["stop"], ["USER_STOP"])
+        self.assertEqual(engine.calls[1]["stop_token_ids"], [777])
+        self.assertEqual(engine.calls[1]["all_stop_token_ids"], {777, 888})
+        self.assertEqual(engine.calls[1]["min_tokens"], 5)
+        self.assertEqual(engine.calls[1]["logprobs"], 1)
         trial_tokens = context.tokenizer.encode(
             TRIAL_PROMPT, add_special_tokens=False)
         self.assertEqual(
@@ -299,15 +355,26 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             ),
         )
         self.assertNotIn(20, engine.calls[2]["prompt_token_ids"])
-        self.assertEqual(visible.count("</think>"), 1)
+        self.assertNotIn("</think>", visible)
         self.assertNotIn("trial", visible)
         self.assertIn(
             "Considering the limited time by the user",
             context.prompt_text,
         )
-        self.assertTrue(context.prompt_text.endswith(GUIDED_FINAL_PROMPT_V1))
-        close_tokens = context.tokenizer.encode(
-            GUIDED_FINAL_PROMPT_V1, add_special_tokens=False)
+        self.assertTrue(
+            context.prompt_text.endswith(
+                GUIDED_FINAL_CUE_V1 + GUIDED_FINAL_SEPARATOR
+            )
+        )
+        close_tokens = [
+            *context.tokenizer.encode(
+                GUIDED_FINAL_CUE_V1, add_special_tokens=False
+            ),
+            THINK_END_ID,
+            *context.tokenizer.encode(
+                GUIDED_FINAL_SEPARATOR, add_special_tokens=False
+            ),
+        ]
         self.assertEqual(
             engine.calls[-1]["prompt_token_ids"][-len(close_tokens):],
             close_tokens,
@@ -326,12 +393,12 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             context.request_state.emitted_completion_tokens,
-            10,
+            3,
         )
         self.assertEqual(context.request_state.hidden_probe_tokens, 1)
         self.assertEqual(
             context.request_state.completion_status, "success")
-        self.assertEqual(context.prompt_text.count("</think>"), 1)
+        self.assertEqual(context.prompt_text.count("</think>"), 0)
         probe = next(
             phase for phase in recorded_phases
             if phase["phase"] == "confidence_probe"
@@ -349,10 +416,10 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             final["final_answer_reason"], "confidence_accepted")
         self.assertEqual(final["completion_token_limit"], 100)
-        self.assertEqual(final["emitted_completion_tokens_before"], 9)
+        self.assertEqual(final["emitted_completion_tokens_before"], 2)
         self.assertEqual(final["pending_boundary_tokens"], 0)
-        self.assertEqual(final["external_remaining_tokens"], 91)
-        self.assertEqual(final["answer_limit"], 91)
+        self.assertEqual(final["external_remaining_tokens"], 98)
+        self.assertEqual(final["answer_limit"], 98)
 
     async def test_final_uses_external_remaining_not_per_child_limit(self):
         context, engine = make_context(
@@ -366,8 +433,7 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
 
         await run_and_drain(context)
 
-        boundary_tokens = len(context.tokenizer.encode(
-            "</think>", add_special_tokens=False))
+        boundary_tokens = 1
         self.assertEqual(
             engine.calls[-1]["max_tokens"],
             20 - 3 - boundary_tokens,
@@ -380,8 +446,15 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_final_limit_also_respects_updated_model_context(self):
         tokenizer = FakeTokenizer()
-        cue_tokens = len(tokenizer.encode(
-            GUIDED_FINAL_PROMPT_V1, add_special_tokens=False))
+        cue_tokens = (
+            len(tokenizer.encode(
+                GUIDED_FINAL_CUE_V1, add_special_tokens=False
+            ))
+            + 1
+            + len(tokenizer.encode(
+                GUIDED_FINAL_SEPARATOR, add_special_tokens=False
+            ))
+        )
         context, engine = make_context(
             [
                 [result("thought", [10])],
@@ -410,14 +483,12 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
 
         visible = await run_and_drain(context)
 
-        boundary_tokens = len(context.tokenizer.encode(
-            "</think>", add_special_tokens=False
-        ))
+        boundary_tokens = 1
         self.assertEqual(call_phases(engine), ["final_answer"])
         self.assertEqual(
             engine.calls[-1]["max_tokens"], 10 - boundary_tokens
         )
-        self.assertEqual(visible.count("</think>"), 1)
+        self.assertNotIn("</think>", visible)
         final = next(
             phase for phase in context.phase_recorder.phases
             if phase["phase"] == "final_answer"
@@ -477,11 +548,21 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             FinalAnswerReason.BUDGET_EXHAUSTED,
         )
         self.assertTrue(
-            context.prompt_text.endswith(BUDGET_EXHAUSTED_FINAL_PROMPT))
-        expected_suffix = context.tokenizer.encode(
-            BUDGET_EXHAUSTED_FINAL_PROMPT,
-            add_special_tokens=False,
+            context.prompt_text.endswith(
+                GUIDED_FINAL_CUE_V1 + GUIDED_FINAL_SEPARATOR
+            )
         )
+        expected_suffix = [
+            *context.tokenizer.encode(
+                GUIDED_FINAL_CUE_V1,
+                add_special_tokens=False,
+            ),
+            THINK_END_ID,
+            *context.tokenizer.encode(
+                GUIDED_FINAL_SEPARATOR,
+                add_special_tokens=False,
+            ),
+        ]
         self.assertEqual(
             engine.calls[-1]["prompt_token_ids"][-len(expected_suffix):],
             expected_suffix,
@@ -512,26 +593,24 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             FinalAnswerReason.BUDGET_EXHAUSTED,
         )
         self.assertTrue(
-            context.prompt_text.endswith(expected_prompt))
-        self.assertEqual(visible.count("</think>"), 1)
+            context.prompt_text.endswith(
+                GUIDED_FINAL_CUE_V1 + GUIDED_FINAL_SEPARATOR
+            )
+        )
+        self.assertNotIn("</think>", visible)
         self.assertNotIn(
             "Considering the limited time by the user",
             "".join(visible),
         )
 
     async def test_model_think_end_enters_free_final_even_before_minimum(self):
-        boundary = "</think>"
-        boundary_ids = [ord(character) for character in boundary]
-        speculative_suffix_ids = [
-            ord(character) for character in "<tool_call>\n<"
-        ]
         context, engine = make_context(
             [
                 [result(
-                    boundary,
-                    [*boundary_ids, *speculative_suffix_ids],
+                    "",
+                    [THINK_END_ID],
                     finish_reason="stop",
-                    stop_reason="</think>")],
+                    stop_reason=THINK_END_ID)],
                 [result("answer", [30], finish_reason="stop")],
             ],
             min_think_budget=2,
@@ -544,37 +623,36 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             ["initial_think", "final_answer"],
         )
         self.assertEqual(context.prompt_text.count("<think>"), 1)
-        self.assertEqual(context.prompt_text.count("</think>"), 1)
-        self.assertEqual(visible.count("</think>"), 1)
+        self.assertEqual(context.prompt_text.count("</think>"), 0)
+        self.assertNotIn("</think>", visible)
         self.assertEqual(
             context.request_state.final_answer_reason,
             FinalAnswerReason.MODEL_THINK_END,
         )
-        self.assertIn("<tool_call>", engine.calls[0]["stop"])
-        self.assertIn("</think>", engine.calls[0]["stop"])
-        self.assertTrue(engine.calls[0]["include_stop_str_in_output"])
+        self.assertEqual(engine.calls[0]["stop"], ["USER_STOP"])
+        self.assertEqual(
+            engine.calls[0]["stop_token_ids"],
+            [777, THINK_END_ID, TOOL_CALL_BEGIN_ID],
+        )
+        self.assertFalse(engine.calls[0]["include_stop_str_in_output"])
         self.assertNotIn("</think>", engine.calls[1]["stop"])
         self.assertFalse(engine.calls[1]["include_stop_str_in_output"])
         self.assertEqual(
             engine.calls[1]["prompt_token_ids"],
-            [60, *boundary_ids],
+            [60, THINK_END_ID],
         )
 
     async def test_model_tool_boundary_continues_without_synthetic_think_end(
         self,
     ):
-        first = "thought<tool_call>"
-        speculative_suffix = "\n<f"
+        first = "thought"
         first_ids = [ord(character) for character in first]
-        speculative_suffix_ids = [
-            ord(character) for character in speculative_suffix
-        ]
         context, engine = make_context([
             [result(
                 first,
-                [*first_ids, *speculative_suffix_ids],
+                [*first_ids, TOOL_CALL_BEGIN_ID],
                 finish_reason="stop",
-                stop_reason="<tool_call>",
+                stop_reason=TOOL_CALL_BEGIN_ID,
             )],
             [result(
                 "<function=bash></function></tool_call>",
@@ -588,9 +666,9 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             call_phases(engine), ["initial_think", "final_answer"])
-        self.assertEqual("".join(visible).count("<tool_call>"), 1)
+        self.assertEqual("".join(visible).count("<tool_call>"), 0)
         self.assertNotIn("</think>", "".join(visible))
-        self.assertEqual(context.prompt_text.count("<tool_call>"), 1)
+        self.assertEqual(context.prompt_text.count("<tool_call>"), 0)
         self.assertEqual(
             context.request_state.final_answer_reason,
             FinalAnswerReason.MODEL_TOOL_CALL,
@@ -600,13 +678,13 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(engine.calls[-1]["kwargs"]["reasoning_ended"])
         self.assertEqual(
             engine.calls[-1]["prompt_token_ids"],
-            [60, *first_ids],
+            [60, *first_ids, TOOL_CALL_BEGIN_ID],
         )
         state = context.request_state
         self.assertEqual(state.thinking_tokens, len("thought"))
         self.assertEqual(
             state.final_answer_tokens,
-            len("<tool_call>") + 2,
+            1 + 2,
         )
 
     async def test_empty_logprobs_fail_open_after_first_probe(self):

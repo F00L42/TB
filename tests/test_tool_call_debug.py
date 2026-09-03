@@ -648,6 +648,145 @@ class ToolCallReplayTests(unittest.TestCase):
         self.assertEqual(
             analysis["controller_passthrough_violation_sequences"], [])
 
+    def test_analysis_accepts_token_only_tool_boundary_contract(self) -> None:
+        summary = {
+            "client_request_id": "r",
+            "server_request_id": "r",
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": [],
+        }
+        common = {
+            "schema": 1,
+            "source": "controller_pre_parser",
+            "completion_epoch": 1,
+            "boundary_stop_mode": "token",
+            "reasoning_protocol_adapter": "qwen3",
+            "reasoning_protocol_bindings": {
+                "tokenizer_class": "tokenizers.QwenTokenizer",
+                "reasoning_parser_class": "reasoning.Qwen3ReasoningParser",
+                "response_parser_class": "parser.Qwen3Parser",
+                "tool_parser_class": "tools.Qwen3CoderToolParser",
+            },
+            "reasoning_protocol_boundary_token_ids": {
+                "think_end": 248069,
+                "tool_call": 248058,
+            },
+            "configured_stop_token_ids": [77, 248069, 248058],
+            "configured_stop_strings": ["USER_STOP"],
+            "include_stop_str_in_output": False,
+            "terminal_flush": False,
+        }
+        records = [
+            {
+                **common,
+                "event": "delta",
+                "phase": "initial_think",
+                "sequence": 1,
+                "controller_state": "thinking",
+                "next_state": "free_final_answer",
+                "reasoning_boundary": "tool_call",
+                "raw_text": "",
+                "forwarded_text": "",
+                "token_ids": [248058],
+                "forwarded_token_ids": [248058],
+                "source_stop_reason": 248058,
+                "raw_text_sha256": "text",
+                "forwarded_text_sha256": "text",
+                "source_token_ids_sha256": "ids",
+                "forwarded_token_ids_sha256": "ids",
+            },
+            {
+                **common,
+                "event": "final_terminal_passthrough",
+                "phase": "final_answer",
+                "sequence": 2,
+                "reasoning_boundary": "tool_call",
+                "raw_text": "",
+                "forwarded_text": "",
+                "token_ids": [],
+                "forwarded_token_ids": [],
+                "raw_text_sha256": "terminal-text",
+                "forwarded_text_sha256": "terminal-text",
+                "source_token_ids_sha256": "terminal-ids",
+                "forwarded_token_ids_sha256": "terminal-ids",
+                "source_finish_reason": "stop",
+                "forwarded_finish_reason": "stop",
+                "source_stop_reason": "eos",
+                "forwarded_stop_reason": "eos",
+                "raw_finished": True,
+                "forwarded_finished": True,
+                "terminal_origin": "source",
+                "final_terminal_passthrough": True,
+                "synthetic_terminal": False,
+            },
+        ]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(analysis["diagnosis"], "pass")
+        self.assertFalse(analysis["raw_has_tool_call_start_text"])
+        self.assertTrue(analysis["raw_has_tool_call_start_token"])
+        self.assertEqual(analysis["token_stop_contract_record_count"], 2)
+        self.assertEqual(
+            analysis["token_stop_contract_violation_sequences"], [])
+        self.assertEqual(
+            analysis["boundary_token_contract_violation_sequences"], [])
+
+    def test_analysis_rejects_controller_string_boundary_in_token_mode(
+        self,
+    ) -> None:
+        summary = {
+            "variant": "dtb",
+            "has_tool_call": True,
+            "anomaly_reasons": [],
+        }
+        records = [{
+            "schema": 2,
+            "event": "delta",
+            "phase": "initial_think",
+            "sequence": 1,
+            "completion_epoch": 1,
+            "controller_state": "thinking",
+            "next_state": "free_final_answer",
+            "reasoning_boundary": "tool_call",
+            "boundary_stop_mode": "token",
+            "reasoning_protocol_adapter": "qwen3",
+            "reasoning_protocol_bindings": {
+                "tokenizer_class": "tokenizers.QwenTokenizer",
+                "reasoning_parser_class": "reasoning.Qwen3ReasoningParser",
+                "response_parser_class": "parser.Qwen3Parser",
+                "tool_parser_class": "tools.Qwen3CoderToolParser",
+            },
+            "reasoning_protocol_boundary_token_ids": {
+                "think_end": 248069,
+                "tool_call": 248058,
+            },
+            "configured_stop_token_ids": [248069, 248058],
+            "configured_stop_strings": ["</think>"],
+            "include_stop_str_in_output": False,
+            "raw_text": "",
+            "token_ids": [248058],
+            "forwarded_token_ids": [248058],
+            "source_stop_reason": 248058,
+        }, {
+            "schema": 2,
+            "event": "terminal_flush",
+            "phase": "final_answer",
+            "sequence": 2,
+            "completion_epoch": 1,
+            "terminal_flush": True,
+        }]
+
+        analysis = classify(summary, records)
+
+        self.assertEqual(
+            analysis["diagnosis"],
+            "controller_token_boundary_contract_failure",
+        )
+        self.assertEqual(
+            analysis["token_stop_contract_violation_sequences"], [1])
+
     def test_analysis_checks_production_schema_one_delta_digests(self) -> None:
         summary = {
             "client_request_id": "r",

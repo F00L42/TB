@@ -13,7 +13,6 @@ from dtb.reasoning.confidence_gates import (
 from dtb.reasoning.request_context import DtbRequestContext
 from dtb.reasoning.parser_boundary import (
     THINK_END_TAG,
-    TOOL_CALL_START_TAG,
     align_stop_boundary_delta,
     configure_thinking_stop,
     detect_reasoning_boundary,
@@ -33,9 +32,13 @@ if TYPE_CHECKING:
     from vllm.outputs import RequestOutput
 
 
-GUIDED_FINAL_PROMPT_V1 = (
+GUIDED_FINAL_CUE_V1 = (
     "Considering the limited time by the user, I have to give the solution "
-    "based on the thinking directly now.\n</think>\n\n"
+    "based on the thinking directly now.\n"
+)
+GUIDED_FINAL_SEPARATOR = "\n\n"
+GUIDED_FINAL_PROMPT_V1 = (
+    GUIDED_FINAL_CUE_V1 + THINK_END_TAG + GUIDED_FINAL_SEPARATOR
 )
 # Compatibility alias for callers that still use the former reason-specific name.
 BUDGET_EXHAUSTED_FINAL_PROMPT = GUIDED_FINAL_PROMPT_V1
@@ -54,6 +57,18 @@ def controller_final_suffix(
         FinalAnswerReason.BUDGET_EXHAUSTED,
     }:
         return GUIDED_FINAL_PROMPT_V1
+    return None
+
+
+def controller_final_cue(
+    reason: FinalAnswerReason,
+) -> str | None:
+    """Return the cue text without embedding a reasoning boundary marker."""
+    if reason in {
+        FinalAnswerReason.CONFIDENCE_ACCEPTED,
+        FinalAnswerReason.BUDGET_EXHAUSTED,
+    }:
+        return GUIDED_FINAL_CUE_V1
     return None
 
 
@@ -324,8 +339,6 @@ class _BaseState(ABC):
         async for result in gen:
             output = result.outputs[0]
             chunk_text = output.text or ""
-            if THINK_END_TAG in chunk_text:
-                chunk_text = chunk_text.split(THINK_END_TAG, 1)[0]
             chunk_token_ids = list(output.token_ids or [])
             chunk_logprobs = _aligned_logprobs(
                 output.logprobs, len(chunk_token_ids))
@@ -377,12 +390,23 @@ class _ThinkingState(_BaseState):
                 context, FinalAnswerReason.BUDGET_EXHAUSTED)
         remaining_budget = _BaseState.remaining_think_budget(context)
         remaining_context = _BaseState.remaining_context(context)
-        forced_final_reserve = len(context.encode_prompt_suffix(
-            GUIDED_FINAL_PROMPT_V1)) + 1
+        if getattr(context.request, "stream", False):
+            protocol = context.require_reasoning_protocol()
+            forced_final_reserve = (
+                len(context.encode_prompt_suffix(GUIDED_FINAL_CUE_V1))
+                + len(protocol.forced_close_token_ids)
+                + len(context.encode_prompt_suffix(GUIDED_FINAL_SEPARATOR))
+                + 1
+            )
+            forced_boundary_tokens = len(protocol.forced_close_token_ids)
+        else:
+            forced_final_reserve = len(context.encode_prompt_suffix(
+                GUIDED_FINAL_PROMPT_V1)) + 1
+            forced_boundary_tokens = len(context.encode_prompt_suffix(
+                THINK_END_TAG
+            ))
         available_think_context = remaining_context - forced_final_reserve
-        forced_completion_reserve = (
-            len(context.encode_prompt_suffix(THINK_END_TAG)) + 1
-        )
+        forced_completion_reserve = forced_boundary_tokens + 1
         available_think_completion = (
             _BaseState.remaining_completion_budget(context)
             - forced_completion_reserve
@@ -421,7 +445,7 @@ class _ThinkingState(_BaseState):
         prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
         params = context.request.to_sampling_params(
             maximum, context.default_sampling_params)
-        configure_thinking_stop(params)
+        configure_thinking_stop(params, context)
         output_kind = getattr(params, "output_kind", None)
         child_request_id = _BaseState.next_engine_request_id(
             context, phase)
@@ -569,8 +593,6 @@ class _ConfidenceProbeState(_BaseState):
         params = context.request.to_sampling_params(
             trial_limit, context.default_sampling_params)
         params.logprobs = 1
-        params.stop = [THINK_END_TAG]
-        params.include_stop_str_in_output = False
         output_kind = getattr(params, "output_kind", None)
         child_request_id = _BaseState.next_engine_request_id(
             context, "confidence_probe")
@@ -677,7 +699,18 @@ class _FinalAnswerState(_BaseState):
                 raise RuntimeError(
                     "model boundary final answer requires closed reasoning")
             await emit_reasoning_boundary_once(context)
-            context.close_reasoning(prompt_suffix)
+            if getattr(context.request, "stream", False):
+                prompt_cue = controller_final_cue(reason)
+                if prompt_cue is None:
+                    raise RuntimeError(
+                        "controller-forced final answer requires a prompt cue"
+                    )
+                context.close_reasoning(
+                    prompt_cue,
+                    GUIDED_FINAL_SEPARATOR,
+                )
+            else:
+                context.close_reasoning(prompt_suffix)
         elif not context.reasoning_boundary_emitted:
             raise RuntimeError(
                 "closed reasoning has no parser-visible boundary")
@@ -687,7 +720,11 @@ class _FinalAnswerState(_BaseState):
         pending_boundary_tokens = (
             0
             if context.reasoning_boundary_emitted
-            else len(context.encode_prompt_suffix(THINK_END_TAG))
+            else (
+                len(context.require_reasoning_protocol().forced_close_token_ids)
+                if getattr(context.request, "stream", False)
+                else len(context.encode_prompt_suffix(THINK_END_TAG))
+            )
         )
         external_remaining = max(
             0,
