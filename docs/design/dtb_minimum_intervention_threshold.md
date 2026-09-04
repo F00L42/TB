@@ -17,6 +17,51 @@ run-05 的实测背景见 `docs/log/perf/agent_run05/RESULT.md`：完整 9 场�
 `192.7 s`，相当于 Vanilla LLM E2E 的 8.99%。因此，消除短请求 handoff 是必要优化，但它只能
 解释 run-05 DTB/Vanilla 总差距的一部分，不能代替后续长请求净收益验证。
 
+### 1.1 从场景级请求到 Agent 任务的分布迁移
+
+此前 DTB 的场景级测试集以独立请求为实验单元，每个分类内部的 reasoning 长度覆盖相对均匀，
+中长 reasoning 样本占有足够权重。固定在首个检查点介入时，长请求节省不会被大量短请求的控制器
+成本迅速稀释，因此可以在逐场景请求 E2E 上观察到收益。
+
+直接把同一套 always-on 策略开启在 Agent 执行场景后，实验对象已经改变。一个 Agent 任务由多轮
+reasoning→content/tool→tool result 反馈组成；绝大多数轮次只需很短的动作判断，只有少数规划、
+排障或收敛轮产生超长 reasoning，形成极端长尾。run-05 中 97.01% 的 Vanilla 请求不超过 850
+token，正是这一分布迁移的实测表现。
+
+| 维度 | 原场景级测试集 | Agent 多轮执行场景 |
+| --- | --- | --- |
+| 实验单元 | 独立、已分类的单请求 | 包含多次模型与工具交互的完整任务 |
+| 分类内 reasoning 分布 | 各长度段相对均匀 | 大量极短轮次与少数超长轮次混合 |
+| DTB 成本暴露 | 中长请求有足够占比摊薄控制成本 | short-path 税被每个短轮次重复支付 |
+| 输出反馈 | 单请求输出后结束 | 一个 tool/action 会改变工作区和所有后续 prompt |
+| 原先主要指标 | 质量门后的逐请求/逐场景 E2E | 质量门后的完整 Agent task wall |
+
+因此，Agent 场景测不到端到端优化的根本背景不是“长 reasoning 不可压缩”，而是**测试场景和
+reasoning 分布发生了变化**：少数长尾收益需要覆盖绝大多数短请求的固定负优化，并且任一被介入
+轮次还可能改变后续工具轨迹。最低介入值首先解决其中的 short-path 税和短轨迹扰动，再为只在
+长尾上衡量 DTB 净收益建立可用前提。
+
+### 1.2 最终目标与指标层级
+
+本设计的最终目标固定为：
+
+> 在 Agent 执行场景中，保证系统可用性和任务正确率不低于同实验身份 Vanilla，并使完整任务的
+> 端到端时延下降。
+
+成功标准不是单独满足“reasoning token 变少”“某个长请求更快”或“原场景级测试集仍有收益”。
+指标按以下层级裁决：
+
+1. **发布硬门：**工具协议 hard failure 为 0、每个任务均生成评测报告、严格正确率不低于
+   Vanilla；
+2. **最终主指标：**LightCode/Agent 任务的 `evaluation_results.json` 中逐任务
+   `start_time → end_time` paired wall，以及任务等权和累计结果；
+3. **因果辅指标：**proxy 累计 LLM E2E、外部 Agent 轮次、首次轨迹分叉、工具/编译/测试 wall；
+4. **机制诊断指标：**单请求 TTFT/E2E、child 数、visible/hidden token、phase wall、abort 和
+   threshold overshoot。
+
+旧场景级测试集继续承担算法能力与回归检查，但不再决定 Agent 版本是否获得性能收益。即使某候选
+在旧场景集保持正收益，只要完整 Agent task wall 没有改善，就没有达成本设计目标。
+
 ## 2. 结论
 
 方案可行，推荐采用**同子请求观察、自然短请求直通、到阈值后内部取消**的实现：
@@ -40,6 +85,8 @@ run-05 的实测背景见 `docs/log/perf/agent_run05/RESULT.md`：完整 9 场�
 6. 第一版把现有 `budget.check_length` 直接解释为最低介入值，不增加第二个数值旋钮。
    `fixed_check_length` 和 scene 的 `check_length` 仍是实验与自动配置入口；只新增一个显式的
    `intervention_mode=eager|deferred` 行为开关。
+7. request-level replay 只负责证明短路径无负优化、长路径存在净收益候选；阈值和策略最终必须按
+   完整 Agent task wall 排名，不能沿用原场景级请求 E2E 作为发布结论。
 
 这个方案达到的是**原生等价的同子请求直通**，不是严格意义的 serving 原生 bypass。DTB 仍需在
 请求开始前构造上下文、执行当前 budget decision，并让输出经过一个轻量 observer/queue；因为是否
@@ -55,7 +102,7 @@ run-05 的实测背景见 `docs/log/perf/agent_run05/RESULT.md`：完整 9 场�
 - 初始生成的同子请求直通、阈值触发、内部 abort 和现有 DTB 状态机衔接；
 - reasoning/content/tool parser 的 token/text 连续性；
 - completion 总额度、取消、错误和唯一 terminal 契约；
-- phase telemetry、stream audit、paired replay 和 LightCode 验收。
+- phase telemetry、stream audit、paired replay、旧场景集回归和 Agent/LightCode 任务级验收。
 
 ### 3.2 非目标
 
@@ -486,6 +533,110 @@ source_terminal_passthrough_count
 frontend 接收的 in-flight kernel 工作无法从 completion usage 推出，应把它作为容量侧待测成本，
 不能记为 0。
 
+### 9.1 两层请求数与任务时延分解
+
+Agent 场景必须区分两种“请求数”：
+
+- `N_external_turn`：Agent 经 proxy 发起的 chat/completions 请求，即一次 reasoning→content/tool
+  决策；run-05 的 `272 → 404` 属于这一层；
+- `N_engine_child`：DTB 为一次外部请求启动的 observation/think/probe/final engine child；hidden
+  probe 和 fresh-final 属于这一层，proxy 不会把它们计成新的 Agent 轮次。
+
+因此内部 probe 不会直接把 272 变成 404。它只能改变本轮 parser-facing 输出、工具选择、参数或
+代码状态，再由 Agent/工具反馈形成新的外部请求。任务级差异应按下式审计：
+
+```text
+ΔT_task
+= ΔN_external_turn × 后续轮次成本
++ 相同外部轮次上的 ΔT_model
++ ΔT_tool / compile / test / evaluation
++ error、retry、平台等待差异
+
+触发轮的 ΔT_model
+= - 被消除的 visible reasoning decode
++ hidden probe decode
++ continuation/final child queue、prefill、TTFT
++ abort、MTP overshoot、controller CPU
+```
+
+每增加一个后期 Agent 轮次，还会携带更长的 messages，因此不能只按固定单轮均值估算；新增轮次会
+同时增加 prompt prefill，并可能继续产生工具与下一轮请求，形成反馈放大。
+
+### 9.2 run-05 外部轮次放大的原因分类
+
+排除 case 36 后，run-05 外部请求增加 132 个（+48.53%），但不是均匀发生：case 28 的请求从
+41 增至 127，case 35 从 26 增至 82；两者合计贡献 8-task LLM E2E 增量的 78.5%。两侧实际启动的
+Agent session 反而是 Vanilla 27、DTB 25，因此当前证据不支持“DTB 普遍生成了更多子 Agent”；
+主要增量来自少数主 Agent 循环变长，case 28 的主 Agent 请求为 32→118，case 35 为 18→73。
+
+可能原因必须分层，不得全部归给 DTB：
+
+| 原因层 | 机制 | run-05 证据与边界 |
+| --- | --- | --- |
+| DTB 输出轨迹扰动 | short boundary 后停止并重新采样、forced cue、长链提前结束或 probe 裁决会改变下一个 tool/content | 源码确定存在这些改变；但缺少固定 seed 的整任务反事实，不能由总请求数单独证明因果 |
+| 规划粒度变小 | reasoning 被压缩后，模型可能从“先形成完整计划再执行”变为“执行一步再观察”，增加 read/bash/edit/check 轮次 | 合理假设；需比较首次触发轮前后的动作粒度和 tool 序列验证 |
+| 输出质量导致返工 | 错误编辑或不完整工具参数引发 compile/test 失败，再进入诊断、修改、重试 | case 2 有真实 DTB 代码回归；case 28 存在大量反复修复，但其起因包含基线编译问题，不能全归 DTB |
+| 成功路径比失败路径做了更多有效工作 | 一侧提前失败，另一侧继续应用 test patch、编译、执行 DT 和写报告；请求更多不等于效率更差 | case 35 的 DTB 编译并通过 36/36 测试，Vanilla 提前失败，是明确样例 |
+| 工具/环境反馈放大 | 首个不同动作改变工作区；stash/pop、patch 失败、依赖不可达或命令位置错误会产生新的上下文和修复循环 | case 28 出现基线编译问题、stash 后修改丢失和手工 test patch；属于实测轨迹，DTB 因果待定 |
+| 原生采样随机性 | 相同 prompt 也可能得到不同 reasoning 长度、下一工具和完成策略 | 同一归档 request body 的 30 次 Vanilla replay 已观察到 reasoning 大幅波动，部分输入的下一工具也变化 |
+| 协议 hard failure | malformed/missing tool call 或无 terminal 会触发重试、等待或缺报告 | case 36 属于已知 stop 碰撞；token-stop/parser 门禁通过前必须单列，不能当性能噪声 |
+| 评测流程不一致 | test patch、测试命令、依赖状态或覆盖范围不同会改变必须执行的工作量 | case 29 的 87/87 与 8/8 表明即使等级相同，工作量也未必相同 |
+
+其中最低介入值主要消除第一行中**短请求的 stop+resample**。它不会自动修复长请求上的规划改变、
+工具环境问题、成功/失败工作量不对称或原生随机性。
+
+### 9.3 最低介入值实装后的剩余净加速风险
+
+即使 deferred short path 完全正确，Agent E2E 仍可能没有加速：
+
+1. **可优化份额太小。** 阈值 850 时，run-05 Vanilla 只有 2.99% 请求会触发，它们占 LLM E2E
+   10.35%。即便把这些请求的整个 LLM 时间降为 0，理论上也只能改善约 10.35% 的 LLM E2E；实际
+   只能省其中的冗余 reasoning decode，prompt prefill、必要 reasoning、final/tool 输出仍存在，真实
+   上限远低于此值。映射到包含工具和评测的 task wall，上限更低。
+2. **越过阈值不等于存在足够长的可压缩尾部。** 模型可能在阈值后几个 token 就自然结束；此时
+   abort、probe 和 fresh-final 的成本大于 `L - threshold` 的 decode 节省。应按阈值后的原生剩余
+   reasoning 长度分桶，而不是只看是否触发。
+3. **hidden work 抵消 visible token 节省。** confidence probe、失败 probe 后的 stride、final child
+   以及它们的 queue/prefill/TTFT 都是真实串行成本，但 response completion usage 不含 hidden
+   probe。
+4. **abort 不是即时停止 NPU。** Scheduler 会结束 request 生命周期，但已提交的 kernel 可能完成；
+   MTP delta overshoot 和迟到计算会消耗容量。单并发 E2E 可能不明显，服务负载下会反映为其他
+   请求 queue 增长。
+5. **长请求仍会改变 Agent 策略。** deferred 只保证首个 boundary 在阈值前的请求原生等价；任何
+   一个被触发的长请求都可能改变下一工具和工作区，随后放大为更多外部轮次。一次触发足以使整条
+   task 轨迹与 Vanilla 分叉。
+6. **更短 reasoning 可能换来更多动作。** 若控制器把全局计划压成局部决策，每轮更快但轮次更多；
+   后期 prompt 越来越长，额外 prefill 和工具 wall 可能超过单轮节省。
+7. **confidence 参数处于两难区。** 阈值或置信度过保守会多次 probe、几乎不压缩；过激则可能降低
+   代码/tool 质量，产生返工或提前失败。质量非劣是时延排名的前置条件。
+8. **最终输出可能变长。** reasoning 缩短不保证 content、tool arguments 或后续 conversation
+   变短；run-05 排除 case 36 后 completion token 仍增加 17.03%，本地 reasoning token 增加
+   28.33%，主要由外部轮次增长驱动。
+9. **短路径仍有 residual wrapper tax。** budget decision、observer token 检查、result queue 和
+   Python 调度仍存在。若它们在 97% 短请求上的累计成本可测，需要第二阶段 lazy budget resolve
+   或更薄的直通生成器。
+10. **实验方差可能淹没有限收益。** sampling/seed、Automatic Prefix Caching、服务负载、任务顺序、
+    依赖可达性和工具返回都会改变结果；9 个任务单轮 A/B 无法稳定识别一个百分点量级的收益。
+11. **观测模式本身会改变时延。** stream-audit/phase run 只能做归属和机制账本；正式性能排名必须
+    使用相同 `OBSERVABILITY.mode=off` 进程。
+
+### 9.4 轨迹首分叉审计
+
+任务级验证不应只比较最终请求数。Vanilla/deferred 两条轨迹应按 root prompt、Agent role、
+messages/tool-result hash 和 turn index 找到**首个不可配对的外部轮次**，并记录此前每轮是否触发
+threshold：
+
+| 首分叉位置 | 首要解释 |
+| --- | --- |
+| 首次 threshold trigger 之前 | short path 非原生等价、seed/sampling 未锁定、工具结果或环境不同；不能归为长链 DTB 收益/损失 |
+| 恰在 threshold-triggered 轮 | DTB 介入改变了 content/tool/action，是控制器因果候选 |
+| trigger 后且前一工具结果已不同 | 下游反馈放大；需把新增轮次分类为有效进展、验证、返工或故障恢复 |
+| 全程无 trigger 但轨迹不同 | deferred 实现未达到原生等价，或实验身份/随机性未受控 |
+
+每个 task 至少输出 `first_divergence_turn`、`trigger_count_before_divergence`、两侧 tool name/arguments
+hash、tool result hash、workspace checkpoint、后续新增轮次分类。这样才能回答“请求数增加是否由
+DTB 造成”，并把机制延迟与 Agent 策略反馈分开。
+
 ## 10. 实现改动面
 
 首版预计修改：
@@ -569,7 +720,7 @@ tool XML 完整、arguments JSON 合法、hard failure = 0
 若失败，先按 controller decision、queue hop、observer CPU 和 telemetry 分解，再决定是否做 lazy
 budget resolution。
 
-### 11.3 阈值搜索与 LightCode
+### 11.3 阈值搜索、场景回归与 Agent E2E
 
 正确性通过后再比较 256、512、850 三个阈值：
 
@@ -591,10 +742,24 @@ budget resolution。
 - final child 首 token
 ```
 
-最终执行同一实验身份的 9 场景 Vanilla/DTB 单并发 LightCode：先要求 9/9 评测报告完整、工具
-协议 hard failure 为 0，再比较字面量 `True` 的 Judge 正确率、任务 wall、代理侧 LLM E2E、请求级
-P50/P95 和 phase 总模型工作量。已知 stop 缺陷不能再从统计中临时排除，因为 token-stop/parser
-patch 是 deferred mode 的启用前置条件。
+验证分三层，不能由前一层直接替代后一层：
+
+1. **请求级机制筛选：**用相同 prompt 的 paired replay 排除 short path 仍变慢、长 path 没有
+   `长尾节省 - 新控制成本 > 0` 的阈值；
+2. **原场景集回归：**确认既有逐分类质量和可用性没有回归，用于证明最低介入值没有破坏已验证的
+   DTB 能力；该层的 E2E 只作兼容证据，不用于选择 Agent 发布版本；
+3. **Agent 最终验收：**执行同一实验身份的 9 场景 Vanilla/DTB 单并发 LightCode，先要求每轮
+   9/9 评测报告完整、工具协议 hard failure 为 0、字面量 `True` 的 Judge 正确率不低于 Vanilla，
+   再以逐任务 `start_time → end_time` paired wall、任务等权结果和累计 wall 判断是否加速。
+
+Agent 最终验收至少执行两轮相反 variant 顺序；若 task wall 波动仍足以改变结论，则增加重复而不是
+用请求级 token 收益替代任务级结果。同时报告 proxy 累计 LLM E2E、外部请求数、首次轨迹分叉、
+请求级 P50/P95 和 phase 总模型工作量，用于解释主指标，不得把它们提升为主指标。
+
+已知 stop 缺陷不能再从统计中临时排除，因为 token-stop/parser patch 是 deferred mode 的启用
+前置条件。最终只有“质量/完整性门通过且 Agent task wall 下降”的阈值能够进入 Agent 场景配置；
+如果 request-level replay 有收益但 Agent task wall 不降，应继续分析触发后的规划粒度与轨迹放大，
+不能宣称最低介入值已经完成性能目标。
 
 ## 12. 实施前需要确认的设计点
 
@@ -618,3 +783,5 @@ generator 生命周期、native terminal passthrough、账本以及 replay 门�
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
 | 2026-09-03 | 初稿：复用 `check_length` 作为最低介入值，设计同 child 原生直通、delta 软阈值和 `aclose()` 内部 abort | run-05 显示 97.01% 请求短于 850，当前 stop + fresh-final 对短请求是系统性负优化 |
+| 2026-09-03 | 增加 Agent 外部轮次/DTB engine child 两层请求模型、run-05 轨迹放大归因、实装后的剩余净加速风险和首分叉审计 | 最低介入值只能消除短请求 handoff，不能自动保证任务级请求数和 E2E 降低 |
+| 2026-09-03 | 补充场景级均匀长度分布到 Agent 极端长尾分布的实验对象迁移；把 Agent task wall 明确为最终主指标，旧场景集降为能力回归 | 直接沿用场景级请求结论无法证明 Agent 多轮执行端到端优化 |

@@ -55,6 +55,10 @@ explicit-end `248069` 与 tool-start `248058` 原子启用，同时修改 Qwen s
 8. continuation 主 prompt 应采用 **token-authoritative** 表示：`prompt_token_ids` 是唯一可变
    事实源，初始 `prompt_text` 只作为路由/诊断的不可变可选视图，不再随 thinking、cue 和
    boundary 反复拼接。该调整与 token-stop 兼容，但应作为独立优化阶段实施和计量。
+9. `915bec9` 的服务器回放进一步暴露了 explicit-end 混合 delta 的 reasoning 保真缺陷。
+   新增独立 `qwen3_reasoning_parser.patch`，仅保留“末尾 end ID 存在、marker text 已剥离”
+   时的正常 reasoning 前缀；不修改 include-stop 默认值、implicit tool 边界或 merge 行为。
+   详细决策见 3.3.1；当前流式部署需同时具备该补丁。
 
 因此，这是一个**流式边界与 parser 的原子正确性重构**，不是修复 final-answer 截断的替代方案，
 也不应被宣称为独立的显著时延优化。当前对齐器已经缓解字符串 stop 的已知后缀问题；迁移的
@@ -164,6 +168,81 @@ reasoning/tool parser 之后，只能证明 post-parser 外部输出不含 marke
 stop_reason == 248069  => output.text 一定以 </think> 结束
 stop_reason == 248058  => output.text 一定以 <tool_call> 结束
 ```
+
+#### 3.3.1 terminal reasoning prefix 的保真修复（2026-09-04）
+
+修改起点仍是本文原生 parser 等价目标；本节是 `915bec9` 上传的 vLLM 0.23.0 +
+vLLM-Ascend 0.23.0 / Qwen3.6 streaming 证据所要求的补充，不改变初始设计时间线。
+
+**实测**：60 个 explicit-end source delta 中，13 个 text 为空，47 个带有边界前的普通正文，
+但均不含 `</think>` marker 文本。47 个 delta 的正文在公共 reasoning 中丢失，共 268 字符、
+117 个非边界 token。controller raw/forwarded 一致；未修改的原生 Qwen reasoner 重放可复现。
+这与 tool-call 中断/缺参是独立问题，没有证据证明二者存在因果关系。
+
+本节把这种输入称为 **terminal reasoning prefix**：其 text 是正常解码的 reasoning 前缀，
+其 delta IDs 末尾另有已被 detokenizer 从 text 中剥离的 end ID，例如：
+
+```text
+text = " different approach.\n"
+ids  = [2086, 5313, 13, 198, 248069]
+```
+
+它不是损坏的输入。`include_stop_str_in_output=False` 的原生 detokenizer 有意保留 stop ID、
+跳过其文本解码。停止位置、token 账本与公开文本是三个不同的契约。
+
+两种方法的取舍如下：
+
+| 方法 | 能解决什么 | 副作用与裁决 |
+| --- | --- | --- |
+| include-stop=True | 让 terminal stop token 参与解码；当前 tokenizer 若如用户确认是 non-special added token，marker 会进入 text，由原 parser 正常消费 | 不改变 token-stop 为字符串 stop，但改变同一请求所有 stop 的文本可见性；还受 skip-special/tokenizer 影响。仅用于隔离 workaround/验证，不改生产默认值或强制覆盖调用者参数 |
+| reasoning parser 的末尾 ID 特判 | 在合法 token/text mismatch 下保留已解码的 prefix | 不需要改变任何采样或 token 账本；仅增加一个受保护分支。采用此方法作为正式修复 |
+
+即使只在 DTB thinking child 强制 include-stop=True，也会影响该 child 继承的用户 stop；
+该字段不是 per-token/per-owner 配置。不要为本问题设置 `skip_special_tokens=False`，否则会
+扩大到其他控制 token 的可见性。当前 tokenizer 的 added-token 属性来自用户确认，不推广到
+其他模型 revision；部署时可记录 `added_tokens_decoder[id].special` 和 decode 结果补证。
+若做 include-stop=True 对照，应从请求参数进入 SamplingParams 构造，不要仅在 post-init 后
+修改 bool 而遗漏与用户字符串 stop 有关的 `output_text_buffer_length` 一致性。
+
+**最小实现**位于 Qwen reasoning parser，而不是 controller 或 detokenizer：
+
+1. 保留现有“end ID 在 delta 中且 marker text 可见”的分支，继续按文本切分 reasoning/content。
+2. 只有 marker text 不存在、且 `delta_token_ids[-1] == self.end_token_id` 时，将非空
+   `delta_text` 原样返回为 `DeltaMessage.reasoning`；空 text 继续返回 `None`。
+3. end ID 不在末尾时不能从 IDs 推断 text 分割点，保留现有行为，不将全部 text 当 reasoning。
+4. 不新增状态、不改函数接口；不改 Qwen implicit `<tool_call>` 分支、unified merge/overwrite
+   逻辑、非流式 parser 或 EngineCore/Scheduler。正常 `reasoning + end + content/tool` 的
+   speculative delta 仍走原分支。
+
+“不得泄漏 marker”指结构 token 的可见文本，不等于禁止 reasoning 引用由普通 token 拼成的
+同名字面量 `</think>`；后者仍是应保留的 payload，不能用全局字符串 grep 为零作验收。
+
+这个 guard 是有限输入契约，不是对任意 text/token 暂时不同步的通用修复。parser 本身不接收
+stop_reason；判据只使用本轮末尾 ID 和 marker 缺失，不假定拿到了 EngineCore terminal 标志。
+
+一致性与验证：
+
+| 契约 | 验证方式/边界 |
+| --- | --- |
+| stop 位置、stop ID、usage/stop_reason 不变 | 补丁不改这些生产代码或参数；detokenizer→parser 测试核对 IDs 不变。真实 HTTP usage/stop_reason 仍须服务器复验 |
+| include=False 的普通 prefix 不丢、不重、不泄漏 marker | 直接用 `encode(prefix)+[end_id]` 与不含 marker 的 text 构造 regression；空 prefix 也覆盖 |
+| include=True 的 marker 正常消费 | 独立 fixture 验证公开 reasoning/content 无新增 marker |
+| marker-present、implicit tool、speculative delta 不回归 | 未修改源码对照 + 新增 direct tests；不修改已有 tool 行为 |
+| unified reasoning 结束后不能丢失本轮 prefix | 原生 DelegatingParser 回归及 BaseIncrementalDetokenizer.update/get_next_output_text 组合测试 |
+| 真实记录中的正文恢复且工具内容不变 | 60 条 real text/IDs 经 reasoner→unified→tool 完整链路离线重放 |
+
+实现制品为 `patches/vllm/v0.23.0/qwen3_reasoning_parser.patch`，同时附带上游
+`tests/reasoning/test_qwen3_reasoning_parser.py` 的回归测试。该补丁与两个既有 patch 文件
+独立，已有 `915bec9` 部署只增量应用它，无需重做 tool parser 修复。
+
+**本地实测**：84 个无模型检查全部通过；未打补丁的负对照有 5 个合成/组合检查失败及
+47 个录制请求失败，10 个原路径对照全部不变。恢复全部 268 字符，60 个请求的 tool name、
+arguments、content 与原公共结果不变。这里的本地 gate 使用依赖/字符 tokenizer stub，
+真实记录保留原 token IDs；不是完整 vLLM/NPU/HTTP 测试，也不是完整原生 pytest 已通过。
+证据见 `docs/log/perf/agent_tool_call_run04_paired_replay/run_server_04_token_stop/REASONING_TAIL_FIX.md`。
+
+新的服务器结果可通过 `reasoning_tail_fidelity.py --require-public-fidelity` 同时校验真实
+公共 reasoning；仅对旧 raw 应用新 parser 的离线通过不能冒充原服务器已经恢复正文。
 
 因此，**不得把“text 中找到 marker”设为边界成立条件，也不得为了表面对齐而向 source delta
 补回 marker 文本。** parser-facing 的事实源是活动 reasoning parser 的协议、`stop_reason` 和
@@ -524,7 +603,9 @@ phase telemetry，不能静默退回每请求 decode。
 
 `248058` 被 stop-token scheduler 接受后，DTB 清除 thinking child terminal、保留 token delta，
 再从以 `248058` 结尾的 continuation prompt 启动 final child。按当前 vLLM 源码和请求默认
-`include_stop_str_in_output=False`，pre-parser boundary 预期是空 text；若实际 child 参数为 `True`
+`include_stop_str_in_output=False`，纯 boundary delta 预期是空 text；若它还包含边界前正文，
+text 不为空，不能把整个 delta 视为纯 marker（本次 explicit-end 修复不改该 implicit 分支）。
+若实际 child 参数为 `True`
 或目标 tokenizer 行为不同，也可能包含 marker。以下序列描述需要兼容的 token-only 分支：
 
 ```mermaid
@@ -739,6 +820,11 @@ request/unified/tool parser 的类型、边界字段与流式状态转换，但�
 
 ### 7.2.2 服务器执行命令
 
+以下保留首次实验的示例命名。reasoning-tail 修复复验应全程使用新的 run ID（例如
+`run04-reasoning-tail-01`）和目录（例如 `run_server_05_reasoning_tail`），同步替换白名单；
+禁止覆盖已经上传的 `run_server_04_token_stop`。旧部署只需增量应用新 reasoning patch，
+见 `patches/vllm/v0.23.0/README.md`；下列 clean-checkout 流程用于完整新部署。
+
 以下命令使用 run04 的第 5、10 条真实上下文，每条 Vanilla/DTB 交替 30 次、单并发。`VLLM_ROOT`
 必须是实际服务将加载的 **clean v0.23.0 checkout**；若当前目录已应用旧 patch，应重新准备 clean
 checkout，不要在旧 patch 上强行叠加。服务启动命令必须复用上一轮完整模板，保持默认
@@ -783,10 +869,14 @@ git -C "$VLLM_ROOT" apply --check \
   "$TB_ROOT/patches/vllm/v0.23.0/dtb_serving.patch"
 git -C "$VLLM_ROOT" apply --check \
   "$TB_ROOT/patches/vllm/v0.23.0/qwen3_coder_parser.patch"
+git -C "$VLLM_ROOT" apply --check \
+  "$TB_ROOT/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch"
 git -C "$VLLM_ROOT" apply \
   "$TB_ROOT/patches/vllm/v0.23.0/dtb_serving.patch"
 git -C "$VLLM_ROOT" apply \
   "$TB_ROOT/patches/vllm/v0.23.0/qwen3_coder_parser.patch"
+git -C "$VLLM_ROOT" apply \
+  "$TB_ROOT/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch"
 git -C "$VLLM_ROOT" diff --check
 git -C "$VLLM_ROOT" diff --binary > "$RUN_DIR/applied_vllm.patch"
 
@@ -800,6 +890,7 @@ python -m pytest tests -q
 sha256sum \
   patches/vllm/v0.23.0/dtb_serving.patch \
   patches/vllm/v0.23.0/qwen3_coder_parser.patch \
+  patches/vllm/v0.23.0/qwen3_reasoning_parser.patch \
   "$RUN_DIR/applied_vllm.patch" \
   "$SERVER_START_SCRIPT" \
   "$DTB_CONFIG" \
@@ -893,6 +984,7 @@ import vllm
 import dtb.request_controller as controller_module
 from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
 from vllm.tool_parsers.qwen3coder_tool_parser import Qwen3CoderToolParser
+from vllm.reasoning.qwen3_reasoning_parser import Qwen3ReasoningParser
 
 print(f"vllm_version={vllm.__version__}")
 for dist in ("vllm-ascend", "torch", "torch-npu"):
@@ -902,6 +994,7 @@ for dist in ("vllm-ascend", "torch", "torch-npu"):
         print(f"{dist}_version=NOT_INSTALLED")
 for name, value in (
     ("parser", Qwen3CoderToolParser),
+    ("reasoning_parser", Qwen3ReasoningParser),
     ("serving", OpenAIServingChat),
     ("controller", controller_module),
 ):
@@ -912,6 +1005,10 @@ for name, value in (
 PY
 
 grep -F "parser_path=$VLLM_ROOT/vllm/tool_parsers/qwen3coder_tool_parser.py" \
+  "$RUN_DIR/runtime_identity.txt"
+grep -F "reasoning_parser_path=$VLLM_ROOT/vllm/reasoning/qwen3_reasoning_parser.py" \
+  "$RUN_DIR/runtime_identity.txt"
+grep -F "reasoning_parser_sha256=cdb64a46e7077ff6f2600ce02916cfbd4cdb5bb6f62937673013a68e6addea88" \
   "$RUN_DIR/runtime_identity.txt"
 grep -F "serving_path=$VLLM_ROOT/vllm/entrypoints/openai/chat_completion/serving.py" \
   "$RUN_DIR/runtime_identity.txt"
@@ -1074,6 +1171,7 @@ LightCode 端到端时延。
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-09-04 | 增加独立 Qwen terminal reasoning prefix 修复、两方案取舍与受保护分支；附直接输入契约/原生组合测试和 60 条完整 parser 链路重放，部署增加第三个 patch 与 reasoner hash | token-stop 正常生效时，原生 reasoner 把“marker 文本被剥离”误当作“整个 chunk 无正文”，丢失 47 次边界前 prefix；不改 include-stop 默认值、implicit tool 或 merge 行为 |
 | 2026-09-01 | 首版：确定仅迁移 thinking boundary，定义 token-stop 输出规范化、配置校验和 paired replay 门禁 | Qwen3.6 两个 reasoning marker 均为单 special token，且 string stop 已出现 speculative text/token 不一致 |
 | 2026-09-01 | 修订为 parser-backed 模型协议；禁止用 text marker 证明或补写边界；协议化 forced close | 公共 SSE 在 token stop 后不含 `</think>`；不同模型结束协议不固定 |
 | 2026-09-01 | 改为两阶段迁移：先 explicit-end 248069，tool-start 248058 等待 token-only parser 适配 | 当前 Qwen parser patch 通过 marker text 建立 tool span，不能消费空 text 的 tool-start boundary |

@@ -21,7 +21,7 @@
   `think_budget/README.md`；已删除源码镜像的历史说明归档见
   `docs/archive/think_budget_refactored_final/README.md`。
 - `patches/vllm/v0.23.0/`：唯一可部署的 vLLM patch 制品及应用说明；依次应用
-  `dtb_serving.patch`、`qwen3_coder_parser.patch`。
+  `dtb_serving.patch`、`qwen3_coder_parser.patch`、`qwen3_reasoning_parser.patch`。
 - `docs/log/`：端到端汇总、vLLM/vLLM-Ascend 服务日志和人工 profiling 结果。
 - `docs/debug/deer_performance_analysis.md`：当前性能诊断、优化优先级和服务器 profiling runbook。
 - `docs/design/think_budget_generalization_plan.md`：13 场景实验、数据提取、自动路由审计、

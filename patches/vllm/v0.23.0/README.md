@@ -4,7 +4,7 @@ This directory is the only deployable patch source for the DTB integration.
 These files are versioned contracts against the fixed upstream tree, not
 importable DTB implementations: the repository owns controller behavior under
 `dtb/`, while each patch contains only the minimal upstream protocol/serving or
-parser delta. Keeping both patches here avoids a second Python copy that could
+parser delta. Keeping the patches here avoids a second Python copy that could
 silently diverge from the applied vLLM code.
 Apply patches from the fixed upstream checkout in this order:
 
@@ -13,13 +13,17 @@ git apply --check \
   /path/to/TB/patches/vllm/v0.23.0/dtb_serving.patch
 git apply --check \
   /path/to/TB/patches/vllm/v0.23.0/qwen3_coder_parser.patch
+git apply --check \
+  /path/to/TB/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch
 git apply --whitespace=fix \
   /path/to/TB/patches/vllm/v0.23.0/dtb_serving.patch
 git apply --whitespace=fix \
   /path/to/TB/patches/vllm/v0.23.0/qwen3_coder_parser.patch
+git apply --whitespace=fix \
+  /path/to/TB/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch
 ```
 
-If either check fails, stop and reconcile the checkout/patch version. Do not
+If any check fails, stop and reconcile the checkout/patch version. Do not
 continue with `--reject`, because a partially applied serving/parser contract
 is not a valid DTB deployment.
 
@@ -40,8 +44,15 @@ is not a valid DTB deployment.
   intentional: arguments are emitted when `</function>` arrives rather than
   parameter by parameter; tool names may still be emitted as soon as the header
   is complete.
+- `qwen3_reasoning_parser.patch` preserves the ordinary reasoning prefix when
+  the last delta ID is the reasoning end ID but its marker text was stripped
+  by terminal-stop detokenization. Empty boundaries still return no text;
+  nonterminal mismatches, marker-present splits, implicit tool boundaries,
+  non-streaming parsing, sampling parameters, usage and stop semantics remain
+  unchanged. It also adds direct and unified-parser regressions to upstream
+  `tests/reasoning/test_qwen3_reasoning_parser.py`.
 
-Validate both patches against the repository's fixed `third_party/vllm`
+Validate all patches against the repository's fixed `third_party/vllm`
 checkout before deployment:
 
 ```bash
@@ -49,6 +60,8 @@ git -C third_party/vllm apply --check \
   ../../patches/vllm/v0.23.0/dtb_serving.patch
 git -C third_party/vllm apply --check \
   ../../patches/vllm/v0.23.0/qwen3_coder_parser.patch
+git -C third_party/vllm apply --check \
+  ../../patches/vllm/v0.23.0/qwen3_reasoning_parser.patch
 ```
 
 Run the no-model partition gate against an applied copy of the parser:
@@ -65,3 +78,59 @@ token-only `248058` starts against the non-streaming parser oracle. Both the
 direct tool parser and unified delegating parser must be partition-equivalent.
 Target-server streaming and non-streaming replay remain required; this local
 gate does not validate vLLM serving finalization or NPU runtime code.
+
+## Terminal-stop reasoning fidelity
+
+From the TB root, run the independent no-model gate. It executes the new
+upstream regression functions, existing-path controls, actual detokenizer base
+methods plus the unified parser, and all 60 recorded DTB parser chains:
+
+```bash
+python tools/dtb/reasoning_tail_fidelity.py --apply-repo-patch \
+  --replay-dir docs/log/perf/agent_tool_call_run04_paired_replay/run_server_04_token_stop/replay
+python -m unittest discover -s tests -p test_qwen_reasoning_tail.py -v
+```
+
+Omit `--apply-repo-patch` for the unmodified-source negative control: it must
+return 1, including 47 recorded reasoning-tail failures. The patched gate
+returns 0 with 84 checks. The original source and tool patch remain read-only.
+Dependencies and the character tokenizer are stubbed; archived records retain
+their real text and IDs. This is not an HTTP/NPU or real-tokenizer pytest run.
+
+For an existing `915bec9` deployment, the first two patches are unchanged.
+Stop the serving process, check and apply **only the new reasoning patch**
+using an absolute patch path, then restart with the unchanged production launch
+command and audit configuration:
+
+```bash
+TB_ROOT=/opt/p00906181/TB
+VLLM_ROOT=/vllm-workspace/vllm
+git -C "$VLLM_ROOT" apply --check \
+  "$TB_ROOT/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch"
+git -C "$VLLM_ROOT" apply \
+  "$TB_ROOT/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch"
+sha256sum "$VLLM_ROOT/vllm/reasoning/qwen3_reasoning_parser.py"
+# Expected LF source hash:
+# cdb64a46e7077ff6f2600ce02916cfbd4cdb5bb6f62937673013a68e6addea88
+```
+
+Do not reapply an already-applied patch, use `--reject`, change the default
+`include_stop_str_in_output`, or modify `stream_interval` (keep default 1).
+`include_stop_str_in_output=True` remains an isolated workaround/control, not
+the formal fix: it affects the detokenization of other request-owned stops too.
+
+In the prepared upstream virtual environment, with the test tokenizers already
+available, run the full native test file (no inference model weights required):
+
+```bash
+cd "$VLLM_ROOT"
+.venv/bin/python -m pytest tests/reasoning/test_qwen3_reasoning_parser.py -q
+```
+
+The native fixture uses its existing three Qwen tokenizer variants; it does not
+by itself prove Qwen3.6 runtime behavior. Repeat the existing line 5/10 server
+stream-audit replay, with a new run directory/ID and matching whitelist. Record
+the **reasoning parser** import path and SHA256 alongside the existing three
+source identities. Check public reasoning against the actual pre-parser prefix,
+not just controller raw/forwarded equality. See the detailed scope and server
+checks in [the design](../../../docs/design/dtb_reasoning_boundary_token_stop.md).
