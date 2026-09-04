@@ -449,16 +449,19 @@ class _ThinkingState(_BaseState):
         output_kind = getattr(params, "output_kind", None)
         child_request_id = _BaseState.next_engine_request_id(
             context, phase)
+        child_prompt = context.engine_input()
+        engine_kwargs = context.engine_request_kwargs(child_prompt)
         controller_cpu_ms = (
             (perf_counter() - controller_started) * 1000
             if recorder is not None else 0.0
         )
 
+        context.record_first_engine_submission()
         generator = context.engine_client.generate(
-            context.engine_prompt,
+            child_prompt,
             params,
             child_request_id,
-            **context.engine_request_kwargs(),
+            **engine_kwargs,
         )
         (
             generated_token_ids,
@@ -570,7 +573,6 @@ class _ConfidenceProbeState(_BaseState):
         phase_started = perf_counter() if recorder is not None else 0.0
         controller_started = perf_counter() if recorder is not None else 0.0
         child_prompt = context.child_prompt(TRIAL_PROMPT)
-        child_prompt_text = child_prompt.get("prompt")
         prompt_tokens = len(child_prompt["prompt_token_ids"])
         trial_limit = min(
             context.policy.trial_answer_length,
@@ -596,19 +598,19 @@ class _ConfidenceProbeState(_BaseState):
         output_kind = getattr(params, "output_kind", None)
         child_request_id = _BaseState.next_engine_request_id(
             context, "confidence_probe")
+        engine_kwargs = context.engine_request_kwargs(
+            child_prompt, reasoning_ended=True)
         controller_cpu_ms = (
             (perf_counter() - controller_started) * 1000
             if recorder is not None else 0.0
         )
 
+        context.record_first_engine_submission()
         generator = context.engine_client.generate(
             child_prompt,
             params,
             child_request_id,
-            **context.engine_request_kwargs(
-                prompt_text=child_prompt_text,
-                reasoning_ended=True,
-            ),
+            **engine_kwargs,
         )
         observation = await _BaseState.consume_trial_output(
             generator,
@@ -748,6 +750,9 @@ class _FinalAnswerState(_BaseState):
         prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
         child_request_id = _BaseState.next_engine_request_id(
             context, "final_answer")
+        child_prompt = context.engine_input()
+        engine_kwargs = context.engine_request_kwargs(
+            child_prompt, reasoning_ended=True)
         controller_cpu_ms = (
             (perf_counter() - controller_started) * 1000
             if recorder is not None else 0.0
@@ -757,11 +762,12 @@ class _FinalAnswerState(_BaseState):
         terminal_output = None
         propagated_error = False
 
+        context.record_first_engine_submission()
         async for result in context.engine_client.generate(
-            context.engine_prompt,
+            child_prompt,
             params,
             child_request_id,
-            **context.engine_request_kwargs(reasoning_ended=True),
+            **engine_kwargs,
         ):
             if not context.reasoning_boundary_emitted:
                 # A hard limit can enter FinalAnswer before any visible

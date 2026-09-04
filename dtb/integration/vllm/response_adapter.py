@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from collections.abc import AsyncGenerator, AsyncIterator
 from typing import Any, TYPE_CHECKING
 
@@ -15,6 +16,17 @@ if TYPE_CHECKING:
     from vllm.entrypoints.openai.chat_completion.serving import OpenAIServingChat
     from vllm.outputs import RequestOutput
     from vllm.tokenizers import TokenizerLike
+
+
+def with_initial_prompt_text(
+    output: RequestOutput | None, initial_text: str | None
+) -> RequestOutput | None:
+    """Adapt external metadata without touching parser deltas or engine output."""
+    if output is None:
+        return output
+    result = copy.copy(output)
+    result.prompt = initial_text
+    return result
 
 
 async def stream_queue(

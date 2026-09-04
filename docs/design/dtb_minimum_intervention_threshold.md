@@ -93,6 +93,13 @@ reasoning 分布发生了变化**：少数长尾收益需要覆盖绝大多数�
 应启用 DTB 取决于未来生成长度，请求开始前不可能同时作出真正的原生旁路决定。若同子请求直通后
 仍有可测的短路径控制器开销，再单独评估延迟预算解析或移除 queue hop，不在首版扩大改动面。
 
+2026-09-04 前置决策：先独立实施
+[输入去 decode 与 Token ID 权威续写](dtb_token_authoritative_prompt.md)，完成 eager 配对验收后
+再实施本文机制。分类直接复用 serving 已有文本，缺失时不 decode 兜底；原始全文只作不可变
+快照，不维护续写文本镜像。这不是 lazy budget resolve，也不消除 eager 的二次提交成本。
+该前置重构已完成本地实现和 229 tests / 1966 subtests 回归；服务器 eager 配对验收仍待执行，
+本文 deferred 机制尚未实施。
+
 ## 3. 范围与非目标
 
 ### 3.1 本阶段范围
@@ -369,7 +376,8 @@ continuation prompt
 约束如下：
 
 - token IDs 是 continuation 的事实源；不得把累计 text 重新 tokenize 后替换它们；
-- 当前兼容路径可同步累计 source delta text 作为 `prompt_text` hint，但 text 不参与 token 边界裁决；
+- 依照前置 [Token ID 账本设计](dtb_token_authoritative_prompt.md)，已有初始全文仅保留为不可变
+  调试快照；source delta text 继续透传 parser/按需审计，不累计为 child `prompt_text` 镜像；
 - 内部 abort 后迟到但未透传的 token 不得进入 continuation；
 - source 前缀已计入 `emitted_completion_tokens` 和 `thinking_tokens`；
 - hidden probe 不占外部 completion 额度；
@@ -639,6 +647,9 @@ DTB 造成”，并把机制延迟与 Agent 策略反馈分开。
 
 ## 10. 实现改动面
 
+以下改动以 [输入去 decode 前置重构](dtb_token_authoritative_prompt.md)已独立验收为起点；
+不在同一 changeset 混入该项改动，以便以冻结后的 eager 版本衡量 deferred 的增量收益。
+
 首版预计修改：
 
 1. `dtb/config/schema.py`、`dtb/config/budget_config.yaml`：增加并校验
@@ -782,6 +793,7 @@ generator 生命周期、native terminal passthrough、账本以及 replay 门�
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-09-04 | 增加输入去 decode/Token ID 权威续写前置设计；不再允许累计 child 全文镜像 | 用户决定先移除重复输入处理，再独立实施最低介入值并衡量增量收益 |
 | 2026-09-03 | 初稿：复用 `check_length` 作为最低介入值，设计同 child 原生直通、delta 软阈值和 `aclose()` 内部 abort | run-05 显示 97.01% 请求短于 850，当前 stop + fresh-final 对短请求是系统性负优化 |
 | 2026-09-03 | 增加 Agent 外部轮次/DTB engine child 两层请求模型、run-05 轨迹放大归因、实装后的剩余净加速风险和首分叉审计 | 最低介入值只能消除短请求 handoff，不能自动保证任务级请求数和 E2E 降低 |
 | 2026-09-03 | 补充场景级均匀长度分布到 Agent 极端长尾分布的实验对象迁移；把 Agent task wall 明确为最终主指标，旧场景集降为能力回归 | 直接沿用场景级请求结论无法证明 Agent 多轮执行端到端优化 |

@@ -36,6 +36,11 @@ class DtbPhaseRecorder:
             self._durations_s[name] += perf_counter() - started_at
             self._calls[name] += 1
 
+    def record_elapsed(self, name: str, started_at: float) -> None:
+        """Record an overlapping wall interval, not an additional engine phase."""
+        self._durations_s[name] += perf_counter() - started_at
+        self._calls[name] += 1
+
     def module_snapshot(self) -> dict[str, object]:
         total_s = perf_counter() - self._started_at
         return {

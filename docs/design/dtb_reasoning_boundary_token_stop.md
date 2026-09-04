@@ -519,6 +519,13 @@ context，不能在 child 之间重算。`budget_disabled`/Vanilla 原生路径�
 
 ### 4.7 continuation prompt 的 token-authoritative 设计
 
+2026-09-04：本节的独立性能重构细化为
+[输入去 decode 与 Token ID 权威续写设计](dtb_token_authoritative_prompt.md)，并安排在最低
+介入值实施之前。以下同步最新约束；接口、无文本行为和验收以新文档为准，token-stop 本身
+的设计基线和已完成修复不变。
+该独立重构现已完成本地实现/无模型回归（229 tests / 1966 subtests），三个 vLLM patch
+保持不变；目标服务器 eager 配对验收与最低介入值实施尚未完成。
+
 #### 4.7.1 状态结构
 
 `DtbRequestContext` 应把“模型输入账本”和“可选文本视图”分开。可以新增一个轻量
@@ -544,8 +551,8 @@ class ContinuationPrompt:
 3. 每个 child 传入 vLLM 的字典保留原 `engine_inputs` 中仍适用的 multimodal、cache 等字段，
    但删除已经随 continuation 失效的 `prompt` 字段，避免 text 与 token IDs 不一致；
 4. hidden probe 使用 fork 后的新 token list，不得与主账本共享可变 list；
-5. `initial_text` 不随 thinking 增长，不作为模型 prompt 的权威表示；需要完整 continuation 文本
-   的隔离审计才允许惰性 decode，并必须单独计入 controller CPU；
+5. `initial_text` 不随 thinking 增长，不作为模型 prompt 的权威表示；完整 continuation 文本
+   仅允许在离线调试工具按 token 快照 decode，运行请求不恢复全文镜像或惰性 decode 兜底；
 6. prompt token 数、外部剩余额度和 phase telemetry 均直接读取 token ledger 长度。
 
 `prompt_text=None` 不会阻止 vLLM 处理 `TokensPrompt`。在当前 `AsyncLLM.add_request()` 路径中，
@@ -563,12 +570,13 @@ scene/budget 分类的优先级应改为：
 ```text
 最新可见 user message
 > serving 已有的 prompt_components.text
-> 仅在两者都缺失时惰性 decode prompt_token_ids
+> 两者都无可用文本时标记 missing，分类输入为空，不 decode
 ```
 
-这能直接删除正常 chat 请求当前必做的一次完整 prompt decode。需要保留 fallback 是因为未来
-可能存在 conversation 缺失、非标准输入或兼容入口；fallback 触发次数和 decode wall 应进入
-phase telemetry，不能静默退回每请求 decode。
+分类选取仅在 adapter 入口执行一次，复用 serving 已提供的数据；原生 serving 没有 DTB 专属
+的分类结果。`missing` 继续走现有 resolver 的 fixed/override 或 general/history/default 规则，
+不因缺文本拒绝有效输入，也不静默改走 Vanilla。serving 全文与旧 decoded fallback 可能不等价，
+缺文本时也可能改变分类；两类兼容入口须单列审计，不能冒称所有请求预算完全不变。
 
 #### 4.7.3 能省与不能省的开销
 
@@ -592,10 +600,10 @@ phase telemetry，不能静默退回每请求 decode。
 
 这项性能优化自身的实施顺序为：
 
-1. 先把分类 decode 改为上述惰性 fallback，不改变 context 的双表示；
-2. 再将 continuation 账本改成 token-authoritative，停止维护可变 prompt text；
-3. 最后与 4.1—4.5 的 boundary token-stop 做组合验证；性能报告仍分别列出
-   `lazy_prompt_text` 与 `boundary_token_stop` 的增量收益，但不在同一 changeset 实现。
+1. 独立 changeset 删除完整输入 decode，将 continuation 账本改成 token-authoritative，
+   停止维护可变 prompt text，同时完成可选初始文本和外部 `return_prompt_text` 兼容；
+2. 固定已部署 token-stop/parser 修复、eager 模式和算法参数，完成输入等价、协议与性能配对；
+3. 冻结该基线后再实施最低介入值；分别列出输入去 decode 与 deferred 同 child 直通的增量收益。
 
 ### 4.8 token-only tool-start 对 streaming tool parser 的影响
 
@@ -806,7 +814,7 @@ reasoning parser/tool parser 绑定、`SamplingParams.stop_token_ids` 与
 probe controller stop 删除、token-only Qwen tool prefix、stream-audit 字段和 token-aware analyzer。
 同一服务 tokenizer 的完整 vocab-ID 集只在首次流式 DTB 绑定时构造；后续请求仍逐次校验活动
 request/unified/tool parser 的类型、边界字段与流式状态转换，但不重复支付 O(vocab) 集合构造成本。
-非流式路径继续走原字符串 stop/full parser；第 4.7 节的完整 prompt-text 惰性化仍是独立性能优化，
+非流式路径继续走原字符串 stop/full parser；第 4.7 节的输入去 decode/Token ID 账本仍是独立性能优化，
 不属于本次正确性 changeset。
 
 本地门禁结果：
@@ -1171,6 +1179,7 @@ LightCode 端到端时延。
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-09-04 | §4.7 收敛到独立输入去 decode 设计：删除运行时惰性 fallback，仅保存初始文本快照；安排在最低介入值之前独立验证 | 用户确定取消 prompt decode，并统一 Token ID 权威续写；避免旧设计与新实施顺序冲突 |
 | 2026-09-04 | 增加独立 Qwen terminal reasoning prefix 修复、两方案取舍与受保护分支；附直接输入契约/原生组合测试和 60 条完整 parser 链路重放，部署增加第三个 patch 与 reasoner hash | token-stop 正常生效时，原生 reasoner 把“marker 文本被剥离”误当作“整个 chunk 无正文”，丢失 47 次边界前 prefix；不改 include-stop 默认值、implicit tool 或 merge 行为 |
 | 2026-09-01 | 首版：确定仅迁移 thinking boundary，定义 token-stop 输出规范化、配置校验和 paired replay 门禁 | Qwen3.6 两个 reasoning marker 均为单 special token，且 string stop 已出现 speculative text/token 不一致 |
 | 2026-09-01 | 修订为 parser-backed 模型协议；禁止用 text marker 证明或补写边界；协议化 forced close | 公共 SSE 在 token stop 后不含 `</think>`；不同模型结束协议不固定 |

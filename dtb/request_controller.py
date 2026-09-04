@@ -19,11 +19,12 @@ from dtb.history.store import (
     HistoryOutcome,
     configure_history_store,
 )
-from dtb.integration.vllm.request_adapter import visible_user_text
+from dtb.integration.vllm.request_adapter import extract_prompt_text_views
 from dtb.integration.vllm.response_adapter import (
     aggregate_queue,
     native_chat_response,
     stream_queue,
+    with_initial_prompt_text,
 )
 from dtb.observability.config import DtbObservabilityRuntime
 from dtb.reasoning.parser_boundary import bind_reasoning_boundary_protocol
@@ -180,6 +181,7 @@ class DtbRequestController:
         request: ChatCompletionRequest,
     ) -> AsyncGenerator[RequestOutput, None]:
         async def generator() -> AsyncGenerator[RequestOutput, None]:
+            return_prompt_text = bool(getattr(request, "return_prompt_text", False))
             producer_task = asyncio.create_task(state_machine.run())
             consumer = (
                 stream_queue(context.result_queue, context)
@@ -188,6 +190,10 @@ class DtbRequestController:
             )
             try:
                 async for item in consumer:
+                    if return_prompt_text:
+                        item = with_initial_prompt_text(
+                            item, context.initial_prompt_text
+                        )
                     yield item
             except asyncio.CancelledError:
                 context.request_state.completion_status = "cancelled"
@@ -230,6 +236,11 @@ class DtbRequestController:
         lora_request: Any = None,
         data_parallel_rank: int | None = None,
     ) -> Any:
+        phase_recorder = self.observability.create_phase_recorder(
+            self.policy.version)
+        controller_entry_started_at = (
+            time.perf_counter() if phase_recorder is not None else None
+        )
         if getattr(request, "n", None) not in (None, 1):
             return serving_chat.create_error_response("DTB currently supports only n=1")
         try:
@@ -315,23 +326,16 @@ class DtbRequestController:
                     f"DTB reasoning protocol binding failed: {exc}"
                 )
 
-        phase_recorder = self.observability.create_phase_recorder(policy.version)
         prompt_token_ids = engine_inputs[0].get("prompt_token_ids", [])
-        try:
-            if phase_recorder is None:
-                prompt_text = tokenizer.decode(
-                    prompt_token_ids, skip_special_tokens=True
-                )
-            else:
-                with phase_recorder.measure("decision.decode_prompt"):
-                    prompt_text = tokenizer.decode(
-                        prompt_token_ids, skip_special_tokens=True
-                    )
-        except Exception:
-            prompt_text = ""
-        classification_text, classification_source = visible_user_text(
-            conversation, prompt_text
-        )
+        if engine_prompt_text is None:
+            engine_prompt_text = engine_inputs[0].get("prompt")
+        if phase_recorder is None:
+            text_views = extract_prompt_text_views(conversation, engine_prompt_text)
+        else:
+            with phase_recorder.measure("decision.select_text"):
+                text_views = extract_prompt_text_views(
+                    conversation, engine_prompt_text)
+        classification_text = text_views.classification_text
         remaining_context = max(
             1,
             int(serving_chat.model_config.max_model_len) - len(prompt_token_ids),
@@ -348,8 +352,9 @@ class DtbRequestController:
         else:
             decision_started_at = time.perf_counter()
             decision_trace: dict[str, Any] = {
-                "classification_source": classification_source,
+                "classification_source": text_views.classification_source,
                 "classification_input_chars": len(classification_text),
+                "initial_text_source": text_views.initial_text_source,
                 "completion_token_limit": completion_token_limit,
             }
             with phase_recorder.measure("decision.total"):
@@ -393,9 +398,8 @@ class DtbRequestController:
             lora_request=lora_request,
             data_parallel_rank=data_parallel_rank,
             trace_headers=trace_headers,
-            prompt_text=(
-                engine_prompt_text or engine_inputs[0].get("prompt") or prompt_text
-            ),
+            prompt_text_views=text_views,
+            controller_entry_started_at=controller_entry_started_at,
             reasoning_ended=reasoning_ended,
             reasoning_parser_kwargs=reasoning_parser_kwargs,
             reasoning_parser=reasoning_parser,

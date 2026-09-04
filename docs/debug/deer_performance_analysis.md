@@ -233,6 +233,27 @@ confidence probe 由 `DtbAlgorithmPolicy` 固定为最多 50 token，并通过
 
 ## 5. 优化优先级
 
+### 当前 Agent 前置项（2026-09-04）：取消完整输入 decode
+
+在最低介入值机制实施前，先独立完成
+[DTB 输入去 decode 与 Token ID 权威续写](../design/dtb_token_authoritative_prompt.md)。
+详细输入、状态机和兼容性契约放在该设计文档，本文保留性能判断与后续实测记录。
+
+**源码确定**：serving 已提供规范化 conversation 和可选 `prompt_components.text`；
+重构前 controller 在选取最新 user 分类文本之前仍完整 decode 输入，context 还持续维护可变全文镜像。
+本地实现已复用已有文本做一次轻量选取，缺文本时显式标记 `missing`，不再 decode 兜底；续写及
+子请求只以 Token ID 为准，已有全文仅保留不可变快照用于诊断和外部可选响应字段。
+
+这项重构可移除重复输入 decode 和长字符串拼接，不能消除 eager 模式的 stop+fresh-final、
+重复 prefill 或模型输出 detokenize。新增 token 快照复制的成本也须计入；净收益尚未实测。
+旧版 `decision.total` 不包含入口完整 decode，新版保持只计 resolver；新增
+`DTB_REQUEST_SUMMARY.modules.controller.entry_to_first_submit` 单独测入口到首次提交 wall。
+这是包含决策、context/token 快照和异步等待的重叠区间，不能当纯 CPU，也不能与 phase wall
+相加。先固定 eager 做协议/质量/性能配对，再实施最低介入值；本地通过不代表服务器收益。
+
+以下 P0—P3 保留原 run_02 场景级分析的历史优先级；不能据此把 Agent 长输入短思考下的输入
+处理成本判断为已测可忽略，也不能将历史场景收益外推为 Agent task wall 改善。
+
 ### P0：重复 run_02，并建立语义质量门
 
 run_02 与已保存明细的新 Vanilla 均为 16/16 `Judge=True`，但尚未证明诊断
@@ -664,6 +685,9 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-04 | 完成 [输入去 decode 前置重构](../design/dtb_token_authoritative_prompt.md#61-本地实施结果2026-09-04)：一次提取 serving 文本、不可变初始快照、Token ID 续写及提交快照、外部 `return_prompt_text` 元数据适配；全量 229 tests / 1966 subtests 通过，三份未改动 patch 合并适用性检查通过 | 新增 81 个用例验证缺文本、off/phase、token-only/混合边界、probe、流式/非流式、取消和错误；`controller.entry_to_first_submit` 为重叠 wall 而非纯 CPU/额外 phase。尚无服务器性能证据，先固定 eager 配对，再推进最低介入值 |
+| 2026-09-04 | 新增 Agent 前置优化入口，详细契约见 [输入去 decode 设计](../design/dtb_token_authoritative_prompt.md)：复用 serving 文本、取消运行时完整输入 decode、Token ID 权威续写及不可变文本快照；尚未实施 | 最低介入值前先独立去除重复输入处理；明确 `decision.total` 的计时缺口，避免与 stop+fresh-final 消除收益混算 |
+| 2026-09-04 | [replay2 服务器重测验收](../log/perf/agent_tool_call_run04_paired_replay/run_server_04_token_stop/replay2/RESULT.md)：60/60 条 DTB 的实际公共 reasoning 与 pre-parser 正文逐字一致，48 个混合 terminal chunk 的 344 字符完整保留；未修复 parser 对同输入恰好丢失这 48 个尾段；120 次工具流协议通过，另补到 1 次纯 `[248058]` 自然边界 | terminal reasoning tail discard 定向缺陷可关闭；工具选择/缺参语义偏离不作为框架修复失败。短思考 audit run 不裁决时延，下一步冻结补丁做 9 场景端到端质量/性能验证；不把保真通过扩大为模型边界语义或所有 parser 路径通过 |
 | 2026-09-04 | 新增独立 `qwen3_reasoning_parser.patch`，仅保留 stripped terminal end-ID delta 的 reasoning prefix；[离线修复验证](../log/perf/agent_tool_call_run04_paired_replay/run_server_04_token_stop/REASONING_TAIL_FIX.md) 84/84 通过，原生负对照重现 47 个真实丢字请求，工具结果保持不变 | 正式修复合法 token/text mismatch；不改变 include-stop 默认值、implicit tool、usage/stop 或 merge 行为。目标服务器/真实 tokenizer 完整 pytest 尚待执行，不能据此裁决性能或所有 parser 问题已修复 |
 | 2026-09-04 | 审计 `915bec9` 的 [run_server_04_token_stop](../log/perf/agent_tool_call_run04_paired_replay/run_server_04_token_stop/RESULT.md)：120 次工具 JSON/terminal 协议检查通过，60 次整数 token-stop 生效，普通 split marker 不再触发旧编排异常；发现 47/60 次 DTB 的 boundary chunk 正文被 Qwen reasoning parser 丢弃，另有两侧各 1 次缺必填参数与 Vanilla 2 次未声明工具 | 工具协议通过不等于完整 parser 等价；优先修复 token-only 边界的正文保真、补 248058 线上覆盖与 Vanilla raw，再进入 9 场景质量/时延验收；本轮无 probe/长思考压缩，不作性能结论 |
 | 2026-08-24 | run_11_fixed_v5 在量化增训权重的 5 个交叉场景完成 240 请求 phase 复验：4 个严格质量层、1 个一题容差层；完整模型生成量相对 run_08 同权重 Vanilla 降低 16.46%；用户补充确认候选为 TP8、Vanilla 为 TP4，跨 TP 的 68.04% phase-on E2E 不可裁决；v4 额度字段 240/240 闭合且无 2,048 cap | 停止 fixed 网格，创建 5 个 fixed_v5 + 8 个 fixed_v4 复验点的量化候选 YAML；先补协议回放，再统一 TP4 运行 telemetry-off Vanilla/自动全集正式排名并记录配置 SHA；跨方案价值先做开源/量化增训权重包 × Vanilla/DTB 的 2×2，对可用中间权重再做训练×量化×DTB 的 2×2×2 |

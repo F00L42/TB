@@ -1,6 +1,7 @@
 """Extract algorithm inputs from native vLLM request structures."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -45,9 +46,9 @@ def merge_stop_token_ids(params: Any, required_ids: tuple[int, ...]) -> None:
 
 
 def visible_user_text(
-    conversation: list[Any], fallback: str
+    conversation: list[Any] | None, fallback: str | None
 ) -> tuple[str, str]:
-    """Return the latest visible user text, never the rendered chat template."""
+    """Select existing text only; the fallback must come from native serving."""
 
     def flatten(content: Any) -> str:
         if isinstance(content, str):
@@ -79,4 +80,30 @@ def visible_user_text(
             text = flatten(content).strip()
             if text:
                 return text, "latest_user_message"
-    return fallback, "decoded_prompt_fallback"
+    if fallback and fallback.strip():
+        return fallback, "serving_prompt_fallback"
+    return "", "missing"
+
+
+@dataclass(frozen=True)
+class PromptTextViews:
+    """Existing request text, never a mutable continuation prompt mirror."""
+
+    classification_text: str
+    classification_source: str
+    initial_text: str | None
+    initial_text_source: str
+
+
+def extract_prompt_text_views(
+    conversation: list[Any] | None, initial_text: str | None
+) -> PromptTextViews:
+    text, source = visible_user_text(conversation, initial_text)
+    return PromptTextViews(
+        classification_text=text,
+        classification_source=source,
+        initial_text=initial_text,
+        initial_text_source=(
+            "serving_prompt" if initial_text is not None else "missing"
+        ),
+    )

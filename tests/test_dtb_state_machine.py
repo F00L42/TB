@@ -221,7 +221,6 @@ def make_context(
             budget_decision=plan,
             completion_token_limit=completion_limit,
         ),
-        prompt_text="<think>",
         phase_recorder=CaptureRecorder(),
         reasoning_protocol=fake_reasoning_protocol(),
     )
@@ -357,15 +356,8 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(20, engine.calls[2]["prompt_token_ids"])
         self.assertNotIn("</think>", visible)
         self.assertNotIn("trial", visible)
-        self.assertIn(
-            "Considering the limited time by the user",
-            context.prompt_text,
-        )
-        self.assertTrue(
-            context.prompt_text.endswith(
-                GUIDED_FINAL_CUE_V1 + GUIDED_FINAL_SEPARATOR
-            )
-        )
+        self.assertEqual(context.initial_prompt_text, "<think>")
+        self.assertNotIn("prompt", context.engine_prompt)
         close_tokens = [
             *context.tokenizer.encode(
                 GUIDED_FINAL_CUE_V1, add_special_tokens=False
@@ -398,7 +390,7 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context.request_state.hidden_probe_tokens, 1)
         self.assertEqual(
             context.request_state.completion_status, "success")
-        self.assertEqual(context.prompt_text.count("</think>"), 0)
+        self.assertEqual(context.engine_prompt["prompt_token_ids"].count(THINK_END_ID), 1)
         probe = next(
             phase for phase in recorded_phases
             if phase["phase"] == "confidence_probe"
@@ -547,11 +539,8 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             context.request_state.final_answer_reason,
             FinalAnswerReason.BUDGET_EXHAUSTED,
         )
-        self.assertTrue(
-            context.prompt_text.endswith(
-                GUIDED_FINAL_CUE_V1 + GUIDED_FINAL_SEPARATOR
-            )
-        )
+        self.assertEqual(context.initial_prompt_text, "<think>")
+        self.assertNotIn("prompt", context.engine_prompt)
         expected_suffix = [
             *context.tokenizer.encode(
                 GUIDED_FINAL_CUE_V1,
@@ -592,11 +581,16 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             context.request_state.final_answer_reason,
             FinalAnswerReason.BUDGET_EXHAUSTED,
         )
-        self.assertTrue(
-            context.prompt_text.endswith(
-                GUIDED_FINAL_CUE_V1 + GUIDED_FINAL_SEPARATOR
-            )
+        expected_suffix = [
+            *context.tokenizer.encode(GUIDED_FINAL_CUE_V1),
+            THINK_END_ID,
+            *context.tokenizer.encode(GUIDED_FINAL_SEPARATOR),
+        ]
+        self.assertEqual(
+            engine.calls[-1]["prompt_token_ids"][-len(expected_suffix):],
+            expected_suffix,
         )
+        self.assertEqual(context.initial_prompt_text, "<think>")
         self.assertNotIn("</think>", visible)
         self.assertNotIn(
             "Considering the limited time by the user",
@@ -622,8 +616,8 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             phases,
             ["initial_think", "final_answer"],
         )
-        self.assertEqual(context.prompt_text.count("<think>"), 1)
-        self.assertEqual(context.prompt_text.count("</think>"), 0)
+        self.assertEqual(context.initial_prompt_text, "<think>")
+        self.assertEqual(engine.calls[-1]["prompt_token_ids"], [60, THINK_END_ID])
         self.assertNotIn("</think>", visible)
         self.assertEqual(
             context.request_state.final_answer_reason,
@@ -668,7 +662,8 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             call_phases(engine), ["initial_think", "final_answer"])
         self.assertEqual("".join(visible).count("<tool_call>"), 0)
         self.assertNotIn("</think>", "".join(visible))
-        self.assertEqual(context.prompt_text.count("<tool_call>"), 0)
+        self.assertEqual(context.initial_prompt_text, "<think>")
+        self.assertEqual(context.engine_prompt["prompt_token_ids"].count(TOOL_CALL_BEGIN_ID), 1)
         self.assertEqual(
             context.request_state.final_answer_reason,
             FinalAnswerReason.MODEL_TOOL_CALL,

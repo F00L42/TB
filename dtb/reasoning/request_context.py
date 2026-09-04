@@ -4,10 +4,14 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, TYPE_CHECKING
+from typing import Any, Mapping, Optional, Sequence, TYPE_CHECKING
 
 from dtb.budgeting.budget_decision import DtbBudgetDecision
 from dtb.config.schema import DtbAlgorithmConfig, DtbAlgorithmPolicy
+from dtb.integration.vllm.request_adapter import (
+    PromptTextViews,
+    extract_prompt_text_views,
+)
 from dtb.reasoning.request_state import (
     DtbRequestState,
     ReasoningBoundary,
@@ -39,7 +43,7 @@ class DtbRequestContext:
     lora_request: Any = None
     data_parallel_rank: Optional[int] = None
     trace_headers: Optional[Mapping[str, str]] = None
-    prompt_text: Optional[str] = None
+    prompt_text_views: PromptTextViews | None = None
     reasoning_ended: Optional[bool] = None
     reasoning_parser_kwargs: Optional[dict[str, Any]] = None
     reasoning_parser: Any = None
@@ -61,6 +65,40 @@ class DtbRequestContext:
     thinking_stop_token_ids: tuple[int, ...] = ()
     thinking_stop_strings: tuple[str, ...] = ()
     thinking_include_stop_str_in_output: bool | None = None
+    controller_entry_started_at: float | None = None
+
+    def __post_init__(self) -> None:
+        # Own the mutable ledger without copying multimodal/cache payloads.
+        # Never mutate the original serving input or an engine submission.
+        self.engine_prompt = self.engine_prompt.copy()
+        self.engine_prompt["prompt_token_ids"] = list(
+            self.engine_prompt.get("prompt_token_ids", ())
+        )
+        if self.prompt_text_views is None:
+            self.prompt_text_views = extract_prompt_text_views(
+                [], self.engine_prompt.get("prompt")
+            )
+
+    @property
+    def initial_prompt_text(self) -> str | None:
+        assert self.prompt_text_views is not None  # initialized in __post_init__
+        return self.prompt_text_views.initial_text
+
+    def engine_input(self) -> dict[str, Any]:
+        """Return a stable per-submission token snapshot, not the live ledger."""
+        child = self.engine_prompt.copy()
+        child["prompt_token_ids"] = list(self.engine_prompt["prompt_token_ids"])
+        return child
+
+    def record_first_engine_submission(self) -> None:
+        if (
+            self.phase_recorder is not None
+            and self.controller_entry_started_at is not None
+        ):
+            self.phase_recorder.record_elapsed(
+                "controller.entry_to_first_submit", self.controller_entry_started_at
+            )
+            self.controller_entry_started_at = None
 
     @property
     def engine_client(self):
@@ -87,8 +125,8 @@ class DtbRequestContext:
 
     def engine_request_kwargs(
         self,
+        child_prompt: dict[str, Any],
         *,
-        prompt_text: Optional[str] = None,
         reasoning_ended: Optional[bool] = None,
     ) -> dict[str, Any]:
         """Return native route identity for every child ``generate`` call."""
@@ -97,7 +135,7 @@ class DtbRequestContext:
             "priority": getattr(self.request, "priority", None) or 0,
             "data_parallel_rank": self.data_parallel_rank,
             "trace_headers": self.trace_headers,
-            "prompt_text": self.prompt_text if prompt_text is None else prompt_text,
+            "prompt_text": child_prompt.get("prompt"),
             "reasoning_ended": (
                 self.reasoning_ended
                 if reasoning_ended is None
@@ -244,32 +282,29 @@ class DtbRequestContext:
             *self.engine_prompt.get("prompt_token_ids", ()),
             *self.encode_prompt_suffix(suffix_text),
         ]
-        if self.prompt_text is not None:
-            child["prompt"] = self.prompt_text + suffix_text
+        child.pop("prompt", None)
         return child
+
+    def _append_tokens(self, token_ids: Sequence[int]) -> None:
+        if token_ids:
+            self.engine_prompt["prompt_token_ids"].extend(token_ids)
+            # The native text no longer describes these IDs. Keep only the
+            # immutable initial text view, never send stale text to vLLM.
+            self.engine_prompt.pop("prompt", None)
 
     def append_prompt_suffix(self, suffix_text: str) -> None:
         if not suffix_text:
             return
-        self.engine_prompt["prompt_token_ids"].extend(
-            self.encode_prompt_suffix(suffix_text)
-        )
-        if self.prompt_text is not None:
-            self.prompt_text += suffix_text
-            self.engine_prompt["prompt"] = self.prompt_text
+        self._append_tokens(self.encode_prompt_suffix(suffix_text))
 
     def append_prompt_token_ids(
         self,
         token_ids: tuple[int, ...] | list[int],
-        text_hint: str = "",
     ) -> None:
         """Append protocol-owned tokens without deriving them from marker text."""
         if not token_ids:
             raise ValueError("protocol token suffix must not be empty")
-        self.engine_prompt["prompt_token_ids"].extend(token_ids)
-        if self.prompt_text is not None and text_hint:
-            self.prompt_text += text_hint
-            self.engine_prompt["prompt"] = self.prompt_text
+        self._append_tokens(token_ids)
 
     def append_thinking(
         self,
@@ -281,10 +316,7 @@ class DtbRequestContext:
         state = self.request_state
         if state.reasoning_state is ReasoningState.CLOSED:
             raise RuntimeError("cannot append thinking after reasoning is closed")
-        self.engine_prompt["prompt_token_ids"].extend(token_ids)
-        if self.prompt_text is not None and text:
-            self.prompt_text += text
-            self.engine_prompt["prompt"] = self.prompt_text
+        self._append_tokens(token_ids)
         thinking_token_count = len(token_ids)
         final_token_count = 0
         if reasoning_boundary is not None:
@@ -354,7 +386,6 @@ class DtbRequestContext:
             self.append_prompt_suffix(prompt_prefix)
             self.append_prompt_token_ids(
                 protocol.forced_close_token_ids,
-                protocol.forced_close_text,
             )
             self.append_prompt_suffix(trailing_text)
         else:

@@ -122,7 +122,6 @@ def make_context(*, stream: bool = False) -> DtbRequestContext:
         lora_request="lora",
         data_parallel_rank=3,
         trace_headers={"traceparent": "x"},
-        prompt_text="base",
         reasoning_ended=False,
         reasoning_parser_kwargs={"chat_template_kwargs": {"x": 1}},
         reasoning_protocol=fake_reasoning_protocol() if stream else None,
@@ -150,19 +149,20 @@ class PromptCopyTests(unittest.TestCase):
         self.assertIs(first["multi_modal_data"], shared_mm)
         self.assertEqual(first["prompt_token_ids"], [1, 2, ord("x"), ord("y")])
         self.assertEqual(context.engine_prompt["prompt_token_ids"], [1, 2])
-        self.assertEqual(first["prompt"], "basexy")
+        self.assertNotIn("prompt", first)
+        self.assertEqual(context.initial_prompt_text, "base")
         self.assertEqual(second, first)
         self.assertEqual(context.tokenizer.encode_calls, 1)
 
     def test_engine_kwargs_preserve_native_route_context(self) -> None:
         context = make_context()
         kwargs = context.engine_request_kwargs(
-            prompt_text="branch", reasoning_ended=True)
+            context.child_prompt("branch"), reasoning_ended=True)
         self.assertEqual(kwargs["priority"], 7)
         self.assertEqual(kwargs["lora_request"], "lora")
         self.assertEqual(kwargs["data_parallel_rank"], 3)
         self.assertEqual(kwargs["trace_headers"], {"traceparent": "x"})
-        self.assertEqual(kwargs["prompt_text"], "branch")
+        self.assertIsNone(kwargs["prompt_text"])
         self.assertIs(kwargs["reasoning_ended"], True)
         self.assertEqual(
             kwargs["reasoning_parser_kwargs"],
@@ -176,7 +176,12 @@ class PromptCopyTests(unittest.TestCase):
         suffix = "limited\n</think>\n\n"
 
         self.assertTrue(context.close_reasoning(suffix))
-        self.assertTrue(context.prompt_text.endswith(suffix))
+        self.assertEqual(context.initial_prompt_text, "base")
+        self.assertNotIn("prompt", context.engine_prompt)
+        self.assertEqual(
+            context.engine_prompt["prompt_token_ids"],
+            [1, 2, *context.tokenizer.encode(suffix)],
+        )
         self.assertFalse(context.close_reasoning("</think>"))
 
 
