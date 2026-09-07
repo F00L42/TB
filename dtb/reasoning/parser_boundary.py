@@ -80,6 +80,16 @@ class ReasoningBoundaryProtocol:
             return spec.boundary
         return None
 
+    def find_first_boundary(
+        self, token_ids: Sequence[int],
+    ) -> tuple[int, ReasoningBoundary] | None:
+        """Observe canonical IDs without requiring a configured engine stop."""
+        for index, token_id in enumerate(token_ids):
+            for spec in self.natural_boundaries:
+                if token_id == spec.token_id:
+                    return index, spec.boundary
+        return None
+
 
 def _parser_name(parser: object) -> str:
     return parser.__class__.__name__ if parser is not None else "none"

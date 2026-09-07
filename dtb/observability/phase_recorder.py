@@ -60,7 +60,7 @@ class DtbPhaseRecorder:
         phase: str,
         round_id: int,
         wall_ms: float,
-        controller_cpu_ms: float,
+        controller_cpu_ms: float | None,
         prompt_tokens: int,
         generated_tokens: int,
         visible: bool,
@@ -82,6 +82,7 @@ class DtbPhaseRecorder:
         external_remaining_tokens: int | None = None,
         answer_limit: int | None = None,
         stop_reason: object = None,
+        intervention: Mapping[str, Any] | None = None,
         **_: Any,
     ) -> dict[str, object]:
         metrics = getattr(output, "metrics", None)
@@ -129,7 +130,9 @@ class DtbPhaseRecorder:
             "queue_ms": queue_ms,
             "prefill_ms": prefill_ms,
             "decode_ms": decode_ms,
-            "controller_cpu_ms": round(max(controller_cpu_ms, 0.0), 3),
+            "controller_cpu_ms": (
+                round(max(controller_cpu_ms, 0.0), 3) if controller_cpu_ms is not None else None
+            ),
             "prompt_tokens": max(prompt_tokens, 0),
             "cached_prompt_tokens": cached_prompt_tokens,
             "generated_tokens": max(generated_tokens, 0),
@@ -148,6 +151,8 @@ class DtbPhaseRecorder:
             })
         if decision_details is not None:
             record["decision_details"] = dict(decision_details)
+        if intervention is not None:
+            record["intervention"] = dict(intervention)
         if phase == "confidence_probe":
             record.update({
                 "confidence_method": confidence_method,
@@ -202,14 +207,24 @@ class DtbPhaseRecorder:
             "thinking_tokens": state.thinking_tokens,
             "hidden_probe_tokens": state.hidden_probe_tokens,
             "final_answer_tokens": state.final_answer_tokens,
+            "unclassified_completion_tokens": getattr(state, "unclassified_completion_tokens", 0),
             "total_model_generated_tokens": (
                 state.thinking_tokens
                 + state.hidden_probe_tokens
                 + state.final_answer_tokens
+                + getattr(state, "unclassified_completion_tokens", 0)
             ),
             "child_generate_calls": state.child_generate_calls,
             "modules": self.module_snapshot(),
             "error": error,
         }
+        intervention = getattr(state, "intervention_telemetry", None)
+        if intervention is not None:
+            record["intervention"] = dict(intervention)
+            record["intervention"]["source_terminal_passthrough_count"] = state.final_terminal_count
+            record["model_work_complete"] = not intervention.get("abort_terminal_seen", False)
+            record["budget_resolution"] = (
+                "resolved" if state.budget_decision is not None else "not_required_native")
+            record["final_terminal_count"] = state.final_terminal_count
         self._writer.publish("DTB_REQUEST_SUMMARY", record)
         return record

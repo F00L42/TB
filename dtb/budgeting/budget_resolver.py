@@ -1,6 +1,7 @@
 """Resolve fixed, scene/difficulty, and history inputs into one DTB budget."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, TYPE_CHECKING
 
 from dtb.budgeting.budget_decision import (
@@ -27,6 +28,13 @@ _DEFAULT_CONFIDENCE_THRESHOLD = 0.95
 _DEFAULT_PERCENTILE_STEP = 0.75
 
 
+@dataclass(frozen=True)
+class InterventionThreshold:
+    tokens: int
+    source: str
+    scene_info: dict[str, Any] | None = None
+
+
 def _round_half_up_average(left: int, right: int) -> int:
     return (int(left) + int(right) + 1) // 2
 
@@ -50,6 +58,22 @@ class DtbBudgetResolver:
     ) -> None:
         self.service_config = service_config
         self.policy = policy or DtbAlgorithmPolicy()
+
+    def intervention_threshold(
+        self, prompt_text: str, config: DtbAlgorithmConfig,
+        phase_recorder: DtbPhaseRecorder | None = None,
+    ) -> InterventionThreshold:
+        """No difficulty/history/full decision on the streaming short path."""
+        if config.fixed_check_length > 0:
+            return InterventionThreshold(config.fixed_check_length, "fixed_check_length")
+        if config.fixed_budget_tokens > 0 or not config.enable_scene_budget:
+            return InterventionThreshold(config.check_length, "runtime")
+        scene_info = self._match_scene(prompt_text, config, phase_recorder)
+        if scene_info.get("scene_matched"):
+            values = self.service_config.scenes.get(str(scene_info["scene"]), {})
+            return InterventionThreshold(
+                int(values.get("check_length", config.check_length)), "scene", scene_info)
+        return InterventionThreshold(config.check_length, "runtime", scene_info)
 
     def _match_scene(
         self,
@@ -105,9 +129,13 @@ class DtbBudgetResolver:
         hard_token_limit: int | None = None,
         reference: str = "",
         decision_trace: dict[str, Any] | None = None,
+        threshold: InterventionThreshold | None = None,
     ) -> DtbBudgetDecision:
         policy = self.policy
-        scene_info = self._match_scene(prompt_text, config, phase_recorder)
+        scene_info = (
+            threshold.scene_info if threshold is not None and threshold.scene_info is not None
+            else self._match_scene(prompt_text, config, phase_recorder)
+        )
         scene = str(scene_info.get("scene", "general"))
         scene_matched = bool(scene_info.get("scene_matched"))
         default_budget = config.default_budget
@@ -295,6 +323,12 @@ class DtbBudgetResolver:
                     "source": fixed_source_names[field_name],
                     "final": fixed_value,
                 }
+        if threshold is not None:
+            budget_values["check_length"] = threshold.tokens
+            source_by_field["check_length"] = {
+                "source": "intervention_threshold", "threshold_source": threshold.source,
+                "final": threshold.tokens,
+            }
         budget = ThinkingBudget(**budget_values)
 
         hard_limit_candidates = {

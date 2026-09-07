@@ -221,6 +221,9 @@ class DtbAlgorithmConfig:
                 raise ValueError(f"{name} must be a non-negative integer")
         if not 0 <= self.fixed_prob_th <= 1:
             raise ValueError("fixed_prob_th must be in [0, 1]")
+        if (self.fixed_budget_tokens > 0 and self.fixed_check_length > 0
+                and self.fixed_check_length > self.fixed_budget_tokens):
+            raise ValueError("fixed_check_length must not exceed fixed_budget_tokens")
 
     @property
     def default_budget(self) -> ThinkingBudget:

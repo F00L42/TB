@@ -159,7 +159,10 @@ class DtbRequestController:
     def _record_history(self, context: DtbRequestContext) -> None:
         if self.history_recorder is None:
             return
-        decision = context.budget_decision
+        decision = context.request_state.budget_decision
+        if decision is None:
+            # Native observation did not run a budget decision. Do not fabricate one.
+            return
         state = context.request_state
         self.history_recorder.record_outcome(HistoryOutcome.from_request(
             parent_request_id=context.request_id,
@@ -241,7 +244,7 @@ class DtbRequestController:
         controller_entry_started_at = (
             time.perf_counter() if phase_recorder is not None else None
         )
-        if getattr(request, "n", None) not in (None, 1):
+        if not getattr(request, "stream", False) and getattr(request, "n", None) not in (None, 1):
             return serving_chat.create_error_response("DTB currently supports only n=1")
         try:
             config = self._build_algorithm_config(request)
@@ -302,6 +305,29 @@ class DtbRequestController:
                 "completion token limit"
             )
 
+        native_params = (
+            request.to_sampling_params(completion_token_limit, serving_chat.default_sampling_params)
+            if request.stream else None
+        )
+        if request.stream:
+            from dtb.reasoning.generation_states import _output_kind_name
+            if (getattr(request, "n", None) not in (None, 1)
+                    or _output_kind_name(native_params) != "DELTA"):
+                # Outside observer's single-choice DELTA contract: keep the
+                # native generator and parser without a partial DTB ledger.
+                native_generator = serving_chat.engine_client.generate(
+                    engine_inputs[0], native_params, request_id,
+                    lora_request=lora_request, priority=getattr(request, "priority", None) or 0,
+                    data_parallel_rank=data_parallel_rank, trace_headers=trace_headers,
+                    prompt_text=engine_prompt_text, reasoning_ended=reasoning_ended,
+                    reasoning_parser_kwargs=reasoning_parser_kwargs,
+                )
+                return await native_chat_response(
+                    serving_chat, request, native_generator, request_id, model_name,
+                    conversation, tokenizer, request_metadata, reasoning_parser,
+                    response_parser, chat_template_kwargs,
+                )
+
         reasoning_protocol = None
         if request.stream:
             try:
@@ -321,10 +347,9 @@ class DtbRequestController:
                     # parser instances and their bound IDs are still checked
                     # on every streaming DTB request.
                     self._reasoning_protocol_tokenizer = tokenizer
-            except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
-                return serving_chat.create_error_response(
-                    f"DTB reasoning protocol binding failed: {exc}"
-                )
+            except (AttributeError, RuntimeError, TypeError, ValueError):
+                # No verified continuation protocol: same-child native completion.
+                reasoning_protocol = None
 
         prompt_token_ids = engine_inputs[0].get("prompt_token_ids", [])
         if engine_prompt_text is None:
@@ -342,45 +367,58 @@ class DtbRequestController:
         )
         hard_token_limit = min(remaining_context, completion_token_limit)
 
-        if phase_recorder is None:
-            decision = self.budget_resolver.resolve(
-                classification_text,
-                config,
-                None,
-                hard_token_limit=hard_token_limit,
-            )
-        else:
-            decision_started_at = time.perf_counter()
-            decision_trace: dict[str, Any] = {
-                "classification_source": text_views.classification_source,
-                "classification_input_chars": len(classification_text),
-                "initial_text_source": text_views.initial_text_source,
-                "completion_token_limit": completion_token_limit,
-            }
-            with phase_recorder.measure("decision.total"):
+        threshold = (
+            self.budget_resolver.intervention_threshold(
+                classification_text, config, phase_recorder)
+            if request.stream else None
+        )
+
+        def resolve_decision():
+            if phase_recorder is None:
                 decision = self.budget_resolver.resolve(
                     classification_text,
                     config,
-                    phase_recorder,
+                    None,
                     hard_token_limit=hard_token_limit,
-                    decision_trace=decision_trace,
+                    threshold=threshold,
                 )
-            decision_wall_ms = (
-                time.perf_counter() - decision_started_at
-            ) * 1000
-            phase_recorder.record_phase(
-                parent_request_id=request_id,
-                child_request_id="",
-                phase="decision",
-                round_id=0,
-                wall_ms=decision_wall_ms,
-                controller_cpu_ms=decision_wall_ms,
-                prompt_tokens=len(prompt_token_ids),
-                generated_tokens=0,
-                visible=False,
-                budget_decision=decision.to_telemetry(),
-                decision_details=decision_trace,
-            )
+            else:
+                decision_started_at = time.perf_counter()
+                decision_trace: dict[str, Any] = {
+                    "classification_source": text_views.classification_source,
+                    "classification_input_chars": len(classification_text),
+                    "initial_text_source": text_views.initial_text_source,
+                    "completion_token_limit": completion_token_limit,
+                }
+                with phase_recorder.measure("decision.total"):
+                    decision = self.budget_resolver.resolve(
+                        classification_text,
+                        config,
+                        phase_recorder,
+                        hard_token_limit=hard_token_limit,
+                        threshold=threshold,
+                        decision_trace=decision_trace,
+                    )
+                decision_wall_ms = (
+                    time.perf_counter() - decision_started_at
+                ) * 1000
+                phase_recorder.record_phase(
+                    parent_request_id=request_id,
+                    child_request_id="",
+                    phase="decision",
+                    round_id=0,
+                    wall_ms=decision_wall_ms,
+                    controller_cpu_ms=decision_wall_ms,
+                    prompt_tokens=len(prompt_token_ids),
+                    generated_tokens=0,
+                    visible=False,
+                    budget_decision=decision.to_telemetry(),
+                    decision_details=decision_trace,
+                )
+
+            return decision
+
+        decision = None if request.stream else resolve_decision()
 
         request_state = DtbRequestState(
             budget_decision=decision,
@@ -412,6 +450,11 @@ class DtbRequestController:
             phase_recorder=phase_recorder,
             stream_audit=self.observability.create_stream_audit(request_id),
             question_text=classification_text,
+            deferred_observation=bool(request.stream),
+            intervention_threshold=threshold.tokens if threshold is not None else 0,
+            intervention_threshold_source=threshold.source if threshold is not None else "none",
+            activate_budget=resolve_decision if request.stream else None,
+            observation_params=native_params,
         )
         response_generator = self._managed_generator(
             DtbStateMachine(context), context, request

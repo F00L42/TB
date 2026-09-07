@@ -64,6 +64,8 @@ class DtbRequestState:
     final_answer_reason: FinalAnswerReason | None = None
     assistant_completion_epoch: int = 1
     final_terminal_count: int = 0
+    unclassified_completion_tokens: int = 0
+    intervention_telemetry: dict | None = None
 
     def __post_init__(self) -> None:
         if (

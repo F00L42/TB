@@ -235,6 +235,10 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
             if record.get("phase") == "final_answer"
         ), {})
         decision_details = decision.get("decision_details")
+        observation = next((
+            record.get("intervention", {}) for record in request_records
+            if record.get("phase") == "native_passthrough"
+        ), {})
         decision_completion_limit = (
             decision_details.get("completion_token_limit")
             if isinstance(decision_details, dict) else None
@@ -250,13 +254,18 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
                 or decision.get("budget_plan")
             ),
             "decision_details": decision.get("decision_details"),
+            "intervention": observation or None,
+            "budget_resolution": (
+                "resolved" if decision else "not_required_native" if observation else "unknown"
+            ),
+            "unclassified_completion_tokens": observation.get("unclassified_completion_tokens", 0),
             # Phases are sequential. This is controller-accounted wall time,
             # not HTTP E2E; pair it with the client-side result CSV.
             "accounted_phase_wall_ms": round(sum(
                 float(record.get("wall_ms") or 0) for record in request_records), 3),
             "generate_calls": sum(
                 1 for record in request_records if record.get("phase") != "decision"),
-            "visible_think_tokens": sum(
+            "visible_think_tokens": int(observation.get("observed_reasoning_tokens") or 0) + sum(
                 int(record.get("generated_tokens") or 0)
                 for record in request_records
                 if record.get("phase") in {"initial_think", "iterative_think"}
@@ -266,7 +275,7 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
                 for record in request_records
                 if record.get("phase") == "confidence_probe"
             ),
-            "final_answer_tokens": sum(
+            "final_answer_tokens": int(observation.get("observed_final_tokens") or 0) + sum(
                 int(record.get("generated_tokens") or 0)
                 for record in request_records
                 if record.get("phase") == "final_answer"
@@ -287,7 +296,7 @@ def summarize_requests(records: list[dict[str, object]]) -> list[dict[str, objec
             "final_answer_reason": final_answer.get(
                 "final_answer_reason"),
             "completion_token_limit": final_answer.get(
-                "completion_token_limit", decision_completion_limit
+                "completion_token_limit", decision_completion_limit or observation.get("completion_token_limit")
             ),
             "emitted_completion_tokens_before": final_answer.get(
                 "emitted_completion_tokens_before"

@@ -252,14 +252,19 @@ def test_facade_never_decodes_and_preserves_native_response_metadata(
                 SimpleNamespace(),
             )
             items = [item async for item in response] if stream else response
-        assert len(engine.calls) == 2
+        assert len(engine.calls) == (1 if stream else 2)
         assert contexts[0].prompt_text_views.classification_source == expected_source
         assert contexts[0].question_text == ("latest user" if has_user else initial or "")
         assert contexts[0].request_state.completion_status == "success"
         if return_text:
             assert all(item.prompt is initial for item in items)
-        assert "prompt" not in submissions[-1]
-        assert engine.calls[-1]["kwargs"]["prompt_text"] is None
+        if stream:
+            assert submissions[0] is native
+            assert contexts[0].request_state.budget_decision is None
+            assert engine.calls[0]["kwargs"]["prompt_text"] is initial
+        else:
+            assert "prompt" not in submissions[-1]
+            assert engine.calls[-1]["kwargs"]["prompt_text"] is None
         assert native["prompt_token_ids"] == [60]
         assert engine.calls[-1]["kwargs"]["data_parallel_rank"] == 2
         assert engine.calls[-1]["kwargs"]["trace_headers"] == {"traceparent": "test"}

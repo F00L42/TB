@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional, Sequence, TYPE_CHECKING
+from typing import Any, Callable, Mapping, Optional, Sequence, TYPE_CHECKING
 
 from dtb.budgeting.budget_decision import DtbBudgetDecision
 from dtb.config.schema import DtbAlgorithmConfig, DtbAlgorithmPolicy
@@ -66,14 +66,18 @@ class DtbRequestContext:
     thinking_stop_strings: tuple[str, ...] = ()
     thinking_include_stop_str_in_output: bool | None = None
     controller_entry_started_at: float | None = None
+    deferred_observation: bool = False
+    intervention_threshold: int = 0
+    intervention_threshold_source: str = "unknown"
+    activate_budget: Callable[[], DtbBudgetDecision] | None = None
+    observation_params: Any = None
+    _owns_prompt: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         # Own the mutable ledger without copying multimodal/cache payloads.
         # Never mutate the original serving input or an engine submission.
-        self.engine_prompt = self.engine_prompt.copy()
-        self.engine_prompt["prompt_token_ids"] = list(
-            self.engine_prompt.get("prompt_token_ids", ())
-        )
+        if not self.deferred_observation:
+            self.own_prompt()
         if self.prompt_text_views is None:
             self.prompt_text_views = extract_prompt_text_views(
                 [], self.engine_prompt.get("prompt")
@@ -89,6 +93,14 @@ class DtbRequestContext:
         child = self.engine_prompt.copy()
         child["prompt_token_ids"] = list(self.engine_prompt["prompt_token_ids"])
         return child
+
+    def own_prompt(self) -> None:
+        """Copy the input ledger only when it is about to be mutated."""
+        if not self._owns_prompt:
+            self.engine_prompt = self.engine_prompt.copy()
+            self.engine_prompt["prompt_token_ids"] = list(
+                self.engine_prompt.get("prompt_token_ids", ()))
+            self._owns_prompt = True
 
     def record_first_engine_submission(self) -> None:
         if (
@@ -287,6 +299,7 @@ class DtbRequestContext:
 
     def _append_tokens(self, token_ids: Sequence[int]) -> None:
         if token_ids:
+            self.own_prompt()
             self.engine_prompt["prompt_token_ids"].extend(token_ids)
             # The native text no longer describes these IDs. Keep only the
             # immutable initial text view, never send stale text to vLLM.

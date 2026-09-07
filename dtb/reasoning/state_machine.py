@@ -18,6 +18,9 @@ class DtbStateMachine:
 
     async def run(self) -> None:
         current: Optional[Type[_BaseState]] = _ThinkingState
+        if self.context.deferred_observation:
+            from dtb.reasoning.deferred_observation import _DeferredInterventionState
+            current = _DeferredInterventionState
         try:
             while current is not None:
                 state_name = current.__name__
