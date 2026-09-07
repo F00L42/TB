@@ -92,17 +92,25 @@ def extract_value_logprobs(
     ]
 
 
+def mean_bottom_k_logprobs(values: list[float], bottom_k: int) -> float:
+    """Aggregate already-filtered values in the reference summation order."""
+    ordered = sorted(values)
+    if not ordered:
+        return 0.0
+    count = min(max(1, bottom_k), len(ordered))
+    return sum(ordered[:count]) / count
+
+
 def cal_value_min_confidence(
     logprobs: list[float | None],
     tokens: list[str | None],
     bottom_k: int = 3,
 ) -> float:
-    value_logprobs = sorted(extract_value_logprobs(logprobs, tokens))
+    value_logprobs = extract_value_logprobs(logprobs, tokens)
     if not value_logprobs:
         valid = [value for value in logprobs if value is not None]
         return min(valid) if valid else 0.0
-    count = min(max(1, bottom_k), len(value_logprobs))
-    return sum(value_logprobs[:count]) / count
+    return mean_bottom_k_logprobs(value_logprobs, bottom_k)
 
 
 def cal_reasoning_zone_confidence(

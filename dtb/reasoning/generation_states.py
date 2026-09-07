@@ -81,21 +81,6 @@ def _output_kind_name(value: Any) -> str:
     return text.upper()
 
 
-def _replace_or_append(
-    output_kind: str,
-    current_text: str,
-    current_token_ids: list[int],
-    chunk_text: str,
-    chunk_token_ids: list[int],
-) -> tuple[str, list[int]]:
-    if output_kind == "DELTA":
-        return (
-            current_text + chunk_text,
-            [*current_token_ids, *chunk_token_ids],
-        )
-    return chunk_text, list(chunk_token_ids)
-
-
 def _aligned_logprobs(
     raw_logprobs: Any,
     token_count: int,
@@ -196,9 +181,14 @@ class _BaseState(ABC):
             else ("DELTA" if getattr(context.request, "stream", False)
                   else "FINAL_ONLY")
         )
-        full_text = ""
+        text_parts: list[str] = []
         all_token_ids: list[int] = []
-        raw_full_text = ""
+        # Only legacy DELTA string-stop alignment needs the raw prefix. Token
+        # stops validate the current delta and never inspect earlier text/IDs.
+        retain_raw_prefix = (
+            kind == "DELTA" and not getattr(context.request, "stream", False)
+        )
+        raw_text_parts: list[str] = []
         raw_all_token_ids: list[int] = []
         raw_generated_tokens = 0
         last_output = None
@@ -208,17 +198,8 @@ class _BaseState(ABC):
             source_output = result.outputs[0]
             chunk_text = source_output.text or ""
             chunk_token_ids = list(source_output.token_ids or [])
-            prior_raw_text = raw_full_text if kind == "DELTA" else ""
-            prior_raw_token_ids = (
-                raw_all_token_ids if kind == "DELTA" else []
-            )
-            raw_full_text, raw_all_token_ids = _replace_or_append(
-                kind,
-                raw_full_text,
-                raw_all_token_ids,
-                chunk_text,
-                chunk_token_ids,
-            )
+            raw_chunk_text = chunk_text
+            raw_chunk_token_ids = chunk_token_ids
             if kind == "DELTA":
                 raw_generated_tokens += len(chunk_token_ids)
             else:
@@ -240,17 +221,22 @@ class _BaseState(ABC):
                 chunk_token_ids,
                 chunk_boundary,
                 source_output.stop_reason,
-                prior_text=prior_raw_text,
-                prior_token_ids=prior_raw_token_ids,
+                prior_text=(
+                    "".join(raw_text_parts)
+                    if retain_raw_prefix and chunk_boundary is not None
+                    else ""
+                ),
+                prior_token_ids=raw_all_token_ids,
             )
-
-            full_text, all_token_ids = _replace_or_append(
-                kind,
-                full_text,
-                all_token_ids,
-                chunk_text,
-                chunk_token_ids,
-            )
+            if retain_raw_prefix:
+                raw_text_parts.append(raw_chunk_text)
+                raw_all_token_ids.extend(raw_chunk_token_ids)
+            if kind == "DELTA":
+                text_parts.append(chunk_text)
+                all_token_ids.extend(chunk_token_ids)
+            else:
+                text_parts = [chunk_text]
+                all_token_ids = list(chunk_token_ids)
             if source_output.finish_reason is not None:
                 terminal_reason = (
                     source_output.stop_reason
@@ -304,6 +290,7 @@ class _BaseState(ABC):
                 context.last_chunk = visible_result
             last_output = result
 
+        full_text = "".join(text_parts)
         if detected_boundary is None:
             detected_boundary = detect_reasoning_boundary(
                 context,
@@ -328,7 +315,7 @@ class _BaseState(ABC):
     ) -> TrialObservation:
         """Collect the complete hidden trial for DELTA/FINAL/CUMULATIVE modes."""
         kind = _output_kind_name(output_kind)
-        text = ""
+        text_parts: list[str] = []
         token_ids: list[int] = []
         sample_logprobs: list[Any | None] = []
         sampled_token_ids: list[int] = []
@@ -343,12 +330,12 @@ class _BaseState(ABC):
             chunk_logprobs = _aligned_logprobs(
                 output.logprobs, len(chunk_token_ids))
             if kind == "DELTA":
-                text += chunk_text
+                text_parts.append(chunk_text)
                 token_ids.extend(chunk_token_ids)
                 sampled_token_ids.extend(chunk_token_ids)
                 sample_logprobs.extend(chunk_logprobs)
             else:
-                text = chunk_text
+                text_parts = [chunk_text]
                 token_ids = chunk_token_ids
                 sampled_token_ids = list(chunk_token_ids)
                 sample_logprobs = chunk_logprobs
@@ -359,7 +346,7 @@ class _BaseState(ABC):
             last_output = result
 
         return TrialObservation(
-            full_text=text,
+            full_text="".join(text_parts),
             all_token_ids=token_ids,
             sample_logprobs=sample_logprobs,
             sampled_token_ids=sampled_token_ids,
@@ -628,6 +615,7 @@ class _ConfidenceProbeState(_BaseState):
             enable_value_min_confidence=(
                 context.config.enable_value_min_confidence),
             value_min_bottom_k=context.config.value_min_bottom_k,
+            collect_diagnostics=recorder is not None,
         )
         state.last_confidence = assessment.score
         if not assessment.available:

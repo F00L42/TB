@@ -11,7 +11,7 @@ from dtb.reasoning.confidence import (
 )
 from dtb.reasoning.request_state import TrialObservation
 from dtb.reasoning.token_filter import (
-    cal_value_min_confidence,
+    mean_bottom_k_logprobs,
     extract_value_logprobs,
 )
 
@@ -20,12 +20,12 @@ from dtb.reasoning.token_filter import (
 class ConfidenceAssessment:
     score: float | None
     average_confidence: float
-    perplexity: float
+    perplexity: float | None
     value_min_raw: float | None
     method: str
     available: bool
     pair_count: int
-    value_pair_count: int
+    value_pair_count: int | None
 
 
 def assess_trial_confidence(
@@ -33,24 +33,25 @@ def assess_trial_confidence(
     *,
     enable_value_min_confidence: bool,
     value_min_bottom_k: int,
+    collect_diagnostics: bool = True,
 ) -> ConfidenceAssessment:
-    """Evaluate only ``observation``; no prior probe or thought can leak in."""
+    """Evaluate the current trial; optionally omit decision-independent work.
+
+    Direct callers retain full diagnostics by default. The production caller
+    requests them only for phase telemetry; uncomputed values are None, not zero.
+    """
     logprobs, tokens = extract_token_logprobs_and_texts(
         observation.sample_logprobs,
         observation.sampled_token_ids,
     )
-    valid_pairs = [
-        (logprob, token)
-        for logprob, token in zip(logprobs, tokens)
-        if logprob is not None
-    ]
+    pair_count = sum(logprob is not None for logprob in logprobs)
     average = cal_confidence(logprobs)
-    perplexity = cal_perplexity(logprobs)
-    if not valid_pairs:
+    perplexity = cal_perplexity(logprobs) if collect_diagnostics else None
+    if not pair_count:
         return ConfidenceAssessment(
             score=None,
             average_confidence=0.0,
-            perplexity=0.0,
+            perplexity=perplexity,
             value_min_raw=None,
             method="confidence_unavailable_fail_open",
             available=False,
@@ -58,10 +59,21 @@ def assess_trial_confidence(
             value_pair_count=0,
         )
 
+    if not enable_value_min_confidence and not collect_diagnostics:
+        return ConfidenceAssessment(
+            score=average,
+            average_confidence=average,
+            perplexity=None,
+            value_min_raw=None,
+            method="average_fallback",
+            available=True,
+            pair_count=pair_count,
+            value_pair_count=None,
+        )
+
     value_logprobs = extract_value_logprobs(logprobs, tokens)
     raw = (
-        cal_value_min_confidence(
-            logprobs, tokens, bottom_k=value_min_bottom_k)
+        mean_bottom_k_logprobs(value_logprobs, value_min_bottom_k)
         if value_logprobs else None
     )
     if (
@@ -76,7 +88,7 @@ def assess_trial_confidence(
             value_min_raw=raw,
             method="value_min",
             available=True,
-            pair_count=len(valid_pairs),
+            pair_count=pair_count,
             value_pair_count=len(value_logprobs),
         )
 
@@ -91,6 +103,6 @@ def assess_trial_confidence(
         value_min_raw=raw,
         method="average_fallback",
         available=True,
-        pair_count=len(valid_pairs),
+        pair_count=pair_count,
         value_pair_count=len(value_logprobs),
     )

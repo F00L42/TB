@@ -648,6 +648,8 @@ def save_chunk_sync(timestamp, chunk):
 
 
 async def async_save_chunk(timestamp, chunk):
+    if not ENABLE_CHUNKS_LOG:
+        return
     await asyncio.to_thread(save_chunk_sync, timestamp, chunk)
 
 

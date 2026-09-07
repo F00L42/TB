@@ -2,7 +2,7 @@
 
 ## 1. 设计目的
 
-Agent 多轮调用场景（如 LightCode 代码生成评测）中，模型每条任务发起约 60 次 LLM 调用，其中 97% 为工具调用轮次，thinking token 占输出 token 的绝大部分。DTB（Dynamic Think-Budget Control）已通过 vLLM serving patch 集成到推理服务端，但 LightCode 是黑盒环境，无法注入 DTB 参数或观察每轮请求。
+Agent 多轮调用场景（如 LightCode 代码生成评测）由多次模型与工具交互构成，请求数随任务和执行轨迹变化。早期单样本约 60 次 LLM 调用、97% 为工具调用轮次，不能据此推断 thinking token 占输出的绝大部分。run-05 的 301 个 Vanilla 请求中，292 个（97.01%）reasoning 不超过 850 token，表现为大量短思考与少量长尾；优化应抓大放小，最终以质量门后的完整 Agent task wall 裁决，详见 `docs/log/perf/agent_run05/RESULT.md`。DTB（Dynamic Think-Budget Control）已通过 vLLM serving patch 集成到推理服务端，但 LightCode 是黑盒环境，无法注入 DTB 参数或观察每轮请求。
 
 本模块的目标是：**在 Agent 和 vLLM 之间部署透传代理，为每轮请求注入 DTB 固定参数，并记录完整的多轮交互数据；在评测结束后，将这些记录确定性关联到 LightCode evaluation task、主 agent 和子 agent，使 Agent 场景下的 DTB 参数优化实验既可审计又便于人工阅读。** 优化实验的最终产出是将推荐参数配置到 `budget_config.yaml` 的 SCENES 中，后续只需 `enable_think_budget=true` 即可自动命中。
 
@@ -217,6 +217,11 @@ FULL_LOG_SHARD_MAX_BYTES = 16 * 1024 * 1024
 
 不再并行写单体 `full_log.jsonl`，否则无法解决上传问题。历史 run 的单体文件仍由抽取工具兼容读取。
 
+`ENABLE_CHUNKS_LOG=false` 时，异步日志入口直接返回，不提交线程池任务；同步入口继续保留开关检查。
+开启时保持现有逐条等待写入、记录顺序与日志格式。代理是临时实验设施，只做不改变功能的小优化，
+不作为当前 DTB 性能重构主线；关闭 chunk 日志时仍保留 full-log 和 token usage。正式配对实验须记录
+并统一两侧代理版本与日志开关，不能把这项源码层面的开销消除写成已测端到端收益。
+
 ### 4.4 full-log 分片契约
 
 目录布局：
@@ -397,6 +402,7 @@ LightCode smoke 9/9 生成报告，质量结果不低于 Vanilla。
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-09-07 | 更新 Agent 短思考/长尾背景；关闭 chunk 日志时在异步入口直接返回，避免无效线程池提交，开启态行为不变 | 用户确认代理为临时设施，仅顺手消除明确的小开销；未测量端到端收益 |
 | 2026-08-25 | 初始设计文档 `agent_multiturn_dtb_experiment_plan.md` | 定义 Agent 多轮场景 DTB 实验方案 |
 | 2026-08-25 | 删除轮次感知模式和管理 API | 推理服务无状态，代理职责明确为透传+记录+统计 |
 | 2026-08-25 | Session 识别从 5 分钟空闲改为 n_messages 单调性 | 实测时间窗口不可靠（session 内最大间隙 122.3s vs 边界间隙 27.1s） |

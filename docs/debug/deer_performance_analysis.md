@@ -233,6 +233,40 @@ confidence probe 由 `DtbAlgorithmPolicy` 固定为最多 50 token，并通过
 
 ## 5. 优化优先级
 
+### 当前 DTB 工程项（2026-09-07）：累计复制与诊断按需计算
+
+**源码确定：** `generation_states.py::consume_output()` 的 DELTA 收集已改为独占 token
+列表追加和文本片段末尾合并，消除每个 delta 重建历史 token 列表的累计复制。streaming
+token-stop 不再维护无消费者的 raw 全文/token 历史；legacy non-streaming DELTA 仍保留
+raw 前缀，并只在边界对齐时合并文本。CUMULATIVE/FINAL_ONLY 继续使用最后快照，已透传
+delta 与引擎输入快照不共享可变累计列表。trial 文本也改为片段合并。
+
+`assess_trial_confidence()` 保持默认完整诊断接口，生产状态机仅在 phase recorder 存在时
+请求完整诊断。无 phase 且 Value-Min 关闭时跳过 Value 过滤/排序；无 phase 时不计算
+perplexity，未计算字段使用 `None`。Value-Min 或 phase 所需的 Value 过滤只执行一次，
+保留原排序和求和顺序。平均置信度的缺失值分母、Value-Min fallback、fail-open、minimum
+门控、阈值比较、50-token probe、final cue、预算/调用数和 policy version 均未修改；
+phase 的原有反事实 `value_min_raw` 和 pair count 继续保留。
+
+**本地实测：** 新增 54 项等价性/所有权测试，全量 **319 tests / 1966 subtests 通过**；
+`compileall` 与改动文件 `git diff --check` 通过。首次全量运行的 3 个 parser 子进程因
+Windows stdin 句柄无效未启动；为测试进程绑定有效 NUL stdin 后原断言与完整套件通过，
+没有修改或跳过这些测试。
+
+本地 Windows/Python 3.14 CPU 微基准对照 `84eac7e` 的真实 `consume_output()` 与当前
+实现：每个 DELTA 为 `text="x", token_ids=[42]`，末个 delta 为 length terminal，使用
+无模型 context、关闭 phase；计时包括收集与入队，不包括 fixture 构造和出队核对。五次
+配对运行取中位数，逐条 text/IDs/finish/stop 与累计结果均完全一致：
+
+| 单 child DELTA 数 | 优化前 | 优化后 |
+|---:|---:|---:|
+| 1,000 | 9.33 ms | 5.97 ms |
+| 4,000 | 49.06 ms | 24.88 ms |
+| 16,000 | 378.04 ms | 126.69 ms |
+
+这是收集器 CPU 诊断，不是目标服务器 E2E。deferred 自然短路径不经过该 thinking
+收集器，较短 stride 下收益更小；本次没有修改 observer、队列、scene 路由或采样参数。
+
 ### 当前 Agent 前置项（2026-09-04）：取消完整输入 decode
 
 在最低介入值机制实施前，先独立完成
@@ -685,6 +719,8 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-07 | 优化 DTB DELTA 累计复制及置信度无用计算；新增 54 项等价性测试，全量 319 tests / 1966 subtests 通过，细节见第 5 节 | 保持算法与 parser-facing 输出语义，保留 phase 诊断；仅有本地收集器 CPU 微基准，尚无服务器 E2E 收益结论 |
+| 2026-09-07 | 更新 Agent 方案的短思考/长尾背景与介入阈值语义；短路径转发简化待最低介入值验收后再实验，parser 优化不列为当前重点；代理关闭 chunk 日志时跳过无效线程池提交，详见 `proxy/AGENTS.md` | 用户收敛优先级至校验成本与压缩收益的权衡；代理仅作小优化，本次无新增服务器时延结论 |
 | 2026-09-04 | 完成 [输入去 decode 前置重构](../design/dtb_token_authoritative_prompt.md#61-本地实施结果2026-09-04)：一次提取 serving 文本、不可变初始快照、Token ID 续写及提交快照、外部 `return_prompt_text` 元数据适配；全量 229 tests / 1966 subtests 通过，三份未改动 patch 合并适用性检查通过 | 新增 81 个用例验证缺文本、off/phase、token-only/混合边界、probe、流式/非流式、取消和错误；`controller.entry_to_first_submit` 为重叠 wall 而非纯 CPU/额外 phase。尚无服务器性能证据，先固定 eager 配对，再推进最低介入值 |
 | 2026-09-04 | 新增 Agent 前置优化入口，详细契约见 [输入去 decode 设计](../design/dtb_token_authoritative_prompt.md)：复用 serving 文本、取消运行时完整输入 decode、Token ID 权威续写及不可变文本快照；尚未实施 | 最低介入值前先独立去除重复输入处理；明确 `decision.total` 的计时缺口，避免与 stop+fresh-final 消除收益混算 |
 | 2026-09-04 | [replay2 服务器重测验收](../log/perf/agent_tool_call_run04_paired_replay/run_server_04_token_stop/replay2/RESULT.md)：60/60 条 DTB 的实际公共 reasoning 与 pre-parser 正文逐字一致，48 个混合 terminal chunk 的 344 字符完整保留；未修复 parser 对同输入恰好丢失这 48 个尾段；120 次工具流协议通过，另补到 1 次纯 `[248058]` 自然边界 | terminal reasoning tail discard 定向缺陷可关闭；工具选择/缺参语义偏离不作为框架修复失败。短思考 audit run 不裁决时延，下一步冻结补丁做 9 场景端到端质量/性能验证；不把保真通过扩大为模型边界语义或所有 parser 路径通过 |

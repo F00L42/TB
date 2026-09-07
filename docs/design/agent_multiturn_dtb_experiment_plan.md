@@ -2,20 +2,25 @@
 
 > **2026-08-29 日志契约更新**：本文中单体 `full_log.jsonl` 和“一个 proxy session 对应一个任务”的描述只适用于历史 run。新实验使用 `full_log/proxy_session_<id>/part-*.jsonl` 有界分片，并在下载 LightCode session 后通过逐请求 root user prompt 指纹生成 task/主子 agent 关联报告。规范接口、完整性规则和命令以 `proxy/AGENTS.md` 第 4.4-4.5 节为准。
 
+> **2026-09-07 场景与优先级更新**：Agent 优化按“大量短思考、少量长尾”抓大放小，先验收[最低介入值机制](dtb_minimum_intervention_threshold.md)，再依据结果实验短路径转发简化。下文早期固定参数扫描保留为历史候选流程，不代表立即启动新一轮扫描或已得到可发布的 Agent scene。
+
 ## 1. 目标与场景定义
 
 ### 1.1 目标
 
-在 Agent 辅助研发场景（如 CodeAgent/OpenCode 自主完成代码生成、编译、测试循环）中，通过 DTB 压缩思维链长度，实现**端到端任务完成时间**的降低，同时不使任务成功率显著退化。
+在 Agent 辅助研发场景（如 CodeAgent/OpenCode 自主完成代码生成、编译、测试循环）中，在系统可用性和任务正确率不低于同实验身份 Vanilla 的前提下，通过 DTB 压缩长尾思考，实现**端到端任务完成时间**的降低。主要指标是逐任务 `start_time → end_time` paired wall；单请求 E2E 和 token 仅用于解释机制。
 
-端到端收益公式：
+在相同请求/工作量下，控制器净收益的分析口径为：
 
 ```text
 净时延收益
-= Σ(每轮减少的 thinking token × TPOT) - Σ(每轮 probe 额外成本 + controller 开销)
+= Σ(每轮减少的可见生成 token × 基线 TPOT)
+  - Σ(hidden probe、重复 prefill、子请求排队、交接和 controller 的额外成本)
 ```
 
-多轮场景的特殊性：单条任务涉及 ~60 次 LLM 调用，thinking token 占 output 的绝大部分；即使单轮压缩收益小，累积效应显著。但同时，工具调用轮次的 thinking 被过度压缩可能导致工具参数错误，其影响会级联到后续所有轮次。
+当前目标场景是大量极短动作判断与少量长规划/排障轮次混合。run-05 的 301 个 Vanilla 请求中，292 个（97.01%）reasoning 不超过 850 token，P50 为 32、P95 为 439；这些是该 run 的观测，不能外推为所有 Agent 的固定分布。相比独立单轮场景，Agent 的可压缩空间较小，应让短请求自然完成，只在长尾上寻求收益。
+
+核心难点仍是校验成本与压缩效果的权衡：减少的可见 token 必须足以覆盖校验及交接成本。过重的 probe 即使缩短了可见输出，也可能没有端到端收益。工具选择或代码修改还会改变后续请求数、工具执行与编译/测试工作量，因此上式不能替代完整任务 wall 的实测。证据和身份限制见 [run-05 结果](../log/perf/agent_run05/RESULT.md)。
 
 ### 1.2 场景约束
 
@@ -50,7 +55,7 @@
 
 ### 1.4 实测基线参考
 
-基于 `results/qwen/local-task29/local-apiserver/dtb/run-01/` 的实际运行数据：
+以下保留 `results/qwen/local-task29/local-apiserver/dtb/run-01/` 的早期单样本数据；当前目标分布以第 1.1 节的 run-05 背景说明为准，不将字符数与 token 数相除推断 thinking 占比：
 
 | 指标 | 数值 |
 | --- | --- |
@@ -68,7 +73,7 @@ LightCode 评测结果（`evaluation_report_20260825153859.json`）：
 - 3 个 error 均为遗漏问题（i18n 配置 + null 防护），非逻辑错误
 
 关键观察：Agent 场景中 62/64 轮都是工具调用轮次，reasoning 文本长度集中在 23–300 字符，仅少数轮次超过 1000 字符。这意味着：
-- 单轮 thinking token 本身就不长，DTB 的主要收益不是大幅削减 thinking，而是通过更早的 confidence accepted 减少不必要的 iterative think 轮次和 probe 成本
+- 短思考轮次应优先同请求自然完成；长尾轮次才需要验证 probe 带来的压缩是否足以覆盖额外成本
 - 工具调用占比极高，参数选择必须保证工具调用格式不被破坏
 
 ## 2. 模块设计
@@ -695,7 +700,7 @@ python analysis/recommend_params.py \
 | Agent 无法配置自定义 endpoint | 需确认 Agent 支持配置 OpenAI base_url；否则需修改 Agent 代码或使用 iptables/环境变量重定向 |
 | 多轮间 prefix cache 命中率影响 E2E | 每组参数前清理 cache 或确保 cache 状态一致；在分析中分离 prefill 和 decode |
 | 工具调用格式对 thinking 压缩敏感 | 优先监控工具调用轮次的格式错误率；必要时使用更宽松的预算 |
-| 代理引入额外时延 | 代理是纯内存转发，额外时延 < 1ms；在 session 记录中包含代理处理时间以确认 |
+| 代理引入额外时延 | 代理包含日志与统计工作，尚无固定耗时上界；统一两侧版本和日志开关，仅作小范围优化，不作为当前算法主线 |
 | session 识别错误 | `n_messages` 单调性是确定性信号，无需阈值调优；Agent 重启对话的场景由分析脚本按时间窗口合并 |
 | telemetry=phase 的性能开销 | phase 模式不影响 E2E 排名；但不应把 phase run 和 off run 的 E2E 混合比较 |
 | reasoning_tokens 在 usage 中为 0 | 使用 reasoning 文本长度替代 token 计数计算 thinking_ratio；telemetry 数据可提供精确的 visible_think token |
@@ -710,3 +715,9 @@ python analysis/recommend_params.py \
 - 阶段一的 13 组预算参数可作为本方案阶段零的初始候选
 - 本方案的推荐参数需要独立的质量门验证，不能继承阶段一的非劣结论
 - 最终推荐参数将写入 `budget_config.yaml` 的 SCENES 中作为新的 Agent 场景，后续只需 `enable_think_budget=true` 即可自动命中
+
+## 9. 变更记录
+
+| 日期 | 变更 | 原因 |
+| --- | --- | --- |
+| 2026-09-07 | 按 run-05 更新目标场景、质量和 task wall 指标，明确抓大放小及校验成本权衡；短路径简化待最低介入值验收后再实验 | 用户确认当前优化优先级；早期单样本和单轮收益不能外推为 Agent 优化空间 |

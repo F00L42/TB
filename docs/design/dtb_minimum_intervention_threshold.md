@@ -236,6 +236,13 @@ DTB 算法 hard-think budget 仅约束激活后的压缩路径；原请求 conte
 不需要增加 `fixed_minimum_intervention_tokens`。如果以后证明第一次 probe 点与最低介入值确实需要
 独立调节，再通过新设计拆分，不能在首版预留含糊字段。
 
+**语义说明（2026-09-07）：**最低介入值回答“何时有资格打断原生生成”，首次检查点回答
+“何时评估一次 probe 是否值得结束思考”；两者概念不同，首版复用 `check_length` 数值。
+达到该值不是精确截断指令，也不保证发起 probe：同批 boundary/terminal 优先，资源检查可解除
+武装，abort drain 后还会按实际前缀重新决定分支。`min_think_tokens` 仍是可用置信度的接受门槛，
+`fixed_num_thinking=0` 仍表示未覆盖而非禁用 probe。本文不因上述概念区分增加参数或改变当前行为。
+将来若实验要求独立检查点或无 probe 策略，应单独定义语义；是否值得拆分仍由校验成本与净收益裁决。
+
 ### 5.3 初始 generation 参数
 
 初始观察 child 的参数必须尽可能等同原生请求：
@@ -1183,6 +1190,7 @@ G3 使用另启的 `OBSERVABILITY.mode=off` 正式性能 run，至少两轮相�
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-09-07 | 补充最低介入值与首次检查点的概念区别及当前复用语义；短路径 observer/queue 简化待本机制验收结果后再实验 | 用户确认优先验证抓大放小，算法持续关注校验成本与压缩效果的权衡；本次不改变运行时策略 |
 | 2026-09-07 | 实现默认 streaming observation、lazy budget/prompt ownership、abort-drain 完整前缀与自然 boundary final；扩展 phase/extractor，新增无模型回归、真实 tokenizer CPU-only 脚本和 G0–G3 可用性验证计划 | 用户要求按已确认设计开发；正式发布前必须验证真实 tokenizer、parser 和 Agent 端到端结果 |
 | 2026-09-07 | 决定采用排空点并完整接纳 H=G+R；增加排空已含 think/tool boundary 时的无 probe、无 cue final 续写，按实际前缀重检预算，更新接口/账本/测试 | 用户确认接纳完整排空前缀；减少字符归属切分，保持 parser 连续性 |
 | 2026-09-07 | 将正常介入改为显式 abort + pre-parser drain；增加固定源码依据、G/R/F 划分、自然 terminal 竞态、补尾能力门禁、异常清理及独立时延账本 | 核对“源码分析取消接口”最新对话；保留 frontend abort 输出可取回暂扣文本，但 collector 合并和 tokenizer 状态使其不能成为任意切点安全保证 |

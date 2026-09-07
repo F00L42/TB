@@ -166,6 +166,8 @@ DTB telemetry 由 `dtb/config/budget_config.yaml` 的 `OBSERVABILITY.mode` 在�
 
 本地改动优先做静态检查和无模型单元测试。不要把无法运行的服务器测试描述为已通过；不要修改或清理与当前任务无关的工作区改动。
 
+Windows 非交互测试启动子进程时，不依赖继承的标准输入。不需要输入的命令显式设置 stdin=subprocess.DEVNULL；需要输入时显式提供。不要将启用 PTY 作为句柄问题的唯一解决办法。
+
 ## 文档维护
 
 - 文档和结构化日志使用 UTF-8。
