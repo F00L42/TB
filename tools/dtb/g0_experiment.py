@@ -125,6 +125,7 @@ def run_matrix(args, runtime=None):
             runtime = Runtime(args.tokenizer)
         with (out / "results.jsonl").open("w", encoding="utf-8") as stream:
             for profile in profiles:
+                manifest.setdefault("tokenizer_initialization", {})[profile["id"]] = runtime.prepare_profile(profile)
                 params = runtime.params(profile)
                 decoder = runtime.decoder(runtime.encode("test"), params)
                 from tools.dtb.g0_runtime import identity
@@ -134,7 +135,15 @@ def run_matrix(args, runtime=None):
                     match = current == profile["identity"]
                     manifest["profile_identity_match"][profile["id"]] = match
                     if not match:
-                        raise ValueError("captured decoder/runtime identity differs; rerun in the service environment")
+                        differences = {key: {"captured": profile["identity"].get(key),
+                                             "current": current.get(key)}
+                                       for key in sorted(set(current) | set(profile["identity"]))
+                                       if key not in current or key not in profile["identity"]
+                                       or current[key] != profile["identity"][key]}
+                        manifest.setdefault("profile_identity_differences", {})[profile["id"]] = differences
+                        raise ValueError("captured decoder/runtime identity differs in "
+                                         + ", ".join(differences)
+                                         + "; see manifest.json/profile_identity_differences")
                 for fixture in fixtures:
                     prompt, sequence, cuts, prompt_source = materialize(runtime, fixture, profile)
                     input_key = digest({"prompt":prompt, "sequence":sequence})

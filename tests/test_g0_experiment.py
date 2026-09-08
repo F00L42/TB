@@ -3,6 +3,7 @@ import copy
 import json
 from pathlib import Path
 import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -24,6 +25,9 @@ class FakeRuntime:
 
     def encode(self, text):
         return list(map(ord, text))
+
+    def prepare_profile(self, profile):
+        return {"test_double": True}
 
     def decoder(self, prompt, params):
         return None
@@ -197,3 +201,104 @@ def test_prepared_inputs_exactly_match_archived_sources(tmp_path):
     regenerated = [json.loads(line) for line in (out/"requests.jsonl").read_text(encoding="utf-8").splitlines()]
     assert len(original) == 14
     assert original == regenerated
+
+
+class CachedTestTokenizer:
+    pass
+
+
+@pytest.fixture
+def tokenizer_pool_stub(monkeypatch):
+    calls = []
+
+    def maybe_make_thread_pool(tokenizer, copies=1):
+        calls.append((tokenizer, copies))
+        original = type(tokenizer)
+        tokenizer.__class__ = type("TokenizerPool" + original.__name__, (original,),
+                                   {"__module__": original.__module__})
+        # Deliberately no return: matches vLLM's successful in-place branch.
+
+    monkeypatch.setitem(sys.modules, "vllm.tokenizers",
+                        SimpleNamespace(maybe_make_thread_pool=maybe_make_thread_pool))
+    return calls
+
+
+def bare_runtime():
+    runtime = Runtime.__new__(Runtime)
+    runtime.tokenizer = runtime._base_tokenizer = CachedTestTokenizer()
+    runtime._pooled_tokenizer = None
+    return runtime
+
+
+def test_pool_is_in_place_on_copy_and_isolated_between_profiles(tokenizer_pool_stub):
+    runtime = bare_runtime()
+    base = runtime.tokenizer
+    profile = {"source": "live_captured", "identity": {
+        "tokenizer_class": f"{CachedTestTokenizer.__module__}.TokenizerPoolCachedTestTokenizer"}}
+    details = runtime.prepare_profile(profile)
+    pooled = runtime.tokenizer
+    assert pooled is not None and pooled is not base
+    assert type(base) is CachedTestTokenizer
+    assert details["actual_class"] == profile["identity"]["tokenizer_class"]
+    assert details["pool_requested"] and details["pool_copies"] == 1
+    assert tokenizer_pool_stub == [(pooled, 1)]
+    runtime.prepare_profile({"source": "historical"})
+    assert runtime.tokenizer is base
+    runtime.prepare_profile(profile)
+    assert runtime.tokenizer is pooled and len(tokenizer_pool_stub) == 1
+
+
+@pytest.mark.parametrize("source,expected", [
+    ("historical", "TokenizerPoolCachedTestTokenizer"),
+    ("single_field_control", "TokenizerPoolCachedTestTokenizer"),
+    ("log_derived", "TokenizerPoolCachedTestTokenizer"),
+    ("live_captured", "CachedTestTokenizer"),
+])
+def test_unwrapped_profiles_preserve_legacy_path(source, expected, tokenizer_pool_stub):
+    runtime = bare_runtime()
+    base = runtime.tokenizer
+    runtime.prepare_profile({"source": source, "identity": {"tokenizer_class": expected}})
+    assert runtime.tokenizer is base
+    assert not tokenizer_pool_stub
+
+
+@pytest.mark.parametrize("mismatch", [None, "tokenizer_fingerprint", "tokenizer_class"])
+def test_matrix_prepares_pool_before_strict_identity(tmp_path, tokenizer_pool_stub, mismatch):
+    class ProfileRuntime(FakeRuntime):
+        prepare_profile = Runtime.prepare_profile
+
+        def __init__(self):
+            super().__init__()
+            self.tokenizer = self._base_tokenizer = CachedTestTokenizer()
+            self._pooled_tokenizer = None
+
+        @property
+        def test_identity(self):
+            return {"tokenizer_class": f"{type(self.tokenizer).__module__}.{type(self.tokenizer).__name__}",
+                    "tokenizer_fingerprint": "unchanged-backend"}
+
+    expected = {"tokenizer_class": f"{CachedTestTokenizer.__module__}.TokenizerPoolCachedTestTokenizer",
+                "tokenizer_fingerprint": "unchanged-backend"}
+    if mismatch:
+        expected[mismatch] += "-different"
+    profile = {"id": "live", "source": "live_captured", "identity": expected,
+               "prompt_token_ids": [11], "request_id": "captured-request", "runtime_state": {},
+               "sampling_params": {"skip_special_tokens": True, "output_kind": "DELTA"}}
+    args = args_for(tmp_path)
+    args.profiles = tmp_path/"live.json"
+    args.profile_ids, args.stop_control, args.require_live_profile = None, False, True
+    write_json(args.profiles, {"schema": 1, "profiles": [profile]})
+    if mismatch:
+        with pytest.raises(ValueError, match=mismatch):
+            g0.run_matrix(args, ProfileRuntime())
+        assert (args.output_dir/"results.jsonl").read_text() == ""
+    else:
+        assert g0.run_matrix(args, ProfileRuntime()) == 0
+    manifest = json.loads((args.output_dir/"manifest.json").read_text())
+    assert manifest["tokenizer_initialization"]["live"]["pool_requested"]
+    assert manifest["profile_identity_match"]["live"] is (mismatch is None)
+    if mismatch:
+        differences = manifest["profile_identity_differences"]["live"]
+        assert list(differences) == [mismatch]
+        assert differences[mismatch]["captured"] == expected[mismatch]
+    assert len(tokenizer_pool_stub) == 1

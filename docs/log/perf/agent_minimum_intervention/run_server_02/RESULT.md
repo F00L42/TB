@@ -388,6 +388,16 @@ python -X utf8 tools/dtb/g0_experiment.py run \
 
 production fixture不指定prompt，因此直接使用profile中原始P；legacy fixture显式指定短prompt，不可拿legacy矩阵宣称真实P已验收。实际decoder类/源码hash、tokenizer指纹及依赖身份不同会报错，先排除环境不一致，不删除identity字段绕过检查。tokenizer指纹若显示`vocabulary_only`，还须单独核对tokenizer配置文件hash。
 
+**TokenizerPool初始化对齐修正（2026-09-08）：**服务器反馈步骤C仅有tokenizer类名差异：采集为`TokenizerPoolCachedTokenizersBackend`，离线为`CachedTokenizersBackend`。当前vLLM源码中，HfRenderer会调用`maybe_make_thread_pool()`原地添加线程安全包装；旧离线入口只调用`get_tokenizer()`，因而在同一容器中也会被严格身份比较拦截。这是测试初始化路径未对齐，不是重启矩阵已经出现文本错误。
+
+离线入口现在先按profile准备tokenizer，再构造decoder、取指纹并进行原有完整字典比较：
+
+- 仅对`source=live_captured`且采集类名以`TokenizerPool`开头的profile，复用当前安装vLLM的`maybe_make_thread_pool()`。像HfRenderer一样先浅拷贝基础tokenizer，再原地包装；不使用其返回值赋值，不伪造类名。
+- CPU矩阵为单线程，使用`copies=1`；它不是服务renderer工作线程数或池并发性能测试。H0/H1、log-derived及未采集到pool包装的profile仍使用原始tokenizer。同一矩阵混合多种profile时分别选择基础/包装对象，不把pool包装遗留到历史组。
+- `manifest.json/tokenizer_initialization`保存逐profile选择及实际类名。包装后仍严格比较**全部**identity字段；若仍不一致，错误消息列出差异字段，`profile_identity_differences`保存采集值/当前值，不忽略类名、模块路径或底层指纹差异。
+
+已有`captured/profile-0001.json`可继续使用，无需因这次脚本修正重启服务或重新采集。同步更新`g0_runtime.py`与`g0_experiment.py`后，使用上面的步骤C命令，仅将输出目录改为新的`.../g0_production/P-native-r2`（若已存在则再换新目录），保留原失败现场。实际服务器复测仍待回传；本地通过只验证包装调用与门禁逻辑，不代表目标decoder已通过。
+
 切点以token计；production阈值fixture用848个固定padding IDs把Unicode邻域放到850附近。它是合成生成序列，**不是历史模型输出IDs或真实触发阈值测量**。实际tokenizer使指定切点超界时脚本报错，保存证据后修改fixture并记录新hash，不静默缩小切点集。生产token-stop或length在拟定取消前生效的case显示not_applicable，需核对是否导致某个child无有效覆盖。
 
 显式skip=False等可达覆盖，应使用服务器真正收到该覆盖后的另一个profile重跑，不能只在已采profile里手动改值又保留live标签。对每种不同child参数/P逐个运行到不同目录；缺失的probe/iterative/final快照在报告中标“未覆盖”。相同profile重启通过不等于不同child参数之间、真实cue注入后也通过。
@@ -422,7 +432,7 @@ python -X utf8 tools/dtb/replay_tool_calls.py \
 
 至少回传baseline三组完整目录、所有captured profile及capture-error、P各组结果和failures/inputs、部署manifest、客户端smoke完整目录与对应phase/服务器日志提取。大型原始日志可按现有方案分片，保留归属索引；不能只回传summary。
 
-当前本地完成输入schema/来源核对、14条请求体逐条重新提取对账；上述pytest命令共59项通过（新增G0测试23项、已有介入测试36项），Python编译与diff空白检查通过。**尚未在目标tokenizer/vLLM环境运行H0/H1/P，未启动采集服务，也未发送真实回放请求**。首轮回传优先是A–C，用它判断旧G0是否由参数差异解释，再决定是否需要decoder修复或补足G0-I，不预设根因。
+当前本地完成输入schema/来源核对、14条请求体逐条重新提取对账；上述pytest命令共67项通过（G0测试31项、已有介入测试36项，含本次新增8项包装/严格比较回归），Python编译与diff空白检查通过。**本地没有目标tokenizer/vLLM运行环境；服务器已反馈旧脚本步骤C的TokenizerPool身份差异，修正后的服务器矩阵尚待回传**。首轮回传优先是A–C，用它判断旧G0是否由参数差异解释，再决定是否需要decoder修复或补足G0-I，不预设根因。
 
 ## 7. 复算与证据边界
 
@@ -441,3 +451,4 @@ python -X utf8 docs/log/perf/agent_minimum_intervention/run_server_02/analyze_ou
 | 2026-09-08 | 对b832b74两个子run完成原始完整输出/SSE/summary参数对账，区分26个工具选择偏离与上轮空参数故障，澄清log-outputs层级及证据边界 | 用户要求判断实际参数缺失来自模型还是parser；本轮实际没有复现空参数，不能混淆两类告警 |
 | 2026-09-08 | 新增第6节生产参数G0详细方案：profile冻结、skip单字段与完整生产矩阵、真实prompt/token切点、DTB各child及parser影响验证、分层修复与服务smoke门槛；原复算节顺延为7 | 用户要求明确真实任务试跑前的G0实验，避免把Vanilla的skip=True直接当作所有child生产配置，或将未实施脚本能力写成现有功能 |
 | 2026-09-08 | 补充6.8执行步骤、G0-P真实decoder矩阵与隔离服务profile采集脚本、H0/H1/日志模板和14条原始请求输入；保留旧脚本，明确G0-I未覆盖项及退出码/证据交付规则 | 用户要求提供可执行脚本与输入；区分开发测试、合成后缀、真实参数取证和生产验收，避免预检查通过被误用为上线结论 |
+| 2026-09-08 | 离线G0按live profile复用原生TokenizerPool包装，保留H0/H1路径和完整identity比较，增加差异字段记录、8项无模型回归及步骤C重跑说明 | 服务器采集含HfRenderer线程池包装，离线直接加载没有包装，同容器也产生类名差异；修正初始化而非绕过检查 |

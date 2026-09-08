@@ -58,6 +58,32 @@ class Runtime:
         self.Request, self.Decoder = EngineCoreRequest, IncrementalDetokenizer
         self.Processor, self.Collector = OutputProcessor, RequestOutputCollector
         self.tokenizer = get_tokenizer(tokenizer_path)
+        self._base_tokenizer = self.tokenizer
+        self._pooled_tokenizer = None
+
+    def prepare_profile(self, profile):
+        """Match the captured serving wrapper without changing legacy profiles.
+
+        Like HfRenderer, copy before applying the in-place vLLM wrapper. The
+        single-threaded CPU gate needs only one pool copy, not server workers.
+        Identity validation still checks the resulting actual class and backend.
+        """
+        expected = profile.get("identity", {}).get("tokenizer_class", "")
+        pooled = (profile["source"] == "live_captured"
+                  and expected.rsplit(".", 1)[-1].startswith("TokenizerPool"))
+        if pooled:
+            if self._pooled_tokenizer is None:
+                from vllm.tokenizers import maybe_make_thread_pool
+                tokenizer = copy.copy(self._base_tokenizer)
+                # The successful wrapping branch returns None; keep the object.
+                maybe_make_thread_pool(tokenizer, copies=1)
+                self._pooled_tokenizer = tokenizer
+            self.tokenizer = self._pooled_tokenizer
+        else:
+            self.tokenizer = self._base_tokenizer
+        return {"requested_class": expected or None,
+                "pool_requested": pooled, "pool_copies": 1 if pooled else None,
+                "actual_class": f"{type(self.tokenizer).__module__}.{type(self.tokenizer).__name__}"}
 
     def encode(self, text):
         return self.tokenizer.encode(text, add_special_tokens=False)
