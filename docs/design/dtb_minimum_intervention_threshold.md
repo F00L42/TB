@@ -1088,6 +1088,12 @@ python -m compileall -q dtb tools/validate_dtb_intervention_detokenizer.py
 
 #### 11.4.2 G0：部署身份与真实 tokenizer 门禁（CPU-only）
 
+2026-09-08 实验回填：`run_server_01` 已执行 G0/G1，完整结论见
+[G0/G1 结果与下一轮计划](../log/perf/agent_minimum_intervention/run_server_01/RESULT.md)。
+G0 在支持的无 string-stop 路径发现 Unicode 重启文本重复，门禁未通过；G1 phase 记录了
+31 次原生旁路与 1 次介入，尚未覆盖排空含 boundary 等分支。下文命令保留为初始验证计划，
+不因已执行回放而标记全部验收通过；下一轮先按结果文档执行 G0-R/G1-R。
+
 在目标服务的 Python 环境、实际 tokenizer 文件上执行；本机没有目标 tokenizer，以下未执行。
 确认部署包含新增 `deferred_observation.py`，按现有顺序应用同版本三个 vLLM patch，不混用旧
 parser。manifest 记录仓库 commit/dirty diff、vLLM/Ascend commit、patch/YAML/tokenizer hash、
@@ -1192,6 +1198,7 @@ G3 使用另启的 `OBSERVABILITY.mode=off` 正式性能 run，至少两轮相�
 | --- | --- | --- |
 | 2026-09-07 | 补充最低介入值与首次检查点的概念区别及当前复用语义；短路径 observer/queue 简化待本机制验收结果后再实验 | 用户确认优先验证抓大放小，算法持续关注校验成本与压缩效果的权衡；本次不改变运行时策略 |
 | 2026-09-07 | 实现默认 streaming observation、lazy budget/prompt ownership、abort-drain 完整前缀与自然 boundary final；扩展 phase/extractor，新增无模型回归、真实 tokenizer CPU-only 脚本和 G0–G3 可用性验证计划 | 用户要求按已确认设计开发；正式发布前必须验证真实 tokenizer、parser 和 Agent 端到端结果 |
+| 2026-09-08 | 链接 run_server_01 实测审计，标明 G0 Unicode 重启门禁失败、G1 短旁路正向证据及切换覆盖不足；下一轮先执行 G0-R/G1-R | 实测证明完整排空和 token 保全仍不能单独保证重启文本保真，不能跳过可用性门禁进行性能发布 |
 | 2026-09-07 | 决定采用排空点并完整接纳 H=G+R；增加排空已含 think/tool boundary 时的无 probe、无 cue final 续写，按实际前缀重检预算，更新接口/账本/测试 | 用户确认接纳完整排空前缀；减少字符归属切分，保持 parser 连续性 |
 | 2026-09-07 | 将正常介入改为显式 abort + pre-parser drain；增加固定源码依据、G/R/F 划分、自然 terminal 竞态、补尾能力门禁、异常清理及独立时延账本 | 核对“源码分析取消接口”最新对话；保留 frontend abort 输出可取回暂扣文本，但 collector 合并和 tokenizer 状态使其不能成为任意切点安全保证 |
 | 2026-09-07 | 默认观察、延迟完整预算、固定阈值约束；对齐 terminal 单发与异常清理，明确 prefix 不重计、abort 不等设备屏障；补充无模型解码重启测试和 Vanilla 尾部阈值筛选 | 用户澄清抓大放小的默认行为，消除短路径固定成本并在开发前验证切换语义 |
