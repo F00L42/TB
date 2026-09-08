@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "created_at": "2026-09-08T08:31:11.151799+00:00",
+  "repo_commit": "c56100572719b05a64312405e61e7449a317bb12",
+  "tokenizer": "/opt/w00618058/Qwen3.6-27B",
+  "profiles": [
+    {
+      "id": "H0-skip-false",
+      "source": "historical",
+      "evidence": "Original G0 SamplingParams; tokenizer/runtime defaults are recorded when executed.",
+      "sampling_params": {
+        "max_tokens": 4096,
+        "output_kind": "DELTA",
+        "stop": [],
+        "skip_special_tokens": false
+      }
+    }
+  ],
+  "fixtures_sha256": "26ac146dcafb03e933ac9e3f0a8e57e44b7ff3bf31135728fbc1de71fa9d44a3",
+  "script_sha256": {
+    "g0_experiment.py": "60951dc85f3cf355851032a3d7d4862984f9223eeac7254d6b45eefc8b63437b",
+    "g0_runtime.py": "1c91ce45625e71ed414e8d552a06ae786d0a05f13a24a440c9dc81f3bc546027",
+    "g0_support.py": "17afacddeddac124001e058f044b89316d4b1f265d861b73b98f7d9b852cf1c2"
+  },
+  "status": "completed",
+  "stream_interval": 1,
+  "scope": "CPU detokenizer/collector fixed suffix; not scheduler, DTB state-machine or parser acceptance",
+  "production_ready": false,
+  "profile_identity_match": {},
+  "runtime_identities": {
+    "H0-skip-false": {
+      "packages": {
+        "vllm": "0.23.0+empty",
+        "vllm-ascend": "0.23.0",
+        "transformers": "5.5.4",
+        "tokenizers": "0.22.2",
+        "fastokens": null,
+        "torch": "2.10.0+cpu",
+        "torch-npu": "2.10.0.post4"
+      },
+      "tokenizer_class": "vllm.tokenizers.hf.CachedTokenizersBackend",
+      "tokenizer_fingerprint_kind": "backend_json",
+      "tokenizer_fingerprint": "a57b5c62cd5f242a06c632b82cc0b4f8239d08cc80fd9347fc1f629be977c6ca",
+      "decoder_class": "vllm.v1.engine.detokenizer.FastIncrementalDetokenizer",
+      "decoder_source": "/vllm-workspace/vllm/vllm/v1/engine/detokenizer.py",
+      "decoder_source_sha256": "52d43b97d5c0f84285df596b2da5f4ee32184b9f41b87c6ef99437225b5720b5",
+      "decode_stream_module": "tokenizers.decoders",
+      "use_fast_detokenizer": true
+    }
+  }
+}
