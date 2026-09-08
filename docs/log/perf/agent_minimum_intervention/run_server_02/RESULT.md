@@ -127,13 +127,13 @@ Get timestamp for report filename
 3. 若该次complete全文本身缺少函数闭合/参数，优先核对实际停止原因及模型/解码；若全文XML完整合法而SSE参数为空，再补实际tool parser输入与终态delta，做原版/补丁固定流对照。不要对新的正常bash调用做无限扩样。
 4. 当前日志没有完整token IDs及模型原始分片，不能据此修复G0。新证据表明Vanilla使用skip_special_tokens=True，而G0脚本显式False；这支持优先对齐生产参数，但未证明该差异就是G0根因，也未验证重启。
 
-## 6. 生产参数下的 G0 实验详细方案（待实施）
+## 6. 生产参数下的 G0 实验详细方案（G0-P工具已补齐，服务器待执行）
 
 ### 6.1 目标、起点与裁决边界
 
 目标是确认：**真实生产请求经最低介入值机制取消、接纳完整排空前缀并重启后，是否保持text/token IDs及parser-facing语义连续**，而不是单纯消除日志中的特殊标记。基线为本报告分析的b832b结果与现有 `tools/validate_dtb_intervention_detokenizer.py`；不预设需要修改运行时。
 
-当前证据：旧G0有60/768个固定序列文本不一致，支持的无string-stop子集也失败30/384；本轮原生Vanilla日志显示 `skip_special_tokens=True`，旧G0固定False。但DTB observation/probe/iterative/final的有效参数及实际decoder后端未全部捕获，**True尚不能代表所有生产child**。本节实验尚未执行，后文拟新增接口也尚未实现。
+当前证据：旧G0有60/768个固定序列文本不一致，支持的无string-stop子集也失败30/384；本轮原生Vanilla日志显示 `skip_special_tokens=True`，旧G0固定False。但DTB observation/probe/iterative/final的有效参数及实际decoder后端未全部捕获，**True尚不能代表所有生产child**。本节服务器实验尚未执行；G0-P脚本、输入和执行步骤已补充到6.8。G0-I完整适配/serving固定流验收仍未由新脚本覆盖，不能据CPU门禁通过宣告生产可用。
 
 实验分三级：
 
@@ -191,12 +191,12 @@ python tools/validate_dtb_intervention_detokenizer.py \
 
 执行器必须保存实际退出码；旧脚本发现任何不一致就返回1，这是实验失败结果，不是执行器异常。不通过管道丢失退出码，也不只保存summary而丢弃失败记录。
 
-**待实现的最小测试入口扩展**（本次仅写方案，不提供假装可执行的新增CLI）：
+**已实现的独立入口：`tools/dtb/g0_experiment.py`**。旧脚本不修改，新入口支持profile/fixture输入、独立输出目录和矩阵选择；H0/H1分别保存，不能以修改源码默认值代替单字段对照。
 
-- 保留 `--tokenizer` 的历史默认行为；新增profile输入、fixture输入、输出目录与显式矩阵选择能力。skip=True/False必须可分别运行，不能只把源码False改True覆盖历史对照。
-- profile输入按6.2驱动真实EngineCoreRequest/decoder；解码参数不缺省覆盖，生产StopChecker路径不能偷偷绕开。固定token序列的测试不验证temperature/seed对应的采样过程，仍保存这些字段以审计身份。
-- 接受原始 `prompt_token_ids`，可选择历史短prompt或真实prompt，不能decode再encode prompt。新增无模型单元测试验证profile装载、无未知字段静默忽略、布尔值/输出kind一致及矩阵计数。
-- 输出结构化JSONL到独立文件，stdout/stderr另存；每个失败保留逐步证据，完成后写机器可读汇总及非零退出码。本文所称生产参数矩阵必须等扩展实现后才可执行。
+- 使用目标环境的真实EngineCoreRequest、IncrementalDetokenizer、OutputProcessor与collector。固定序列驱动时显式考虑EOS、token-stop、string-stop及length；不加载权重、不启动scheduler，不声称执行了真实StopChecker或采样。当前只支持n=1、DELTA、detokenize=True、min_tokens=0和无状态采样配置；其他形状显式报错，不静默降级。
+- 接受原始 `prompt_token_ids`，保存完整P和固定生成IDs；不decode再encode prompt。profile未知字段在目标SamplingParams构造前拒绝。日志推导参数与真实采集参数采用不同source，`--require-live-profile`拒绝前者。
+- 输出结构化JSONL、失败逐步证据、机器可读汇总与退出码。环境初始化异常也写error.json。批处理保存各组stdout/stderr及退出码，H0失败不阻断H1。
+- 新脚本仅覆盖6.4中**相同profile、固定H/S的decoder/collector重启**。`forced_close`是历史构造后缀，不是实际DTB trial/cue实现；自然stop早于拟定取消的case记not_applicable，不能算作真实竞态或自然terminal旁路验收。详见6.8的未覆盖清单。
 
 ### 6.4 第三步：固定token对照契约与真实fixture
 
@@ -275,6 +275,155 @@ G0-P/I通过后，再在隔离服务以生产参数对少量真实长请求做G0
 
 这一门槛只关闭已测生产路径的G0风险，不要求消除所有Vanilla语义偏离，也不证明所有Unicode/未知环境永不出错。上轮空arguments与正式Agent质量/时延仍按各自实验独立裁决。
 
+### 6.8 可执行交付：脚本、输入与步骤
+
+#### 6.8.1 文件与职责
+
+下列路径相对仓库根目录；所有命令在仓库根目录执行。服务器命令采用Linux shell续行语法；PowerShell可合并成单行执行。
+
+| 文件 | 用途 |
+| --- | --- |
+| `tools/dtb/g0_experiment.py` | `prepare / validate / batch / run / capture-server`统一入口；不修改正常服务源码 |
+| `tools/dtb/g0_runtime.py` | 延迟导入目标vLLM，真实decoder/collector重启、EOS/stop终止建模及环境指纹 |
+| `tools/dtb/g0_support.py` | 严格输入校验、归属核对、原始请求体提取、独立输出目录 |
+| `tests/test_g0_experiment.py` | 无模型开发测试；不代表真实decoder通过 |
+| `input/g0/legacy_profiles.json` | H0=False、H1=True，SamplingParams仅此字段不同 |
+| `input/g0/vanilla_log_profile.json` | 本轮日志推导的Vanilla参数；不是live profile，不能单独完成生产验收 |
+| `input/g0/legacy_fixtures.jsonl` | 原四fixture、所有切点、pending=0/1/4、两种后缀 |
+| `input/g0/production_fixtures.jsonl` | Unicode全切点、T=850附近切点、含中文/emoji参数的合法Qwen XML文本；后缀均为合成固定输入 |
+| `input/g0/request_selection.json` | run-05短请求＋全部13条reasoning>512请求的精确ID选择 |
+| `input/g0/prepared/requests.jsonl` | 已提取14条完整原始request_body，约2.9MB；可直接传给现有回放脚本 |
+| `input/g0/prepared/manifest.json` | 来源run、选择列表与选择hash；每条输入另有请求体hash及source_file/source_line |
+
+表中`input/`完整前缀为 `docs/log/perf/agent_minimum_intervention/input/`。prepared中的body未插入标记、未重新构造messages。回放器会按既有规则设置variant/stream/request ID，实际发送body仍由其manifest/chunks记录；本轮不要额外覆盖temperature、top_p、seed或max_tokens。
+
+输入行号及历史用途：
+
+| prepared行 | 原请求ID | 历史reasoning tokens / 角色 |
+| ---: | --- | --- |
+| 1 | `2ef6d0fb695340d9` | 短请求，先用于native参数/P采集 |
+| 2–4 | `236bb99275fd4fde`、`c7af9207ac9e49d0`、`93e063de1af94fc7` | 2865 / 2086 / 1682，辅助请求；不能当作长工具请求 |
+| 5 | `8deb2c5c7d444684` | 1356，主agent，历史read调用；长工具smoke首选 |
+| 6–10 | `a01c8b87f1a94920`、`01c0d54221fc4048`、`953bc7ce51544f9e`、`3df06fd15ece471b`、`667d0d04cf2f49aa` | 932 / 927 / 919 / 863 / 857，子agent或辅助请求 |
+| 11–14 | `1be39e7a64444784`、`e56cd6f4f895481e`、`ad8a9c51a7974d7c`、`29b8bb88babf4bd4` | 748 / 640 / 534 / 520，主agent，阈值以下对照 |
+
+历史长度用于选样，**不保证重采样再次超过850**。全部标为`latency_eligible=false`，这是G0取证输入，不是已冻结的参数搜索性能数据集。HTTP回放不实际执行工具，语义期望偏离仍须与协议错误分开。
+
+#### 6.8.2 步骤A：输入与H0/H1预检查（CPU，不启动推理）
+
+已附prepared输入，无需重新提取。需要复核来源时可提取到新目录，不能覆盖已有证据：
+
+```bash
+python -X utf8 tools/dtb/g0_experiment.py prepare \
+  --selection docs/log/perf/agent_minimum_intervention/input/g0/request_selection.json \
+  --output-dir docs/log/perf/agent_minimum_intervention/run_server_03/g0_production/prepared_check
+
+python -X utf8 tools/dtb/g0_experiment.py validate \
+  --profiles docs/log/perf/agent_minimum_intervention/input/g0/legacy_profiles.json \
+  --fixtures docs/log/perf/agent_minimum_intervention/input/g0/legacy_fixtures.jsonl
+```
+
+使用与服务相同的Python和tokenizer目录；以下路径沿用历史部署示例，实际不同则替换，并记入部署manifest。无需权重推理，但必须能导入服务器实际vLLM及其依赖。
+
+```bash
+python -X utf8 tools/dtb/g0_experiment.py batch \
+  --tokenizer /opt/w00618058/Qwen3.6-27B \
+  --output-dir docs/log/perf/agent_minimum_intervention/run_server_03/g0_production/baseline
+```
+
+批处理依次运行H0、H1、log-derived，前一组失败仍执行后组。输出`batch_summary.json`记录每个真实退出码与命令，另存每组stdout/stderr。各子目录包含`manifest.json`、`results.jsonl`、`summary.json`、`inputs/`和`failures/`；失败文件保存reference/resumed逐token文本、首差位置及H/S IDs。环境异常看`error.json`。
+
+- 退出0：该组所有**适用**case通过；仍需查看not_applicable数和未覆盖项。
+- 退出1：存在保真差异；H0复现旧问题时这是有效实验结果，不是脚本启动失败。
+- 退出2：配置/依赖/执行异常；不能统计为模型或decoder失败率。
+- 退出3：没有适用且通过的case；不能当通过。
+
+H0/H1包含不匹配string-stop对照，按summary分组看无stop子集。log-derived不添加string-stop，但还使用合成短prompt，仅用于参数组合预检查。所有summary固定`production_ready=false`，因为本入口不负责完整G0裁决。
+
+#### 6.8.3 步骤B：隔离服务采集真实profile/P
+
+只在获准的实验实例使用；不停止现有生产服务，不在现有满载设备旁擅自新增模型副本。采集器通过进程内hook包装`IncrementalDetokenizer.from_new_request`，先构造原decoder，再对request ID白名单保存**实际EngineCoreRequest参数、原始prompt IDs、EOS运行态、decoder/tokenizer指纹**。没有改写参数或正常源码。该包装尚需服务器首跑验证；若无profile或出现capture-error，采集失败，不能用日志模板补成live。
+
+启动方式是把原API server的参数传到`--`之后，**不是**把`vllm serve MODEL`整条命令传进去。以下为骨架，执行前必须补回原部署的并行、Ascend、MTP、cache、generation_config、chat template等全部参数；不能凭此骨架重建生产身份。模型名/parser参数也应与原服务核对。
+
+```bash
+python -X utf8 tools/dtb/g0_experiment.py capture-server \
+  --output-dir docs/log/perf/agent_minimum_intervention/run_server_03/g0_production/captured \
+  --request-prefix chatcmpl-dtbtool- \
+  -- --model /opt/w00618058/Qwen3.6-27B \
+  --served-model-name qwen3.6-27b --host 127.0.0.1 --port 9002 \
+  --enable-auto-tool-choice --tool-call-parser qwen3_coder --reasoning-parser qwen3
+```
+
+这里的白名单仅用于**无其他回放流量的隔离实例**。如共用实例，应收窄为`chatcmpl-dtbtool-l1-a1-`并只采行1。服务侧的最终ID可先由下方`--list-request-ids`检查；通常在客户端request ID前加`chatcmpl-`。原始profile可能包含敏感prompt IDs，按内部实验日志管理，不对外发布。
+
+另开终端，先仅发送行1的Vanilla；不为了取profile提前触发未经验证的DTB切换：
+
+```bash
+python -X utf8 tools/dtb/replay_tool_calls.py \
+  --file docs/log/perf/agent_minimum_intervention/input/g0/prepared/requests.jsonl \
+  --lines 1 --mode vanilla --repetitions 1 --request-id-run g0-native-profile \
+  --url http://127.0.0.1:9002/v1/chat/completions --model qwen3.6-27b \
+  --output-dir docs/log/perf/agent_minimum_intervention/run_server_03/g0_production/native_capture
+```
+
+加`--list-request-ids`可只打印请求ID而不发送。需要认证时使用现有`OPENAI_API_KEY`，不要把密钥写入文档/profile。
+
+检查`captured/profile-0001.json`：request_id应属于刚才的Vanilla，source=`live_captured`，有非空prompt IDs、identity、runtime_state，实际skip/stop/max_tokens与服务一致。编号表示采集顺序，**不是phase类型**；不能盲目把0002当observation。保存完整部署manifest（6.2），采集器的capture_manifest不是其替代：它未采集generate层kwargs、parser初态、CANN、全部配置文件hash和dirty diff。
+
+采集会增加序列化/I/O成本，即使`OBSERVABILITY.mode=off`也属于诊断run；不混入正式off时延排名。这里无需开启stream_audit。若后续要确认真实介入，另开`phase`账本run，仍与正式off性能分开。
+
+#### 6.8.4 步骤C：真实profile固定流矩阵
+
+将步骤B实际得到的native profile传入；下例假设核对后确为0001：
+
+```bash
+python -X utf8 tools/dtb/g0_experiment.py run \
+  --tokenizer /opt/w00618058/Qwen3.6-27B \
+  --profiles docs/log/perf/agent_minimum_intervention/run_server_03/g0_production/captured/profile-0001.json \
+  --require-live-profile \
+  --fixtures docs/log/perf/agent_minimum_intervention/input/g0/production_fixtures.jsonl \
+  --output-dir docs/log/perf/agent_minimum_intervention/run_server_03/g0_production/P-native
+```
+
+production fixture不指定prompt，因此直接使用profile中原始P；legacy fixture显式指定短prompt，不可拿legacy矩阵宣称真实P已验收。实际decoder类/源码hash、tokenizer指纹及依赖身份不同会报错，先排除环境不一致，不删除identity字段绕过检查。tokenizer指纹若显示`vocabulary_only`，还须单独核对tokenizer配置文件hash。
+
+切点以token计；production阈值fixture用848个固定padding IDs把Unicode邻域放到850附近。它是合成生成序列，**不是历史模型输出IDs或真实触发阈值测量**。实际tokenizer使指定切点超界时脚本报错，保存证据后修改fixture并记录新hash，不静默缩小切点集。生产token-stop或length在拟定取消前生效的case显示not_applicable，需核对是否导致某个child无有效覆盖。
+
+显式skip=False等可达覆盖，应使用服务器真正收到该覆盖后的另一个profile重跑，不能只在已采profile里手动改值又保留live标签。对每种不同child参数/P逐个运行到不同目录；缺失的probe/iterative/final快照在报告中标“未覆盖”。相同profile重启通过不等于不同child参数之间、真实cue注入后也通过。
+
+#### 6.8.5 步骤D：后续门禁与真实回放入口
+
+当前可在本地或服务器执行已有开发回归：
+
+```bash
+python -m pytest -p no:cacheprovider tests/test_g0_experiment.py tests/test_dtb_intervention.py -q
+```
+
+这些测试的engine/parser替身只验证开发契约，**不替代6.5要求的真实DTB适配＋parser＋serving固定流G0-I**。本次新增工具没有实现generate层child构造快照、真实cue跨phase固定流、自然结束抢先的服务终态、实际parser输入/输出逐delta比对；这些仍是进入完整真实任务前的未关闭门禁，不能以CPU绿灯或下面回放成功代替。
+
+在对应G0-P/I门禁关闭后，以下命令可用于G0-S隔离服务smoke。首先只跑行5一次配对，确认phase账本/child ID中确实发生介入；没有介入就仅记旁路样本。若0001等已存在不覆盖，继续按新增profile的request_id/phase归属选取，并将新child参数回灌步骤C。
+
+```bash
+python -X utf8 tools/dtb/replay_tool_calls.py \
+  --file docs/log/perf/agent_minimum_intervention/input/g0/prepared/requests.jsonl \
+  --lines 5 --mode both --repetitions 1 --order alternating \
+  --request-id-run g0-production-smoke \
+  --url http://127.0.0.1:9002/v1/chat/completions --model qwen3.6-27b \
+  --fixed-budget-tokens 20000 --fixed-check-length 850 \
+  --fixed-think-stride 500 --fixed-num-thinking 5 \
+  --fixed-min-think-tokens 1 --fixed-prob-th 0.93 \
+  --output-dir docs/log/perf/agent_minimum_intervention/run_server_03/g0_production/smoke
+```
+
+单并发，stream默认开启，stream_interval保持1，不做其他值实验。若需要补覆盖，将`--lines`改为`1,5,11,12,13,14`用于短/阈值下/长工具对照；辅助长请求另选`2,3,4,7`，不要混作工具正确率。每次修改输入选择/重复次数使用新run ID和输出目录。不要通过降低T强行触发后就声称生产T=850已覆盖。
+
+#### 6.8.6 回传清单与本地验证状态
+
+至少回传baseline三组完整目录、所有captured profile及capture-error、P各组结果和failures/inputs、部署manifest、客户端smoke完整目录与对应phase/服务器日志提取。大型原始日志可按现有方案分片，保留归属索引；不能只回传summary。
+
+当前本地完成输入schema/来源核对、14条请求体逐条重新提取对账；上述pytest命令共59项通过（新增G0测试23项、已有介入测试36项），Python编译与diff空白检查通过。**尚未在目标tokenizer/vLLM环境运行H0/H1/P，未启动采集服务，也未发送真实回放请求**。首轮回传优先是A–C，用它判断旧G0是否由参数差异解释，再决定是否需要decoder修复或补足G0-I，不预设根因。
+
 ## 7. 复算与证据边界
 
 新增 `analyze_output_logs.py` 与 `output_evidence.json`；保留两个子run的自动RESULT原文。运行：
@@ -291,3 +440,4 @@ python -X utf8 docs/log/perf/agent_minimum_intervention/run_server_02/analyze_ou
 | --- | --- | --- |
 | 2026-09-08 | 对b832b74两个子run完成原始完整输出/SSE/summary参数对账，区分26个工具选择偏离与上轮空参数故障，澄清log-outputs层级及证据边界 | 用户要求判断实际参数缺失来自模型还是parser；本轮实际没有复现空参数，不能混淆两类告警 |
 | 2026-09-08 | 新增第6节生产参数G0详细方案：profile冻结、skip单字段与完整生产矩阵、真实prompt/token切点、DTB各child及parser影响验证、分层修复与服务smoke门槛；原复算节顺延为7 | 用户要求明确真实任务试跑前的G0实验，避免把Vanilla的skip=True直接当作所有child生产配置，或将未实施脚本能力写成现有功能 |
+| 2026-09-08 | 补充6.8执行步骤、G0-P真实decoder矩阵与隔离服务profile采集脚本、H0/H1/日志模板和14条原始请求输入；保留旧脚本，明确G0-I未覆盖项及退出码/证据交付规则 | 用户要求提供可执行脚本与输入；区分开发测试、合成后缀、真实参数取证和生产验收，避免预检查通过被误用为上线结论 |
