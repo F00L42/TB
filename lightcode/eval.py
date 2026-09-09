@@ -39,26 +39,48 @@ def build_request_body(test_case, config):
         "skill": "code-production-evaluation",
         "git_url": test_case.get("git_url", ""),
         "branch": test_case.get("branch", ""),
-        "description": test_case.get("Question",""),
+        "description":  f"使用 code-production-evaluation 完成评测 \n {test_case.get('Question', '')}",
         "base_commit": test_case.get("base_commit", ""),
-        "patch": f"使用 code-production-evaluation 完成评测 \n {test_case.get('Answer', '')}",
+        "patch": test_case.get('Answer', ''),
         "ut_patch": test_case.get("ut_patch", ""),
         "build_command": test_case.get("build_command", ""),
         "settings": test_case.get("settings", "")
     }
     
     return {
-        "taskInfo": {
+        "task_info": {
             "type": "evaluation",
-            "desc": "请使用code-production-evaluation对以下用例完成评测",
+            "desc": "使用code-production-evaluation对以下用例完成评测.",
             "params": params
         },
-        "autoRecycle": True,
-        "template_id": config.get("template_id", 57),
+        "auto_recycle": True,
+        "agent_type": config.get("agent_type", "opencode"),
         "env": {
             "USER_ID": config.get("user_id", ""),
-            "X_AUTH_TOKEN": config.get("token", "")
-        }
+            "X_AUTH_TOKEN": config.get("x_auth_token")
+        },
+        # 生产环境使用template_id,beta环境直接使用以下参数,把template_id注释掉
+        "template_id": config.get("template_id", 57),
+        # skills按需配置,目前AR2code保持当前配置即可
+        # "skills": [                          
+        #     {
+        #     "skill_id": "code-production-evaluation",            
+        #     "version": "1.0.2"               
+        #     }
+        # ],
+        # "model_config": {                     
+        #     "model": config.get("model_id", "glm-5.2"),                 
+        #     "provider_config": {               
+        #         "base_url": config.get("provider_base_url", "http://oneapi.rnd.huawei.com/v1"),            
+        #         "api_key": config.get("provider_api_key", "sk-1234"),
+        #     "models": [                       
+        #         {   
+        #         "id": config.get("model_id", "glm-5.2"),             
+        #         "name": config.get("model_id", "glm-5.2"),            
+        #         }
+        #       ]
+        #     }
+        # }
     }
 
 def create_task(body, config):
@@ -84,11 +106,10 @@ def query_task_status(task_id, config):
         
         if response.status_code == 200 and result_data.get("success"):
             data = result_data.get("data", {})
-            task_params = data.get("taskParams") or {}
             return {
                 "success": True,
                 "status": data.get("status", "UNKNOWN"),
-                "branch": task_params.get("branch", "") if isinstance(task_params, dict) else "",
+                "branch": data.get("taskParams", "").get("branch", ""),
                 "session_history_url": data.get("sessionHistoryUrl", ""),
                 "error_message": data.get("errorMessage", ""),
                 "create_time": data.get("createTime", ""),
@@ -104,7 +125,6 @@ def save_results_thread_safe(results_dict, output_file, file_lock):
     """线程安全地将结果刷入磁盘"""
     with file_lock:
         with open(output_file, 'w', encoding='utf-8') as f:
-            # 转换为列表格式保存
             json.dump(list(results_dict.values()), f, ensure_ascii=False, indent=2)
 
 def _run_attempt(test_case, config, file_name, result_entry, results_dict, output_file, file_lock):
@@ -123,11 +143,9 @@ def _run_attempt(test_case, config, file_name, result_entry, results_dict, outpu
                 result_entry["response"] = resp_data
                 print(f"[{file_name}] 任务已启动，TaskId: {task_id}")
                 
-                # 同步一次初始状态
                 results_dict[file_name] = result_entry
                 save_results_thread_safe(results_dict, output_file, file_lock)
                 
-                # 2. 轮询状态
                 while True:
                     time.sleep(config.get("poll_interval", 10))
                     
@@ -138,18 +156,14 @@ def _run_attempt(test_case, config, file_name, result_entry, results_dict, outpu
                     if status_info.get("success"):
                         result_entry["session_history_url"] = status_info.get("session_history_url")
                         result_entry["error_message"] = status_info.get("error_message")
-                        result_entry["create_time"] = status_info.get("create_time")
-                        result_entry["start_time"] = status_info.get("start_time")
                         result_entry["end_time"] = status_info.get("end_time")
                     else:
                         result_entry["error"] = status_info.get("error")
                     
-                    # 实时更新结果到字典和文件
                     results_dict[file_name] = result_entry
                     save_results_thread_safe(results_dict, output_file, file_lock)
                     
-                    # 如果状态为终态，退出轮询。此线程结束，线程池会自动拉取下一个任务
-                    if current_status not in ["RUNNING", "DISPATCHING", "CREATING"]:
+                    if current_status not in ["RUNNING", "DISPATCHING", "CREATING", "QUEUED"]:
                         print(f"[{file_name}] 任务结束，最终状态: {current_status}")
                         break
             else:
@@ -172,28 +186,22 @@ def process_single_case(test_case, config, results_dict, file_lock, output_file)
     """单个测试用例的完整生命周期管理：创建 -> 轮询 -> 写入（带重试机制）"""
     file_name = test_case.get('_file_name', 'unknown')
 
-    # 初始化状态字典
     result_entry = {
         "file": file_name,
         "task_id": None,
         "status": "STARTING",
         "response": None,
-        "error": None,
-        "create_time": "",
-        "start_time": "",
-        "end_time": "",
+        "error": None
     }
 
-    # 首次启动前的错峰等待
     wait_time = random.randint(0, 10)
-    try:
-        wait_time += eval(file_name.split("_")[0]) * 2
-    except:
-        pass
+    # try:
+    #     wait_time += eval(file_name.split("_")[0]) * 2
+    # except:
+    #     pass
     time.sleep(wait_time)
     print("WAIT" , wait_time )
 
-    # 重试配置：最多重试 3 次，等待时间依次为 300-600s 随机、600s、1200s
     max_retries = 3
     for attempt in range(max_retries + 1):
         status = _run_attempt(test_case, config, file_name, result_entry, results_dict, output_file, file_lock)
@@ -202,15 +210,14 @@ def process_single_case(test_case, config, results_dict, file_lock, output_file)
             break
 
         if attempt == 0:
-            wait = random.randint(300, 600)
+            wait = random.randint(30, 60)
         elif attempt == 1:
-            wait = 600
+            wait = 60
         else:
-            wait = 1200
+            wait = 120
         print(f"[{file_name}] 状态为 FAILED，第 {attempt + 1}/{max_retries} 次重试，等待 {wait}s ...")
         time.sleep(wait)
 
-    # 确保任何退出路径都能落盘
     results_dict[file_name] = result_entry
     save_results_thread_safe(results_dict, output_file, file_lock)
 
@@ -231,7 +238,7 @@ def main():
     if args.concurrency: config["concurrency"] = args.concurrency
     
     # 如果必填参数仍然缺失，则报错
-    if not config.get("token"):
+    if not config.get("x_auth_token") :
         print("错误: 请在 config.yaml 或通过 --token 提供 X_AUTH_TOKEN")
         return
         
@@ -255,13 +262,11 @@ def main():
         
         # 阻塞等待所有任务完成
         for future in as_completed(futures):
-            # 捕获并忽略线程内的顶层异常，以免主程序崩溃
             future.result() 
 
     print("\n" + "=" * 60)
     print("所有用例执行完成！结果已汇总至:", output_file)
     
-    # 简单统计结果
     finished = sum(1 for r in results_dict.values() if r["status"] == "FINISHED")
     failed = sum(1 for r in results_dict.values() if r["status"] == "FAILED")
     others = len(results_dict) - finished - failed

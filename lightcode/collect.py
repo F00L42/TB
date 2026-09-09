@@ -10,9 +10,9 @@ from datetime import datetime
 # 禁用不安全请求警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# 【修改1】去掉了 beta. 前缀，保持与 run_eval.py 一致
-API_URL = "https://xingyun.rnd.huawei.com/gateway/AiAgentManageService/v1/lightcode/tasks"
-API_KEY = "sk-c61c47c22b3a4dc3924d068640f2c76d"
+# 保持与 run_eval.py 一致
+API_URL = "https://beta.xingyun.rnd.huawei.com/gateway/AiAgentManageService/v1/lightcode/tasks"
+API_KEY = "sk-c6461c64d939411d94188a15f0fc430a"
 
 
 def query_task_status(task_id):
