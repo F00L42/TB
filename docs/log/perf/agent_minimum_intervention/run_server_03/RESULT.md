@@ -276,7 +276,39 @@ python -X utf8 docs/log/perf/agent_minimum_intervention/run_server_03/check_prob
 
 本次本地已核对两轮Vanilla输入完全相等并验证命令可加载第2行；检查器以无模型fixture验证有probe、仅旁路、缺/重复summary、token账本不一致、协议失败和语义偏离的判定，真实服务器回放待执行。
 
+## 9. Work“重启测试诊断”复核：尚不能解除端到端阻断
+
+复核日期：2026-09-09；外部诊断：[重启测试诊断](chatgpt-conversation://6aa0b730-9250-83ea-9597-6c75a6c19314)。本节不新增服务器实测，不修改运行时，也不把外部报告中的实验声明当成本地已执行结果。
+
+### 9.1 新诊断改变了什么
+
+**结论仍为暂缓启用DTB的正式Agent端到端评测，但根因定位已收敛，下一步无需继续盲目扩展同一矩阵。** Work报告在tokenizers 0.22.2的ByteLevel/ByteFallback小词表上复现了native-prefill前缀回显，并报告“从原P初始化、逐步重放H再接S”可以消除其最小例子的回显；它没有运行目标Qwen tokenizer、完整矩阵或真实Ascend取消链，因此这是候选修复方向，不是生产修复验收。
+
+本地重新核对附件H1 `000001.json`：H最后token为59720，S第一个token为102；旧流含abort输出合计是`分析中文与 emoji`，新流的第一个delta却是`assistant\n<think>\n分析中文与 emoji 👩`。连续流期望新增的只是` 👩`；collector拼接结果与直接decoder重启结果相同，且token IDs守恒。因此该反例发生在**固定token序列的文本解码层**，不是模型重新采样产生了错误，也不是tool parser才引入了角色标记；但尚不能据此排除parser的其他独立缺陷。
+
+**源码确定：**[Python DecodeStream构造器](https://github.com/huggingface/tokenizers/blob/v0.22.2/bindings/python/src/decoders.rs)保存预填IDs，但prefix初始为空；[Rust step_decode_stream](https://github.com/huggingface/tokenizers/blob/v0.22.2/tokenizers/src/tokenizer/mod.rs)仅在预填解码结果不以U+FFFD结尾时建立prefix。未完成字符令prefix保持空，后续token使文本完整后，就可能返回包括预填在内的全文；空prefix也不会触发InvalidPrefix异常。这与本轮固定流首delta回显一致。因网页渲染行号存在差异，以函数名定位。
+
+当前vLLM `FastIncrementalDetokenizer.__init__()`仍将`request.prompt_token_ids`传给`DecodeStream(ids=...)`（`third_party/vllm/vllm/v1/engine/detokenizer.py`）；DTB在`deferred_observation.py`接纳排空H后执行`context.append_prompt_token_ids(prefix)`，后续状态新建generate子请求。**完整delta/完整token IDs，不等于新的增量decoder恢复了旧流的未完成字符状态。** 这并不否定P+H作为模型续写输入的合法性，但否定了仅凭IDs完整就宣称parser-facing文本安全的充分性。
+
+### 9.2 测试方法的限制不等于当前反例无效
+
+- `AsyncLLM.abort()`先在OutputProcessor回收状态并投递本地abort终态，再通知EngineCore；这里H应定义为**前端最终接纳的前缀**，不是设备已经计算出的全部token。旧状态移除后的迟到输出不属于续写前缀。现有pending用例不能替代真实调度/批输出竞态覆盖。
+- `get_next_output_text(finished=True, delta=True)`释放文本stop缓冲，并非对DecodeStream执行Unicode finalization。生产profile的`stop=[]`也不能保证P+H尾部字符完整。
+- 跨切点实际命中string stop、强制close/cue改变后缀等情况需要独立oracle；不能全部要求与原始自然续写全文相等。但此处`original`后缀、无string-stop的失败仍存在，不能用这些测试边界将它注销。
+- G0暴露的是确定性保真反例，不是线上发生率。工具XML fixture中思考已结束后的强制切点不直接代表observer可达路径；仍需验证真实abort前未闭合、排空后含boundary的分支。
+
+### 9.3 端到端准入与最短后续路径
+
+1. **先用目标环境已有P/H/S做三路对照**：旧decoder继续；新decoder原生预填P+H；新decoder从P初始化并重放H（抑制重放输出）再接S。记录P+H解码尾部、首个重启delta、完整text/IDs与stop结果。先测现成失败000001与阈值附近000039，再回归生产矩阵；不需要模型重采样即可确认该修复方向是否适用于目标tokenizer。
+2. **修复必须落到实际输出链，而非仅改测试。** 候选是保留/恢复逻辑输出decoder状态，或正确重放H恢复状态；不能简单截掉回显文本、删除U+FFFD、改skip或移动阈值规避单个切点。probe/cue会改变逻辑后缀，需分别处理decoder状态、已发送offset和隐藏输出，不能把同一可变decoder不加区分地共用给所有子请求。重放的CPU成本应只在真实介入后发生，并计入telemetry。
+3. **补真实OutputProcessor与DTB/parser固定流回归**：通过`process_outputs`输入实际批次形状，验证abort回收、迟到输出、自然terminal抢先、排空含think-end/tool前缀；真实probe/cue/final链要求无prompt回显、无hidden输出泄漏、工具参数和终态正确。无string-stop生产域先收口，不把当前原生拒识的任意string-stop跨界问题扩成新增准入范围。
+4. **第8节隔离G1可以继续执行。** 但当前仓库尚无新的实际probe验收结果；即使标题长轨迹成功，也只能补充基础切换证据，不能抵消已知G0反例或替代工具链验收。
+5. 上述保真修复及可达分支验证通过后，再进行2–3个单并发真实任务可用性试跑，之后扩9场景。正式时延实验另用同身份、关闭profile采集的`OBSERVABILITY.mode=off`配对结果。当前可继续Vanilla功能检查及不执行工具的隔离诊断；不建议直接开启完整DTB评测来寻找一个可能低频、但已有固定反例的基础缺陷。
+
+本次仅完成外部报告、失败附件与源码复核；没有运行目标模型、没有部署修复，也没有新增G0/G1通过结论。
+
 | 日期 | 变更 | 原因 |
 | --- | --- | --- |
 | 2026-09-08 | 对010ce完成G0矩阵/profile/SSE归属复算，识别生产skip=True下prompt回显、旁路与切换覆盖差异；给出暂缓正式Agent评测及分层关闭门禁的建议 | 用户要求判断是否可开始端到端测试，避免以身份修复或零HTTP协议错误替代重启可用性验收 |
 | 2026-09-08 | 补充G0外部诊断材料；选择两轮Vanilla同请求体1792/2865-token长思考，提供T850与有条件T128隔离G1命令、phase检查器和覆盖边界 | 用户要求并行调查测试方法/重启根因并获得真实probe可用性证据；不把历史长思考或诊断成功当完整端到端准入 |
+| 2026-09-09 | 复核Work的DecodeStream native-prefill诊断，区分前端接纳前缀、decoder状态与测试oracle，补充三路目标tokenizer对照及端到端准入判断 | 外部诊断收敛了根因，但尚未提供生产修复及真实介入链验收，不能据此解除G0阻断 |

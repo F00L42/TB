@@ -102,6 +102,12 @@ decision 延迟到达到介入阈值后才执行。短路径只承担阈值读�
 本文 deferred 机制已完成本地实现；实现范围、测试结果和部署前可用性门禁见第 11.4 节。
 本地无目标模型/NPU，不能据此认定真实 tokenizer 连续性或 Agent E2E 已验证。
 
+**2026-09-09 决策交接：**G0 已发现固定 token 流重启的 prompt/H 回显；用户决定先用当前实现
+做完整 9 场景的**诊断性**端到端实验，观察真实触发路径与任务影响，再决定是否实施
+“保留 P-IDs、仅重编码 abort 后普通思考 H”的局部规避。完整候选、证据边界和决策清单见
+第 12.1–12.8 节。候选尚未实现或验收，不替代本文当前 token-ID 权威实现；诊断轮不是 G2/G3
+通过，也不因一次未复现而注销 G0 反例。
+
 ## 3. 范围与非目标
 
 ### 3.1 本阶段范围
@@ -566,6 +572,10 @@ continuation prompt token IDs
   不得在阈值处 abort，应解除武装并继续原生 child；
 - `max_internal_calls` 不足以容纳至少一次 probe 和一次 final 时同样不介入。
 
+上述是当前已实现契约。第 12 节的待决策候选仅为“自有 abort、排空后仍 OPEN 的普通思考”
+提出例外：原始输出账本仍保留 H，模型 prompt 改用重编码的 Ĥ，二者不再承诺 IDs 相等。
+候选若获准实现，必须同步修订第 8.1/11 节对应断言及 Token ID 账本文档；不得悄悄放宽现有测试。
+
 排空后无 boundary 且资源允许时进入 `_ConfidenceProbeState`；已含 boundary 则直接 final，
 不 probe。观察到的 reasoning 记为第一个 thinking segment；probe
 拒绝后 `_ThinkingState` 读取 `thinking_segments > 0`，因此生成 `think_stride`，不会再次生成
@@ -687,6 +697,10 @@ boundary；自然 boundary 分支不合成、不加 cue，详见第 5.6.3 节。
 7. threshold 前不添加 answer cue、synthetic boundary、controller stop 或 fresh child；
 8. priority、LoRA、trace、DP affinity 和 parser 参数对所有后续 child 保持现有透传契约；
 9. client cancellation 和 engine error 必须向外传播，不能被状态机 `controller_end` 静默变成成功。
+
+第 4 项适用于当前实现及第 12 节候选的非适用分支；候选适用分支拟改为“外部 H 原样且只发送/
+计数一次，模型 P 原样、Ĥ 的改写可审计”。这是一项尚未批准部署的前缀改写，不是无损 decoder
+恢复；外层 parser 的跨 child 连续性仍必须验证，其他不变量不放宽。
 
 ### 8.2 竞态与裁决表
 
@@ -1155,6 +1169,10 @@ python tools/dtb/replay_tool_calls.py \
 
 #### 11.4.4 G2：9 场景完整 Agent 可用性，再做 G3 时延
 
+2026-09-09 补充：允许在 G0 未关闭时先进行一次隔离环境的完整 Agent **诊断轮**，以核对真实
+切换覆盖、回显与工具/任务影响，详见第 12.7 节；这不是下述正式 G2 准入，更不是发布或性能验收。
+分析 session 应区分“允许收集真实端到端证据”和“已通过重启安全门”，不继续将前者一概阻断。
+
 G0/G1 通过后，以相同环境快照执行 Vanilla/新 DTB 的 9 场景 LightCode 单并发。回传 proxy
 按 session 拆分日志及关联产物、evaluation_results、请求体/seed、服务 manifest 和错误日志。
 先要求两侧 9/9 评测报告完整、工具协议无新增 hard failure、严格正确率不低于 Vanilla；失败项
@@ -1192,10 +1210,242 @@ G3 使用另启的 `OBSERVABILITY.mode=off` 正式性能 run，至少两轮相�
 冒充通过。实现重点是 observation state、abort drain ownership、原生完成
 竞态、排空 boundary 分支、native terminal passthrough、账本以及 replay 门禁。
 
+### 12.1 候选状态、目标与证据（2026-09-09）
+
+**候选名：abort 后普通思考前缀文本归一化。状态：仅讨论设计，等待实际端到端结果后决策；
+未修改运行时、默认参数、parser 或测试 oracle。** 原设计基线保持不变，本节是后续可用性候选，
+仍以短请求原生直通、抓大放小、质量不退化前提下 Agent task wall 下降为目标。
+
+依据与强度：
+
+- **实测归档：**[run_server_03/RESULT.md](../log/perf/agent_minimum_intervention/run_server_03/RESULT.md)
+  对 `010ce` 的复核中，生产 profile 固定流出现 IDs 守恒但文本回显；H1 的
+  `g0_production/baseline/H1/failures/000001.json` 在 H 最后 ID=59720 后重启，S 首 ID=102。
+  旧流已显示 `分析中文与 emoji`，新流首 delta 却是
+  `assistant\n<think>\n分析中文与 emoji 👩`，连续旧流该步只输出 ` 👩`。这不是重新采样。
+- **源码支持的解释：**vLLM `FastIncrementalDetokenizer` 以 prompt IDs 新建 DecodeStream；
+  tokenizers 0.22.2 的预填文本若以 U+FFFD 结尾，会暂不建立已输出 prefix，后续字符补齐时可能
+  返回预填全文。参见 [DecodeStream](https://github.com/huggingface/tokenizers/blob/v0.22.2/tokenizers/src/tokenizer/mod.rs)
+  及 run_server_03 第 9 节。Work 的小词表复现不是目标 Qwen 修复验收。
+- **用户提供的历史观察：**既有 `finish_reason="length"` 再续写未观察到回显。它支持本次先不改
+  length 路径，但未提供完整覆盖分母，不能推出任意长度切点安全。
+- **讨论采用的范围判断：**canonical 结构 token 为 reasoning/tool 的协议边界，继续保留已验证的
+  token-ID 续写路径；不是声称所有 stop ID 都自动恢复 decoder 状态。结构标记、跳过 special
+  token 与其前后字符的组合仍以实际 tokenizer/parser 回归为准。
+- **尚未证明：**真实 Agent 的故障发生率、各 child 可达性、重编码是否只改变 H 尾部、归一化后
+  parser 连续性和实际净时延。不能称本候选“100% 有效”或用固定矩阵失败比例估计线上故障率。
+
+本候选不恢复旧 decoder 内部状态，而是主动从已完整显示的思考文本重新建立模型前缀。
+它允许放弃未显示的字节片段，并可能改变 H 的 token 切分；这是需要质量验收的取舍。
+
+### 12.2 核心概念与适用分支
+
+| 符号 | 定义与归属 |
+| --- | --- |
+| P | serving 已应用 chat template 等原生预处理后交给 DTB 的初始 `prompt_token_ids`；保持原样 |
+| H | 观察与排空接纳的 source IDs，即 G+R；包含空文本 delta 的 IDs，永远保留真实输出账本语义 |
+| V(H) | 从同一 child 按顺序透传的 source delta text 拼接；含排空及 text-only 补尾，排除内部 abort 结束语义；不是 `decode(H)`，也不是 HTTP post-parser 字段 |
+| Ĥ | `tokenizer.encode(V(H), add_special_tokens=False)` 的结果；候选使用的模型前缀，不冒充原始生成 token |
+
+具体入口是内部 token prompt `P + Ĥ`，不是把整个请求改成文本 HTTP 请求；不重编码 P，不重新套
+chat template，不引入第二次 Agent 消息提交，也不恢复全 prompt decode。后续 child 仍使用 IDs。
+
+| 实际分支 | 本候选处理 |
+| --- | --- |
+| 未触发、阈值同批 boundary/terminal、资源不足 disarm | 同 child 原生完成，不做 H 编码 |
+| abort 排空后自然 stop/length 抢先完成 | 全部 payload/terminal 原样一次；不归一化、不创建 child |
+| 自有 abort，排空后仍 OPEN，H 为可支持的普通思考 | 构造 P+Ĥ 一次；按重检预算进入 probe 或现有受限 final |
+| 自有 abort，排空已含 think-end、tool-start 或后续正文/参数 | **不应用本规避**；保留完整 P+H，沿现有无 probe、无 cue final 分支；不是宣称该路径已证明安全 |
+| 后续结构 token 停止或 iterative_think 的 length 停止 | 不扩展改动范围，继续现有 token-ID 路径；新发现问题时另行决策 |
+| 非自有 abort、错误、超时、取消、无 terminal 耗尽 | 保持错误/取消语义，不重启 |
+
+“触发时无 boundary”不等于“排空后的 H 无 boundary”。资格判断必须放在完整 drain 接纳和
+boundary 分类之后，不能在 trigger 时就决定丢弃 H 的 IDs。无 canonical boundary 也不自动等于
+没有任何 special token；实施前需固定实际 tokenizer 的 special ID 集和可支持条件。
+
+`skip_special_tokens=True` 在已确认 H 不含需保留的 special token 时不是该转换的主要障碍。
+但 V(H) 已可能跳过标记；encode 没有该 skip 参数，不能据此补回缺失结构。普通引用文本里的
+`</think>` 也可能在重编码后变成 canonical special ID，必须检查 Ĥ 是否新引入结构标记。
+不能通过删除该文本或换掉协议 token 来“修复”测试。排空 boundary 分支明确留在候选之外。
+
+### 12.3 运行顺序、账本与最小改动面
+
+候选若被选中，流程为：
+
+1. 继续现有 native observation/threshold/abort/drain；source text、IDs、logprobs 及 FIFO
+   顺序不变。接纳排空增量，先处理自然 terminal、错误和 boundary 分支。
+2. 对适用分支，join 已保存的 V(H)，只 encode 一次得到 Ĥ。验证文本/结构条件，保留转换结果，
+   不能在每个 probe/stride 之前重复执行转换。
+3. 在首次 commit 时构造 `P + Ĥ`，**不是**在已追加 H 的 prompt 后再追加 Ĥ。原始 P/路由上下文
+   保持不变；陈旧 `prompt` 文本字段不得与新 IDs 一起提交。
+4. 用实际 `len(P+Ĥ)` 重检 context 和 probe/cue/final 空间；外部 completion 剩余额度仍按已发送
+   H 的实际数量计算。Ĥ 变短不返还已消耗 completion 或 thinking budget，变长也不虚增输出 usage。
+5. 只设置一次 `thinking_segments=1`，不得调用同时追加和计数的 `append_thinking()` 重计 H。
+   不重新发送 V(H)/Ĥ，不把 Ĥ 当生成量或给它合成 logprobs，不重新初始化外层 parser。
+6. 所有后续 probe、拒绝后的 iterative thinking 和 final 都基于同一个已归一化主 prompt。
+   probe 的 trial suffix 只属于 child，不写回主 prompt；后续真实输出继续按现有规则追加其 IDs。
+7. 接纳后的原始 H 仍用于真实计数和按需审计。临时文本与旧前缀引用尽快释放，不长期维护全量
+   continuation 文本镜像；取消/异常传播不变，不新增 sleep、设备 barrier 或隐式重试。
+
+建议概念接口（**非现有 API，具体命名待实施**）：
+
+| 职责 | 输入 / 输出 | 所属位置 |
+| --- | --- | --- |
+| 判断归一化资格 | 自有终态、完整 H/boundary、已绑定协议、tokenizer 能力 → 适用/原因 | `deferred_observation.py`，不复制 tool parser |
+| 构造归一化前缀 | H、V(H)、tokenizer → Ĥ / 验证失败 | 薄 helper，复用现有 tokenizer，不改上游 checkout |
+| 一次性提交前缀 | P、选定 H 或 Ĥ → 主 token prompt；不改已发计数 | `request_context.py`，与现有 prompt ownership 配合 |
+| 记录转换证据 | source/model 前缀长度、原因、成本 → intervention telemetry | 现有 observability/extractor，见 12.5 |
+
+失败策略必须在实施前冻结：已 abort 后不能声称还能原生旁路。编码异常、归一化不保真、新增
+结构 ID、无合法续写空间等，不得静默回落到已知危险的原 H 来掩盖失败；可以维持显式失败契约，
+或另行验证一种安全回退后再采用。未解决此项前不启用候选；自然 boundary 等明确非适用分支
+沿现有路径并记录未覆盖范围，不混同为“转换失败后的安全 fallback”。
+
+**与现有契约的差异：**输出账本的 H 与模型输入 Ĥ 被显式分离。旧 G0 中 `H+S` 的严格 token
+守恒不能作为 Ĥ 的断言；外层 parser 仍看到原 H 的 IDs 和文本，随后看到新 child 的 IDs/text。
+跨 child 的空文本 token/未完成字符不会因为模型 prompt 改写就自动被 parser 修复，必须做
+固定流 parser 回归。不得删除已经发送的 H、修改历史 usage，或把这个例外推广到工具参数。
+
+### 12.4 获取 V(H) 的轻量实现与性能代价
+
+当前 observer 主要保留 IDs，不保留完整 H 文本。若要求 V(H) 与实际 source 输出严格相同，
+不能等 abort 后才凭空取得此前的 text，也不能用 `decode(H)` 冒充 V(H)。候选建议在 armed
+期间保留非空 source text 的片段引用，在接纳 drain 时追加其 text（包括空 IDs 补尾），介入
+成功后才 join/encode；disarm、自然结束、异常时释放。避免保留整个 RequestOutput/logprobs，
+避免每 chunk 字符串累加、decode 或重编码。
+
+这意味着短请求可能新增轻量 list append/引用保存与临时内存成本，**不能宣称短路径绝对零新增
+成本**。只有 H 编码和最终 join 能延迟到真正介入后。若现有层能以明确 ownership 提供这些文本
+而不重复保存，可复用，但不得依赖生产 `off` 时不存在的 telemetry 缓冲。
+内存按实际接纳字符/片段计量，不假设每个 delta 只有一个 token 或字符数永远受 T 严格限制。
+
+缓存与时延裁决：
+
+- P 是已模板化的 token 输入，候选逐 ID 保留；不会因 H 重编码而破坏 P 内完整块的匹配条件。
+  实际命中仍要求 APC、块驻留、相同 DP/LoRA/cache 条件；跨 P/H 的末尾块可能变化。
+- `encode(V(H))` 不保证仅删除原 H 最后几个 token；模型生成切分与重编码切分可能不同。
+  必须测 H/Ĥ 最长公共 token 前缀（LCP），再分析 H 对应完整块的可复用部分。
+- 不把整个新 child TTFT 都归给本规避；原 token-ID 方案也有 abort、child 提交、queue/prefill。
+  额外项是差量，且 TTFT 与其中 queue/prefill 不重复相加。生成轨迹改变的成本另列。
+
+```text
+规避增量成本
+= 全量 eligible observer 的文本片段保留成本
++ 各适用 abort 的 join/encode/校验/commit 增量
++ 相对原 token-ID 重启的额外 prefill/queue/传输成本
++ 后续 probe、思考、final 和 Agent 轨迹变化的时间差
+```
+
+历史 run-05 的 301 请求中 9 个 reasoning>850。假设轨迹不变、每个各转换一次，且先不计全量
+观察保留成本与轨迹变化，则下表仅用于敏感性分析，不是服务器实测或上线预测：
+
+| 每次转换及其净后续开销（假设） | 9 次累计 | /历史 LLM E2E 2143.578s | /历史评测 wall 4302.263s |
+| ---: | ---: | ---: | ---: |
+| 10 ms | 0.09 s | 0.004% | 0.002% |
+| 100 ms | 0.9 s | 0.042% | 0.021% |
+| 1 s | 9 s | 0.42% | 0.21% |
+| 5 s | 45 s | 2.10% | 1.05% |
+
+真实开销和触发数未知；LLM 时间也未必等量进入 task wall。不能用历史 eager 短路径的 0.66s
+替代这里的 encode 成本。应优先测局部 H 编码与 LCP，再测实际 cache/prefill；没有依据声称
+P 的 14K–126K tokens 必须全重算。单并发先验收，另注意同步编码在共享事件循环中对其他请求的阻塞。
+
+### 12.5 需要的 telemetry 与证据字段
+
+本节“记录/测量”指**若实施候选，同步扩展现有 telemetry 和提取器**，不是新增无条件打印。
+下列字段为拟议字段，当前服务不保证存在；`OBSERVABILITY.mode=phase` 在启动时启用，
+`off` 不创建 recorder、哈希或仅供诊断的计时。算法必需的文本保留/校验不受 mode 控制。
+
+建议在 intervention 中增补：`handoff_prefix_mode`（`token_ids`/`text_normalized`）、
+`normalization_applied`、`normalization_skip_reason`、`accepted_source_prefix_tokens`、
+`model_restart_prefix_tokens`、`normalized_prefix_chars`、`prefix_token_count_delta`、
+`normalization_wall_ms`。原 `restart_prefix_tokens` 继续表示已接纳 H 数量，避免静默改字段语义。
+`normalization_wall_ms` 包含在 handoff/controller 时间内，不能再次叠加到 phase wall。
+
+H/Ĥ 的 LCP、文本重解码对照、special-ID 差异、原始/归一化 IDs hash 优先在离线审计测量；
+若在线 phase 采集，需单列 audit 开销，不把它作为生产成本。每个 child 保留实际 prompt token
+数量、cached prompt tokens（不可得则 null）、queue/prefill/首输出、generated/hidden token。
+源码身份、tokenizer/backend hash、采样与 cache 条件继续写 manifest。
+
+原始 P/H/V(H)/Ĥ 和内部 delta 可能包含业务数据，只在隔离且获准的定向产物或
+`stream_audit` 白名单中保存，不写入普通 phase 日志。`phase` 与 `stream_audit` 是互斥模式；
+phase 单独不能证明 prompt 回显，proxy SSE 单独也看不到 hidden probe。
+
+### 12.6 实施前必须确认的信息与验证顺序
+
+| 待确认问题 | 必须取得的证据 | 对决策的影响 |
+| --- | --- | --- |
+| 当前实际 E2E 是否介入、在哪个 child 首次异常 | parent→observation/abort→probe/stride/final 归属，原始异常 delta/终态 | 无介入的成功不能验证重启；只改 abort 未必覆盖实际失败位置 |
+| H 真的是普通思考吗 | 排空后首 boundary、special IDs、text-only/empty-text 形状 | boundary/结构遗漏分支不能套用本候选 |
+| V(H) 是否完整且无重放 | source 顺序、drain 合并、实际发送文本；保留/释放生命周期 | 防止重建漏掉 G 或重复 R，量化短路径新增成本 |
+| 编码是否保留可见文本与结构语义 | 目标 tokenizer 的 Ĥ、解码结果、H/Ĥ LCP、结构 ID 差异 | 不预设只少末尾几个 token；禁止引用 marker 被升级为协议 boundary |
+| 改写后的流能否交给当前 parser | 原 H 已发、再接新 child 的固定流；Unicode 空文本 token 与工具参数审计 | 模型前缀完整不替代 parser-facing 连续性 |
+| 账本与预算是否一致 | P 不变、H 原计数、Ĥ prompt 长度、probe 隐藏量、唯一 terminal | 不返还已用额度、不重计 H、后续 child 不误回原 H |
+| 是否有净时延余量 | join/encode P50/P95、缓存命中、额外 prefill、短 observer 成本、实际 task wall | 质量先通过，再决定是否值得采用 |
+| 失败策略与能力范围 | 编码失败、新结构 ID、无容量、排空 boundary 的明确定义 | abort 后不能假装原生恢复；不得用未验证 fallback 掩盖失败 |
+
+验证顺序建议：
+
+1. **先读取实际端到端诊断结果**，依第 12.7 节分类，不自动开发或切换生产参数。
+2. 如选择候选，先在目标 tokenizer 的 CPU-only 实验中比较原 H 与 Ĥ；保留 G0 旧连续/重启
+   反例作对照。覆盖真实 H、Unicode 未完成尾部、literal marker、排空 boundary、text-only 补尾。
+3. 对 Ĥ 使用匹配其新前缀的 decoder 基准；不能机械复用旧 S 的续字节 token 并要求等于原 H+S。
+   候选已放弃该未显示部分，旧 S 可能不再是新前缀的合法字符接续。先用明确完整的固定后缀隔离
+   回显，再用实际生成后缀验证质量；外层 parser 则必须接收真实已发 H 的流，不得在测试中偷偷
+   把历史改成 Ĥ。转换 oracle 不应通过删除回显、替换字符或放宽工具协议断言来制造通过。
+4. 无模型状态机回归：所有表中分支、一次归一化、P 不变、无重复输出/计数、容量变化、取消及
+   错误；确认 `off` 无诊断工作、短路径无 encode，片段引用按时释放。
+5. 同一服务身份进行原 token-ID 实现/候选的定向 paired replay：至少覆盖真实 probe 拒绝后的
+   stride、接受后的 final，以及候选不处理的 drain-boundary 与 length 路径。一次固定流通过
+   不等于跨 child 全部安全，也不新增 stream_interval 实验维度。
+6. 小样本机制与协议通过后，再比较真实 9 场景的可用性/质量；正式性能使用独立 off 运行。
+   若需要改变结构 token/length 分支或改为持久 decoder 状态恢复，另行评审，不在本候选里扩展。
+
+### 12.7 当前完整端到端诊断轮的裁决方法
+
+用户已决定可以先在可重建、与真实业务隔离的评测环境运行完整 9 场景，用实际轨迹判断问题影响，
+而非为了寻找可能低频事件无限扩大合成矩阵。本节是分析交接，不新增执行脚本或声称测试已运行。
+沿用生产 T=850、其他 fixed 参数、stream_interval=1、单并发，保存同身份 Vanilla；不先降阈值
+改变任务轨迹来充当生产结果。
+
+至少回传：部署 manifest、proxy 分片 full_log 与 chunks、LightCode 主/子 session 和
+evaluation_results、完整 `DTB_PHASE`/`DTB_REQUEST_SUMMARY`，按 parent/session/task 关联。
+若启用额外输出采集，记录其开关，不能混入 off 性能基线。发现疑似回显后，以同一请求历史中
+足够长且独特的文本片段核对，不仅搜索 `system`/`assistant`/`<think>` 等可能合法引用的短词。
+内部异常可能表现为少量新增 IDs 对应巨量 text；post-parser SSE 可能拆分、改字段或失败，
+客户端不保证收到一个完整的大 chunk。hidden probe 需要内部取证，客户端无异常不足以排除。
+
+| 端到端观察 | 允许结论与下一步 |
+| --- | --- |
+| 无实际 abort/后续 child | 旁路证据；不裁决重启，继续定向 G1 |
+| 有介入、未见回显、报告/质量正常 | 本轮真实覆盖内未观察到；可暂缓候选开发并补充覆盖，不能宣布任意切点安全或 G0 通过 |
+| 回显确认但任务成功 | 真实保真问题成立；检查是否落入 OPEN abort 候选域，再决定局部规避；任务成功不抵消协议契约 |
+| 回显与工具污染/任务失败关联 | 固化最早异常 parent/child/H，优先修复其可达路径；符合候选域时做 12.6 验证 |
+| 异常发生于 drain-boundary、length 或其他候选外分支 | 本候选不充分；转向该分支或 decoder 状态恢复，不套用普通 H 重编码 |
+| 任务失败但没有回显证据 | 分别检查模型语义、工具环境、parser/终态；不能全部归因 G0 |
+| phase/原始流/归属不足 | 标记不可裁决，补证据；不把“没有记录”解释为“没有发生” |
+
+本轮允许报告实际 task wall/LLM E2E 差值，但不归因正式性能收益。发布仍需第 1.2/11 节质量和
+协议契约；若暂不采用候选，应记录已知 G0 风险与残余未覆盖路径，而不是重新标成可无损重启。
+
+### 12.8 其他 session 的决策输出要求
+
+分析实际结果后，在对应 run 的 RESULT 中至少写出：
+
+1. `采用候选 / 暂缓候选 / 候选不覆盖根因 / 证据不足`，并引用具体 parent、child、任务和文件。
+2. 当前确认的触发域、special/boundary 情况、首个异常 delta；明确哪些是实测、源码确定、假设。
+3. 若采用：冻结 H→Ĥ 资格和失败策略，列出 12.6 的待验证项；本设计不是自动实施授权。
+4. 原始 H 与模型 Ĥ 账本例外、短路径文本保留开销和 cache/LCP 结果；不得只报告 token 减少。
+5. G0/G1、诊断性 E2E、正式 G2/G3 分别处于什么状态，下一步实验及停止条件。
+
+目前没有 H 局部重编码的服务器耗时或净收益实测，本节不预置通过结论、不增加生产 YAML/HTTP
+开关。若需 A/B，可用冻结实现版本标识实验；是否引入临时诊断开关另行决定。
+
 ## 13. 变更历史
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-09-09 | 增加 12.1–12.8 的 abort 后普通 H 文本归一化候选：保留 P-IDs、分支范围、H/Ĥ 账本、文本保留成本、cache/LCP、telemetry/验证和跨 session 决策清单；明确诊断性完整 E2E 可先运行，候选未实现 | 用户要求保存讨论方案，供其他 session 根据真实端到端触发及质量/时延证据决定，不将局部规避写成无损恢复或已通过发布门 |
 | 2026-09-07 | 补充最低介入值与首次检查点的概念区别及当前复用语义；短路径 observer/queue 简化待本机制验收结果后再实验 | 用户确认优先验证抓大放小，算法持续关注校验成本与压缩效果的权衡；本次不改变运行时策略 |
 | 2026-09-07 | 实现默认 streaming observation、lazy budget/prompt ownership、abort-drain 完整前缀与自然 boundary final；扩展 phase/extractor，新增无模型回归、真实 tokenizer CPU-only 脚本和 G0–G3 可用性验证计划 | 用户要求按已确认设计开发；正式发布前必须验证真实 tokenizer、parser 和 Agent 端到端结果 |
 | 2026-09-08 | 链接 run_server_01 实测审计，标明 G0 Unicode 重启门禁失败、G1 短旁路正向证据及切换覆盖不足；下一轮先执行 G0-R/G1-R | 实测证明完整排空和 token 保全仍不能单独保证重启文本保真，不能跳过可用性门禁进行性能发布 |

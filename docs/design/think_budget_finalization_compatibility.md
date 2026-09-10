@@ -27,6 +27,12 @@ parser-facing 已输出额度。该修改已通过本地无模型回归，等待
 
 本轮决策固定为：
 
+> 2026-09-10 后续说明：下列“不修改 probe”是 v3/v4 当时的实验隔离范围，
+> 不是 trial 无需 think-end 的实测结论。Agent run-06 后用户决定独立验证
+> 仅给原 TRIAL_PROMPT 追加 `</think>\n\n`，保持 trial50/.93 和 fresh-final 不变。
+> [实验补丁、输入与步骤](../log/perf/agent_run06/trial_close_experiment/README.md)
+> 已准备但未应用到当前生产源码；不回写历史结果，也不包含 accepted trial 复用。
+
 1. **不修改 confidence probe。** Probe 继续使用当前 `TRIAL_PROMPT`，不向其 prompt 添加
    `</think>`，trial 继续隐藏并在本轮实现中丢弃；
 2. **只修改 `confidence_accepted` 的 fresh-final 后缀。** 它与 `budget_exhausted` 一样使用

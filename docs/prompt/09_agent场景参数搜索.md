@@ -57,3 +57,21 @@ run-05端到端实验结果
    2. 输出结果分析
 2. 规划下一步计划，如继续搜索参数或配置新场景或实验
    1. 考虑到每次在思维链结束后stop会造成额外的首字开销，是否有方法在较短的思维链场景中不触发停止？（即原生输出，只有当思维链长度超过一定阈值才停下来检验）
+
+---
+
+新一轮run-06全量测试结果
+dtb
+透传
+proxy\results\qwen\local-task29\local-apiserver\dtb\run-06 附带phase日志
+评测
+lightcode\session_logs_dtb_06
+vanilla
+透传
+proxy\results\qwen\local-task29\local-apiserver\vanilla\run-06
+评测
+lightcode\session_logs_vanilla_06
+1. 当触发abort&probe路径时，是否存在异常回显现象
+2. 分析任务执行结果和时延
+   1. 比对分析评测都正确的情况下dtb能否达成时延优化
+3. 规划如何进一步达成最终目标
