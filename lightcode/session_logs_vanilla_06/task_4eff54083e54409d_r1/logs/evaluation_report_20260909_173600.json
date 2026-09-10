@@ -1,0 +1,56 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "2_DataSmartCubeService_ece9bf60",
+    "commit": "ece9bf60d190e3d99b5855c06229fc59898bb97c",
+    "evaluation_time": "2026-09-09T17:36:00+08:00"
+  },
+  "requirement": {
+    "description": "功能需求:\n1. 模板名称唯一性校验 - 在创建和修改模板时校验名称唯一性,排除当前模板本身\n2. 已发布模板修改限制 - 禁止修改Deployed状态的模板\n技术规格:\n1. 错误码配置 - 新增TEMPLATE_NAME_EXISTS错误码,中英文错误描述\n2. 数据库查询功能 - 新增selectByTemplateName DAO/Mapper/SQL",
+    "files_count": 7,
+    "files_expected": [
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/impl/IntelligentTemplateDelegateImpl.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/input/reporttemplate/CheckErrorCode.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDao.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/mapper/ReportTemplateMapper.java",
+      "service/src/main/resources/i18n/errorcode_en_US.properties",
+      "service/src/main/resources/i18n/errorcode_zh_CN.properties",
+      "service/src/main/resources/mybatis/zenith/ReportTemplateMapper.xml"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "files_generated": 7,
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "compilation": {
+    "status": "failed",
+    "error_type": "cannot_find_symbol",
+    "error_message": "IntelligentTemplateDelegateImpl.java:[73,58] cannot find symbol\n  symbol:   method getStatus()\n  location: class com.huawei.ncedatacubeplus.nl2report.model.report.BasicInfo",
+    "error_details": "AI生成的代码中第73行使用了 template.getBasicInfo().getStatus(),但getStatus()方法实际上定义在ReportTemplate类上而非BasicInfo类上。正确写法应为 template.getStatus()。",
+    "line_number": 73,
+    "file": "IntelligentTemplateDelegateImpl.java"
+  },
+  "test_patch_apply": {
+    "status": "not_executed",
+    "reason": "编译失败,未执行test patch应用"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败,未执行DT"
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI代码生成阶段成功生成了全部7个文件,但在编译验证阶段发现代码错误:在generateReportTemplate方法中,访问模板状态时错误地使用了template.getBasicInfo().getStatus(),而getStatus()方法实际定义在ReportTemplate类上。该错误导致编译失败,无法继续评测。",
+    "failure_step": "步骤4: 编译验证(主代码)"
+  },
+  "completed_steps": [
+    "步骤0: 参数解析与Settings文件保存",
+    "步骤1: 代码仓克隆与回退",
+    "步骤2: Patch信息提取",
+    "步骤3: AI代码生成",
+    "步骤4: 编译验证(部分完成-发现编译错误)"
+  ]
+}

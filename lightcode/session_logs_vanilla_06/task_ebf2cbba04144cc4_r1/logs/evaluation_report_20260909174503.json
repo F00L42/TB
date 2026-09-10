@@ -1,0 +1,70 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "3_DataSmartCubeService_31f1241c",
+    "commit": "31f1241c99dda6f1c499cf1e737fe738ba6fe354",
+    "evaluation_time": "20260909174503"
+  },
+  "requirement": {
+    "description": "报告模板数据库操作功能：实现ReportTemplatePO数据模型、ReportTemplateDao数据访问层、ReportTemplateMapper接口及XML映射文件，支持完整CRUD和发布状态管理",
+    "files_count": 4,
+    "files_expected": [
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/model/ReportTemplatePO.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDao.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/mapper/ReportTemplateMapper.java",
+      "service/src/main/resources/mybatis/zenith/ReportTemplateMapper.xml"
+    ],
+    "files_generated": [
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/model/ReportTemplatePO.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDao.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/mapper/ReportTemplateMapper.java",
+      "service/src/main/resources/mybatis/zenith/ReportTemplateMapper.xml"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "content_issues": [
+      "ReportTemplateMapper.xml的updateByTemplateId方法缺少CREATEDATE, CREATOR, STATUS三个字段"
+    ]
+  },
+  "test_patch_apply": {
+    "method": "git_apply",
+    "manual_applied_files": [
+      "service/src/test/resources/spring/service_dao.xml",
+      "service/src/test/resources/sql/datasmartcube_tables_h2.sql"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "command": "mvn clean compile -s /app/code/settings.xml -DskipTests -Dmaven.test.skip=true -Dpackage.type=container",
+    "error_message": ""
+  },
+  "test_compilation": {
+    "status": "success",
+    "command": "mvn test-compile -s /app/code/settings.xml -Dpackage.type=container",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": ["ReportTemplateDaoTest"],
+    "total_tests": 15,
+    "passed_tests": 14,
+    "failed_tests": 1,
+    "errors": 0,
+    "skipped_tests": 0,
+    "pass_rate": "93.33%",
+    "failed_test_details": [
+      {
+        "test_name": "testUpdateByTemplateId",
+        "error_message": "org.junit.ComparisonFailure: expected:<[Updated ]Test Creator> but was:<[]Test Creator>\n原因: ReportTemplateMapper.xml的updateByTemplateId方法SQL中缺少CREATEDATE, CREATOR, STATUS三个SET字段，导致更新操作未覆盖全量字段",
+        "root_cause": "生成的updateByTemplateId SQL仅包含TEMPLATENAME, REMARK, VERSION, MODIFYDATE, MODIFIER, TEMPLATETYPE, COVER, CATALOGS共8个字段，缺失CREATEDATE, CREATOR, STATUS 3个字段"
+      }
+    ]
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "子agent成功生成了全部4个预期文件，无多余/缺失文件。主代码编译通过，测试代码编译通过。15个测试用例中14个通过，1个失败(testUpdateByTemplateId)，失败原因为updateByTemplateId的SQL缺少CREATEDATE/CREATOR/STATUS三个字段。通过率为93.33%，达到优秀级别(>=90%)。"
+  }
+}

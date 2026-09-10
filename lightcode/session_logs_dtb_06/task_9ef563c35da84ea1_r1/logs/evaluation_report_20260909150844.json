@@ -1,0 +1,45 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "36_DVAIAgentService_ed9292b4",
+    "commit": "ed9292b495e45ff380b8fc7acf769b9e1a27f136",
+    "evaluation_time": "2026-09-09T15:08:44+08:00"
+  },
+  "requirement": {
+    "description": "java异常日志等问题发现1个，fix:修复大模型返回null导致的空指针",
+    "files_count": 1,
+    "files_generated": ["service/src/main/java/com/huawei/i2000/dvaiagentservice/business/llm/LlmInvokeApi.java"]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "issues": [
+      "parseAndCleanContent方法缺少throws LLMFixException声明。该方法中抛出了LLMFixException（checked exception），但方法签名未声明throws子句，导致编译失败。参考patch中该方法的签名包含throws LLMFixException"
+    ]
+  },
+  "test_patch_apply": {
+    "method": "not_applied",
+    "reason": "主代码编译失败，未执行test_patch应用"
+  },
+  "compilation": {
+    "status": "failed",
+    "error_message": "/app/code/CodeBenchRepos/service/src/main/java/com/huawei/i2000/dvaiagentservice/business/llm/LlmInvokeApi.java:[173,13] unreported exception com.huawei.i2000.dvaiagentservice.exception.LLMFixException; must be caught or declared to be thrown\n原因：LLMFixException继承自ServiceException（checked exception），parseAndCleanContent方法中抛出该异常但未在throws子声明。参考patch的方法签名为：private static String parseAndCleanContent(ChatCompletionResponse response, String rawJson) throws LLMFixException"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行DT",
+    "test_classes": ["LlmInvokeApiTest"],
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "pass_rate": "0%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI生成的代码未能通过编译。parseAndCleanContent方法中抛出LLMFixException（checked exception）但未在方法签名中声明throws子句，导致编译期错误。参考patch中该方法正确声明了throws LLMFixException。修复方式：在parseAndCleanContent方法签名中添加throws LLMFixException"
+  }
+}
