@@ -64,13 +64,13 @@ def count_tokens(text: str) -> int:
 
 
 # ================= 配置区 =================
-RESULTS_DIR = "results/qwen/local-task29/local-apiserver/dtb/run-05"
+RESULTS_DIR = "results/qwen/local-task29/local-apiserver/vanilla/run-06"
 
 TARGET_BASE_URL = "http://10.44.160.79:9001"
 LISTEN_PORT = 9000
 
 # DTB 参数配置名称（用于日志标识，非功能用途）
-DTB_CONFIG_NAME = "dtb_moderate"
+DTB_CONFIG_NAME = "vanilla"
 
 # DTB 固定参数注入 — 修改此字典即可切换实验组
 # Vanilla 基线：不注入任何 DTB 参数
@@ -91,10 +91,10 @@ dtb_moderate = {"model": "qwen3.6-27b", "enable_think_budget": True,
 #                "fixed_budget_tokens": 3050, "fixed_check_length": 950,
 #                "fixed_think_stride": 450, "fixed_num_thinking": 5,
 #                "fixed_min_think_tokens": 950, "fixed_prob_th": 0.95}
-# APPEND_BODY = {
-#     "model": "qwen3.6-27b",
-# }
-APPEND_BODY = dtb_moderate
+APPEND_BODY = {
+    "model": "qwen3.6-27b",
+}
+# APPEND_BODY = dtb_moderate
 # 是否记录 chunks.jsonl（流式 chunk 粒度较大时可关闭以节省磁盘）
 ENABLE_CHUNKS_LOG = True
 # full-log 分片目标上限。单条记录不会被拆分；超限单条记录独占一个 part。
