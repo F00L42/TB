@@ -1,0 +1,63 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "37_DVAIAgentService_11718ad6",
+    "commit": "11718ad6e7cc19909e969b988170555b87f8a63b",
+    "evaluation_time": "2026-09-11 10:51:12"
+  },
+  "requirement": {
+    "description": "【分解给XOps技术组】【智能体】告警的分层标签支撑通用分析知识、领域分析知识，根因告警识别准确率提升",
+    "files_count": 3,
+    "files_generated": [
+      "deployment/src/main/release/pub/knowledges/application.json",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/impl/IncidentServiceDelegateImpl.java",
+      "service/src/main/resources/service-configure.properties"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "diff_match": true
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": [
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/impl/ConfigLoadedTest.java",
+      "service/src/test/resources/rest-stubs/mappings/index.json",
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/EsIndexUtilsTest.java",
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/IndicesTest.java"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "main_code_compile": "success",
+    "test_code_compile": "success"
+  },
+  "dt_results": {
+    "test_classes": [
+      "ConfigLoadedTest",
+      "EsIndexUtilsTest",
+      "IndicesTest"
+    ],
+    "total_tests": 3,
+    "passed_tests": 2,
+    "failed_tests": 1,
+    "skipped_tests": 0,
+    "pass_rate": "66.67%",
+    "failed_test_details": [
+      {
+        "test_name": "EsIndexUtilsTest.test_getEsIndex_whenNormalRequest_thenReturnIndexList",
+        "error_message": "expected:<32> but was:<31>",
+        "root_cause": "EsIndexUtilsTest中的索引数量断言(assertEquals(32))未随mock数据更新同步调整。mock数据中dv_knowledge_incident相关4个索引替换为archive_klg_index_dv相关3个索引，总数从34变为31，但测试断言仍期望32，导致失败。此问题与AI代码生成无关，为原始测试代码的数据一致性缺陷。"
+      }
+    ]
+  },
+  "evaluation_conclusion": {
+    "grade": "合格",
+    "summary": "AI正确生成了3个功能代码文件，diff与预期patch完全一致。主代码和测试代码均编译通过。3个测试用例中2个通过（ConfigLoadedTest和IndicesTest），1个失败（EsIndexUtilsTest），通过率66.67%。失败原因与AI生成的代码无关，为原始测试代码中索引数量断言(32)与实际mock数据(31)不匹配导致的测试数据一致性缺陷。AI代码生成准确无误。",
+    "ai_code_quality": "优秀 - AI生成的代码与参考patch完全一致",
+    "suggestion": "建议修复EsIndexUtilsTest中的索引数量断言（将32改为31），并同步验证mock数据与实际业务逻辑的一致性。"
+  }
+}

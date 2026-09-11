@@ -1,0 +1,59 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "28_ExperienceAssuranceService_42e693fa",
+    "commit": "42e693fa023172cd617139154791c2505a9470e7",
+    "evaluation_time": "20260911103950"
+  },
+  "requirement": {
+    "description": "在用户体验保障服务中，需要支持针对特定区域的可配置化放号控制功能。提供可配置化的区域放号状态管理能力，支持自定义不可放号原因的配置，实现区块级和点位级的放号控制，确保配置能够实时生效。",
+    "files_count": 4,
+    "files_generated": [
+      "implements/nbi/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/BlockAllocCalculator.java",
+      "implements/nbi/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/ResponseAssembler.java",
+      "implements/nbi/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/ThirdPointAllocationServiceDelegateImpl.java",
+      "implements/nbi/src/main/resources/mybatis/zenith/CapacityDBMapper.xml"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": [
+      "implements/nbi/src/test/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/ResponseAssemblerTest.java",
+      "implements/nbi/src/test/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/ThirdPointAllocationServiceDelegateImplTest.java"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "test_compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": [
+      "ThirdPointAllocationServiceDelegateImplTest",
+      "ResponseAssemblerTest"
+    ],
+    "total_tests": 12,
+    "passed_tests": 12,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "pass_rate": "100.00%",
+    "failed_test_details": []
+  },
+  "baseline_issues": {
+    "description": "基线commit(42e693fa)存在预编译问题：ThirdSceneSpaceAllocationServiceDelegateImpl.java 中的 queryAllocResult 方法签名与生成的接口不匹配（接口期望CapacityLocationParam，实现使用CapacityPredictParam），且CapacityLocationParam类不存在。评测时临时排除该文件以继续测试。",
+    "excluded_file": "ThirdSceneSpaceAllocationServiceDelegateImpl.java"
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI代码生成质量优秀。4个目标文件全部正确生成，无多余或缺失文件。主代码编译通过，测试补丁手动应用后编译通过。12个测试用例全部通过，通过率100%。代码完全符合需求规格，实现了区块级和点位级的可配置化放号控制功能。注意：基线commit存在预编译问题（CapacityLocationParam缺失），排查后确认与本次修改无关。"
+  }
+}

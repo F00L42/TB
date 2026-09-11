@@ -1,0 +1,45 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "26_ExperienceAssuranceService_0222e644",
+    "commit": "0222e6444d6c7d7d93a8ba5d37884ef3f28438fe",
+    "evaluation_time": "20260911093157"
+  },
+  "requirement": {
+    "description": "ExperienceAssuranceService新增查询所有实例ID与当前实例ID功能",
+    "files_count": 1,
+    "files_generated": [
+      "implements/common/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/common/impl/utils/InstanceUtils.java"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "status": "not_executed",
+    "reason": "主代码编译失败，未执行test_patch应用"
+  },
+  "compilation": {
+    "status": "failed",
+    "error_message": "Compilation failure:\n1. [line 54] type com.huawei.oss.rest.util.RestCaller does not take parameters - RestCaller<Void> is invalid, RestCaller class does not support generic type parameters\n2. [line 55] cannot find symbol: method builder(com.huawei.oss.rest.util.RestMethod, java.lang.String) - RestCaller class has no static 'builder' method; the correct API is 'new RestCaller.Builder(url, method)'\n\nThe AI generated code used RestCaller.builder(RestMethod.POST, POLICY_URI) pattern which does not exist in the actual RestCaller API. The correct pattern per reference patch is: new RestCaller.Builder(POLICY_URL, RestMethod.POST).header(key, value).build().call().getRespHeaderMap()"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行DT"
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI生成的主代码编译失败。主要问题：1) RestCaller使用了错误的API调用方式，使用了不存在的 RestCaller.builder() 静态方法，而实际API应使用 new RestCaller.Builder(url, method) 构造器方式；2) RestCaller添加了不存在的泛型参数。导致代码无法通过Maven编译。由于编译失败，后续test_patch应用和DT测试均未执行。",
+    "failure_step": "步骤4：编译验证",
+    "failure_details": "RestCaller API使用方式不正确。生成的代码使用 RestCaller.builder(RestMethod.POST, POLICY_URI) 构造REST调用，但RestCaller类没有builder静态方法，也不支持泛型类型参数。正确的API为 new RestCaller.Builder(url, method).header(key, value).build().call().getRespHeaderMap()"
+  },
+  "completed_steps": [
+    "步骤0：参数解析与Settings文件保存",
+    "步骤1：代码仓克隆与回退",
+    "步骤2：Patch信息提取",
+    "步骤3：AI代码生成"
+  ]
+}
