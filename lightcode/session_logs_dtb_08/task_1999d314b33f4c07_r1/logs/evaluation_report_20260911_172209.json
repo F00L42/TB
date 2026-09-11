@@ -1,0 +1,80 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "37_DVAIAgentService_11718ad6",
+    "commit": "11718ad6e7cc19909e969b988170555b87f8a63b",
+    "evaluation_time": "2026-09-11T17:22:09+08:00"
+  },
+  "requirement": {
+    "description": "【分解给XOps技术组】【智能体】告警的分层标签支撑通用分析知识、领域分析知识，根因告警识别准确率提升",
+    "files_count": 5,
+    "files_patch": [
+      "deployment/src/main/release/pub/knowledges/application.json",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/impl/IncidentServiceDelegateImpl.java",
+      "service/src/main/resources/service-configure.properties",
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/EsIndexUtilsTest.java",
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/IndicesTest.java"
+    ],
+    "files_generated": [
+      "deployment/src/main/release/pub/knowledges/application.json",
+      "service/src/main/java/com/huawei/i2000/dvaiagentservice/impl/IncidentServiceDelegateImpl.java",
+      "service/src/main/resources/service-configure.properties"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/EsIndexUtilsTest.java",
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/business/intent/IndicesTest.java"
+    ],
+    "format_issues": [],
+    "note": "Patch analysis subagent identified only 3 non-test files in patch. 2 test files in the main patch were missed. AI agent correctly generated all 3 requested files matching the expected diff."
+  },
+  "test_patch_apply": {
+    "method": "git_apply",
+    "manual_applied_files": [],
+    "files_applied": [
+      "service/src/test/java/com/huawei/i2000/dvaiagentservice/impl/ConfigLoadedTest.java",
+      "service/src/test/resources/rest-stubs/mappings/index.json"
+    ]
+  },
+  "compilation": {
+    "main_code": "success",
+    "test_code": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": [
+      "ConfigLoadedTest",
+      "EsIndexUtilsTest",
+      "IndicesTest"
+    ],
+    "total_tests": 3,
+    "passed_tests": 2,
+    "failed_tests": 1,
+    "skipped_tests": 0,
+    "pass_rate": "66.67%",
+    "failed_test_details": [
+      {
+        "test_name": "EsIndexUtilsTest.test_getEsIndex_whenNormalRequest_thenReturnIndexList",
+        "error_message": "expected:<32> but was:<0> (Run 2-6); Run 1: expected:<[dv_knowledge_incident]> but was:<[archive_klg_index_dv]>",
+        "root_cause": "EsIndexUtilsTest.java was not generated as it was missed in patch analysis. The test still expects old index name 'dv_knowledge_incident' but code returns 'archive_klg_index_dv'."
+      }
+    ],
+    "passed_test_details": [
+      {
+        "test_name": "ConfigLoadedTest.testConfigLoaded",
+        "note": "Passed. ut_patch applied correctly with expected value 'archive_klg_index_dv'."
+      },
+      {
+        "test_name": "IndicesTest.testIndices",
+        "note": "Passed. Pure unit test without mock server dependency."
+      }
+    ]
+  },
+  "evaluation_conclusion": {
+    "grade": "合格",
+    "summary": "代码生成部分：AI生成了3个主代码文件，diff与预期完全一致。但patch分析阶段遗漏了patch中的2个测试文件（EsIndexUtilsTest.java, IndicesTest.java），导致测试文件未更新。编译验证通过（主代码和测试代码均编译成功）。test_patch通过git apply成功应用。DT执行结果：3个测试中2个通过（ConfigLoadedTest, IndicesTest），1个失败（EsIndexUtilsTest），通过率66.67%，评级为'合格'。失败的根本原因是patch分析不完整，遗漏了内嵌在main patch中的测试文件变更。"
+  }
+}

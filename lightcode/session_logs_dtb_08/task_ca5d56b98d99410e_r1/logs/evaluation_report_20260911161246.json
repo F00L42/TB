@@ -1,0 +1,41 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "26_ExperienceAssuranceService_0222e644",
+    "base_commit": "0222e6444d6c7d7d93a8ba5d37884ef3f28438fe",
+    "evaluation_time": "2026-09-11T16:12:46+08:00"
+  },
+  "requirement": {
+    "description": "ExperienceAssuranceService新增查询所有实例ID与当前实例ID功能。新增InstanceUtils工具类，包含queryAllInstanceIds()通过IR接口获取所有实例ID，queryCurrentInstanceId()通过POD_NAME环境变量获取当前实例ID。",
+    "files_count": 1,
+    "files_expected": ["implements/common/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/common/impl/utils/InstanceUtils.java"]
+  },
+  "code_generation": {
+    "status": "success",
+    "files_generated": ["implements/common/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/common/impl/utils/InstanceUtils.java"],
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": [],
+    "issues_found": [
+      "引入不存在的类 com.huawei.oss.rest.util.Response"
+    ]
+  },
+  "test_patch_apply": {
+    "status": "not_executed",
+    "reason": "主代码编译失败，未执行test_patch应用"
+  },
+  "compilation": {
+    "status": "failed",
+    "error_message": "[ERROR] /app/code/CodeBenchRepos/implements/common/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/common/impl/utils/InstanceUtils.java:[14,32] cannot find symbol\n  symbol:   class Response\n  location: package com.huawei.oss.rest.util\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project maos-experienceassuranceservice-impl-common: Compilation failure",
+    "error_details": "生成的代码导入了不存在的类 com.huawei.oss.rest.util.Response。该包下不存在Response类，应为生成代码时AI子agent错误地引入了不存在的API。"
+  },
+  "dt_results": {
+    "status": "not_executed",
+    "reason": "编译失败，未执行DT"
+  },
+  "evaluation_conclusion": {
+    "grade": "不合格",
+    "summary": "AI子agent生成的代码编译失败。主要问题：引入了不存在的类com.huawei.oss.rest.util.Response，导致maven编译无法通过。子agent未使用参考patch中的正确导入（RestCaller.Builder模式调用POST接口），而是引入了不存在的Response类。",
+    "failure_step": "步骤4：编译验证"
+  }
+}

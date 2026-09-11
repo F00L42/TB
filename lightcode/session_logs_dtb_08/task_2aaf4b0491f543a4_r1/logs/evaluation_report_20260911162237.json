@@ -1,0 +1,62 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "36_DVAIAgentService_ed9292b4",
+    "commit": "ed9292b495e45ff380b8fc7acf769b9e1a27f136",
+    "evaluation_time": "2026-09-11T16:22:37+08:00"
+  },
+  "requirement": {
+    "description": "java异常日志等问题发现1个，fix:修复大模型返回null导致的空指针",
+    "files_count": 1,
+    "files_generated": ["service/src/main/java/com/huawei/i2000/dvaiagentservice/business/llm/LlmInvokeApi.java"]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": ["service/src/test/java/com/huawei/i2000/dvaiagentservice/impl/LlmInvokeApiTest.java"]
+  },
+  "compilation": {
+    "main_code": "success",
+    "test_code": "success"
+  },
+  "dt_results": {
+    "test_classes": ["LlmInvokeApiTest"],
+    "total_tests": 4,
+    "passed_tests": 3,
+    "failed_tests": 1,
+    "errors": 0,
+    "skipped_tests": 0,
+    "pass_rate": "75% (3/4)",
+    "failed_test_details": [
+      {
+        "test_name": "testParseAndCleanContentWithThinkBlock",
+        "error_type": "org.junit.ComparisonFailure",
+        "error_message": "expected:<[你好，我是 AI。]> but was:<[<thinking> 正在思考... </thinking> 你好，我是 AI。 ]>",
+        "analysis": "THINK_BLOCK常量为8字符(</think>)，测试输入中的闭合标签为11字符(</thinking>)，两者不匹配导致indexOf返回-1，未执行截断逻辑，返回了完整原始字符串"
+      }
+    ]
+  },
+  "passed_tests": [
+    {
+      "test_name": "testParseAndCleanContentWithoutThinkBlock",
+      "description": "正常流程 - 不包含思考标签的纯文本处理"
+    },
+    {
+      "test_name": "testParseAndCleanContentEmptyChoices",
+      "description": "异常流程 - choices列表为空时抛出LLMFixException"
+    },
+    {
+      "test_name": "testParseAndCleanContentNullContent",
+      "description": "异常流程 - content为null时抛出LLMFixException"
+    }
+  ],
+  "evaluation_conclusion": {
+    "grade": "良好",
+    "summary": "AI代码生成功能正确：成功添加了import java.util.Optional、将空指针风险代码重构为使用Optional链式调用的私有方法parseAndCleanContent，逻辑与目标patch一致。编译全部通过。4个测试中3个通过、1个失败。失败的测试(testParseAndCleanContentWithThinkBlock)是因为THINK_BLOCK常量(8字符)与测试用例输入中的标签(11字符)不匹配，属于测试用例与源代码常量不一致的问题，非AI生成代码问题。"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "36_DVAIAgentService_ed9292b4",
+    "commit": "ed9292b495e45ff380b8fc7acf769b9e1a27f136",
+    "evaluation_time": "2026-09-11T14:51:51+08:00"
+  },
+  "requirement": {
+    "description": "使用 code-production-evaluation 完成评测 java异常日志等问题发现1个，fix:修复大模型返回null导致的空指针",
+    "files_count": 1,
+    "files_generated": ["service/src/main/java/com/huawei/i2000/dvaiagentservice/business/llm/LlmInvokeApi.java"]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "git_apply",
+    "manual_applied_files": []
+  },
+  "compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": ["LlmInvokeApiTest"],
+    "total_tests": 4,
+    "passed_tests": 4,
+    "failed_tests": 0,
+    "skipped_tests": 0,
+    "pass_rate": "100%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI生成的代码完全正确：1) 正确识别了空指针异常问题的根因（直接调用chain式getXXX无null-safe保护）；2) 使用Optional链式调用实现了安全的空值处理；3) 在响应结构不完整时正确抛出LLMFixException；4) 正确实现了THINK_BLOCK的过滤逻辑；5) 代码在主代码编译和测试代码编译阶段均通过；6) 全部4个测试用例通过（testParseAndCleanContentWithThinkBlock、testParseAndCleanContentWithoutThinkBlock、testParseAndCleanContentEmptyChoices、testParseAndCleanContentNullContent），覆盖正常流程和异常流程场景。"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "3_DataSmartCubeService_31f1241c",
+    "commit": "31f1241c99dda6f1c499cf1e737fe738ba6fe354",
+    "evaluation_time": "20260911170130"
+  },
+  "requirement": {
+    "description": "功能需求\n1. 报告模板数据库操作功能：实现报告模板的完整CRUD操作，支持模板发布状态管理（发布/取消发布），所有数据库操作需包含完善的异常处理和日志记录机制\n2. 数据模型：新增报告模板持久化对象(ReportTemplatePO)\n3. 数据访问层：新增ReportTemplateDao类，继承自AbstractDao基类，实现insert/selectByTemplateId/deleteByTemplateId/updateByTemplateId/updateStatusWithDeployed/updateStatusWithUndeployed方法\n4. Mapper接口：新增ReportTemplateMapper接口\n5. 测试要求：为所有DAO层方法编写完整的单元测试",
+    "files_count": 5,
+    "files_generated": [
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/model/ReportTemplatePO.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDao.java",
+      "service/src/main/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/mapper/ReportTemplateMapper.java",
+      "service/src/main/resources/mybatis/zenith/ReportTemplateMapper.xml",
+      "service/src/main/resources/mybatis/zenith/MaterialLibrariesMapper.xml (修改注释)"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "mixed",
+    "manual_applied_files": [
+      "service/src/test/resources/spring/service_dao.xml",
+      "service/src/test/resources/sql/datasmartcube_tables_h2.sql"
+    ],
+    "git_applied_files": [
+      "service/src/test/java/com/huawei/ncedatacubeplus/datasmartcubeservice/simplifieddao/dao/ReportTemplateDaoTest.java"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "test_compilation": {
+    "status": "success",
+    "error_message": ""
+  },
+  "dt_results": {
+    "test_classes": ["ReportTemplateDaoTest"],
+    "total_tests": 15,
+    "passed_tests": 14,
+    "failed_tests": 1,
+    "skipped_tests": 0,
+    "pass_rate": "93.33%",
+    "failed_test_details": [
+      {
+        "test_name": "testUpdateByTemplateId",
+        "error_message": "org.junit.ComparisonFailure: expected:<[Updated ]Test Creator> but was:<[]Test Creator>\n原因：MyBatis多参数映射问题。updateByTemplateId(String templateId, ReportTemplatePO reportTemplatePO)方法在XML中使用#{reportTemplatePO.fieldName}格式，但Mapper接口未使用@Param注解导致ReportTemplatePO对象参数未被正确绑定，更新操作未生效。"
+      }
+    ]
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI生成的代码编译通过，15个测试用例中14个通过，通过率93.33%。生成的4个新文件(ReportTemplatePO.java, ReportTemplateDao.java, ReportTemplateMapper.java, ReportTemplateMapper.xml)和1个修改文件(MaterialLibrariesMapper.xml)均正确生成，无多余文件或缺失文件。唯一失败的测试(testUpdateByTemplateId)是测试代码本身的MyBatis参数映射问题（Mapper接口缺少@Param注解导致reportTemplatePO参数无法在XML中正确绑定），而非AI生成代码的问题。整体代码质量优秀。"
+  }
+}

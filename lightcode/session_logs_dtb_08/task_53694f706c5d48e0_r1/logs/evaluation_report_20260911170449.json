@@ -1,0 +1,51 @@
+{
+  "evaluation_info": {
+    "git_url": "https://codehub-dg-y.huawei.com/GeneralRDTools/CodeBenchRepos.git",
+    "branch": "28_ExperienceAssuranceService_42e693fa",
+    "commit": "42e693fa023172cd617139154791c2505a9470e7",
+    "evaluation_time": "20260911170449"
+  },
+  "requirement": {
+    "description": "在用户体验保障服务中，需要支持针对特定区域的可配置化放号控制功能。通过统一配置接口，能够灵活管理不同地理位置的放号状态和不可放号原因，提升运维响应效率并支持定制化业务需求。功能包括：可配置化放号状态管理、不可放号原因配置化、区块级放号控制、点位级放号验证。",
+    "files_count": 4,
+    "files_generated": [
+      "implements/nbi/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/BlockAllocCalculator.java",
+      "implements/nbi/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/ResponseAssembler.java",
+      "implements/nbi/src/main/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/ThirdPointAllocationServiceDelegateImpl.java",
+      "implements/nbi/src/main/resources/mybatis/zenith/CapacityDBMapper.xml"
+    ]
+  },
+  "code_generation": {
+    "status": "success",
+    "extra_files": [],
+    "missing_files": [],
+    "format_issues": []
+  },
+  "test_patch_apply": {
+    "method": "manual_apply",
+    "manual_applied_files": [
+      "implements/nbi/src/test/java/com/huawei/oss/wireless/experienceassuranceservice/nbi/impl/service/ThirdPointAllocationServiceDelegateImplTest.java"
+    ]
+  },
+  "compilation": {
+    "status": "success",
+    "notes": "主代码编译通过。注：基线commit存在 ThirdSceneSpaceAllocationServiceDelegateImpl.java 的预编译错误（方法签名与接口不匹配），已临时排除后编译。此问题为基线代码已有问题，与AI生成代码无关。"
+  },
+  "dt_results": {
+    "test_classes": [
+      "com.huawei.oss.wireless.experienceassuranceservice.nbi.impl.service.ResponseAssemblerTest",
+      "com.huawei.oss.wireless.experienceassuranceservice.nbi.impl.service.ThirdPointAllocationServiceDelegateImplTest"
+    ],
+    "total_tests": 12,
+    "passed_tests": 12,
+    "failed_tests": 0,
+    "errors": 0,
+    "skipped_tests": 0,
+    "pass_rate": "100.00%",
+    "failed_test_details": []
+  },
+  "evaluation_conclusion": {
+    "grade": "优秀",
+    "summary": "AI生成的代码全部编译通过，12个测试用例100%通过。代码变更覆盖了需求中的核心功能：(1) BlockAllocCalculator中新增区块结果清理逻辑；(2) ResponseAssembler中新增可配置化放号状态管理和不可放号原因配置化；(3) ThirdPointAllocationServiceDelegateImpl中新增点位级放号验证和配置化返回；(4) CapacityDBMapper.xml中优化了getSceneCells查询。代码质量优秀，完全满足需求要求。"
+  }
+}
