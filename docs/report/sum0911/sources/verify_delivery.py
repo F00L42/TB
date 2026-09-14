@@ -29,8 +29,8 @@ with zipfile.ZipFile(pptx) as z:
     slides = [n for n in names if re.fullmatch(r'ppt/slides/slide\d+.xml', n)]
     charts = [n for n in names if re.search(r'/charts/chart\d+.xml$', n)]
     notes = [n for n in names if re.fullmatch(r'ppt/notesSlides/notesSlide\d+.xml', n)]
-    assert len(slides) == 4 and len(charts) == 2 and len(notes) == 4
-    assert len([n for n in names if n.endswith('.xlsx')]) == 2
+    assert len(slides) == 4 and len(charts) == 3 and len(notes) == 4
+    assert len([n for n in names if n.endswith('.xlsx')]) == 3
 receipt = json.loads((out.parent / '.sum0911-build/validation.json').read_text(encoding='utf-8'))
 assert receipt['finalSha256'] == hashlib.sha256(pptx.read_bytes()).hexdigest()
 assert receipt['firstPartyImport']['passed']

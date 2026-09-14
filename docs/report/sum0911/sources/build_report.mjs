@@ -21,6 +21,8 @@ if(process.argv.includes('--html-only')) process.exit(0);
 
 // The deck is generated exclusively from the blog narrative and its source snapshot.
 const {Presentation,PresentationFile,FileBlob}=await import('@oai/artifact-tool');
+const {drawCompactSubagent,createSubagentFigure}=await import('./subagent_diagram.mjs');
+const {drawLongTailCompact,createLongTailFigure}=await import('./long_tail_chart.mjs');
 const {applyPresentationChartFont,finalizePresentation}=await import(pathToFileURL(path.join(skill,'container_tools/artifact_tool_utils.mjs')));
 const data=JSON.parse(await fs.readFile(path.join(here,'evidence.json'),'utf8'));
 const build=path.join(path.dirname(out),'.sum0911-build');
@@ -100,43 +102,18 @@ function chart(s,categories,series,pos,opts={}){
 }
 // 4. Source reasoning with adjacent analysis, plus non-overlapping length bins.
 {
- const s=page('已能汇报测试事实，DTB 停止后续重复推敲',4);
- txt(s,'case37：原始思考文本与批注',78,149,730,48,31,C.teal,true);
- txt(s,'原文节选；[…] 为省略，彩色文字为分析标注',78,198,735,35,21,C.muted);
- function quote(text,x,y,w,h,emphasis,color=C.teal){
-  const z=txt(s,text,x,y,w,h,25,C.ink);
-  for(const phrase of emphasis){const r=z.text.get(phrase);r.bold=true;r.fill=color;}
-  return z;
- }
- quote('I see the results:\n- Tests run: 3\n- Failures: 1 […]\n- 2 tests passed: […]',78,250,455,151,['Tests run: 3','Failures: 1','2 tests passed']);
- txt(s,'① 汇报事实已齐备',550,259,285,40,25,C.teal,true);
- txt(s,'3 条测试，1 条失败\n2 条通过',550,307,285,78,23,C.muted);
- txt(s,'[省略原文中重列的 31 项索引]',78,402,475,31,20,C.muted);
- quote("Let me count:\nThat's 31 indices total",78,438,455,80,['Let me count:','31 indices total'],'#AC6219');
- txt(s,'② 再次计数',550,437,275,38,25,'#AC6219',true);
- txt(s,'没有新增工具证据',550,480,285,39,23,C.muted);
- quote("But then the count should be 34,\nnot 32 […]\nI'm getting 31 items total […]",78,538,455,110,['34','32','31 items total'],'#AC6219');
- txt(s,'③ 继续反复推敲',550,544,285,38,25,'#AC6219',true);
- txt(s,'31 / 34 / 32 来回计数\n根因尚未证实',550,588,285,76,23,C.muted);
- txt(s,'850 token 介入，首 probe 接受',78,693,760,48,31,C.teal,true);
- txt(s,'50-token 试答 .904 ≥ .90，转入 final\n保留 2/3 测试事实，继续创建报告目录',78,748,755,70,24);
+ const s=page('子 Agent 早退：结束重复展开，交付结构化结果',4);
+ drawCompactSubagent(s);
 
- txt(s,'思考长度分布与 token 成本',875,149,650,48,31,C.ink,true);
- txt(s,'Vanilla-06，391 条有效请求，52,112 reasoning token',875,199,655,55,22,C.muted);
- const bins=data.vanilla_distribution_bins;
- chart(s,bins.map(b=>b.label),[
-  {name:'请求占比',values:bins.map(b=>+b.request_share.toFixed(8)),fill:C.gray,valuesFormatCode:'0.00%'},
-  {name:'reasoning token 占比',values:bins.map(b=>+b.token_share.toFixed(8)),fill:C.teal,valuesFormatCode:'0.00%'}
- ],{left:859,top:268,width:681,height:351},{legend:true,barOptions:{gapWidth:65},
-  yAxis:{max:.65,majorUnit:.2,numberFormatCode:'0%'},
-  xAxis:{textStyle:{typeface:F,fontSize:23,fill:C.ink}},
-  dataLabels:{showValue:true,position:'outEnd',textStyle:{typeface:F,fontSize:20,fill:C.ink,bold:true}}});
- txt(s,'分档单位：token；请求数依次为 128 / 224 / 28 / 11',879,617,652,36,21,C.muted);
- txt(s,'2.81% 的长尾请求\n占 38.88% 的 reasoning token',875,666,670,105,37,C.teal,true);
- txt(s,'短请求原生完成，长请求才试答\n独立 closed 账本：97.25%（354/364）同 child 完成',875,773,665,65,22);
- txt(s,'案例来自 run-06-closed，分析针对汇报子目标，试答分数不是正确概率。11 条长尾中 9 条为标题；closed 旁路比例不代表 run-08。',78,851,1345,35,18,C.muted);
- note(s,'博客 §4.2、§5.1。原始reasoning片段由full-log第20行逐字核验，仅通过[…]省略与换行排版，不展示未保存的hidden trial全文。片段1在开头提取3 tests、1 failure、2 passed，标注只表示汇报事实充分；片段2在完整重列31项索引后再计数；片段3在34/32/31间反复推敲，根因未证实。案例request0480aca87728475f，parent chatcmpl-a385fe220c683c95。850-token native后50-token probe以.904024首次接受，再fresh-final174token并创建报告目录。分档互斥：0–20/21–300/301–850/>850，包含0-token请求。请求数128/224/28/11，reasoning token1976/16210/13663/20263，总数391与52112。分档不是累计阈值；长尾20,263是完整reasoning，不全为可删除冗余。阈值后10913仍须扣除必要推理与控制成本。closed354/364同child，仅10请求介入；该phase run全量慢4.26%，不冒充主性能组。原始来源和字符位置见sources/evidence.json。');
+ drawLongTailCompact(s,data);
+ txt(s,'左图为 run-06 子 Agent 的实际早退路径，非单次净压缩对照；原文 […] 为省略，试答分数不等于正确概率。长尾含 9 条标题。',78,851,1345,35,18,C.muted);
+ note(s,'博客 §4.1、§5.1。案例case28子Agent request0aa42c61e0a5411e，parent chatcmpl-aaeacbc036f1e222。从patch提取文件、实体、测试方法，真实执行中的信息提取任务。已列init()和测试方法，随后Now let me look more carefully开始再展开签名。851-token处首probe50token .985006≥.93接受，fresh-final输出含file_info/data_structures/test_methods的JSON。旧版未close、gate .93，非run08。任务最终12/12不等于JSON每字段正确。对应Vanilla344reasoning，DTB851，E2E25.644906→25.487352秒；仅解释实际停止机制，不作净压缩率证明。没有trial全文，不将final当trial原样复用，也不画未生成后续思考为已省下文本。右图为391条Vanilla有效请求按原始timestamp升序枚举的散点图；横轴为发起序号，不是等距时间或严格串行回合，主子请求可交错。顶部编号和竖线标记9个任务区段。纵轴850处分段：下段0–850多给空间，上段850–3500完整保留最大3482；各段线性、上下单位高度不同，不按跨段高度比较倍数。短请求使用空心描边圆点，坐标不抖动。380条<850、11条>850，没有恰好850的请求。97.19%描述该策略在基线分布上的预计覆盖，不是run08实测介入率。长尾11条为9标题2业务，总思考20263，占38.88%；扣去11×850后为10913，占全部52112的20.94%。长尾不全为冗余，850是有分布依据的候选介入值，并非本图证明的最优值。实际达到850且仍在思考才考虑介入。独立完整统计图另放大11条长尾，数据、时间顺序与任务边界见sources/evidence.json。');
 }
+
+const longTailFigure=createLongTailFigure(Presentation,data);
+await fs.mkdir(path.join(out,'统计图'),{recursive:true});
+const longTailPng=await longTailFigure.presentation.export({slide:longTailFigure.slide,format:'png',scale:2});
+await fs.writeFile(path.join(out,'统计图','思考长度长尾与850阈值.png'),new Uint8Array(await longTailPng.arrayBuffer()));
 
 const revision=Date.now();
 const candidate=path.join(build,`candidate-${revision}.pptx`);
@@ -168,4 +145,8 @@ for(let i=0;i<4;i++){
  const png=await finalDeck.export({slide:finalDeck.slides.items[i],format:'png',scale:1});
  await fs.writeFile(path.join(out,'预览',`${String(i+1).padStart(2,'0')}.png`),new Uint8Array(await png.arrayBuffer()));
 }
-console.log('Report HTML, four-slide deck, and editable data charts generated.');
+const figure=createSubagentFigure(Presentation,data.subagent_case);
+const figurePng=await figure.presentation.export({slide:figure.slide,format:'png',scale:1});
+await fs.writeFile(path.join(out,'子Agent早退示意图.png'),new Uint8Array(await figurePng.arrayBuffer()));
+await(await PresentationFile.exportPptx(figure.presentation)).save(path.join(build,'subagent-figure-editable.pptx'));
+console.log('Report, P4, and source-text subagent diagram generated.');
