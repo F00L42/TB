@@ -64,10 +64,13 @@ def quantile(values, q):
     return s[low] + (s[min(low+1, len(s)-1)]-s[low])*(pos-low)
 
 
-def load_variant(variant):
-    proxy = REPO / f"proxy/results/qwen/local-task29/local-apiserver/{variant}/run-06"
-    lc = REPO / f"lightcode/session_logs_{variant}_06"
-    corr = {r["request_id"]: r for r in jsonl(ROOT/f"{variant}_correlation/requests.jsonl")}
+def load_variant(variant, *, proxy=None, lc=None, correlation=None, output_dir=None):
+    # Explicit paths allow follow-up audits without rewriting historical artifacts.
+    proxy = proxy or REPO / f"proxy/results/qwen/local-task29/local-apiserver/{variant}/run-06"
+    lc = lc or REPO / f"lightcode/session_logs_{variant}_06"
+    output_dir = output_dir or ROOT
+    correlation = correlation or ROOT/f"{variant}_correlation"
+    corr = {r["request_id"]: r for r in jsonl(correlation/"requests.jsonl")}
     tasks = {}
     call_owners = defaultdict(set)
     content_owners = defaultdict(set)
@@ -215,8 +218,8 @@ def load_variant(variant):
         t["reasoning_tokens_local"] = sum(r["metrics"].get("reasoning_tokens_local",0) for r in rows)
         t["request_e2e_p50_s"] = quantile([r["metrics"]["e2e_ms"]/1000 for r in rows], .5)
         t["request_e2e_p95_s"] = quantile([r["metrics"]["e2e_ms"]/1000 for r in rows], .95)
-    write(ROOT/f"{variant}_supplemental_links.json", supplement)
-    (ROOT/f"{variant}_request_index.jsonl").write_text("".join(json.dumps(x,ensure_ascii=False)+"\n" for x in index),encoding="utf8")
+    write(output_dir/f"{variant}_supplemental_links.json", supplement)
+    (output_dir/f"{variant}_request_index.jsonl").write_text("".join(json.dumps(x,ensure_ascii=False)+"\n" for x in index),encoding="utf8")
     return {"tasks":tasks, "requests":index}, all_raw
 
 
