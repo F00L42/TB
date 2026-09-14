@@ -430,3 +430,4 @@ telemetry-off 正式 E2E 和完整 manifest 未通过或未验证。详见
 | 2026-08-24 | 纳入 run_11：318 个 controller-forced final 均使用 24-token cue，空 final 为 0/633；同时发现两条 2,048-token final 截断，完整 final 协议仍未通过 | cue 修复可以冻结；下一优先级是移除控制器额外 final 硬帽，而不是改 probe、回滚 cue 或提前实现 trial reuse |
 | 2026-08-24 | 完成 `dtb-algorithm-v4` 本地实现：复用原生有效 completion 上限，增加 parser-facing 统一额度账本，删除默认 final cap 并补充 final/request telemetry 与回归测试 | 让多 child DTB 与一次原生 assistant completion 的 `max_tokens`、上下文和真实 `finish_reason` 语义一致 |
 | 2026-08-24 | 纳入 run_11_fixed_v5 的 v4 服务器路径证据：240 个 final 额度字段闭合、全部自然 stop、无 2,048 cap；历史长 final、no-final 集和小 `max_tokens` 仍未覆盖 | 不把短 final 的成功误写为完整协议通过，保留定向验收门 |
+| 2026-09-10 | 明确历史“probe 不变”的决策范围；补充 run-06 后仅在 trial cue 末尾追加 `</think>` 的独立实验入口，保持 trial 长度、置信度阈值和 fresh-final 不变 | 验证显式思考边界对隐藏试答与净时延的影响；不提前改写历史结论或启用 trial reuse，服务器效果待验证 |

@@ -719,6 +719,8 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-14 | [阶段汇报 P4](../report/sum0911/技术博客.md) 增加 case37 原始 reasoning 节选与就地批注；从 391 条 Vanilla 请求复算 ≤20、21–300、301–850、>850 token 四档，数量为 128/224/28/11、token 为 1,976/16,210/13,663/20,263 | 直观展示汇报事实已齐备后的重复计数，并突出 2.81% 长尾占 38.88% reasoning token；仅补充既有数据复算，不新增服务器实验或扩大根因正确性结论 |
+| 2026-09-14 | 汇总 [DTB 阶段性汇报](../report/sum0911/技术博客.md)：Vanilla-06 对 run-08 的 9 任务总通过数 4/9 持平、累计 LLM E2E 减少 11.57%、可见 reasoning 减少 23.70%；独立 closed 账本解释 case37 早退与 354/364 原生同 child 完成 | 明确 Vanilla case35 原始 36/36、case36 退化和 case2 改善；平台执行时间合计仅减少 3.95%。本次整理既有证据，不新增服务器实验，不将 phase 机制比例移植到 off 性能组或宣称跨模型收益 |
 | 2026-09-07 | 优化 DTB DELTA 累计复制及置信度无用计算；新增 54 项等价性测试，全量 319 tests / 1966 subtests 通过，细节见第 5 节 | 保持算法与 parser-facing 输出语义，保留 phase 诊断；仅有本地收集器 CPU 微基准，尚无服务器 E2E 收益结论 |
 | 2026-09-07 | 更新 Agent 方案的短思考/长尾背景与介入阈值语义；短路径转发简化待最低介入值验收后再实验，parser 优化不列为当前重点；代理关闭 chunk 日志时跳过无效线程池提交，详见 `proxy/AGENTS.md` | 用户收敛优先级至校验成本与压缩收益的权衡；代理仅作小优化，本次无新增服务器时延结论 |
 | 2026-09-04 | 完成 [输入去 decode 前置重构](../design/dtb_token_authoritative_prompt.md#61-本地实施结果2026-09-04)：一次提取 serving 文本、不可变初始快照、Token ID 续写及提交快照、外部 `return_prompt_text` 元数据适配；全量 229 tests / 1966 subtests 通过，三份未改动 patch 合并适用性检查通过 | 新增 81 个用例验证缺文本、off/phase、token-only/混合边界、probe、流式/非流式、取消和错误；`controller.entry_to_first_submit` 为重叠 wall 而非纯 CPU/额外 phase。尚无服务器性能证据，先固定 eager 配对，再推进最低介入值 |
