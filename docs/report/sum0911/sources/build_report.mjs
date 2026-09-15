@@ -9,20 +9,11 @@ process.env.RUNTIME_NODE_MODULES=path.join(runtime,'node/node_modules');
 process.env.RUNTIME_NODE=path.join(runtime,'node/bin/node.exe');
 process.env.RUNTIME_PYTHON=path.join(runtime,'python/python.exe');
 const skill='C:/Users/F-O-O/.codex/plugins/cache/openai-primary-runtime/presentations/26.909.12148/skills/presentations';
-const {marked}=await import(pathToFileURL(path.join(runtime,'node/node_modules/marked/lib/marked.esm.js')));
-const css=`:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f5f7f8;color:#142c3d;font:17px/1.85 'Microsoft YaHei','Noto Sans CJK SC',sans-serif}main{max-width:1060px;margin:40px auto;background:white;padding:60px 70px}h1{font-size:35px;line-height:1.45;letter-spacing:-.5px;margin:0 0 28px}h2{font-size:26px;margin:52px 0 18px;color:#087f7c;border-bottom:1px solid #dbe4e8;padding-bottom:10px}h3{font-size:20px;margin-top:30px}p{margin:16px 0}a{color:#087f7c;text-underline-offset:3px}strong{font-weight:700}table{width:100%;border-collapse:collapse;margin:25px 0;font-size:14px;line-height:1.65}th{background:#edf3f5;text-align:left}th,td{padding:11px 13px;border-bottom:1px solid #dbe4e8;vertical-align:top}code{font-family:Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}pre{white-space:pre-wrap;background:#f2f5f7;padding:20px}li{margin:9px 0}nav{font-size:14px;margin-bottom:26px;color:#687985}.dist{margin:26px 0;padding:22px 0}.dist p{margin:4px 0}.bar{height:32px;display:flex;background:#dbe4e8;margin:8px 0 15px}.bar span{background:#087f7c}.small{font-size:14px;color:#526976}@media(max-width:700px){main{margin:0;padding:25px 18px}h1{font-size:27px}table{display:block;overflow:auto}}@media print{body{background:white}main{margin:0;padding:0;max-width:none}h2,h3{break-after:avoid}tr{break-inside:avoid}a{color:inherit}}`;
-for(const stem of ['邮件正文']){
- let md=await fs.readFile(path.join(out,stem+'.md'),'utf8');
- let body=marked.parse(md);
- await fs.writeFile(path.join(out,stem+'.html'),`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${stem} · DTB 阶段性汇报</title><style>${css}</style><main><nav>DTB 阶段性汇报　2026.09　<a href="技术博客.md">技术博客</a>　<a href="邮件正文.html">邮件正文</a>　<a href="DTB阶段性汇报.pptx">展示 PPT</a></nav>${body}</main></html>`,'utf8');
-}
-
-if(process.argv.includes('--html-only')) process.exit(0);
-
 // The deck is generated exclusively from the blog narrative and its source snapshot.
 const {Presentation,PresentationFile,FileBlob}=await import('@oai/artifact-tool');
 const {drawCompactSubagent,createSubagentFigure}=await import('./subagent_diagram.mjs');
 const {drawLongTailCompact,createLongTailFigure}=await import('./long_tail_chart.mjs');
+const {finalizeOfficeCharts}=await import('./finalize_office_charts.mjs');
 const {applyPresentationChartFont,finalizePresentation}=await import(pathToFileURL(path.join(skill,'container_tools/artifact_tool_utils.mjs')));
 const data=JSON.parse(await fs.readFile(path.join(here,'evidence.json'),'utf8'));
 const build=path.join(path.dirname(out),'.sum0911-build');
@@ -135,10 +126,19 @@ await finalizePresentation({workspaceDir:path.dirname(out),candidatePath:candida
  explicitTotalSlideCount:4,requiredNativeChartOwnerSlides:[3,4],requiredNativeTableOwnerSlides:[],
  materializeLiteralChartWorkbooks:true,fontPolicy:{basis:'design',families:[F]},
  verifyArtifactToolImport:true,receiptPath:path.join(build,`validation-${revision}.json`)});
-await fs.copyFile(path.join(build,`validation-${revision}.json`),path.join(build,'validation.json'));
+const officeCheckedPath=path.join(build,'release',`office-validated-${revision}.pptx`);
+await finalizeOfficeCharts({workspaceDir:path.dirname(out),candidatePath:checkedPath,finalPath:officeCheckedPath,
+ pythonExecutable:path.join(runtime,'python/python.exe'),
+ integrityValidatorPath:path.join(skill,'container_tools/inspect_presentation_package_integrity.py'),
+ layoutValidatorPath:path.join(skill,'container_tools/inspect_presentation_layout_geometry.py'),
+ layoutArgs:['--expected-slide-size-emu','15240000,8572500','--validate-bullet-geometry','--validate-heading-fit'],
+ explicitTotalSlideCount:4,requiredNativeChartOwnerSlides:[3,4],requiredNativeTableOwnerSlides:[],
+ fontPolicy:{basis:'design',families:[F]},verifyArtifactToolImport:true,
+ receiptPath:path.join(build,`office-validation-${revision}.json`)});
+await fs.copyFile(path.join(build,`office-validation-${revision}.json`),path.join(build,'validation.json'));
 const outputPath=path.join(out,'DTB阶段性汇报.pptx');
 try { await fs.copyFile(outputPath,path.join(build,`before-${revision}.pptx`)); } catch(e) { if(e.code!=='ENOENT') throw e; }
-await fs.copyFile(checkedPath,outputPath);
+await fs.copyFile(officeCheckedPath,outputPath);
 const finalDeck=await PresentationFile.importPptx(await FileBlob.load(outputPath));
 await fs.mkdir(path.join(out,'预览'),{recursive:true});
 for(let i=0;i<4;i++){
