@@ -156,6 +156,7 @@ def _run_attempt(test_case, config, file_name, result_entry, results_dict, outpu
                     if status_info.get("success"):
                         result_entry["session_history_url"] = status_info.get("session_history_url")
                         result_entry["error_message"] = status_info.get("error_message")
+                        result_entry["create_time"] = status_info.get("create_time")
                         result_entry["end_time"] = status_info.get("end_time")
                     else:
                         result_entry["error"] = status_info.get("error")
