@@ -1,5 +1,7 @@
 # Agent DTB 透传代理工程指南
 
+范围说明：下文原设计描述 `agent_dtb_proxy.py` 的 LightCode/DTB 实验入口。新增的通用纯观测入口为 `agent_observation_proxy.py`，实现位于 `observation/`，不注入 DTB 参数、不按 session 分区。其时间归档、Token 口径和消息轨迹契约见 [`README-observation.md`](README-observation.md) 与 [`通用代理设计`](../docs/design/general_agent_observation_proxy.md)。两入口共用底层有界 JSONL writer，旧入口的目录及 schema 契约保持不变。
+
 ## 1. 设计目的
 
 Agent 多轮调用场景（如 LightCode 代码生成评测）由多次模型与工具交互构成，请求数随任务和执行轨迹变化。早期单样本约 60 次 LLM 调用、97% 为工具调用轮次，不能据此推断 thinking token 占输出的绝大部分。run-05 的 301 个 Vanilla 请求中，292 个（97.01%）reasoning 不超过 850 token，表现为大量短思考与少量长尾；优化应抓大放小，最终以质量门后的完整 Agent task wall 裁决，详见 `docs/log/perf/agent_run05/RESULT.md`。DTB（Dynamic Think-Budget Control）已通过 vLLM serving patch 集成到推理服务端，但 LightCode 是黑盒环境，无法注入 DTB 参数或观察每轮请求。

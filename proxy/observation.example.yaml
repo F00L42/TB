@@ -1,0 +1,24 @@
+listen: {host: "127.0.0.1", port: 9000}
+upstream:
+  base_url: "http://127.0.0.1:9001"
+  auth_mode: forward
+  trust_env: false
+capture:
+  output_root: "../docs/log/perf"
+  labels: {agent: unknown, scenario: unknown, variant: baseline_unverified}
+protocols:
+  chat_completions:
+    paths: ["/v1/chat/completions"]
+    reasoning_fields: [reasoning_content, reasoning]
+tokenizers: {}
+# Exact response/request model names must map to matching local tokenizer artifacts:
+# tokenizers:
+#   qwen3.6-27b: {path: "../docs/tokenizer/Qwen3.6-27B"}
+report:
+  timezone: Asia/Shanghai
+  live_interval_seconds: 5
+  thresholds: [256, 512, 850, 1024, 2048, 4096]
+trajectories:
+  enabled: true
+  projection_profiles: []
+  # Enable [omit_reasoning] ONLY if the client drops reasoning from history.
