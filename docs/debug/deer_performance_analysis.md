@@ -719,6 +719,10 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-16 | 通用观测代理移除 label_headers，保留 capture.labels 静态运行标签 | 简化采集配置，不要求 Agent 配合发送标签 header；不改变透传或 Token 统计口径 |
+| 2026-09-16 | 新增 [通用 Agent 观测代理](../../proxy/README-observation.md)：纯透传、时间归档、Token 来源、prompt 轨迹及长尾阈值报告；旧 proxy 保持入口与产物格式 | 用于 LightCode 以外的场景采集；本地 28 项无模型测试及本地 tokenizer 计数通过，未测真实 Agent/目标服务性能；报告线程 CPU/I/O 与采集设置须纳入后续实验身份 |
+| 2026-09-16 | 新增 [Qwen/GLM parser 源码对比](../design/dtb_qwen36_glm53_parser_comparison.md) 与真实 tokenizer 无模型回放；Qwen patched 30 个工具比较一致，GLM 30 个中 12 个不一致 | 复现 GLM 零参数流式缺失、array/number 分片参数错误及 stripped reasoning 边界错分；仅合成源码诊断，不代表服务器故障率或性能；未修改生产 parser |
+| 2026-09-15 | 新增 [GLM-5.3 Agent 加速计划](../design/dtb_glm53_agent_acceleration_plan.md) 与本地 tokenizer 固定快照/审计；区分多机共置和 PD，识别 Qwen-only parser 绑定、空 DP rank、KV extra_args 与传输生命周期限制 | 为获取中的用户轨迹提供 token 分布与语义早退分析契约；本次只有 tokenizer 实测和源码结论，不代表 GLM/PD 服务器加速已验证，也不修改生产默认值 |
 | 2026-09-15 | 修复阶段汇报散点的样本线条覆盖，空心标记两层共用数据；新增[统计图可编辑 PPTX](../report/sum0911/统计图/思考长度长尾与850阈值.pptx) | 处理用户报告的 Office 连线显示差异，保持阈值线与任务边界；已检查 OOXML 和预览，未做 Office 实机复核，未修改统计结论或新增服务器实验 |
 | 2026-09-14 | [阶段汇报统计图](../report/sum0911/统计图/思考长度长尾与850阈值.png) 改用391条请求按发起时间枚举的空心散点、9个任务区段与11条长尾放大图，标出850阈值、97.19%阈值以下覆盖及10,913 token（20.94%）的阈值以上尾部 | 直观解释将介入成本集中到长尾的分布依据；主图在850处分为0–850和850–3500两段线性尺度、下段多给空间；长尾放大图保留统一线性尺度，不将潜在尾部等同可删除冗余，不据分布宣称850最优；未新增服务器实验 |
 | 2026-09-14 | [阶段汇报](../report/sum0911/技术博客.md) 单例切换为 run-06 case28 子 Agent 信息提取，增加原始文本圆角框与外部批注图，标明 851-token 首 probe .985006 接受后转入 JSON；保留 case37 备份 | 用户要求展示具体业务子 Agent。该例对应 Vanilla 344、DTB 851 reasoning token，仅证明实际早退机制，不作为单次净压缩收益；任务 12/12 不代替逐字段 JSON 审计，不生成反事实“已省下”思考文本 |
