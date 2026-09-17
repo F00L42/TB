@@ -69,7 +69,7 @@ class DtbTelemetryTests(unittest.TestCase):
         finally:
             writer.close()
         self.assertEqual(record["schema"], 3)
-        self.assertEqual(record["policy_version"], "dtb-algorithm-v4")
+        self.assertEqual(record["policy_version"], "dtb-algorithm-v4-trial-close-exp1")
         self.assertEqual(record["variant"], "dtb")
         self.assertEqual(record["queue_ms"], 250.0)
         self.assertEqual(record["prefill_ms"], 500.0)

@@ -345,8 +345,9 @@ class StateMachineGoldenTraceTests(unittest.IsolatedAsyncioTestCase):
             engine.calls[1]["prompt_token_ids"][-len(trial_tokens):],
             trial_tokens,
         )
-        self.assertNotIn("</think>", TRIAL_PROMPT)
-        self.assertNotIn(
+        self.assertEqual(TRIAL_PROMPT.count("</think>"), 1)
+        self.assertTrue(TRIAL_PROMPT.endswith("</think>\n\n"))
+        self.assertIn(
             "</think>",
             context.tokenizer.decode(
                 engine.calls[1]["prompt_token_ids"],
