@@ -43,8 +43,7 @@ GUIDED_FINAL_PROMPT_V1 = (
 # Compatibility alias for callers that still use the former reason-specific name.
 BUDGET_EXHAUSTED_FINAL_PROMPT = GUIDED_FINAL_PROMPT_V1
 TRIAL_PROMPT = (
-    "I have to give the answer based on the thinking directly "
-    "without explanation now.\n**Final Answer**\n"
+    "\n OK, I have completed my thinking and can now provide the final output.\n</think>\n\n"
 )
 
 

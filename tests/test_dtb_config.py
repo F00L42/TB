@@ -36,7 +36,7 @@ class DtbConfigTests(unittest.TestCase):
         self.assertNotIn("final_answer_max_tokens", names)
 
     def test_algorithm_policy_is_code_owned(self) -> None:
-        self.assertEqual(POLICY_VERSION, "dtb-algorithm-v4")
+        self.assertEqual(POLICY_VERSION, "dtb-algorithm-v4-trial-close-exp1")
         self.assertEqual(DtbAlgorithmPolicy().version, POLICY_VERSION)
         with self.assertRaises(ValueError):
             DtbAlgorithmPolicy(trial_answer_length=51)
