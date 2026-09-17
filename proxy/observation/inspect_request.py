@@ -25,7 +25,7 @@ def main():
                 snapshot_events(root, db, problems)
                 if not db.execute("SELECT 1 FROM events WHERE rid=? LIMIT 1", (args.request_id,)).fetchone():
                     parser.error("request ID not found")
-                row, detail = reconstruct(db, args.request_id, config, TokenCounter(config["tokenizers"]))
+                row, detail = reconstruct(db, args.request_id, config, TokenCounter.from_config(config))
                 print(json.dumps({"record": row, "detail": detail, "archive_warnings": problems}, ensure_ascii=False, indent=2))
         return
     found = []

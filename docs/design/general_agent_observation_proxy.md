@@ -23,7 +23,7 @@
 ### 1.2 首版边界
 
 - 支持固定上游的 HTTP 反向代理；Chat Completions 包括多 choice、工具调用、错误响应和取消。未知路径照常转发并记录请求摘要，模型类未支持接口仍可保存原始 body。
-- 默认纯观测：不覆盖 model、不注入 DTB 参数、不自动设置 `stream_options.include_usage`、不重试生成、不更改工具或采样参数。客户端主动发送的字段原样保留。需要 usage 时由实验操作者统一配置客户端，记录差异。
+- 默认纯观测：`append_body: {}` 时请求 body 原样透传，不自动设置 `stream_options.include_usage`，不重试生成。允许操作者显式配置固定 `append_body`，覆盖 Chat Completions POST 请求的顶层字段（包括 model、DTB 和采样参数）；记录原始请求与实际发送请求及覆盖规则，实验间修改配置并重启。
 - 不实现 WebSocket/Realtime、CONNECT 隧道、协议转换、自动 session 猜测、工具执行、在线预算控制或自动修改 `budget_config.yaml`。不支持的连接升级应明确拒绝，不能称为透传成功。
 - 能观察的思考是 API 暴露的 reasoning 文本或 usage 字段。隐藏 probe、服务端未输出的思考、队列/prefill/decode 时间不能从代理还原；使用 `null/not_observable`，需要另接服务端 telemetry。
 - 一次 HTTP 调用不是完整 Agent 任务。代理不把 LLM 请求时延之和命名为 task wall；质量和任务边界由外部评测账本提供。
@@ -51,7 +51,7 @@
 
 **一：以请求时间归档，身份只作为标签。** 每次 HTTP 调用生成独立 `request_id`。时间桶只是文件分区；task/session/parent ID 若由调用方明确提供，可以保存和筛选，但不决定落盘，也不用相邻时间或 prompt 相似性猜测身份。
 
-**二：转发与解释分离。** 网络路径只转发并复制观测数据到有界队列；SSE 解析、tokenizer 和 Markdown 渲染均由后台消费或离线执行。解析失败只降低统计可用性，不能破坏已正确返回的响应。选用原字节采集而非解析后重组，是为了保留未知字段、工具片段和协议异常供复核。
+**二：转发与解释分离。** 默认网络路径只转发并复制观测数据到有界队列；只有显式启用 body 附加时，才在发往上游前执行有界的请求 JSON 解析/覆盖。SSE 解析、tokenizer 和 Markdown 渲染均由后台消费或离线执行。观测解析失败只降低统计可用性，不能破坏已正确返回的响应。原字节采集保留未知字段、工具片段和协议异常供复核。
 
 **三：事实日志与派生视图分离。** 增量事实日志保存生命周期和 body；请求表、Token 表、可读报告都是可重建视图。不为时间排序阻塞响应，也不在完成时维护全局有序大文件。物理追加顺序可以交错，阅读顺序由请求到达时间决定。
 
@@ -82,7 +82,7 @@ flowchart LR
 | HTTP 消息转发 | 新 transport；参考原代理路由，但不直接导入带启动副作用、硬编码参数的旧模块 |
 | JSONL 锁、字节滚动、残缺尾恢复 | 从 `full_log_writer.py` 提取通用 `RollingJsonlWriter`；旧 `FullLogShardWriter` 保留 session 布局包装及回归测试 |
 | 协议解释 | 独立 Chat Completions adapter；将来 Responses/Messages 增加 adapter，不改 transport |
-| tokenizer | 模型别名到固定本地 tokenizer 的映射；复用已有 tokenizer 制品及清单格式，不下载模型权重、不复制 DTB 状态机 |
+| tokenizer | 一次运行对应一个实际模型，代理持有一个固定本地 tokenizer；别名共用，实时与退出分析复用，不下载模型权重 |
 | 消息轨迹重建 | 新离线 `trajectories` 模块消费 RequestRecord 与消息引用；匹配规则、节点出处和歧义随报告保存，不写回采集归属 |
 | LightCode 关联 | 继续属于 `tools/dtb/correlate_lightcode_proxy.py`；新代理不依赖它，也不伪造其 session schema |
 | 质量/性能裁决 | 遵守 [泛化实验流程第 6 节](think_budget_generalization_plan.md#6-阶段一实验与数据采集)，由独立实验报告完成 |
@@ -127,9 +127,13 @@ flowchart LR
 
 ### 3.2 HTTP 透传契约
 
-保持方法、原始路径语义、query 的重复键及编码、请求 body、响应状态和响应 body。上游 base path 采用明确的前缀映射，不用字符串 `startswith` 猜测路径重叠。客户端 Host 由上游目标替换；逐跳 header 及 `Connection` 指定字段按 HTTP 规则处理，其余端到端 header 保留重复值，不折叠成普通 dict。[HTTP 依据：RFC 9110 §7.6.1](https://www.rfc-editor.org/rfc/rfc9110.html#section-7.6.1)。
+保持方法、原始路径语义、query 的重复键及编码、响应状态和响应 body；请求 body 除显式配置的附加规则外保持原样。上游 base path 采用明确的前缀映射，不用字符串 `startswith` 猜测路径重叠。客户端 Host 由上游目标替换；逐跳 header 及 `Connection` 指定字段按 HTTP 规则处理，其余端到端 header 保留重复值，不折叠成普通 dict。[HTTP 依据：RFC 9110 §7.6.1](https://www.rfc-editor.org/rfc/rfc9110.html#section-7.6.1)。
 
 body 采用未自动解压的原始字节流转发，保留与 body 一致的 `Content-Encoding`；解析支路单独解压。这里的字节等价指应用 body，不要求 HTTP chunk framing、网络包边界或 header 大小写一致。HEAD、无 body 状态码、压缩响应和重复 header 均单独验证。
+
+请求附加模式是上述请求 body 等价规则的显式例外：非空 `append_body` 只处理配置路径上的 Chat Completions POST。先收齐 JSON，以 `{**incoming, **append_body}` 顶层覆盖，嵌套对象整体替换；gzip/deflate 输入先解压，上游发送未压缩 UTF-8 JSON，重设 Content-Type/Content-Length，移除原编码及失效的 body 摘要 header。原始、解压后、修改后的大小受 `upstream.request_body_max_bytes` 限制（默认 32 MiB）；坏 JSON/非对象返回 400，不支持的类型/编码返回 415，超限返回 413，不发往上游。未启用附加及其他协议不受此缓冲限制。
+
+归档新增 `request_body_transform`（顶层覆盖规则、配置参数、发送 header）及 `forwarded_request_body_fragment`。`request_body_fragment` 始终保存客户端原始字节。派生明细的 `request` 为有效发送版本，`original_request` 为修改前内容，`request_transform` 为修改证据；请求页面展示两者，轨迹和参数分析使用有效发送版本，避免将原请求误认为真实模型输入。
 
 首版使用进程生命周期共享连接池；不启用 cookie 状态复用，避免一个 Agent 的上游 `Set-Cookie` 隐式进入另一请求。认证默认逐请求透传，可配置固定上游凭据覆盖并在 manifest 记录模式，不记录凭据内容。重定向原样返回，不自动跟随；代理不自动重试，客户端重试形成新的请求记录。
 
@@ -157,7 +161,7 @@ body 采用未自动解压的原始字节流转发，保留与 body 一致的 `C
 | EOF 缺少所选协议要求的终止证据 | `parse_status=incomplete`；不以连接正常关闭冒充生成完整 |
 | 解析异常/未支持协议 | 响应照传；事实照存；`parse_error/unsupported` |
 | 进程崩溃 | 启动记录无终止事件的请求记 `interrupted_unknown`，不猜测模型是否完成 |
-| 优雅关闭 | 停止接收，按配置等待活跃流，再排空日志队列并记录 clean shutdown |
+| 优雅关闭 | 停止接收，等待活跃流（CLI 最多 30 秒，超时取消），停止并等待实时分析，排空日志并关闭归档，再执行一次离线分析 |
 
 append 成功不等于断电持久化。拟定每秒批量 flush/fsync，manifest 保存策略；进程/机器崩溃可能丢失未持久化尾部。尾行不完整则保留原文件、新开 part，审计报告坏行和缺失终止事件。启动/终止事件的 `finally` 路径应有防重复标记，避免取消与正常完成重复记账。
 
@@ -198,7 +202,9 @@ SSE 支路使用增量 UTF-8 解码和完整事件解析，支持 CRLF/LF/CR、�
 
 每个值携带 `source`、`status`、`scope`；status 至少区分 `known`、`missing`、`unsupported`、`partial`、`ambiguous`、`tokenizer_unavailable`。零只在对应范围被完整观测且确实为空，或上游明确报告 0 时成立。上游报告 0 与暴露 reasoning 非空可以并存，作为 discrepant usage 展示，不偷偷改写。
 
-本地 tokenizer 按 response model 优先、request model 回退的显式 alias 配置选择；二者不匹配且无映射时标为未知。记录 tokenizer revision、文件 hash、实现版本和 `add_special_tokens=false`。默认仅本地文件且 `trust_remote_code=false`，缺失不联网兜底，也不按字符数猜 Token。
+一次代理运行对应一个实际模型，配置单个 `tokenizer.path`。`ObservationProxy` 启动时加载并长期持有同一个 TokenCounter/tokenizer；不同请求与响应 model 别名共用，不按请求实例化。实时分析线程退出后，最终离线分析继续复用该对象，二者不并发使用 tokenizer。加载失败也缓存失败状态，后续不反复加载；缺失不联网兜底、不按字符数猜 Token。模型切换需重启新运行，由操作者保证配置制品匹配实际模型；模型名称仍按响应优先、请求回退记录，并不由名称证明模型权重身份。记录 tokenizer 文件 hash、实现版本和 `add_special_tokens=false`，只允许本地文件且 `trust_remote_code=false`。
+
+独立离线 CLI 在自身进程中加载一次；兼容旧采集 manifest 的 `tokenizers` 映射，但新运行配置使用单数 `tokenizer`。正常 lifespan shutdown（包括 Ctrl+C）只生成一次最终报告，重复 close 不重复执行。日志排空后才分析，发布 `derived/<analysis_id>/SUMMARY.md` 并打印路径，另写 `shutdown_analysis.json` 状态；分析失败保留归档供手工重算。最终分析时间不受前述活跃请求等待 30 秒限制。强杀或连续中断不能保证收尾完成。
 
 重计数在完整组件拼接后做，不能把每个 delta 的编码长度相加；多个工具参数/choice 按各自组件分界求和并保留明细。重编码即使使用同一 tokenizer 也不保证恢复原始生成 token ID 序列；结构 token、特殊标记、分段边界及隐藏推理会产生差异。差值可以报告，但不能简单解释为 hidden reasoning。
 
@@ -377,11 +383,11 @@ protocols:
   chat_completions:
     paths: ["/v1/chat/completions"]
     reasoning_fields: ["reasoning_content", "reasoning"]
-tokenizers:
-  qwen3.6-27b:
-    path: "docs/tokenizer/Qwen3.6-27B"
-    local_files_only: true
-    trust_remote_code: false
+tokenizer:
+  path: "docs/tokenizer/Qwen3.6-27B"
+  local_files_only: true
+  trust_remote_code: false
+append_body: {}  # 可显式配置 model / enable_think_budget / fixed_budget_tokens 等顶层覆盖字段
 report: {timezone: "Asia/Shanghai", thresholds: [256, 512, 850, 1024, 2048, 4096]}
 trajectories: {enabled: true, matching: exact, projection_profiles: [], show_prompt_history: true}
 ```
@@ -437,7 +443,7 @@ P1–P3 构成首版代码交付；P4 才能声称实际 agent 场景接入已�
 ### 7.1 关键不变量
 
 1. 每个入站请求都有独立 RequestContext；时间桶永不随响应完成时刻/session 改变。
-2. 去除明确的 HTTP 转发处理后，body 未变；解析失败与 Token 失败不改变客户端 payload。
+2. 未启用 body 附加时请求字节不变；启用时只做显式顶层覆盖，原始与实际发送版本可核对；响应字节不变，观测解析失败与 Token 失败不改变客户端 payload。
 3. request events 的字节偏移连续、终止状态唯一；有 gap 或缺终止的记录不能混入完整分布。
 4. 按请求重建不依赖 part 的全局行顺序；同一请求 event_seq 冲突必须报错。
 5. 本地 Token、API usage、隐藏工作量是三个不同口径；没有统一成未经验证的“总生成量”。
@@ -478,18 +484,25 @@ P1–P3 构成首版代码交付；P4 才能声称实际 agent 场景接入已�
 
 首版的明确实现选择：
 
-- 使用原生 ASGI，避免框架在转发过程中重建消息；网络事件原样透传，分析在后台线程/离线 CLI。
+- 使用原生 ASGI，默认转发原始 body；显式 `append_body` 只重建目标请求 JSON，响应始终原字节转发，分析在后台线程/离线 CLI。
 - 每次启动创建独立 capture 目录，当前不开放既有目录续写。通用 writer 的重启/残缺尾恢复已有测试；恢复同一采集进程清单仍是后续接口。
 - body 按接收块切为最多 64 KiB 的事件，每片保存接收时刻；首版未启用跨接收块合并，队列限额计入固定对象开销。可从未压缩 SSE 完整语义事件映射接收时刻；压缩响应该指标为 null。
 - 实时报告仅在采集事件有变化时重建；采用临时 SQLite 索引与逐请求处理，正文解析每方向默认限 32 MiB，超限 raw 保留而语义统计排除。实时报告本身的 CPU/I/O 成本尚未量化，可关闭后离线分析。未实现大正文解析的无限制溢写/拆页，不能承诺任意大小的语义重建。
 - `derived/live` 逐文件替换并最后更新 manifest；正式不可变报告独立保存，不能把 live 当作跨文件原子快照。轻量请求索引/轨迹指纹仍随样本量增长，百万级调用需后续容量测试。
 - 严格轨迹匹配和显式 `omit_reasoning` profile 已实现，公共历史、工具结果映射、分支链接和歧义可读；摘要/裁剪后的模糊延续暂不自动连接。外部 annotations 保存证据且冲突审计，不自动覆盖标签或裁决质量。
-- `threshold_scan.csv` 和可读分组页输出候选覆盖；没有自动参数注入、自动 SCENES 修改或最优参数结论。
+- `threshold_scan.csv` 和可读分组页输出候选覆盖；仅支持操作者显式配置的固定参数附加，不根据统计自动选择参数，不自动修改 SCENES 或声明最优参数。
+
+### 7.5 单模型运行及关闭分析（2026-09-17）
+
+**源码确定**：单数 `tokenizer` 配置由代理实例持有，启动预加载，实时分析和最终离线分析串行复用同一个对象；`append_body` 恢复旧代理顶层覆盖语义，并归档原始/实际发送两个版本；lifespan shutdown 先等待已取消请求完成上游连接清理及终止记账，再排空日志并执行一次最终分析。
+
+**本地实测**：上述两份测试共 42 项通过，新增 JSON/SSE 参数覆盖、压缩请求与大小限制、原始/有效请求复算、模型别名共用单实例、关闭幂等、分析失败保留归档、取消清理与日志关闭次序，以及真实 Uvicorn 子进程 SIGINT 触发最终报告。真实本地 Qwen3.6 tokenizer 重复 prepare 与别名访问保持同一对象，示例文本重计数为 7 tokens；未加载模型权重，未测目标服务器性能。
 
 ## 8. 变更历史
 
 | 日期 | 变更 | 原因 |
 | --- | --- | --- |
+| 2026-09-17 | 单模型/单 tokenizer 长期复用；显式 append_body 顶层覆盖并审计修改前后请求；Ctrl+C 正常关闭后自动执行一次离线分析 | 用户明确一次运行对应一个模型，保留旧代理参数附加能力，并在退出时生成最终阅读与统计结果；本地 42 项测试通过，不声明服务器性能收益 |
 | 2026-09-16 | 初始需求与设计；确定时间归档、独立请求生命周期、透明转发、Token 来源及分布到超参候选的证据边界 | 用于 LightCode 以外的 Agent 场景；用户确认首版完整解析 Chat Completions，其余协议透传且标记统计未支持 |
 | 2026-09-16 | 增加基于多轮 prompt 的消息轨迹重建：历史快照、响应延续匹配、共享前缀/分支、对话式阅读及调用覆盖说明；同步结构、接口、P2 和验收 | 用户明确时间归档不妨碍利用 messages 恢复可阅读轨迹，无 session 归属也应尽量呈现完整历史 |
 | 2026-09-16 | 落地通用代理首版、时间采集、Token/轨迹/分布报告与无模型测试；同步可执行命令及实现边界 | 用户要求开始在 proxy/ 构建；只声明本地功能验证，不声明目标服务器性能或真实任务质量通过 |

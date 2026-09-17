@@ -1,6 +1,6 @@
 # Agent DTB 透传代理工程指南
 
-范围说明：下文原设计描述 `agent_dtb_proxy.py` 的 LightCode/DTB 实验入口。新增的通用纯观测入口为 `agent_observation_proxy.py`，实现位于 `observation/`，不注入 DTB 参数、不按 session 分区。其时间归档、Token 口径和消息轨迹契约见 [`README-observation.md`](README-observation.md) 与 [`通用代理设计`](../docs/design/general_agent_observation_proxy.md)。两入口共用底层有界 JSONL writer，旧入口的目录及 schema 契约保持不变。
+范围说明：下文原设计描述 `agent_dtb_proxy.py` 的 LightCode/DTB 实验入口。新增通用观测入口为 `agent_observation_proxy.py`，实现位于 `observation/`，不按 session 分区。默认纯透传；用户显式配置 `append_body` 时，沿用旧代理的顶层字段覆盖规则，并保存原始与实际发送的请求。一次运行对应一个模型、长期复用一个 tokenizer，正常关闭时排空日志后执行一次离线分析。其时间归档、Token 口径和消息轨迹契约见 [`README-observation.md`](README-observation.md) 与 [`通用代理设计`](../docs/design/general_agent_observation_proxy.md)。两入口共用底层有界 JSONL writer，旧入口的目录及 schema 契约保持不变。
 
 ## 1. 设计目的
 

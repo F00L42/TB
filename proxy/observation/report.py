@@ -45,7 +45,7 @@ def request_markdown(row, detail, zone):
             f"{stamp(row['started_at_utc'], zone)} → {stamp(row.get('completed_at_utc'), zone)}\n",
             f"耗时：{metric(row['e2e_ms'])} ms；采集：{row['capture_status']}；解析：{row['parse_status']}\n",
             "## 本次 Token（来源与状态）\n", fenced(detail["tokens"]),
-            "## 输入历史\n", "<details><summary>展开完整输入 messages</summary>\n"]
+            "## 输入历史（实际发送给上游）\n", "<details><summary>展开完整输入 messages</summary>\n"]
     request = detail.get("request", {})
     messages = request.get("messages", []) if isinstance(request, dict) else []
     for index, message in enumerate(messages if isinstance(messages, list) else []):
@@ -53,8 +53,13 @@ def request_markdown(row, detail, zone):
     text.extend(["</details>\n", "## 本次响应\n"])
     for choice in detail.get("response", {}).get("choices", []):
         text.append(message_md(choice["message"], f"choice {choice['index']} · {escaped(choice['finish_reason'])}"))
-    text.extend(["## 完整请求参数\n", "<details><summary>展开请求</summary>\n", fenced(request), "</details>\n",
-                 "## 完整性及原始位置\n", fenced({"warnings": detail["warnings"], "raw_refs": detail["raw_refs"]})])
+    text.extend(["## 完整请求参数（实际发送给上游）\n", "<details><summary>展开请求</summary>\n", fenced(request), "</details>\n"])
+    if detail.get("request_transform"):
+        text.extend(["## 代理附加参数\n", "按顶层字段覆盖；嵌套对象整体替换。\n",
+                     fenced(detail["request_transform"]["append_body"]),
+                     "<details><summary>展开客户端原始请求（修改前）</summary>\n",
+                     fenced(detail.get("original_request")), "</details>\n"])
+    text.extend(["## 完整性及原始位置\n", fenced({"warnings": detail["warnings"], "raw_refs": detail["raw_refs"]})])
     return "\n".join(text)
 
 

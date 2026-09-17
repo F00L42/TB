@@ -11,17 +11,31 @@ def observation(value, source, status=None):
 
 
 class TokenCounter:
-    def __init__(self, mappings, loaders=None):
+    def __init__(self, mappings, loaders=None, *, tokenizer=None):
         self.mappings = mappings
+        self.tokenizer = tokenizer
         self.cache = dict(loaders or {})
         self.identities = {}
         self.errors = {}
 
+    @classmethod
+    def from_config(cls, config):
+        # Historical captures retain their original per-model configuration.
+        return cls(config.get("tokenizers", {}), tokenizer=config.get("tokenizer"))
+
+    def prepare(self):
+        if self.tokenizer is not None:
+            self._load(None)
+
+    def _key(self, model):
+        return "run" if self.tokenizer is not None else model
+
     def _load(self, model):
+        model = self._key(model)
         if model in self.cache:
             return self.cache[model]
-        spec = self.mappings.get(model)
-        if not spec:
+        spec = self.tokenizer if self.tokenizer is not None else self.mappings.get(model)
+        if not spec or not spec.get("path"):
             return None
         try:
             from transformers import AutoTokenizer
@@ -91,5 +105,5 @@ class TokenCounter:
             valid = type(value) is int and value >= 0
             api[name] = observation(value if valid else None, "usage." + ".".join(path),
                                     "known" if valid else "missing" if value is None else "invalid")
-        return {"model": model, "tokenizer_ref": self.identities.get(model), "api": api,
+        return {"model": model, "tokenizer_ref": self.identities.get(self._key(model)), "api": api,
                 "choices": per_choice, "hidden_probe_tokens": None, "total_model_generated_tokens": None}

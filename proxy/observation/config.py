@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 DEFAULTS = {
     "listen": {"host": "127.0.0.1", "port": 9000},
     "upstream": {"base_url": "http://127.0.0.1:9001", "auth_mode": "forward",
-                 "auth_env": None, "trust_env": False,
+                 "auth_env": None, "trust_env": False, "request_body_max_bytes": 33554432,
                  "path_mapping": {"incoming_prefix": "/", "upstream_prefix": "/"},
                  "timeout": {"connect_seconds": 30, "read_seconds": None,
                              "write_seconds": 30, "pool_seconds": 30}},
@@ -23,7 +23,8 @@ DEFAULTS = {
                 "redact_query_keys": ["api_key", "key", "token", "access_token"]},
     "protocols": {"chat_completions": {"paths": ["/v1/chat/completions"],
                   "reasoning_fields": ["reasoning_content", "reasoning"]}},
-    "tokenizers": {},
+    "append_body": {},
+    "tokenizer": {"path": None, "local_files_only": True, "trust_remote_code": False},
     "report": {"timezone": "Asia/Shanghai", "thresholds": [256, 512, 850, 1024, 2048, 4096],
                "live_interval_seconds": 5, "max_body_bytes": 33554432},
     "trajectories": {"enabled": True, "matching": "exact",
@@ -87,13 +88,20 @@ def load_config(path=None, overrides=None):
     if not 1 <= cap["body_fragment_bytes"] <= 65536:
         raise ValueError("body_fragment_bytes must be <= 65536")
     cap["output_root"] = str((base / cap["output_root"]).resolve())
-    if not isinstance(result["tokenizers"], dict):
-        raise ValueError("tokenizers must map model names to local tokenizer settings")
-    for spec in result["tokenizers"].values():
-        if set(spec) - {"path", "local_files_only", "trust_remote_code"}:
-            raise ValueError("unknown tokenizer setting")
-        if spec.get("trust_remote_code", False) or not spec.get("local_files_only", True):
-            raise ValueError("only local, non-remote-code tokenizers are supported")
+    if not isinstance(result["append_body"], dict) or any(not isinstance(k, str) for k in result["append_body"]):
+        raise ValueError("append_body must be a JSON object")
+    try:
+        json.dumps(result["append_body"], allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("append_body must be a JSON object") from exc
+    if type(upstream["request_body_max_bytes"]) is not int or upstream["request_body_max_bytes"] <= 0:
+        raise ValueError("upstream.request_body_max_bytes must be a positive integer")
+    spec = result["tokenizer"]
+    if spec["trust_remote_code"] or not spec["local_files_only"]:
+        raise ValueError("only local, non-remote-code tokenizers are supported")
+    if spec["path"] is not None:
+        if not isinstance(spec["path"], str) or not spec["path"]:
+            raise ValueError("tokenizer.path must be a local path or null")
         spec["path"] = str((base / spec["path"]).resolve())
     from zoneinfo import ZoneInfo
     ZoneInfo(result["report"]["timezone"])

@@ -1,4 +1,4 @@
-"""Read-only JSON/SSE interpretation. Never used to construct forwarded bytes."""
+"""JSON/SSE interpretation and bounded body decompression."""
 from __future__ import annotations
 
 import codecs

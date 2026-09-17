@@ -3,14 +3,19 @@ from __future__ import annotations
 
 import asyncio
 import http.cookiejar
+import json
 import logging
 import os
 import threading
+import zlib
 from urllib.parse import parse_qsl, urlencode
 
 import httpx
 
 from .capture import Capture
+from .chat_completions import decode_body
+from .storage import write_json
+from .tokens import TokenCounter
 
 HOP = {b"connection", b"keep-alive", b"proxy-authenticate", b"proxy-authorization",
        b"te", b"trailer", b"transfer-encoding", b"upgrade"}
@@ -39,15 +44,22 @@ class NoCookies(http.cookiejar.CookieJar):
 
 
 class ObservationProxy:
-    def __init__(self, config, *, client=None, capture=None):
+    def __init__(self, config, *, client=None, capture=None, counter=None):
         self.config = config
         self.client = client
         self.capture = capture
         self.owns_client = client is None
         self.live_stop = threading.Event()
         self.live_thread = None
+        self.counter = counter or TokenCounter.from_config(config)
+        self._close_task = None
+        self.final_report = None
+        self.active_requests = set()
 
     async def start(self):
+        await asyncio.to_thread(self.counter.prepare)
+        if self.counter.errors:
+            log.warning("Local tokenizer unavailable: %s", self.counter.errors)
         if self.capture is None:
             self.capture = Capture(self.config)
         if self.client is None:
@@ -62,26 +74,52 @@ class ObservationProxy:
 
     def _live_reports(self):
         from .analysis import analyze_capture
-        from .tokens import TokenCounter
-        counter = TokenCounter(self.config["tokenizers"])
         last_revision = None
         while not self.live_stop.wait(self.config["report"]["live_interval_seconds"]):
             revision = (self.capture.accepted, self.capture.finished, self.capture.written_events, self.capture.write_errors)
             if self.capture.finished and revision != last_revision:
                 try:
-                    analyze_capture(self.capture.root, live=True, counter=counter)
+                    analyze_capture(self.capture.root, live=True, counter=self.counter)
                     last_revision = revision
                 except Exception:
                     log.exception("Live report failed; raw capture remains available")
 
     async def close(self):
+        # Lifespan shutdown and callers can share cleanup without analyzing twice.
+        if self._close_task is None:
+            self._close_task = asyncio.create_task(self._close())
+        await asyncio.shield(self._close_task)
+
+    async def _close(self):
         self.live_stop.set()
         if self.live_thread:
             await asyncio.to_thread(self.live_thread.join)
-        if self.owns_client and self.client:
-            await self.client.aclose()
-        if self.capture:
-            await asyncio.to_thread(self.capture.close)
+        # Uvicorn may send lifespan.shutdown immediately after cancelling requests.
+        # Their finally blocks must finish (including upstream close) before the writer.
+        if self.active_requests:
+            await asyncio.gather(*self.active_requests, return_exceptions=True)
+        try:
+            if self.owns_client and self.client:
+                await self.client.aclose()
+        finally:
+            if self.capture:
+                await asyncio.to_thread(self.capture.close)
+                await asyncio.to_thread(self._final_analysis)
+
+    def _final_analysis(self):
+        from .analysis import analyze_capture
+        try:
+            log.info("Capture closed; building final observation report")
+            self.final_report = analyze_capture(self.capture.root, counter=self.counter)
+            result = {"status": "completed", "report": self.final_report.relative_to(self.capture.root).as_posix()}
+            log.info("Final observation report: %s", self.final_report / "SUMMARY.md")
+        except Exception as exc:
+            result = {"status": "failed", "error": type(exc).__name__}
+            log.exception("Final analysis failed; retry with python -m proxy.observation.analysis <capture_dir>")
+        try:
+            write_json(self.capture.root / "shutdown_analysis.json", result)
+        except Exception:
+            log.exception("Could not persist final analysis status")
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "lifespan":
@@ -101,7 +139,16 @@ class ObservationProxy:
         elif scope["type"] == "websocket":
             await send({"type": "websocket.close", "code": 1008})
         elif scope["type"] == "http":
-            await self.handle(scope, receive, send)
+            if self._close_task is not None:
+                await send({"type": "http.response.start", "status": 503, "headers": [(b"content-length", b"0")]})
+                await send({"type": "http.response.body", "body": b""})
+                return
+            task = asyncio.current_task()
+            self.active_requests.add(task)
+            try:
+                await self.handle(scope, receive, send)
+            finally:
+                self.active_requests.discard(task)
 
     async def handle(self, scope, receive, send):
         if self.client is None or self.capture is None:
@@ -174,8 +221,48 @@ class ObservationProxy:
                     raise RuntimeError("upstream bearer credential is unavailable")
                 forwarded = [(k, v) for k, v in forwarded if k != b"authorization"]
                 forwarded.append((b"authorization", ("Bearer " + value).encode()))
+            body = request_body()
+            append = self.config["append_body"]
+            if append and scope["method"] == "POST" and scope["path"] in self.config["protocols"]["chat_completions"]["paths"]:
+                limit = self.config["upstream"]["request_body_max_bytes"]
+                raw = bytearray()
+                try:
+                    async for chunk in body:
+                        if len(raw) + len(chunk) > limit:
+                            await local_response(413)
+                            return
+                        raw.extend(chunk)
+                finally:
+                    await body.aclose()
+                header_map = {k.lower(): v.lower() for k, v in headers}
+                encoding = header_map.get(b"content-encoding", b"identity")
+                media = header_map.get(b"content-type", b"application/json").split(b";", 1)[0].strip()
+                if encoding not in {b"", b"identity", b"gzip", b"deflate"} or (media != b"application/json" and not media.endswith(b"+json")):
+                    await local_response(415)
+                    return
+                try:
+                    decoded = decode_body(bytes(raw), safe_headers(headers), limit)
+                    original = json.loads(decoded)
+                    if not isinstance(original, dict):
+                        raise ValueError("request_not_object")
+                    # Same top-level override semantics as legacy APPEND_BODY.
+                    body = json.dumps({**original, **append}, ensure_ascii=False, allow_nan=False).encode("utf-8")
+                except (ValueError, UnicodeError, zlib.error) as exc:
+                    await local_response(413 if str(exc) == "decoded_body_limit" else 400)
+                    return
+                if len(body) > limit:
+                    await local_response(413)
+                    return
+                forwarded = [(k, v) for k, v in forwarded if k not in {
+                    b"content-length", b"content-encoding", b"content-type", b"content-md5", b"digest", b"content-digest"}]
+                forwarded.extend([(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode())])
+                self.capture.emit(ctx, "request_body_transform", {
+                    "policy": "top_level_override", "append_body": append,
+                    "headers": safe_headers(forwarded)})
+                if not metadata_only:
+                    self.capture.body(ctx, "forwarded_request", body)
             # Construct Request directly: do not merge shared-client cookies/default headers.
-            request = httpx.Request(scope["method"], url, headers=forwarded, content=request_body(),
+            request = httpx.Request(scope["method"], url, headers=forwarded, content=body,
                                     extensions={"timeout": self.client.timeout.as_dict()})
             self.capture.emit(ctx, "upstream_dispatch", {})
             upstream = await self.client.send(request, stream=True, follow_redirects=False)

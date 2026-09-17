@@ -117,6 +117,7 @@ class Capture:
         return True
 
     def body(self, ctx, direction, data):
+        ctx.offsets.setdefault(direction, 0)
         step = self.config["capture"]["body_fragment_bytes"]
         for start in range(0, len(data), step):
             chunk = data[start:start + step]

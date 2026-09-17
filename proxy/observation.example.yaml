@@ -3,6 +3,7 @@ upstream:
   base_url: "http://127.0.0.1:9001"
   auth_mode: forward
   trust_env: false
+  request_body_max_bytes: 33554432  # Only bounds buffering when append_body is enabled.
 capture:
   output_root: "../docs/log/perf"
   labels: {agent: unknown, scenario: unknown, variant: baseline_unverified}
@@ -10,10 +11,15 @@ protocols:
   chat_completions:
     paths: ["/v1/chat/completions"]
     reasoning_fields: [reasoning_content, reasoning]
-tokenizers: {}
-# Exact response/request model names must map to matching local tokenizer artifacts:
-# tokenizers:
-#   qwen3.6-27b: {path: "../docs/tokenizer/Qwen3.6-27B"}
+# One proxy run observes one actual model; aliases share this tokenizer instance.
+tokenizer: {path: null}
+# tokenizer: {path: "../docs/tokenizer/Qwen3.6-27B"}
+# Same top-level override semantics as legacy APPEND_BODY, Chat Completions POST only.
+append_body: {}
+# append_body:
+#   model: qwen3.6-27b
+#   enable_think_budget: true
+#   fixed_budget_tokens: 850
 report:
   timezone: Asia/Shanghai
   live_interval_seconds: 5

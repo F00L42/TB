@@ -119,6 +119,7 @@ def test_raw_stream_query_headers_and_report(tmp_path):
         assert [(k, v) for k, v in sent[0]["headers"] if k == b"x-many"] == [(b"x-many", b"a"), (b"x-many", b"b")]
         assert streams[0].closed
         counter = TokenCounter({}, {"test-model": WordTokenizer()})
+        counter.identities["test-model"] = {"source": "test_fixture", "name": "WordTokenizer"}
         output = analyze_capture(app.capture.root, counter=counter)
         rows = [json.loads(line) for line in (output / "requests.jsonl").read_text().splitlines()]
         assert rows[0]["reasoning_tokens_local"] == 2
@@ -387,7 +388,8 @@ def test_live_report_appears_without_next_request(tmp_path):
     asyncio.run(run())
 
 
-def test_real_http_server_raw_body_and_cookie_isolation(tmp_path):
+@pytest.mark.parametrize("inject", [False, True])
+def test_real_http_server_raw_body_and_cookie_isolation(tmp_path, inject):
     """Exercise uvicorn/httpx wire transport, not only mocked request objects."""
     import uvicorn
     received = []
@@ -424,6 +426,8 @@ def test_real_http_server_raw_body_and_cookie_isolation(tmp_path):
     proxy_server = None
     try:
         config = settings(tmp_path, upstream={"base_url": f"http://127.0.0.1:{upstream_server[3]}"})
+        if inject:
+            config["append_body"] = {"model": "actual-model", "fixed_budget_tokens": 850}
         app = ObservationProxy(config)
         proxy_server = launch(app, "on")
         raw = b'{ "model":"test-model", "messages":[] }'
@@ -433,7 +437,12 @@ def test_real_http_server_raw_body_and_cookie_isolation(tmp_path):
                 with client.stream("POST", f"http://127.0.0.1:{proxy_server[3]}/v1/chat/completions?q=%2f&q=+", content=raw) as res:
                     assert b"".join(res.iter_raw()) == wire
                     assert res.headers.get_list("x-repeat") == ["a", "b"]
-        assert all(r["body"] == raw and r["query"] == b"q=%2f&q=+" for r in received)
+        assert all(r["query"] == b"q=%2f&q=+" for r in received)
+        if inject:
+            assert all(json.loads(r["body"]) == {"model": "actual-model", "messages": [], "fixed_budget_tokens": 850} for r in received)
+            assert all(int(dict(r["headers"])[b"content-length"]) == len(r["body"]) for r in received)
+        else:
+            assert all(r["body"] == raw for r in received)
         assert not any(k.lower() == b"cookie" for k, v in received[1]["headers"])
     finally:
         for item in [proxy_server, upstream_server]:
@@ -503,3 +512,242 @@ def test_parser_failure_does_not_prevent_other_requests_report(tmp_path):
         again = analyze_capture(app.capture.root)
         assert again == out
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+def test_append_body_preserves_original_and_reports_effective_request(tmp_path, streaming):
+    async def run():
+        original = {"model": "client-alias", "messages": [{"role": "user", "content": "中文"}],
+                    "stream": streaming, "temperature": 0.7, "extra": {"old": 1}}
+        append = {"model": "test-model", "enable_think_budget": True, "fixed_budget_tokens": 850,
+                  "extra": {"new": 2}}
+        raw = gzip.compress(encode(original))
+        wire = stream_for(response()["choices"][0]["message"]) if streaming else encode(response())
+        seen = []
+        async def upstream(request):
+            seen.append((request, await request.aread()))
+            return httpx.Response(200, headers={"content-type": "text/event-stream" if streaming else "application/json"},
+                                  stream=BytesStream([wire]))
+        async with httpx.AsyncClient(transport=httpx.MockTransport(upstream)) as client:
+            app = ObservationProxy(settings(tmp_path, append_body=append), client=client,
+                                   counter=TokenCounter({}, {"test-model": WordTokenizer()}))
+            await app.start()
+            sent = await invoke(app, raw, headers=[(b"content-type", b"application/json"),
+                                (b"content-encoding", b"gzip"), (b"content-length", str(len(raw)).encode())])
+            # Other protocols retain original bytes even with append_body enabled.
+            await invoke(app, raw, path="/v1/responses", headers=[(b"content-encoding", b"gzip")])
+            await app.close()
+        assert b"".join(e.get("body", b"") for e in sent) == wire
+        request, sent_body = seen[0]
+        assert json.loads(sent_body) == {**original, **append}
+        assert int(request.headers["content-length"]) == len(sent_body)
+        assert "content-encoding" not in request.headers
+        assert seen[1][1] == raw and seen[1][0].headers["content-encoding"] == "gzip"
+        rows = [json.loads(line) for line in (app.final_report / "requests.jsonl").read_text().splitlines()]
+        detail = read_json(app.final_report / rows[0]["detail_json"])
+        assert detail["original_request"] == original
+        assert detail["request"] == {**original, **append}
+        assert detail["request_transform"]["append_body"] == append
+        assert rows[0]["body_modified"] and rows[0]["exclusions"] == []
+        assert rows[1]["parse_status"] == "unsupported" and not rows[1]["body_modified"]
+        page = (app.final_report / rows[0]["detail_markdown"]).read_text(encoding="utf-8")
+        assert "客户端原始请求" in page and "fixed_budget_tokens" in page
+        assert original["model"] == "client-alias" and append == app.config["append_body"]
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("body,headers,limit,expected", [
+    (b"not json", [], 128, 400), (b"[]", [], 128, 400),
+    (b"{}", [(b"content-encoding", b"br")], 128, 415),
+    (b"{}", [(b"content-type", b"text/plain")], 128, 415),
+    (b"x" * 129, [], 128, 413),
+    (gzip.compress(b"x" * 200), [(b"content-encoding", b"gzip")], 128, 413),
+    (b"{}", [], 8, 413),
+])
+def test_append_body_rejects_invalid_or_oversize_input(tmp_path, body, headers, limit, expected):
+    async def run():
+        calls = []
+        async def upstream(request):
+            calls.append(request)
+            raise AssertionError("must not forward a request that cannot be modified")
+        async with httpx.AsyncClient(transport=httpx.MockTransport(upstream)) as client:
+            app = ObservationProxy(settings(tmp_path, append_body={"model": "fixed"},
+                                   upstream={"request_body_max_bytes": limit}), client=client)
+            await app.start()
+            sent = await invoke(app, body, headers=headers)
+            await app.close()
+        assert sent[0]["status"] == expected and not calls
+        assert read_json(app.capture.process_path)["clean_shutdown"]
+    asyncio.run(run())
+
+
+def test_one_tokenizer_for_aliases_live_and_final_analysis(tmp_path, monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    import proxy.observation.analysis as analysis
+    import proxy.observation.tokens as tokens
+    loads, analyses = [], []
+    tokenizer = WordTokenizer()
+    def load(*args, **kwargs):
+        loads.append((args, kwargs))
+        return tokenizer
+    monkeypatch.setitem(sys.modules, "transformers", SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=load)))
+    monkeypatch.setattr(tokens.importlib.metadata, "version", lambda name: "test-version")
+    real_analyze = analysis.analyze_capture
+    def analyze(root, **kwargs):
+        analyses.append((kwargs.get("live", False), kwargs["counter"]))
+        if not kwargs.get("live"):
+            assert read_json(app.capture.process_path)["clean_shutdown"]
+            assert not app.live_thread.is_alive()
+        return real_analyze(root, **kwargs)
+    monkeypatch.setattr(analysis, "analyze_capture", analyze)
+    app = None
+    async def run():
+        nonlocal app
+        async def upstream(request):
+            request_body = json.loads(await request.aread())
+            data = response()
+            data["model"] = request_body["model"] + "-served"
+            return httpx.Response(200, stream=BytesStream([encode(data)]))
+        async with httpx.AsyncClient(transport=httpx.MockTransport(upstream)) as client:
+            app = ObservationProxy(settings(tmp_path, tokenizer={"path": str(tmp_path)},
+                                   report={"live_interval_seconds": 0.05}), client=client)
+            await app.start()
+            assert len(loads) == 1  # Initialized before any request.
+            await asyncio.gather(*(invoke(app, encode({"model": alias, "messages": []})) for alias in ["alias-a", "alias-b"]))
+            try:
+                for _ in range(100):
+                    if (app.capture.root / "derived/live/analysis_manifest.json").exists():
+                        break
+                    await asyncio.sleep(0.025)
+                assert (app.capture.root / "derived/live/analysis_manifest.json").exists()
+            finally:
+                await asyncio.gather(app.close(), app.close())
+                await app.close()
+        assert len(loads) == 1
+        assert all(counter is app.counter for live, counter in analyses)
+        assert sum(not live for live, _ in analyses) == 1 and not analyses[-1][0]
+        rows = [json.loads(line) for line in (app.final_report / "requests.jsonl").read_text().splitlines()]
+        assert len(rows) == 2 and all(r["reasoning_tokens_local"] == 2 for r in rows)
+        assert rows[0]["tokenizer_ref"] == rows[1]["tokenizer_ref"]
+        assert read_json(app.capture.root / "shutdown_analysis.json")["status"] == "completed"
+    asyncio.run(run())
+
+
+def test_final_analysis_failure_keeps_capture_and_is_not_retried(tmp_path, monkeypatch):
+    import proxy.observation.analysis as module
+    calls = []
+    def fail(root, **kwargs):
+        calls.append(root)
+        raise RuntimeError("analysis failure")
+    monkeypatch.setattr(module, "analyze_capture", fail)
+    async def run():
+        app = ObservationProxy(settings(tmp_path))
+        await app.start()
+        await app.close()
+        await app.close()
+        assert len(calls) == 1 and app.final_report is None
+        assert read_json(app.capture.process_path)["clean_shutdown"]
+        assert read_json(app.capture.root / "shutdown_analysis.json") == {"status": "failed", "error": "RuntimeError"}
+    asyncio.run(run())
+
+
+def test_shutdown_waits_for_cancelled_request_cleanup_before_analysis(tmp_path):
+    async def run():
+        reading, closing, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        class SlowStream(BytesStream):
+            async def __aiter__(self):
+                reading.set()
+                yield b'data: {"choices": []}\n\n'
+                await asyncio.Event().wait()
+            async def aclose(self):
+                closing.set()
+                await release.wait()
+        async def upstream(request):
+            await request.aread()
+            return httpx.Response(200, stream=SlowStream([]))
+        async with httpx.AsyncClient(transport=httpx.MockTransport(upstream)) as client:
+            app = ObservationProxy(settings(tmp_path), client=client)
+            await app.start()
+            request_task = asyncio.create_task(invoke(app, b'{"messages":[]}'))
+            await asyncio.wait_for(reading.wait(), 2)
+            request_task.cancel()
+            await asyncio.wait_for(closing.wait(), 2)
+            close_task = asyncio.create_task(app.close())
+            try:
+                await asyncio.sleep(0.025)
+                assert not close_task.done() and not app.capture.stopping
+                assert app.capture.finished == 0
+            finally:
+                release.set()
+                await asyncio.gather(request_task, return_exceptions=True)
+                await close_task
+            rows = [json.loads(line) for line in (app.final_report / "requests.jsonl").read_text().splitlines()]
+            assert len(rows) == 1 and rows[0]["transport_status"] == "client_disconnected"
+            assert rows[0]["capture_status"] == "complete"
+            assert read_json(app.final_report / "integrity.json")["status"] == "complete"
+    asyncio.run(run())
+
+
+def test_uvicorn_sigint_runs_final_analysis(tmp_path):
+    """SIGINT uses Uvicorn's real signal/lifespan path in the child main thread."""
+    import subprocess
+    import sys
+    script = tmp_path / "sigint_server.py"
+    script.write_text('''import signal, sys, threading, time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import httpx, uvicorn
+from proxy.observation.config import load_config
+from proxy.observation.transport import ObservationProxy
+root = Path(sys.argv[2])
+class ResponseStream(httpx.AsyncByteStream):
+    async def __aiter__(self):
+        yield b'{"choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}'
+async def upstream(request):
+    await request.aread()
+    return httpx.Response(200, headers={"content-type": "application/json"}, stream=ResponseStream())
+app = ObservationProxy(load_config(overrides={"capture": {"output_root": str(root)}, "report": {"live_interval_seconds": 0}}),
+                       client=httpx.AsyncClient(transport=httpx.MockTransport(upstream)))
+server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, lifespan="on", log_level="warning"))
+def interrupt():
+    while not server.started:
+        time.sleep(0.02)
+    (root / "ready").write_text(str(server.servers[0].sockets[0].getsockname()[1]))
+    while not (root / "stop").exists():
+        time.sleep(0.02)
+    signal.raise_signal(signal.SIGINT)
+threading.Thread(target=interrupt, daemon=True).start()
+try:
+    server.run()
+except KeyboardInterrupt:
+    pass
+''', encoding="utf-8")
+    repo = Path(__file__).resolve().parents[1]
+    proc = subprocess.Popen([sys.executable, str(script), str(repo), str(tmp_path)],
+                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        for _ in range(300):
+            if (tmp_path / "ready").exists() or proc.poll() is not None:
+                break
+            time.sleep(0.02)
+        assert (tmp_path / "ready").exists()
+        port = int((tmp_path / "ready").read_text())
+        with httpx.Client(trust_env=False) as client:
+            result = client.post(f"http://127.0.0.1:{port}/v1/chat/completions", json={"messages": []})
+            assert result.status_code == 200
+        (tmp_path / "stop").touch()
+        stdout, stderr = proc.communicate(timeout=15)
+        assert proc.returncode == 0, (stdout, stderr)
+        root = next(tmp_path.glob("agent_*"))
+        status = read_json(root / "shutdown_analysis.json")
+        assert status["status"] == "completed"
+        report = root / status["report"]
+        assert (report / "SUMMARY.md").is_file()
+        assert read_json(report / "integrity.json")["status"] == "complete"
+        assert len((report / "requests.jsonl").read_text().splitlines()) == 1
+        assert len([p for p in (root / "derived").iterdir() if p.is_dir()]) == 1
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.communicate(timeout=5)

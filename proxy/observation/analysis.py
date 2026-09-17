@@ -67,6 +67,7 @@ def reconstruct(db, rid, config, counter):
     offsets = {"request": 0, "response": 0}
     warnings, refs, timings = [], [], {}
     start = terminal = headers = None
+    transform = None
     last_response = None
     response_marks = []
     semantic_ms = None
@@ -93,9 +94,15 @@ def reconstruct(db, rid, config, counter):
             headers = payload
         elif kind == "request_body_end":
             body_end_at = event["at_utc"]
+        elif kind == "request_body_transform":
+            transform = payload
         elif kind.endswith("_body_fragment"):
-            direction = kind.split("_")[0]
+            direction = kind.removesuffix("_body_fragment")
             try:
+                if direction not in {"request", "response", "forwarded_request"}:
+                    raise ValueError("unknown_body_direction")
+                offsets.setdefault(direction, 0)
+                buffers.setdefault(direction, bytearray())
                 data = base64.b64decode(payload["data_b64"], validate=True)
                 if payload["offset"] != offsets[direction]:
                     warnings.append("body_offset_gap")
@@ -121,6 +128,7 @@ def reconstruct(db, rid, config, counter):
         warnings.append("body_size_mismatch")
     capture_status = "complete" if terminal.get("capture_status") == "complete" and not any(w != "analysis_body_limit" for w in warnings) else "incomplete"
     request = {}
+    original_request = None
     response = {"parse_status": "unsupported", "choices": [], "usage": None, "warnings": []}
     request_parse_error = None
     if not start.get("metadata_only") and capture_status == "complete" and "analysis_body_limit" not in warnings:
@@ -129,6 +137,12 @@ def reconstruct(db, rid, config, counter):
             request = json.loads(decoded) if decoded else {}
             if not isinstance(request, dict):
                 raise ValueError("request_not_object")
+            if transform:
+                original_request = request
+                decoded = decode_body(bytes(buffers.get("forwarded_request", b"")), transform["headers"], limit)
+                request = json.loads(decoded)
+                if not isinstance(request, dict):
+                    raise ValueError("forwarded_request_not_object")
         except (ValueError, UnicodeError, zlib.error) as exc:
             request_parse_error = type(exc).__name__
             request = {}
@@ -175,6 +189,7 @@ def reconstruct(db, rid, config, counter):
            "completed_at_utc": terminal.get("completed_at_utc"), "process_id": start["process_id"],
            "arrival_seq": start["arrival_seq"], "bucket": start["bucket"], "labels": start["labels"],
            "model": tokens["model"], "tokenizer_ref": tokens["tokenizer_ref"],
+           "body_modified": transform is not None,
            "path": start["path"], "transport_status": terminal["transport_status"],
            "capture_status": capture_status, "parse_status": response["parse_status"],
            "status_code": headers["status_code"] if headers else None,
@@ -192,6 +207,7 @@ def reconstruct(db, rid, config, counter):
            "exclusions": sorted(set(exclusions)),
            "detail_json": f"details/{rid}.json", "detail_markdown": f"requests/{start['bucket']}/{rid}.md"}
     return row, {"request": request, "response": response, "tokens": tokens,
+                 "original_request": original_request, "request_transform": transform,
                  "warnings": sorted(set(warnings + response["warnings"])), "raw_refs": refs,
                  "request_metadata": start}
 
@@ -223,7 +239,8 @@ def analyze_capture(root, *, live=False, counter=None, from_time=None, to_time=N
     thresholds = config["report"]["thresholds"] if thresholds is None else thresholds
     if any(type(h) is not int or h < 0 for h in thresholds):
         raise ValueError("thresholds must be nonnegative integers")
-    counter = counter or TokenCounter(config["tokenizers"])
+    counter = counter or TokenCounter.from_config(config)
+    counter.prepare()
     derived = root / "derived"
     derived.mkdir(exist_ok=True)
     problems = []
@@ -302,7 +319,7 @@ def analyze_capture(root, *, live=False, counter=None, from_time=None, to_time=N
                              "input_files": files, "config_hash": manifest["config_hash"],
                              "from": from_time, "to": to_time, "thresholds": thresholds,
                              "annotations_sha256": annotation_hash, "tokenizers": counter.identities,
-                             "parser_version": 1, "trajectory_version": 1, "integrity": integrity}
+                             "parser_version": 2, "trajectory_version": 1, "integrity": integrity}
         analysis_identity["analysis_code_sha256"] = digest({path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                                                            for path in sorted(Path(__file__).parent.glob("*.py"))})
         analysis_id = digest(analysis_identity)[:20]
