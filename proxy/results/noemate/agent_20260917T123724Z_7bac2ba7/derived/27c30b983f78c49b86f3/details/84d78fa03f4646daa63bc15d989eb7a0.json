@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nCPU使用率\n\n\n\n最终回答：\n\n\nCPU使用率是云核心网及网络设备运维中的基础性能指标，用于统计测量对象（如节点、进程、单板等）处理器的负载程度。以下是该指标的核心说明：\n\n### 1. 基本定义与计算\n* **含义**：反映计算资源的利用情况，帮助评估系统性能和响应能力。通常以百分比（%）表示。\n* **测量周期**：系统默认以 **5分钟** 为周期进行采样测量。\n* **计算公式**：当统计周期大于采集周期时，取统计周期内各采集周期的平均值。\n  `CPU使用率 = AVERAGE(M1, M2, …, Mi)` （Mi 为第 i 次采样的CPU使用率）\n\n### 2. 默认阈值与关联告警\n在 FusionStage、5GC 等云化网元侧，该指标通常配置有默认的阈值监控规则。当测量值 **连续3个周期** 超过阈值时会上报告警：\n| 阈值 | 告警级别 | 常见告警ID示例 |\n|:---|:---|:---|\n| **> 75%** | 次要 (Minor) | `ALM-136808` 或 `ALM-6808` 次要阈值超限 |\n| **> 85%** | 重要 (Major) | `ALM-136807` 或 `ALM-6807` 重要阈值超限 |\n\n> 💡 **说明**：上述阈值可在 OM Portal 的 `应用运维 > 性能监控 > 阈值规则`（或网元侧 `监控分析 > 性能监控 > 阈值规则`）中根据实际业务负载自定义调整。\n\n### 3. 常见查询方式\n* **OM Portal 图形化查询**：进入对应产品的性能监控页面，选择节点/进程指标即可查看实时与历史CPU使用率曲线。\n* **SNMP 协议查询（以交换机/硬件设备为例）**：\n  可通过 MIB 节点 `hwEntityCpuUsage` (OID: `1.3.6.1.4.1.2011.5.25.31.1.1.1.1.5`) 获取单板或设备的CPU使用率。结合 `entPhysicalClass` 筛选实体类型后，执行 `snmpget` 即可返回具体百分比数值。\n\n### 4. 运维建议\n* **持续高负载（>80%）**：可能存在业务瓶颈或异常流量，建议结合内存使用率、网络IO及具体进程负载进行联合分析，必要时扩容计算资源或优化业务调度。\n* **持续低负载（<20%）**：可能表明资源分配过剩，可评估缩容或合并实例以提升资源利用率。\n* **突发尖峰**：若仅为短期周期性波动（如定时任务、批量同步），通常属于正常现象；若无明确业务触发，需排查后台异常进程或死循环任务。\n\n如需查询特定网元或时间段的实时CPU使用率数据，请提供具体的网元名称、对象类型及时间范围。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何修改CPU使用率的告警阈值？\nCPU使用率持续超过85%时如何定位高负载进程？\n如何通过SNMP协议查询指定单板的CPU使用率？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 937,
+      "total_tokens": 976,
+      "completion_tokens": 39,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 937,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 39,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 976,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 38,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 4260857,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4261948,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 5383,
+      "byte_offset": 4262154,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4267537,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4312334,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4312695,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1323,
+      "byte_offset": 4312903,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4314226,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 4314431,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 4314643,
+      "path": "archive/2026-09-17/22/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7bc37859-5275-422f-9b6e-09f25bad5aea"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-5e23dc01-49bd-44b5-9787-bd5eabc93b3a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-2ec9d487-8e5d-4e7a-b4cf-f903beef4df7"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3859"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T22:12:35.064712+00:00",
+    "arrival_seq": 9380,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/22"
+  }
+}

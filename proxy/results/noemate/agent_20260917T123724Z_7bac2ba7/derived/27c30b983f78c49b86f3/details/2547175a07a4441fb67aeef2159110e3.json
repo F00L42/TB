@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n- 示例：\n\n\n\n最终回答：\n\n\n已记录触发条件示例。结合您的License资源监控规范，更新后的告警档案模块如下：\n\n### 📋 触发条件示例：资源达到License扩容门限\n| 资源类型 | 网元示例 | License上限 | 当前使用量 | 使用率 | 触发结果 |\n|:---|:---|:---|:---|:---|:---|\n| **PDU会话数** | SMF | 10000 | 9200 | `92%` | 超过 `90%` 阈值，触发告警 |\n| **注册用户数** | AMF | 50000 | 46000 | `92%` | 超过 `90%` 阈值，触发告警 |\n\n---\n请继续提供下一字段（如 **恢复条件**、**标准化处置SOP**、**关联告警** 或 **典型案例**），我将为您追加至完整档案中。\n\n> 💡 **运维提示**：结合您的SMF配置规范，阈值触发后需重点验证 **PFCP会话建立与修改流程** 是否因授权限制出现信令阻塞或超时。统计周期建议与话务波动粒度对齐，防止瞬时峰值导致误报。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请提供恢复条件的具体示例\n请提供标准化处置SOP的具体内容\n请提供关联告警的具体示例",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 543,
+      "total_tokens": 567,
+      "completion_tokens": 24,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 543,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 24,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 567,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 23,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 10684130,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10685221,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3339,
+      "byte_offset": 10685427,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10688766,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 360,
+      "byte_offset": 10970763,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 207,
+      "byte_offset": 10971123,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1262,
+      "byte_offset": 10971330,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 204,
+      "byte_offset": 10972592,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 211,
+      "byte_offset": 10972796,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    },
+    {
+      "byte_length": 383,
+      "byte_offset": 10973007,
+      "path": "archive/2026-09-17/19/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-58868f2e-862c-40c1-bd49-30ee3bcabdcb"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-130dbf3e-5520-4cb4-a33b-d9da598c07e3"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-d1ba6a54-cbe4-4627-9af2-747e7b79ee8b"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2326"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T19:19:06.582731+00:00",
+    "arrival_seq": 6739,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/19"
+  }
+}

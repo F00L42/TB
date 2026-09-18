@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n主密钥异常告警是什么意思\n\n\n\n最终回答：\n\n\n主密钥异常告警（如 ALM-20306 / ALM-20232 / ALM-238690306）是指系统在主密钥出现异常状态时上报的重要级别告警。以下是详细说明：\n\n### 告警解释\n当主密钥发生异常时（例如密钥文件损坏、密钥下载失败、密钥激活失败或密钥翻译失败等），系统会上报此告警。当主密钥恢复正常后，该告警会自动清除。\n\n### 对系统的影响\n系统的加密服务和密码修改（解密）服务将不可用，可能影响依赖加密功能的业务正常运行。\n\n### 可能原因\n1. **密钥文件损坏**\n2. **密钥下载失败**\n3. **密钥激活失败**\n4. **密钥翻译失败**\n\n### 处理步骤\n可根据告警参数中的“异常原因”针对性处理：\n\n- **密钥文件损坏**\n  1. 执行 `DSP MKINFO` 命令查询备OMU上密钥文件是否正常。\n  2. 若正常，执行 `SWP OMU` 完成主备倒换，检查告警是否清除。\n  3. 若仍异常，执行配置备份恢复或重建网元操作。\n\n- **密钥下载/激活失败**\n  1. 执行 `MOD MK` 命令更新主密钥，检查告警是否清除。\n  2. 若未清除，执行 `DSP MKUNSYNCTARGET` 查看vNode下载状态，建议执行 `RST VNODE` 重启下载失败的vNode。\n\n- **密钥翻译失败**\n  1. 执行 `MOD MK` 命令更新主密钥。\n  2. 若告警未清除，请收集告警信息和配置信息并联系华为技术支持。\n\n> 注：不同产品版本（如 ATS9900、CSC3300、UPG、CloudEPSN 等）的告警ID略有差异，但触发机制与处理逻辑基本一致。处理前建议结合具体网元版本参考对应文档。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据告警参数中的“异常原因”字段快速定位具体的故障类型？\n执行 SWP OMU 主备倒换操作前需要满足哪些前提条件及注意事项？\n如果重启下载失败的 vNode 后告警仍未清除，应如何进一步收集信息并联系技术支持？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 720,
+      "total_tokens": 782,
+      "completion_tokens": 62,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 720,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 62,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 782,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 61,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 9464260,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9465351,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4343,
+      "byte_offset": 9465557,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9469900,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 362,
+      "byte_offset": 9740197,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 209,
+      "byte_offset": 9740559,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1492,
+      "byte_offset": 9740768,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9742679,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 9742885,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    },
+    {
+      "byte_length": 385,
+      "byte_offset": 9743483,
+      "path": "archive/2026-09-17/14/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-bb13a67b-2fb5-4ef7-bb9a-8cb310d7a29a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-b0267cd0-3768-4c01-b981-bb62d04f3eb3"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-74dbb65f-eccd-41b9-952f-6f5177fb7b5d"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3080"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T14:19:55.326931+00:00",
+    "arrival_seq": 1448,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/14"
+  }
+}

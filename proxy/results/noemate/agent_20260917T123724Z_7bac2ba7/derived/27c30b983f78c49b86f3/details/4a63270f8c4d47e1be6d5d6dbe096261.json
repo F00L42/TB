@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nAMF01 CPU利用率 92% ≤85% 降低资源争用风险\n\n\n\n最终回答：\n\n\n已确认。**三、关键指标数据对比** 第一行已录入：\n\n| 指标名称 | 优化前值 | 优化后目标值 | 说明 |\n|:---|:---|:---|:---|\n| **AMF01 CPU利用率** | `92%` | `≤85%` | 降低资源争用风险 |\n\n请继续提供后续指标行（如内存使用率、活跃会话数、会话建立失败率等），或直接回复 `生成报表` 输出完整文档。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "内存使用率 88% ≤80% 避免内存溢出风险\n活跃会话数 12000 ≤10000 提升用户接入体验\n会话建立失败率 5.2% ≤3% 降低信令处理延迟",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 399,
+      "total_tokens": 456,
+      "completion_tokens": 57,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 399,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 57,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 456,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 56,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 11481840,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 11482931,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 2699,
+      "byte_offset": 11483137,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 11485836,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 11800313,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 11800674,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 1327,
+      "byte_offset": 11800882,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11802209,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 11802414,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 11802626,
+      "path": "archive/2026-09-17/18/part-00002.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c9c70731-fc26-4f41-9edf-103d0d4c53c3"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-6831f14a-959e-4a5b-bf01-e87e7f42bc5b"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-fdcc4eb5-816f-4506-9605-c9f1a6cfdc76"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "1848"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T18:05:45.248632+00:00",
+    "arrival_seq": 5231,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/18"
+  }
+}

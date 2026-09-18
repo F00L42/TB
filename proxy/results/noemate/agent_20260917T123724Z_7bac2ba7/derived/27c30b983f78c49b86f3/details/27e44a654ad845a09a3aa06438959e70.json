@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nNRF网元的NF心跳异常告警发生原因是什么\n\n\n\n最终回答：\n\n\n根据知识库信息，**ALM-100060 NF心跳异常告警**的发生原因如下：### 可能原因1. **NRF自身故障**2. **传输网络故障**3. **对端NF故障**### 告警触发机制当在NRF注册的NF与NRF间的心跳异常后，NRF将NF的状态设置为Suspended状态，系统产生此告警。### 对系统的影响其他NF将不能通过NRF发现该NF，该NF提供服务对应的流程可能会受到影响。### 处理步骤1. **检查NRF自身故障** 执行`DSP REGNFINSTANCE`查看该NF的状态是否为Suspended。2. **检查传输网络故障** 在告警服务台上查看NRF是否有HTTP链路告警。如有，参考\"ALM-100155 HTTP链路故障\"的告警处理步骤。3. **检查对端NF故障** 联系对端NF的维护工程师，排查对端NF是否有故障。4. 如以上步骤无法解决，请收集告警信息、日志信息和配置信息，并联系华为技术支持处理。### 告警恢复机制- 当NF与NRF间的心跳恢复后，会自动恢复本告警。- 当NF向NRF发起去注册请求且NRF处理成功后，会自动恢复本告警。- 当NRF检测到NF处于Suspended状态的时间已经超过配置的NF老化时间，NRF将NF删除后，会自动恢复本告警。- 当执行`DEL REGNFINSTANCE`命令删除NF实例成功后，会自动恢复本告警。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何执行DSP REGNFINSTANCE命令来查看NF的状态？\n如果在告警服务台上看到HTTP链路告警，应如何处理？\nNF老化时间的配置方法是什么？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 617,
+      "total_tokens": 654,
+      "completion_tokens": 37,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 617,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 37,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 654,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 36,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 9018456,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9019547,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 3927,
+      "byte_offset": 9019753,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9023680,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 9050555,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 9050916,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1335,
+      "byte_offset": 9051124,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9052459,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 9052664,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 9052876,
+      "path": "archive/2026-09-17/21/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b93f41c3-7b98-409c-b88a-43452c884e57"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-001cc5cc-eb30-45fb-914e-7fcf99e951b7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ee2c36c4-a7cb-4c09-b184-6990fdb8dfe9"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2767"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T21:43:59.869487+00:00",
+    "arrival_seq": 8712,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/21"
+  }
+}

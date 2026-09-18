@@ -1,18 +1,18 @@
-listen: {host: "127.0.0.1", port: 9000}
+listen: {host: "71.77.153.223", port: 9000}
 upstream:
   base_url: "http://127.0.0.1:9001"
   auth_mode: forward
   trust_env: false
   request_body_max_bytes: 33554432  # Only bounds buffering when append_body is enabled.
 capture:
-  output_root: "../docs/log/perf"
-  labels: {agent: unknown, scenario: unknown, variant: baseline_unverified}
+  output_root: "result/noemate/"
+  labels: {agent: noemate, scenario: cc, variant: baseline}
 protocols:
   chat_completions:
     paths: ["/v1/chat/completions"]
     reasoning_fields: [reasoning_content, reasoning]
 # One proxy run observes one actual model; aliases share this tokenizer instance.
-tokenizer: {path: null}
+tokenizer: {path: "../docs/tokenizer/Qwen3.6-27B"}
 # tokenizer: {path: "../docs/tokenizer/Qwen3.6-27B"}
 # Same top-level override semantics as legacy APPEND_BODY, Chat Completions POST only.
 append_body: {}
@@ -22,7 +22,7 @@ append_body: {}
 #   fixed_budget_tokens: 850
 report:
   timezone: Asia/Shanghai
-  live_interval_seconds: 5
+  live_interval_seconds: 0
   thresholds: [256, 512, 850, 1024, 2048, 4096]
 trajectories:
   enabled: true

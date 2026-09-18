@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n                      端口状态  =  正常\n\n\n\n最终回答：\n\n\n✅ **测试结果确认**：端口 `0`（E1/T1）状态显示正常，说明**本端端口硬件、线缆及物理层配置均无异常**，本地环回测试通过。\n\n### 🔧 下一步操作建议\n1. **解除自环配置**  \n   - 执行 `STOP PORTLOP` 停止软件环回。\n   - 拆除物理环回头，恢复标准 E1 接线。\n2. **传输链路全程测试**  \n   - 对接误码仪进行端到端测试（建议 `≥15分钟`），确认全程误码率 `<1e-6` 且无滑码。\n3. **对端状态核对**  \n   - 联系对端机房确认对应端口是否 `Up`、时钟模式（主/从/线路）与帧格式是否匹配。\n   - 检查对端是否上报 `RLOS`/`LOF` 等物理层告警。\n\n### 📌 运维规范提醒\n- 遵循 **先主后次** 原则：物理层与传输链路验证通过后，再逐层核对协议配置与业务路由。\n- 现网解除环回与链路切换建议安排在 **凌晨 2:00～4:00 维护窗口**，并落实 **双人复核**，避免瞬时业务中断。\n- 若链路测损达标但对端仍告警，需同步检查中间传输设备（如 PDH/SDH 交叉）是否存在时隙错位或配置漂移。\n\n请反馈解除自环后的链路误码测试结果与对端端口状态，我们将据此推进后续定位。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "解除自环后如何进行端到端误码测试？\n如果对端端口状态异常该如何排查？\n时钟模式和帧格式不匹配会有什么影响？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 621,
+      "total_tokens": 652,
+      "completion_tokens": 31,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 621,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 31,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 652,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 30,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 878564,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 879655,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 3855,
+      "byte_offset": 879861,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 883716,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 1247640,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 1248001,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 1315,
+      "byte_offset": 1248209,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1249524,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 1249729,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 1249941,
+      "path": "archive/2026-09-17/18/part-00007.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-21bb208f-8215-4628-801c-88e1ff9ec82c"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-c70a287f-4150-4090-b75b-7605c7575f92"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ad4ad5bb-14d9-403d-b665-60a6f3d1f5ac"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2713"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T18:20:17.340651+00:00",
+    "arrival_seq": 5567,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/18"
+  }
+}

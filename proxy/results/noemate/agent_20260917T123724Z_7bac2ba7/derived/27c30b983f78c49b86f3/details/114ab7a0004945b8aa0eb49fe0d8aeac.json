@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM鉴权失败 \n\n\n\n最终回答：\n\n\n**UDM鉴权失败**是指UDM在为用户生成或校验鉴权向量（AV）时，因签约数据异常、密钥材料缺失、算法不匹配或信令交互错误，导致无法完成合法用户鉴权并返回拒绝响应（如`AUTHENTICATION_REJECT`）的故障现象。\n\n结合现网运维规范与协议流程，提供以下标准化诊断与处理指引：\n\n---\n\n### 1. 常见诱因（按概率排序）\n| 类别 | 典型原因 |\n|:---|:---|\n| **签约数据异常** | 用户未签约5G业务、KI/K2/K4密钥缺失或过期、AMF/OPC参数未配置 |\n| **密钥与HSM异常** | HSM密钥索引缺失、K2/K4类型不匹配（如UDM用户与HSM用户混配）、随机密钥未启用 |\n| **鉴权算法不匹配** | 终端与网络侧鉴权算法（MILENAGE/SHA256/SM4等）不一致，导致RES与XRES比对失败 |\n| **自动开户触发前拒绝** | 未知用户接入时，`NGC_AUTOPROV`设为`FALSE`或策略配置为直接拒绝 |\n| **信令/接口异常** | Diameter/MAP鉴权请求超时、参数缺失（如IMSI、RAND、AUTN）、对端HSS/AUSF响应异常 |\n\n---\n\n### 2. 诊断步骤（遵循先主后次）\n1. **确认鉴权失败节点**  \n   - 抓取AUSF↔UDM或MME↔UDM鉴权信令，定位失败发生在`Authentication Information Request/Answer`阶段，还是RES/XRES比对阶段。\n2. **检查用户签约数据**  \n   - 执行`LST KI`、`LST K2`、`LST K4`确认密钥材料存在且未过期。\n   - 验证鉴权算法类型、AMF序列号、HLR序列号是否与终端及现网策略一致。\n3. **核查HSM与密钥索引**  \n   - 若使用HSM鉴权，确认`HSM密钥索引`在安全模块中真实存在，且K2/K4的`密钥输入方式`均为`GenOnHSM`。\n4. **检查自动开户策略**  \n   - 查询`SET UDMSERV`参数：`NGC_AUTOPROV`、`NGC_AUTOPROV_3RDPARTY`、`NGC_AUTOPROV_AUTH_CAUSE`，确认未知用户是否被策略直接拒绝。\n5. **分析信令错误码**  \n   - 若返回`MAP_AUTHENTICATION_FAILURE_REPORT`，检查`Failure cause`（用户响应错误/网络签名错误）与`User error`（未知用户/数据缺失/系统故障）。\n\n---\n\n### 3. 解决措施\n| 故障场景 | 处理动作 |\n|:---|:---|\n| **密钥缺失/加载失败** | 重新执行`ADD KI`加载完整鉴权材料；若报`ERR4115/ERR4198`，检查K2/K4加密类型与HSM索引一致性 |\n| **自动开户拒绝** | 将`NGC_AUTOPROV`设为`TRUE`，配置`NGC_AUTOPROVTYPE`为`NOTIFY`或`ALL`触发开户流程 |\n| **算法不匹配** | 统一网络侧与终端鉴权算法，修改`SET MAPSERV`或`SET UDMSERV`中的算法参数后重试 |\n| **HSM密钥异常** | 执行`LST K2/K4`核对索引，确认HSM服务正常；若报`ERR4208`，联系安全模块管理员恢复密钥 |\n| **信令超时/参数错误** | 检查Diameter/MAP链路状态、防火墙策略、对端路由；修正缺失的强制参数（IMSI、RAND、AUTN） |\n\n---\n\n### 4. 运维规范提醒\n- **变更窗口**：修改鉴权策略、重载KI或调整HSM配置可能影响在线用户，建议调度至 **凌晨2:00～4:00话务低峰期**。\n- **双人复核**：密钥材料加载、算法切换、自动开户策略下发需落实双人复核，防止误配引发批量鉴权失败。\n- **效果验证**：操作后监控UDM鉴权成功率、`AUTHENTICATION_REJECT`占比及关联信令时延，确认指标回升后固化基线。\n\n如需输出特定错误码（如`ERR3097`/`ERR4198`）的详细处理SOP或鉴权信令抓包过滤规则，可提供具体故障上下文。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何抓取并分析AUSF与UDM之间的鉴权信令以定位失败阶段？\n执行LST KI/K2/K4命令后，如何判断密钥材料是否过期或配置不一致？\n当NGC_AUTOPROV参数设为FALSE时，如何调整自动开户策略以允许未知用户接入？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1309,
+      "total_tokens": 1376,
+      "completion_tokens": 67,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1309,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 67,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1376,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 66,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 6428279,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6429370,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 6827,
+      "byte_offset": 6429576,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6436403,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6680825,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6681186,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1459,
+      "byte_offset": 6681394,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6682853,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 6683058,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 6683270,
+      "path": "archive/2026-09-17/16/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-91b3f868-e4b3-444f-9c66-7d1fa4e75511"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-54ae3cf4-dba0-438c-beed-094712cefbaa"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-63ce7d67-d4f9-4d1c-808f-c29d0b7f90b7"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4944"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T16:01:52.104186+00:00",
+    "arrival_seq": 3290,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/16"
+  }
+}

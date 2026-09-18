@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n在5G Core中的UNC产品中，能解释一下“DWORD1601 BIT6控制HTTP是否在对端拆链或空闲超时场景下上报告警”的含义吗？\n\n\n\n最终回答：\n\n\n在5G Core的UNC产品中，软参 **`DWORD1601 BIT6`** 的核心含义是：**控制HTTP在对端拆链或空闲超时场景下是否上报告警**。\n\n以下是该参数的详细说明：\n\n### 🔹 核心含义\n控制对端拆链或空闲超时后，HTTP是否上报告警。 \n> **举例**：当AMF作为客户端、SMF作为服务端时，如果SMF主动释放链路，AMF端是否会上报HTTP链路故障告警，即由该参数控制。\n\n### 🔹 取值说明\n| 取值 | 含义 |\n|:---:|---|\n| `0` | 对端拆链或空闲超时场景下，**不上报**告警（系统默认值） |\n| `1` | 对端拆链或空闲超时场景下，**上报**告警 |\n\n### 🔹 应用场景\n- **设置为 `0`**：适用于仅需关注关键告警的运维场景。当现网存在较多正常的断链告警（如 `ALM-100155 HTTP链路故障告警`）造成告警风暴或干扰时，可设为0以过滤此类告警。\n- **设置为 `1`**：适用于需要全面监控HTTP链路状态的场景，确保所有链路异常（包括对端主动拆链和空闲超时）均能被记录和告警。\n\n### 🔹 生效方式\n修改参数值后**立即生效**，无需重启服务或网元。\n\n### 🔹 配置示例\n```bash\n# 查询当前取值\nLST FWSOFTPARABITS: PARATYPE=DWORD, DWORDNUM=1601, POSITION=6;\n\n# 修改取值为 1（开启告警上报）\nSET FWSOFTPARABITS: PARATYPE=DWORD, DWORDNUM=1601, VALUE=VALUE_1, POSITION=6;\n```\n\n该参数主要用于平衡告警 granularity（粒度）与运维噪音，可根据实际现网的监控策略灵活调整。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "在UNC产品中，除了DWORD1601 BIT6外，还有哪些软参可以控制HTTP链路的告警上报行为？\n如果将对端拆链告警关闭后，是否会影响HTTP链路故障的定位和排查效率？\n在实际现网中，如何判断当前HTTP链路告警是否已经形成告警风暴，从而决定是否需要调整该参数？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 743,
+      "total_tokens": 819,
+      "completion_tokens": 76,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 743,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 76,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 819,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 75,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 1766585,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 1767676,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 4399,
+      "byte_offset": 1767882,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 1772281,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 1913581,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 1913942,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1555,
+      "byte_offset": 1914150,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1915705,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 1915910,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 1916122,
+      "path": "archive/2026-09-17/20/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-835fbf9b-e2b7-454e-904a-205b44185458"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-dbccf7b0-fa30-4327-82a0-9edf31c11ff2"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-365e8875-21ed-459b-b9b5-3481734732ef"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3123"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T20:19:42.581274+00:00",
+    "arrival_seq": 7188,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/20"
+  }
+}

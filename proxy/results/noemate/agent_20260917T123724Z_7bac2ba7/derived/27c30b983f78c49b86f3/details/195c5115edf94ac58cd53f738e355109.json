@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n  - 从amf02z00613865的N2接口日志（【CN_NetworkMonitoring】系统）抽取出告警时段的关键信息：  \n\n\n\n最终回答：\n\n\n网元 AMF-02 在 2026-07-31 19:34 时段同步触发告警共 4 条，详细数据如下：\n\n| 告警 ID | 告警名称 | 告警级别 | 首次上报时间 |\n|:---|:---|:---|:---|\n| ALM-300168 | AMF TAI 跟踪区承载过载 | P1 严重 | 2026-07-31 16:19:12 |\n| ALM-300241 | AMF 信令处理 CPU 占用超 92% | P2 重要 | 2026-07-31 16:19:45 |\n| ALM-300375 | NGAP 接口信令消息拥塞 | P2 重要 | 2026-07-31 16:20:01 |\n| ALM-300429 | TAI 区域寻呼消息堆积超限 | P3 次要 | 2026-07-31 16:20:08 |"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请提供告警时段 N2 接口日志中记录的具体异常信令消息类型及频率。\n请确认上述告警是否已影响终端用户的正常接入或业务连续性。\n请说明当前 AMF 网元采取的临时缓解措施及后续处理建议。",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 579,
+      "total_tokens": 636,
+      "completion_tokens": 57,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 579,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 57,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 636,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 56,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 3922010,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 3923101,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 2963,
+      "byte_offset": 3923307,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 3926270,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4091838,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4092199,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 1447,
+      "byte_offset": 4092407,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4093854,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 4094059,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 4094271,
+      "path": "archive/2026-09-17/16/part-00007.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7184f6cb-ed34-45c1-8670-6e6d67617a9e"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-b3ffc2ff-7b72-40b0-bc87-19bc7965c3ce"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-b140674b-23c7-434a-b093-436529534299"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2044"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T16:28:18.135017+00:00",
+    "arrival_seq": 3749,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/16"
+  }
+}

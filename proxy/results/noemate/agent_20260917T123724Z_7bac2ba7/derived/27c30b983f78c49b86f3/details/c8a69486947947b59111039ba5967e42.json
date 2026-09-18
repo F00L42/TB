@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nP-CSCF异常关联\n\n\n\n最终回答：\n\n\n### 📡 P-CSCF异常关联分析与排查方案\n\nP-CSCF作为IMS信令入口网元，其异常会直接阻断或延迟注册/呼叫请求向S-CSCF的转发，是引发S-CSCF接通率跌破门限的**上游级联根因**。需结合时间关联规则与负载阈值，按以下维度定位：\n\n---\n\n#### 🔍 关联影响机制\n| 异常类型 | 对S-CSCF接通率的影响路径 |\n|:---|:---|\n| **传输/链路中断** | P-S间SIP链路丢包/超时 → 请求未到达S-CSCF → 接通率统计下降 |\n| **资源过载/队列积压** | P-CSCF CPU/内存触发**剧烈波动（30min>15%）**或**高位震荡（2h>80%±5%）** → 信令处理延迟/丢弃 → S-CSCF无请求可处理 |\n| **路由/配置错误** | 号码分析或负载均衡策略错配 → 请求转发至错误S-CSCF或黑洞 → 呼叫建立失败 |\n| **反压流控触发** | P-CSCF反压激活（阈值>85%）未同步优化QoS → 语音控制面报文被拥塞丢弃 → S-CSCF接通率骤降 |\n\n---\n\n#### 🛠️ 排查步骤（遵循先主后次原则）\n\n| 优先级 | 核查项 | 执行动作与判定标准 |\n|:---|:---|:---|\n| **P0** | **物理/传输层状态** | 探测P-CSCF↔S-CSCF SIP链路，确认无 `RLOS`/`ETH_LOS` 级联告警；检查TCP/TLS连接状态与RTT基线。 |\n| **P1** | **时间关联核对** | 提取P-CSCF异常日志时间戳。若与S-CSCF告警时间 **±5分钟内**，判定为强关联，优先修复P-CSCF侧故障。 |\n| **P2** | **资源负载与反压** | 导出夜间CPU/队列曲线。若触发反压（**阈值>85%**），必须**同步优化QoS参数**与信令优先级，保障语音请求优先转发。 |\n| **P3** | **路由与转发策略** | 核对P-CSCF号码分析规则、S-CSCF选择算法（如Hash/轮询）及ACL放行策略，排除路由错配或策略拦截。 |\n\n---\n\n#### 📌 运维规范提醒\n- **维护窗口**：路由修正、反压阈值调整、QoS策略割接或容量扩容，请严格安排在 **凌晨2:00～4:00** 话务低峰期执行。\n- **操作红线**：所有现网配置变更与割接必须落实 **双人复核** 机制，禁止单人执行。\n- **级联验证**：P-CSCF负载回落且链路恢复后，抓取SIP信令Trace验证请求正常抵达S-CSCF，确认接通率回归 `≥80%` 基线。\n\n提供P-CSCF异常日志时间戳、负载曲线或SIP链路探测结果后，可进一步精准判定关联强度并生成修复脚本。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请提供P-CSCF异常日志的时间戳，以便与S-CSCF告警时间进行±5分钟关联核对。\n当前P-CSCF的CPU/内存负载曲线是否触发反压阈值（>85%）或出现剧烈波动？\nP-CSCF与S-CSCF之间的SIP链路是否存在丢包、超时或RLOS/ETH_LOS级联告警？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 998,
+      "total_tokens": 1085,
+      "completion_tokens": 87,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 998,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 87,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1085,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 86,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 6553858,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6554949,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 5379,
+      "byte_offset": 6555155,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6560534,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6636179,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6636540,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 1491,
+      "byte_offset": 6636748,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6638239,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 6638444,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 6638656,
+      "path": "archive/2026-09-17/17/part-00002.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-286e46b0-4438-4dc8-b9a2-173049942d86"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-6d41f7e1-7831-42a9-87ed-98ae71a02227"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-b140674b-23c7-434a-b093-436529534299"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3858"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T17:06:41.312605+00:00",
+    "arrival_seq": 4267,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/17"
+  }
+}

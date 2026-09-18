@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nEVP中多Profile指的什么？\n\n\n\n最终回答：\n\n\n根据核心网知识库，**多Profile（通常指“一卡多号多Profile”业务）** 是指用户通过一张SIM/USIM卡关联多个拥有独立业务的MSISDN号码，并可根据不同使用场景按需激活和切换号码的特性。\n\n### 🔑 核心定义\n用户签约该业务后，可在同一张卡上配置多个号码（每个号码对应独立的业务Profile）。通过手机操作即可在不同Profile间切换，从而满足差异化业务需求，无需频繁换卡或携带多部终端。\n\n### 🌍 典型应用场景\n| 场景 | 激活的Profile | 业务特点 |\n|:---|:---|:---|\n| 家庭环境 | 家庭号码Profile | 绑定家庭套餐、亲情网等 |\n| 国内工作 | 工作号码Profile | 绑定彩铃、企业通信等 |\n| 出国漫游 | 漫游号码Profile | 绑定国际漫游套餐、境外流量包等 |\n\n### ⚙️ 关键特性与限制\n- **号码上限**：一张卡关联的MSISDN号码最多为 **9个**。\n- **网元支持**：主要由 `SAE-HSS`（HSS9860 V900R008C01+）和 `HLR` 存储并转发业务数据。\n- **性能影响**：签约后，单条SRI消息处理能力降低不超过40%。\n- **业务冲突**：不可与以下业务同时签约（会发生冲突）：\n  `MIMSI`、`ALS`、`Follow Me`、`VP双号(VVDN)`、`多SIM`、`GROUPSIM`、`LINKED SIM`、`COMISDN`。\n\n### 💡 客户价值\n- **运营商**：提供个性化卡号服务，增强用户黏性，降低因多号需求导致的转网流失。\n- **用户**：一机多号、按需切换，保护隐私并节省资费，提升号码管理的自主性。\n\n> 注：若您提到的 `EVP` 是指特定产品模块或自定义缩写，且与上述 HSS/HLR 一卡多号特性不符，请补充具体网元或产品背景，我将为您进一步精准解答。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "一卡多号业务中，如何配置和切换不同的Profile？\n哪些业务与多Profile存在冲突，无法同时签约？\n多Profile业务对SRI消息处理性能的具体影响是多少？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 752,
+      "total_tokens": 794,
+      "completion_tokens": 42,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 752,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 42,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 794,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 41,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 10330052,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10331143,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 4535,
+      "byte_offset": 10331349,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10335884,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10612931,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10613292,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1367,
+      "byte_offset": 10613500,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10614867,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 10615072,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 10615284,
+      "path": "archive/2026-09-17/22/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c412448c-0f75-4678-9a29-c3b192f323d1"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-c792b5e0-bbe5-4698-aa49-bee0535251a5"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-91316b88-2bce-47a8-b809-0c87a9e6d70c"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3224"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T22:33:37.439803+00:00",
+    "arrival_seq": 9861,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/22"
+  }
+}

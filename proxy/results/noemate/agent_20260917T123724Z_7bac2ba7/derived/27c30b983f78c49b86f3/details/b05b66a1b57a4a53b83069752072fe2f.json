@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nEVP中 nPVR的录制模式有哪些？\n\n\n\n最终回答：\n\n\n根据相关技术规范，EVP 中的 nPVR（Network PVR，网络个人视频录像）主要支持以下两种录制模式：\n\n1. **即时录制（Instant Recording）**\n   * **定义**：用户请求录制当前正在播出的直播节目。\n   * **流程特点**：SCF 接收到请求后会立即校验权限与存储空间，随后选择相应的 PSS Adapter 建立内容分发通道，启动实时录制。\n\n2. **定时录制（Scheduled Recording）**\n   * **定义**：用户预约录制未来某个特定时间播出的节目。\n   * **流程特点**：SCF 接收请求后会创建定时器，等到设定的开始时间到达后，再按照即时录制的流程控制 Recording Server 执行录制操作。\n\n**补充说明**：\n* nPVR 的核心特点是**网络侧录制**，即节目内容直接录制并存储在网络的媒体服务器中，用户后续可随时点播回放，无需终端全程在线或占用本地存储。\n* 当多个用户请求录制同一节目时，网络侧可根据策略仅生成一份录制任务，并在状态变化时同步更新所有请求用户的个人配置。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "nPVR的即时录制和定时录制在权限校验和存储空间检查上有哪些具体差异？\n当多个用户请求录制同一节目时，EVP如何确定仅生成一份录制任务的具体策略是什么？\n如果定时录制开始时间到达时网络媒体服务器存储空间不足，EVP会如何处理该录制请求？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 510,
+      "total_tokens": 575,
+      "completion_tokens": 65,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 510,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 65,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 575,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 64,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 7811651,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 7812742,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 3655,
+      "byte_offset": 7812948,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 7816603,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 7888054,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 7888415,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 1547,
+      "byte_offset": 7888623,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7890170,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 7890375,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 7890587,
+      "path": "archive/2026-09-17/22/part-00010.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-9ba47120-6cb8-49d4-a4c4-0bff4f4c58fe"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-27250d13-5676-4ba9-be39-ffd2715c049c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a67fb75f-599a-4fe0-8d00-6a536808effa"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2563"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T22:36:56.347311+00:00",
+    "arrival_seq": 9924,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/22"
+  }
+}

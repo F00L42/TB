@@ -1,0 +1,261 @@
+{
+  "request": {
+    "model": "qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n3. 定时器配置问题（占比约10%）：  \n\n\n\n最终回答：\n\n\n### 3. 定时器配置问题（占比约10%）：\n- **NG-AP控制面定时器配置过短**：AMF（移动锚点）与gNB间的 `T309`（RRC连接建立）、`T319`（初始UE消息响应）等定时器阈值低于现网实际传输延迟。在跨域路由或弱覆盖场景下，信令往返时间超出阈值即触发N2接口响应超时及 `ALM-100072` 上报。\n- **PFCP/N4接口会话定时器不匹配**：SMF与UPF（用户面网关）间的 `SessionDeactivationDelay`、`DelayedPFCPReportTimer` 等配置不一致。会话创建或修改期间，若UPF未在AMF期望窗口内完成PDR/FAR规则加载，会导致上下文传输失败并级联引发N2信令挂起。\n- **SCTP保活/心跳定时器不一致**：N2底层SCTP链路的 `HeartbeatInterval` 与 `PathMaxRT` 配置不匹配现网链路RTT。网络微抖动时误判链路断裂，触发SCTP偶联重建与NG-AP状态机重置，造成批量信令超时。\n- **反压阈值与定时器协同失效**：现网触发反压机制时，若未同步调整信令重传定时器与队列等待阈值，高优先级语音控制面报文仍会被拥塞丢弃。当**N2模式反压阈值>85%**时，必须**同步优化QoS参数**与定时器容限，避免自保机制误杀正常业务。\n\n📌 **排查与处理建议**：\n1. **核对定时器基线**：执行 `LST NGAPCFG` 与 `LST PFCPTIMER`，比对AMF/gNB/UPF侧定时器配置是否符合现网延迟基线（建议RTT+30%容余）。\n2. **信令跟踪验证**：抓取N2/N4接口Trace，定位超时消息的具体等待节点，确认是否为定时器截断或反压队列缓存超时。\n3. **参数调整规范**：涉及定时器扩容、反压阈值修改或SCTP保活调整的操作，请严格安排在 **凌晨2:00～4:00** 话务低峰期执行，并落实 **双人复核** 机制。\n4. **级联影响排查**：遵循 **先主后次原则**，优先确认物理层/传输层无 `RLOS`/`ETH_LOS` 级联告警，再定位控制面定时器配置。调整完成后执行VoNR呼叫建立与切片切换测试，验证超时告警自愈。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "parse_error",
+    "model": "qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "现网环境中T309和T319定时器的具体配置值是多少？\n如何获取N2/N4接口的信令Trace以定位超时消息的具体等待节点？\n当N2模式反压阈值超过85%时，应如何同步调整QoS参数与定时器容限？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "function_call": {
+            "name": "",
+            "arguments": ""
+          }
+        },
+        "finish_reason": null,
+        "warnings": [
+          "invalid_tool_arguments_or_name"
+        ],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 863,
+      "total_tokens": 929,
+      "completion_tokens": 66,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": [
+      "parse_error:AttributeError:'NoneType' object has no attribute 'items'",
+      "invalid_tool_arguments_or_name"
+    ]
+  },
+  "tokens": {
+    "model": "qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/p00906181/260707/TB/docs/tokenizer/Qwen3.6-27B",
+      "files_sha256": "ffdcec66b8666624577098424fb25391ece0b4a815390d38c3527d6ff3c1e1c9",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 863,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 66,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 929,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 65,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "observed_partial_or_unsupported"
+  },
+  "original_request": null,
+  "request_transform": null,
+  "warnings": [
+    "invalid_tool_arguments_or_name",
+    "parse_error:AttributeError:'NoneType' object has no attribute 'items'"
+  ],
+  "raw_refs": [
+    {
+      "byte_length": 1091,
+      "byte_offset": 12957129,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12958220,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4935,
+      "byte_offset": 12958426,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12963361,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 13004969,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 13005330,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1423,
+      "byte_offset": 13005538,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13006961,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 13007166,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 384,
+      "byte_offset": 13007378,
+      "path": "archive/2026-09-17/16/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-111dbe6a-7bfd-4b23-a04c-e75e59d8d115"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-611ff98a-76f4-44bc-96a4-b105eff4c5b7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-b140674b-23c7-434a-b093-436529534299"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3525"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "cc",
+      "variant": "baseline"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-09-17T16:17:30.406752+00:00",
+    "arrival_seq": 3569,
+    "process_id": "6ed02155e6bc424787cd35ca4ea96961",
+    "bucket": "2026-09-17/16"
+  }
+}
