@@ -150,6 +150,64 @@ def test_json_sse_equivalent_and_missing_done():
     assert missing["parse_status"] == "incomplete"
 
 
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("null_fields", [("function_call",), ("tool_calls",), ("function_call", "tool_calls")])
+def test_null_optional_tool_fields_preserve_response(streaming, null_fields):
+    # Put reasoning after the null fields to detect premature parser termination.
+    message = {"role": "assistant", "content": "done", **dict.fromkeys(null_fields),
+               "reasoning_content": "think first"}
+    payload = response(message)
+    if streaming:
+        payload["choices"][0]["delta"] = payload["choices"][0].pop("message")
+    body = b"data: " + encode(payload) + b"\n\ndata: [DONE]\n\n" if streaming else encode(payload)
+    parsed = parse_response(body, [("content-type", "text/event-stream" if streaming else "application/json")],
+                            ["reasoning_content"])
+    assert parsed["parse_status"] == "complete"
+    assert parsed["warnings"] == []
+    assert parsed["usage"] == payload["usage"]
+    choice = parsed["choices"][0]
+    assert choice["finish_reason"] == "stop"
+    assert choice["message"] == {"role": "assistant", "content": "done", "reasoning_content": "think first"}
+    assert choice["reasoning"] == "think first"
+    measured = TokenCounter({}, {"test-model": WordTokenizer()}).measure(parsed, "test-model")
+    assert measured["choices"][0]["reasoning"]["value"] == 2
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("field", ["function_call", "tool_calls"])
+def test_null_tool_fields_do_not_erase_real_calls(streaming, field):
+    function = {"name": "read", "arguments": '{"path":"x"}'}
+    tool = {"id": "call1", "type": "function", "function": function}
+    value = function if field == "function_call" else [{**tool, **({"index": 0} if streaming else {})}]
+    message = {"function_call": None, "tool_calls": None, field: value}
+    finish = "function_call" if field == "function_call" else "tool_calls"
+    if streaming:
+        deltas = [{"function_call": None, "tool_calls": None}, message,
+                  {"function_call": None, "tool_calls": None}]
+        events = [{"choices": [{"index": 0, "delta": delta}]} for delta in deltas]
+        events.append({"choices": [{"index": 0, "delta": {}, "finish_reason": finish}]})
+        body = b"".join(b"data: " + encode(event) + b"\n\n" for event in events) + b"data: [DONE]\n\n"
+    else:
+        payload = response(message)
+        payload["choices"][0]["finish_reason"] = finish
+        body = encode(payload)
+    parsed = parse_response(body, [("content-type", "text/event-stream" if streaming else "application/json")], [])
+    assert parsed["parse_status"] == "complete"
+    assert parsed["warnings"] == []
+    assert parsed["choices"][0]["finish_reason"] == finish
+    assert parsed["choices"][0]["message"] == {"role": "assistant", field: function if field == "function_call" else [tool]}
+
+
+@pytest.mark.parametrize("field", ["function_call", "tool_calls"])
+def test_null_optional_field_does_not_hide_invalid_tool_arguments(field):
+    function = {"name": "read", "arguments": ""}
+    value = function if field == "function_call" else [{"id": "call1", "type": "function", "function": function}]
+    message = {"function_call": None, "tool_calls": None, field: value}
+    parsed = parse_response(encode(response(message)), [("content-type", "application/json")], [])
+    assert parsed["parse_status"] == "parse_error"
+    assert "invalid_tool_arguments_or_name" in parsed["warnings"]
+
+
 def test_multichoice_tool_fragments_and_reasoning_conflict():
     deltas = [
         {"choices": [{"index": 0, "delta": {"reasoning_content": "a", "reasoning": "b", "tool_calls": [{"index": 0, "id": "call1", "function": {"name": "read", "arguments": '{"path":'}}]}}]},

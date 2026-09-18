@@ -146,6 +146,8 @@ def parse_response(body, headers, reasoning_fields):
                         choice["warnings"].append(f"nontext_{field}")
                         choice["message"][field] = value
                 elif field == "tool_calls":
+                    if value is None:
+                        continue  # Optional null means no calls, including in SSE deltas.
                     for pos, call in enumerate(value):
                         tool_index = call.get("index") if streaming else pos
                         if type(tool_index) is not int or tool_index < 0:
@@ -164,6 +166,8 @@ def parse_response(body, headers, reasoning_fields):
                                     raise ValueError("tool_fragment_not_string")
                                 tool["function"][key] += fragment
                 elif field == "function_call":
+                    if value is None:
+                        continue
                     function = choice["message"].setdefault(field, {"name": "", "arguments": ""})
                     for key, fragment in value.items():
                         function[key] = function.get(key, "") + fragment

@@ -81,6 +81,8 @@ python -m proxy.observation.inspect_request <capture_dir> --request-id <request_
 
 观测解析失败不会改变转发结果；显式启用 body 附加时的请求验证规则见上文。语义重建单请求每方向默认最多解码 32 MiB，超出时保留原始 body，但标 `analysis_body_limit` 并排除统计；可配置 `report.max_body_bytes`，应考虑解析及渲染内存。gzip/deflate 支持离线解析，其他 Content-Encoding 在纯透传路径保留，但其语义解析标为不支持。
 
+Chat Completions 的 JSON 响应和 SSE delta 中，`function_call: null`、`tool_calls: null` 均按没有新增工具调用处理，不生成空工具记录，也不清除已累积的调用；后续 reasoning、正文和 finish_reason 继续解析。真实工具调用的参数错误仍会报告。此修复不会自动更新历史派生报告。
+
 ## 多轮轨迹
 
 轨迹无需 session ID：先直接显示 prompt 中有序历史，再检查另一实采请求的 `输入历史 + assistant 响应` 是否精确出现在这个 prompt 中，补上相应调用的时间、思考与 Token。
@@ -110,4 +112,4 @@ $testRun = Join-Path (Get-Location) ('proxy/.test-output/run-' + [guid]::NewGuid
 python -m pytest tests/test_agent_observation_proxy.py tests/test_full_log_writer.py -q -p no:cacheprovider --basetemp $testRun
 ```
 
-测试覆盖无模型的真实 HTTP 连接、SSE/JSON、压缩、重复 header、Cookie 隔离、取消/断流、并发、缺口、轨迹与旧 writer 兼容，以及 body 附加审计、tokenizer 复用、真实 SIGINT 退出分析和取消请求的清理次序。2026-09-17 本地共 42 项通过。需要另装 pytest。真实 Agent、模型服务性能和质量仍须在目标环境验证；本地测试不代表这些运行时验收已完成。
+测试覆盖无模型的真实 HTTP 连接、SSE/JSON、压缩、重复 header、Cookie 隔离、取消/断流、并发、缺口、轨迹与旧 writer 兼容，以及 body 附加审计、tokenizer 复用、真实 SIGINT 退出分析和取消请求的清理次序。2026-09-18 新增可选工具字段 null 的流式/非流式回归，本地共 54 项通过。需要另装 pytest。真实 Agent、模型服务性能和质量仍须在目标环境验证；本地测试不代表这些运行时验收已完成。
