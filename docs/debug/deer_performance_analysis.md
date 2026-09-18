@@ -719,6 +719,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-18 | 新增 [Noemate 透传日志分析执行手册](noemate_proxy_analysis_runbook.md)，固定 proxy/results/noemate 入口，提供快照审计、账本分布、RawRef 样本导出、回放条件及最小回传包 | 指导服务器本地 agent 分析长时间并发日志；将候选阈值、单请求协议/质量与完整任务收益分开，未读取服务器实际数据或预设压缩结论 |
 | 2026-09-17 | 通用观测代理改为单模型 tokenizer 常驻复用，恢复显式 append_body 顶层覆盖及原始/有效请求审计，Ctrl+C 后排空日志并执行一次离线分析 | 用户澄清运行与实验参数契约；42 项本地无模型测试及真实 tokenizer 复用验证通过，包含真实 SIGINT 与取消清理次序；未测服务器性能，附加参数和实时分析设置须纳入实验身份 |
 | 2026-09-16 | 通用观测代理移除 label_headers，保留 capture.labels 静态运行标签 | 简化采集配置，不要求 Agent 配合发送标签 header；不改变透传或 Token 统计口径 |
 | 2026-09-16 | 新增 [通用 Agent 观测代理](../../proxy/README-observation.md)：纯透传、时间归档、Token 来源、prompt 轨迹及长尾阈值报告；旧 proxy 保持入口与产物格式 | 用于 LightCode 以外的场景采集；本地 28 项无模型测试及本地 tokenizer 计数通过，未测真实 Agent/目标服务性能；报告线程 CPU/I/O 与采集设置须纳入后续实验身份 |
