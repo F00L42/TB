@@ -238,8 +238,11 @@ class _DeferredInterventionState(_BaseState):
                     state.budget_decision = context.activate_budget()
                 if recorder is not None:
                     decision_ms += (perf_counter() - decision_started) * 1000
-                _, can_probe = _room(context, len(prefix))
-                if not can_probe:
+                can_final, can_probe = _room(context, len(prefix))
+                # A hard think budget equal to the intervention threshold is a
+                # direct-final policy. It needs final capacity, not probe room.
+                budget_exhausted = _BaseState.remaining_think_budget(context) <= 0
+                if not can_probe and not (budget_exhausted and can_final):
                     armed = classified = False
                     prefix.clear()
                     if trace is not None:

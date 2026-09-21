@@ -11,7 +11,7 @@ import pytest
 from dtb.budgeting.budget_resolver import DtbBudgetResolver
 from dtb.config.loader import load_dtb_service_config
 from dtb.reasoning.deferred_observation import _DeferredInterventionState
-from dtb.reasoning.generation_states import _ConfidenceProbeState, _FinalAnswerState
+from dtb.reasoning.generation_states import GUIDED_FINAL_CUE_V1, _ConfidenceProbeState, _FinalAnswerState
 from dtb.reasoning.request_state import FinalAnswerReason
 from dtb.reasoning.state_machine import DtbStateMachine
 from test_dtb_state_machine import THINK_END_ID, TOOL_CALL_BEGIN_ID, make_context, result
@@ -88,6 +88,79 @@ def queued(context):
     return values
 
 
+def set_direct_budget(context, resolver):
+    service = load_dtb_service_config()
+    config = replace(context.config, fixed_check_length=context.intervention_threshold,
+                     fixed_budget_tokens=context.intervention_threshold)
+    budget_resolver = DtbBudgetResolver(service)
+    threshold = budget_resolver.intervention_threshold("test", config)
+    resolver.return_value = budget_resolver.resolve("test", config, None, threshold=threshold)
+    context.config = config
+
+
+@pytest.mark.parametrize("phase", [False, True])
+@pytest.mark.parametrize("tail_ids", [[], [15, 16, 17]])
+def test_equal_budget_and_threshold_goes_to_cued_final_without_probe(phase, tail_ids):
+    async def run():
+        final = result("answer", [30, 31], finish_reason="stop")
+        context, engine, resolver, native = setup(
+            [delta()], [result("tail", tail_ids, finish_reason="abort")], [[final]], phase=phase)
+        set_direct_budget(context, resolver)
+        # Only observation + final capacity is required, even when probe cannot fit.
+        context.config = replace(context.config, max_internal_calls=2)
+        with patch.object(_ConfidenceProbeState, "handle", side_effect=AssertionError("probe forbidden")):
+            await DtbStateMachine(context).run()
+        state = context.request_state
+        assert state.completion_status == "success", context.orchestration_error
+        assert state.final_answer_reason is FinalAnswerReason.BUDGET_EXHAUSTED
+        assert state.probe_round == state.hidden_probe_tokens == 0
+        assert len(engine.calls) == 2 and len(engine.aborts) == 1
+        cue = context.tokenizer.encode(GUIDED_FINAL_CUE_V1, add_special_tokens=False)
+        assert engine.calls[1][0]["prompt_token_ids"] == [60, 10, 11, 12, 13, 14, *tail_ids, *cue, THINK_END_ID, 10, 10]
+        assert engine.calls[1][1].max_tokens == 100 - 5 - len(tail_ids) - 1
+        assert native["prompt_token_ids"] == [60]
+        ids = [t for output in queued(context) for t in output.outputs[0].token_ids]
+        assert ids == [10, 11, 12, 13, 14, *tail_ids, THINK_END_ID, 30, 31]
+        assert state.final_terminal_count == 1
+        if phase:
+            assert state.intervention_telemetry["post_drain_branch"] == "budget_final"
+            assert all(p["phase"] != "confidence_probe" for p in context.phase_recorder.phases)
+        else:
+            assert state.intervention_telemetry is None
+    asyncio.run(run())
+
+
+def test_direct_budget_without_final_capacity_stays_native():
+    async def run():
+        terminal = result("done", [30], finish_reason="length")
+        context, engine, resolver, _ = setup([delta(), terminal])
+        set_direct_budget(context, resolver)
+        context.request_state.completion_token_limit = 6  # No room for boundary + answer.
+        await DtbStateMachine(context).run()
+        assert context.request_state.completion_status == "success"
+        assert not engine.aborts and len(engine.calls) == 1
+        assert queued(context)[-1] is terminal
+        assert context.request_state.probe_round == 0
+    asyncio.run(run())
+
+
+def test_nonstream_equal_budget_and_first_segment_also_skips_probe():
+    async def run():
+        context, engine = make_context([
+            [result("abcde", [10, 11, 12, 13, 14])],
+            [result("answer", [30, 31], finish_reason="stop")],
+        ], hard_limit=5)
+        context.request.stream = False
+        with patch.object(_ConfidenceProbeState, "handle", side_effect=AssertionError("probe forbidden")):
+            await DtbStateMachine(context).run()
+        assert context.request_state.completion_status == "success", context.orchestration_error
+        assert context.request_state.final_answer_reason is FinalAnswerReason.BUDGET_EXHAUSTED
+        assert context.request_state.probe_round == context.request_state.hidden_probe_tokens == 0
+        assert len(engine.calls) == 2
+        assert all(p["phase"] != "confidence_probe" for p in context.phase_recorder.phases)
+    asyncio.run(run())
+
+
 @pytest.mark.parametrize("boundary", [THINK_END_ID, TOOL_CALL_BEGIN_ID])
 @pytest.mark.parametrize("width", [0, 3, 8])
 def test_short_same_child_disarms_even_when_boundary_crosses_threshold(boundary, width):
@@ -147,11 +220,14 @@ def test_drain_accepts_all_payload_and_resumes_from_full_prefix(tail):
     ([TOOL_CALL_BEGIN_ID, 21, 22], FinalAnswerReason.MODEL_TOOL_CALL),
     ([THINK_END_ID, TOOL_CALL_BEGIN_ID, 21], FinalAnswerReason.MODEL_THINK_END),
 ])
-def test_drained_boundary_goes_directly_to_final_without_cue_or_duplicate(ids, reason):
+@pytest.mark.parametrize("direct_budget", [False, True])
+def test_drained_boundary_goes_directly_to_final_without_cue_or_duplicate(ids, reason, direct_budget):
     async def run():
         tail = result("boundary+partial arguments", ids, finish_reason="abort")
         final = result("rest", [30, 31], finish_reason="stop")
-        context, engine, _, _ = setup([delta()], [tail], [[final]])
+        context, engine, resolver, _ = setup([delta()], [tail], [[final]])
+        if direct_budget:
+            set_direct_budget(context, resolver)
         await DtbStateMachine(context).run()
         assert context.request_state.completion_status == "success"
         assert context.request_state.final_answer_reason is reason
@@ -170,10 +246,13 @@ def test_drained_boundary_goes_directly_to_final_without_cue_or_duplicate(ids, r
 
 
 @pytest.mark.parametrize("finish", ["stop", "length"])
-def test_native_terminal_wins_abort_race_without_new_child(finish):
+@pytest.mark.parametrize("direct_budget", [False, True])
+def test_native_terminal_wins_abort_race_without_new_child(finish, direct_budget):
     async def run():
         tail = [delta("tail", [20]), result("done", [THINK_END_ID, 30], finish_reason=finish)]
-        context, engine, _, native = setup([delta()], tail)
+        context, engine, resolver, native = setup([delta()], tail)
+        if direct_budget:
+            set_direct_budget(context, resolver)
         await DtbStateMachine(context).run()
         assert context.request_state.completion_status == "success"
         assert len(engine.calls) == 1 and len(engine.aborts) == 1
