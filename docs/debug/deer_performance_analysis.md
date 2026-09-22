@@ -719,6 +719,8 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-21 | 审计 [Noemate 4c259c](../log/perf/noemate_direct750_off_20260921T064359Z/RESULT.md)：576 个 off 请求/223419 SSE 事件；筛出长178/259/319/353、短21/321/365/394，验收转为长请求可控与短路径非劣 | 用户确认环境不变、APC on、加载修复、所有日志未开启；direct750 有67/128次可见思考超过750，实际接管未证实；319平均快8.67%但集中单次；同轨迹8对短请求平均差−7.85ms，只是事后敏感性结果。先12请求真实phase，再独立长短验证，不宣称稳定加速或质量不退化 |
+| 2026-09-21 | 审阅 [Noemate 六试点的 12 次 Vanilla 思考](../log/perf/noemate_replay_20260920T012159Z/PILOT_SEMANTIC_REVIEW.md)，逐 token 标注分类完成、日志时间推导和算术纠错 | 750 支持开始试验，非统一语义安全边界；正确均值一次位于 751–758，512 前两次均有错误值。仅离线语义审阅，无新模型生成或正确率结论 |
 | 2026-09-21 | 更新 [Noemate 下一轮命令](../log/perf/noemate_replay_20260920T012159Z/RESULT.md#6-下一轮固定-h750对照有-probe-与直接答案)：8 条 phase + 32 条 off，在 H=750 下比较 probe750/direct750；补充 resolver→remaining budget→流式/非流式 final 的源码链 | 750 用于固定介入值的退出策略对照，非最优阈值结论；822 次 Vanilla 中 45.01% 超过 750，后缀空间 13.14% 仅为静态长度统计。system 匹配交其他任务；未运行服务器实验 |
 | 2026-09-21 | 修复硬预算等于介入值时流式门禁错误撤销直接 final 的问题；补充 [Noemate 零 probe 与场景识别审计](../log/perf/noemate_replay_20260920T012159Z/RESULT.md#8-新场景识别与零-probe-候选) | 89 tests、1956 subtests 通过；配置候选可识别 156/411 个 Skill 请求，system 身份覆盖 411 但当前 matcher 不读取 system；25/822 仅为第三次 probe 长度候选。生产 YAML 未改，无服务器收益或正确性结论 |
 | 2026-09-21 | 审计 [Noemate replay 7249b3](../log/perf/noemate_replay_20260920T012159Z/RESULT.md) 的 28 个 chunks 分片和全部配对；750 的 5.591% 为过滤后中位加速率，第二轮缓存较接近时平均慢 0.858%，可见思考总量增加 1.484%；准备 32 条校准与 8 条 phase 索引 | 用户确认 APC 开启、observability off；V1-D1-D2-V2 固定首遍存在缓存顺序混杂。先做逐案例预热的候选对照和成本账本，再决定扩大与端到端；未评分正确性或执行新服务器实验 |
