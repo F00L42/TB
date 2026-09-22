@@ -1,0 +1,136 @@
+diff --git a/vllm/reasoning/qwen3_reasoning_parser.py b/vllm/reasoning/qwen3_reasoning_parser.py
+--- a/vllm/reasoning/qwen3_reasoning_parser.py
++++ b/vllm/reasoning/qwen3_reasoning_parser.py
+@@ -197,7 +197,12 @@ class Qwen3ReasoningParser(BaseThinkingReasoningParser):
+                     reasoning=reasoning if reasoning else None,
+                     content=content if content else None,
+                 )
+-            # end_token_id in IDs but not in text (already stripped)
++            # A terminal stop token can be stripped from text while its ID
++            # remains. Preserve the reasoning prefix decoded in the same delta.
++            # Do not infer a text split when the end ID is not the last token.
++            if delta_token_ids and delta_token_ids[-1] == self.end_token_id:
++                return DeltaMessage(reasoning=delta_text) if delta_text else None
++            # Other text/token mismatches retain the existing behavior.
+             return None
+ 
+         # Implicit reasoning end via <tool_call>.
+diff --git a/tests/reasoning/test_qwen3_reasoning_parser.py b/tests/reasoning/test_qwen3_reasoning_parser.py
+--- a/tests/reasoning/test_qwen3_reasoning_parser.py
++++ b/tests/reasoning/test_qwen3_reasoning_parser.py
+@@ -10,7 +10,9 @@ from tests.reasoning.utils import (
+     run_reasoning_extraction_streaming,
+ )
+ from vllm.entrypoints.openai.chat_completion.protocol import ChatCompletionRequest
++from vllm.parser.abstract_parser import DelegatingParser
+ from vllm.reasoning import ReasoningParser, ReasoningParserManager
++from vllm.reasoning.qwen3_reasoning_parser import Qwen3ReasoningParser
+ 
+ parser_name = "qwen3"
+ start_token = "<think>"
+@@ -373,3 +375,105 @@ def test_reasoning_thinking_disabled(
+ 
+     assert reasoning == expected_reasoning
+     assert content == expected_content
++
++
++@pytest.mark.parametrize("tail", [" different approach.\n", "时间戳。\n", "\n", ""])
++def test_reasoning_terminal_stop_id_preserves_prefix(qwen3_tokenizer, tail):
++    """Stop IDs survive detokenization even when their marker text is stripped."""
++    parser = Qwen3ReasoningParser(qwen3_tokenizer)
++    previous_text = "Let me try a"
++    previous_ids = qwen3_tokenizer.encode(previous_text, add_special_tokens=False)
++    # Deliberately do not tokenize a string containing the end marker.
++    delta_ids = qwen3_tokenizer.encode(tail, add_special_tokens=False) + [
++        parser.end_token_id
++    ]
++    original_ids = list(delta_ids)
++    result = parser.extract_reasoning_streaming(
++        previous_text=previous_text,
++        current_text=previous_text + tail,
++        delta_text=tail,
++        previous_token_ids=previous_ids,
++        current_token_ids=previous_ids + delta_ids,
++        delta_token_ids=delta_ids,
++    )
++    if tail:
++        assert result is not None
++        assert result.reasoning == tail
++        assert result.content is None
++    else:
++        assert result is None
++    assert delta_ids == original_ids
++    assert parser.is_reasoning_end_streaming(previous_ids + delta_ids, delta_ids)
++
++
++def test_reasoning_stripped_nonterminal_end_id_keeps_existing_behavior(
++    qwen3_tokenizer,
++):
++    """An ID in the middle cannot establish a missing marker's text offset."""
++    parser = Qwen3ReasoningParser(qwen3_tokenizer)
++    delta_ids = (
++        qwen3_tokenizer.encode("tail", add_special_tokens=False)
++        + [parser.end_token_id]
++        + qwen3_tokenizer.encode("answer", add_special_tokens=False)
++    )
++    result = parser.extract_reasoning_streaming(
++        previous_text="",
++        current_text="tailanswer",
++        delta_text="tailanswer",
++        previous_token_ids=[],
++        current_token_ids=delta_ids,
++        delta_token_ids=delta_ids,
++    )
++    assert result is None
++
++
++@pytest.mark.parametrize("content", ["", "answer", TOOL_CALL_BODY])
++def test_reasoning_terminal_stop_marker_present(qwen3_tokenizer, content):
++    """Marker-present and speculative content/tool suffixes retain their split."""
++    parser = Qwen3ReasoningParser(qwen3_tokenizer)
++    tail = "reasoning tail"
++    text = tail + parser.end_token + content
++    delta_ids = (
++        qwen3_tokenizer.encode(tail, add_special_tokens=False)
++        + [parser.end_token_id]
++        + qwen3_tokenizer.encode(content, add_special_tokens=False)
++    )
++    result = parser.extract_reasoning_streaming(
++        previous_text="",
++        current_text=text,
++        delta_text=text,
++        previous_token_ids=[],
++        current_token_ids=delta_ids,
++        delta_token_ids=delta_ids,
++    )
++    assert result is not None
++    assert result.reasoning == tail
++    assert result.content == (content or None)
++
++
++@pytest.mark.parametrize("include_marker", [False, True])
++def test_reasoning_terminal_stop_id_delegating(qwen3_tokenizer, include_marker):
++    """The unified parser must publish the tail before marking reasoning ended."""
++    reasoner = Qwen3ReasoningParser(qwen3_tokenizer)
++    parser = DelegatingParser(qwen3_tokenizer)
++    parser.reasoning_parser = reasoner
++    request = ChatCompletionRequest(
++        messages=[], model="test-model", stream=True,
++        stop_token_ids=[reasoner.end_token_id],
++        include_stop_str_in_output=include_marker,
++    )
++    prefix, tail = "Let me try a", " different approach.\n"
++    prefix_ids = qwen3_tokenizer.encode(prefix, add_special_tokens=False)
++    tail_ids = qwen3_tokenizer.encode(tail, add_special_tokens=False) + [
++        reasoner.end_token_id
++    ]
++    messages = [parser.parse_delta(
++        prefix, prefix_ids, request, prompt_token_ids=[], finished=False,
++    ), parser.parse_delta(
++        tail + (reasoner.end_token if include_marker else ""),
++        tail_ids, request, finished=True,
++    )]
++    assert "".join(m.reasoning or "" for m in messages if m) == prefix + tail
++    assert "".join(m.content or "" for m in messages if m) == ""
++    assert parser._stream_state.reasoning_ended
++    assert tail_ids[-1] == reasoner.end_token_id

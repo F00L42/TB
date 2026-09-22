@@ -1,0 +1,143 @@
+--- a/vllm/entrypoints/openai/chat_completion/protocol.py
++++ b/vllm/entrypoints/openai/chat_completion/protocol.py
+@@ -420,6 +420,7 @@
+         "can detect such behavior and terminate early, saving time and tokens.",
+     )
+ 
++    enable_thinking_observer: bool = Field(default=False)
+     # --8<-- [end:chat-completion-extra-params]
+ 
+     @model_validator(mode="before")
+--- a/vllm/entrypoints/openai/chat_completion/serving.py
++++ b/vllm/entrypoints/openai/chat_completion/serving.py
+@@ -74,6 +74,8 @@
+ from vllm.utils.collection_utils import as_list
+ from vllm.utils.mistral import is_mistral_tokenizer, is_mistral_tool_parser
+ 
++from thinking_observer.integration import VllmObserver, close_with_response
++
+ if TYPE_CHECKING:
+     from vllm.entrypoints.serve.render.serving import OpenAIServingRender
+ 
+@@ -167,6 +169,7 @@
+         # Please use the Responses API instead.
+         self.supports_code_interpreter = False
+         self.python_tool = None
++        self.thinking_observer = VllmObserver.from_env()
+ 
+     def warmup(self) -> None:
+         self.renderer.warmup(
+@@ -268,6 +271,7 @@
+         # Extract data_parallel_rank from header (router can inject it)
+         data_parallel_rank = self._get_data_parallel_rank(raw_request)
+ 
++        observation_context = None
+         # Schedule the request and get the result generator.
+         max_model_len = self.model_config.max_model_len
+         generators: list[AsyncGenerator[RequestOutput, None]] = []
+@@ -316,6 +320,12 @@
+             )
+ 
+             if isinstance(sampling_params, BeamSearchParams):
++                if (self.thinking_observer.enabled
++                        and request.enable_thinking_observer):
++                    logger.warning(
++                        "THINKING_OBSERVER_FALLBACK request_id=%s reason=beam_search",
++                        sub_request_id,
++                    )
+                 generator = self.beam_search(
+                     prompt=engine_input,
+                     request_id=sub_request_id,
+@@ -338,10 +348,7 @@
+                 else:
+                     reasoning_ended = None
+ 
+-                generator = self.engine_client.generate(
+-                    engine_input,
+-                    sampling_params,
+-                    sub_request_id,
++                engine_kwargs = dict(
+                     lora_request=lora_request,
+                     trace_headers=trace_headers,
+                     priority=request.priority,
+@@ -349,10 +356,32 @@
+                     reasoning_ended=reasoning_ended,
+                     reasoning_parser_kwargs={
+                         "chat_template_kwargs": chat_template_kwargs,
+-                    }
+-                    if reasoning_parser
+-                    else None,
+-                )
++                    } if reasoning_parser else None,
++                )
++                if (self.thinking_observer.enabled
++                        and request.enable_thinking_observer):
++                    response_parser = (
++                        self.parser_cls(tokenizer, request.tools,
++                                        chat_template_kwargs=chat_template_kwargs)
++                        if self.parser_cls is not None else None
++                    )
++                    observation_context = self.thinking_observer.prepare(
++                        request=request, prompt=engine_input, params=sampling_params,
++                        engine=self.engine_client, reasoning_ended=reasoning_ended,
++                        tokenizer=tokenizer, reasoning_parser=reasoning_parser,
++                        response_parser=response_parser, request_id=sub_request_id,
++                        model=model_name, max_model_len=max_model_len,
++                        data_parallel_rank=data_parallel_rank,
++                    )
++                if observation_context is not None:
++                    generator = self.thinking_observer.generate(
++                        self.engine_client, engine_input, sampling_params,
++                        observation_context, engine_kwargs, stream=request.stream,
++                    )
++                else:
++                    generator = self.engine_client.generate(
++                        engine_input, sampling_params, sub_request_id, **engine_kwargs,
++                    )
+ 
+             generators.append(generator)
+ 
+@@ -368,7 +397,7 @@
+             )
+ 
+         if request.stream:
+-            return self.chat_completion_stream_generator(
++            response = self.chat_completion_stream_generator(
+                 request,
+                 result_generator,
+                 request_id,
+@@ -380,16 +409,24 @@
+                 chat_template_kwargs=chat_template_kwargs,
+             )
+ 
+-        return await self.chat_completion_full_generator(
+-            request,
+-            result_generator,
+-            request_id,
+-            model_name,
+-            conversation,
+-            tokenizer,
+-            request_metadata,
+-            parser,
+-        )
++            if observation_context is not None:
++                return close_with_response(response, result_generator)
++            return response
++
++        try:
++            return await self.chat_completion_full_generator(
++                request,
++                result_generator,
++                request_id,
++                model_name,
++                conversation,
++                tokenizer,
++                request_metadata,
++                parser,
++            )
++        finally:
++            if observation_context is not None:
++                await result_generator.aclose()
+ 
+     def get_chat_request_role(self, request: ChatCompletionRequest) -> str:
+         if request.add_generation_prompt:
