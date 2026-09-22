@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
+from itertools import islice
 from typing import Any, Dict, Iterable
 
 from dtb.config.loader import load_dtb_service_config
@@ -26,27 +28,48 @@ _CJK_RE = re.compile(r"[\u3400-\u9fff]")
 _TEMPLATE_MATCH_SCORE = 100.0
 
 
-def _matches(text: str, keyword: str) -> bool:
-    """Match Chinese by phrase and ASCII by token/phrase boundaries."""
-    keyword = str(keyword).strip()
+@lru_cache(maxsize=2048)
+def _compile_keyword(keyword: str) -> str | re.Pattern[str]:
+    """Cache only immutable keyword rules, never request text or route results.
+
+    Chinese/symbol phrases use casefolded substring matching. Other phrases
+    retain Python regex IGNORECASE and Unicode word-boundary semantics.
+    """
     if not keyword:
-        return False
+        return ""
     if _CJK_RE.search(keyword) or not any(char.isalnum() for char in keyword):
-        return keyword.casefold() in text.casefold()
+        return keyword.casefold()
     parts = [re.escape(part) for part in keyword.split()]
     phrase = r"\s+".join(parts)
     if keyword[0].isalnum():
         phrase = r"(?<![\w])" + phrase
     if keyword[-1].isalnum():
         phrase += r"(?![\w])"
-    return re.search(phrase, text, flags=re.IGNORECASE) is not None
+    return re.compile(phrase, flags=re.IGNORECASE)
+
+
+def _matches(
+    text: str, keyword: str, *, folded_text: str | None = None,
+) -> bool:
+    """Match with the original phrase rules and an optional request-local fold."""
+    matcher = _compile_keyword(str(keyword).strip())
+    if isinstance(matcher, str):
+        return bool(matcher) and matcher in (
+            text.casefold() if folded_text is None else folded_text
+        )
+    return matcher.search(text) is not None
 
 
 def _matched_keywords(
     text: str,
     keywords: Iterable[str],
+    *,
+    folded_text: str | None = None,
 ) -> list[str]:
-    return [str(keyword) for keyword in keywords if _matches(text, keyword)]
+    return [
+        str(keyword) for keyword in keywords
+        if _matches(text, keyword, folded_text=folded_text)
+    ]
 
 
 def _structural_scores(text: str) -> Dict[str, list[tuple[str, float]]]:
@@ -55,20 +78,21 @@ def _structural_scores(text: str) -> Dict[str, list[tuple[str, float]]]:
     def add(scene: str, evidence: str, score: float) -> None:
         scores.setdefault(scene, []).append((evidence, score))
 
-    code_blocks = _CODE_BLOCK_RE.findall(text)
-    if code_blocks:
+    if _CODE_BLOCK_RE.search(text):
         add("code_generation", "structure:code_block", 4.0)
     if _CODE_SIGNATURE_RE.search(text):
         add("code_generation", "structure:code_signature", 3.0)
     if _LATEX_RE.search(text):
         add("math_reasoning", "structure:latex", 3.0)
-    step_count = len(_MULTI_STEP_RE.findall(text))
+    # Scores saturate at three steps / two count fields. Do not allocate every
+    # match from a long prompt after the score is already determined.
+    step_count = sum(1 for _ in islice(_MULTI_STEP_RE.finditer(text), 3))
     if step_count:
         add("planning", "structure:numbered_steps", min(2.0 * step_count, 6.0))
     choice_labels = set(_CHOICE_LINE_RE.findall(text))
     if len(choice_labels) >= 3:
         add("classification", "structure:choice_list", 3.0)
-    if len(_COUNT_FIELD_RE.findall(text)) >= 2:
+    if sum(1 for _ in islice(_COUNT_FIELD_RE.finditer(text), 2)) >= 2:
         add("statistics_aggregation", "structure:count_fields", 3.0)
     if _SQL_RE.search(text):
         add("tool_call", "structure:sql_statement", 3.0)
@@ -90,6 +114,7 @@ def classify_scene(
     priority_rank = {
         scene: index for index, scene in enumerate(priority)}
     structural = _structural_scores(question)
+    folded_question = question.casefold()
     scores: Dict[str, float] = {}
     strong_matches: Dict[str, list[str]] = {}
     weak_matches: Dict[str, list[str]] = {}
@@ -105,17 +130,19 @@ def classify_scene(
         required_any = [
             str(keyword) for keyword in indicators.get("required_any", [])
         ]
-        matched_required_all = _matched_keywords(question, required_all)
-        matched_required_any = _matched_keywords(question, required_any)
+        matched_required_all = _matched_keywords(
+            question, required_all, folded_text=folded_question)
+        matched_required_any = _matched_keywords(
+            question, required_any, folded_text=folded_question)
         has_required_gate = bool(required_all or required_any)
         required_gate_matched = (
             len(matched_required_all) == len(required_all)
             and (not required_any or bool(matched_required_any))
         )
         strong = _matched_keywords(
-            question, indicators.get("strong", []))
+            question, indicators.get("strong", []), folded_text=folded_question)
         weak = _matched_keywords(
-            question, indicators.get("weak", []))
+            question, indicators.get("weak", []), folded_text=folded_question)
         contributions = structural.get(scene, [])
         if has_required_gate and not required_gate_matched:
             score = 0.0

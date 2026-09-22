@@ -3,18 +3,45 @@
 DTB（Dynamic Think-Budget Control）在 vLLM Chat Completion serving 内控制可见思考长度，
 同时保持原生 reasoning/tool parser 面向的文本、token ID、结构边界、terminal 和多轮语义。
 
+修改代码先读[模块导航与所有权约束](AGENTS.md)；设计的已实现/候选/历史状态见
+[设计索引](../docs/design/README.md)。本地交付检查：`python tools/dtb/check_static.py`。
+
 ## 结构
 
 - `request_controller.py`：外部请求生命周期门面；不包含预算算法或 parser 实现。
 - `config/`：从 `budget_config.yaml` 启动时加载一次并 fail-fast 校验；YAML 是部署参数唯一来源。
 - `budgeting/`：scene 路由与 fixed/scene/difficulty/history 预算解析，输出 `DtbBudgetDecision`。
-- `reasoning/`：`DtbRequestState`、三状态机、child generate 行为和 parser boundary 契约。
+- `reasoning/`：原生 observation、thinking/probe/final 三状态、请求账本和 parser boundary 契约。
 - `history/`：默认关闭的在线历史策略与持久化。
 - `observability/`：默认关闭的 phase telemetry 和定向 stream audit。
 - `integration/vllm/`：原生请求输入与 stream/non-stream response parser 适配。
 
-难度估计是原始设计的一部分，完整保存在 `budgeting/difficulty/`，生产默认关闭。本轮结构重构
-没有删除或改写其裁决语义；后续单独做集成一致性检视。
+难度估计保存在 `budgeting/difficulty/`，生产默认关闭。其算法与当前静态优化独立，
+是否适用于某次部署需通过对应场景验证。
+
+## 请求执行入口
+
+流式请求先走 `_DeferredInterventionState`：用原生参数启动同一个 child 并观察；
+满足既有协议、介入阈值和容量条件后才裁决完整预算、abort/drain 并接管。
+阈值内自然结束或不具备安全接管能力时，同一个 child 继续完成。非流式请求直接进入
+thinking/probe/final 路径。两者都交回 vLLM 原生 parser。
+
+```mermaid
+flowchart LR
+    A[原生 serving 入口] --> B{启用 DTB}
+    B -->|否| N[原生单次生成]
+    B -->|是| C{流式}
+    C -->|是| O[原生 observation]
+    O -->|自然结束或无法安全接管| P[原生 parser]
+    O -->|满足介入条件并完成交接| S[thinking / probe / final]
+    C -->|否| S
+    S --> P
+    N --> P
+```
+
+当前分类文本由 `visible_user_text()` 选择最近的非空 user 消息，必要时回退到 serving 的
+完整 prompt。System 身份路由和逐场景 native action 仍是独立设计，不能向 YAML 添加
+未实现字段。Qwen 流式协议需要绑定并验证 parser；GLM 适配状态见设计索引。
 
 ## 配置生命周期
 

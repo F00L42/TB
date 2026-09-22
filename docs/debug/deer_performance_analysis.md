@@ -765,3 +765,4 @@ threshold/budget 实验分开。
 | 2026-07-21 | 纳入 run_00 请求级 phase、环境和客户端明细；确认 probe decode 主导、APC 增长前缀未命中、最后一轮死 probe 与 classification 误路由；补齐 manifest/RESULT | 用 158 个 engine call 的实测账本替代历史聚合假设，并明确下一轮的首改与采集缺口 |
 | 2026-07-21 | 纳入 v0.23.0 最新 DTB 汇总；落地 phase ledger、浅拷贝/日志优化、v0.23.0 调用上下文透传、manifest 模板与日志提取工具 | 先获得隐藏 probe 与 child phase 的请求级证据，再对 2000–4000 token probe 做质量约束消融 |
 | 2026-07-20 | 重写性能分析；建立完整成本模型、优化优先级和服务器 runbook | 校正早期文档对 scheduler slot、KV cache 和 MTP 因果的过度推断，并纳入新日志证据 |
+| 2026-09-22 | 基于 f342e127 在 codex/dtb-static-refactor 完成路由规则缓存/局部 casefold、非流式文本一次合并、final 私有方法提取和文档导航；472 tests 与 1966 subtests 通过，633 条完整路由字典与基线一致 | [静态优化设计](../design/dtb_static_cpu_refactor.md)与[本地 CPU 证据](../log/perf/static_cpu_20260922/RESULT.md)可复算；算法、配置、patch 不变，真实并发 E2E/质量/内存仍为 pending_remote |

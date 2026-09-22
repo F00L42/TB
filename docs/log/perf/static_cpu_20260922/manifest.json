@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "experiment_role": "local_cpu_microbenchmark_and_static_equivalence",
+  "date": "2026-09-22",
+  "baseline_commit": "f342e1276a0d8b9c8b2c02f57917b19be936b799",
+  "candidate_branch": "codex/dtb-static-refactor",
+  "candidate_identity": "source_sha256: benchmark ran before commit; candidate_head in microbenchmark.json is the base HEAD, not a claim of clean candidate code",
+  "source_sha256": {
+    "dtb/budgeting/scene_router.py": "3b7dd9c13dfd03b828051536fa6530899e61b5f21c73016a663f1d33bc80c328",
+    "dtb/integration/vllm/response_adapter.py": "e8055948d28a663181e370b57427e8057b21f669c2b4b03c401f2420d370e29d",
+    "dtb/reasoning/generation_states.py": "ac53373f43c7611a845ad761c8c733bbdbca3c58f626da1d020fa07691d11520"
+  },
+  "unchanged_contract_sha256": {
+    "dtb/config/budget_config.yaml": "f4c8a659c3d8ecd52893c2bb0f462ec30d7909b35bfb43e0c17bd44afa8cfb7a",
+    "dtb/config/budget_config_quant.yaml": "5dc64a4be8305f24adcb1afef1da3a6cc1c97c763494e3ff39583efb9c36430f",
+    "dtb/config/schema.py": "7db0135df11aa9a665b1fd48a3cdc16f633560c6d1859aaffe09c99e89ecfdfd",
+    "patches/vllm/v0.23.0/dtb_serving.patch": "a9937680675edca33f87b02ad853b23255dcd51b354ca185134faadb8cd9d5d7",
+    "patches/vllm/v0.23.0/qwen3_coder_parser.patch": "2725c882a5557c1159f431c53e2aede14084f536ddc8cf7d8bb436f4c0680460",
+    "patches/vllm/v0.23.0/qwen3_reasoning_parser.patch": "10cd54c78d24807c57ba6a3ac4ac974230adaa9e2a617b0667d723300a35c6ec"
+  },
+  "model": null,
+  "inference_device": null,
+  "server_validation": "pending_remote",
+  "observability": {
+    "mode": "not_applicable",
+    "phase_ledger": false
+  },
+  "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "dependencies": {
+    "pytest": "9.1.1",
+    "PyYAML": "6.0.3",
+    "httpx": "0.28.1",
+    "uvicorn": "0.53.0",
+    "numpy": "2.5.2",
+    "Pillow": "12.3.0",
+    "tzdata": "2026.4"
+  },
+  "upstream": {
+    "vllm": "0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665",
+    "vllm_ascend": "f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db"
+  },
+  "validation": {
+    "full_tests_passed": 472,
+    "subtests_passed": 1966,
+    "final_characterization_before_and_after": 41,
+    "static_cpu_tests": 16,
+    "complete_route_dicts_equal": 633,
+    "protected_files_unchanged": 13,
+    "non_final_state_ast_unchanged": true,
+    "maintained_navigation_links_checked": 45,
+    "delivery_links_checked": 50
+  },
+  "commands": [
+    "python tools/dtb/check_static.py",
+    "python -X utf8 tools/dtb/static_cpu_benchmark.py --replay --output .pytest_cache/static-cpu-final.json"
+  ],
+  "microbenchmark_sha256": "dabe3a712563da9bee814fd164631532c17a17cb617bfa3a7ab6b4ee8443674e",
+  "source_hash_encoding": "SHA-256 of raw file bytes, including line endings"
+}

@@ -1,8 +1,14 @@
 # FinalAnswerState 等价重构建议
 
+> 状态更新（2026-09-22）：`codex/dtb-static-refactor` 已按本设计完成局部方法提取，
+> 基于 f342e127 原实现先运行 41 项新增行为测试，再验证重构结果。
+> 当前方法为 `_prepare_boundary`、`_resolve_limits`、`_consume_stream`；phase 写出保留在
+> `handle`，真实 generate 参数也在主流程可见。下文为原始设计及历史验证记录，示意接口名
+> 不作为当前 API。完整交付证据见[静态优化记录](dtb_static_cpu_refactor.md)。
+
 ## 1. 设计目的与范围
 
-基线：2026-09-10，仓库 HEAD `326aff3ab0a9803a9324b1eac274a695ffebc959`。评审对象为 `dtb/reasoning/generation_states.py::_FinalAnswerState.handle`，当前约 180 行。本文件是重构建议，尚未修改实现。
+设计基线：2026-09-10，仓库 HEAD `326aff3ab0a9803a9324b1eac274a695ffebc959`。评审对象为 `dtb/reasoning/generation_states.py::_FinalAnswerState.handle`，当时约 180 行。设计起草时尚未修改实现；当前状态见页首。
 
 目标是使维护者能够直接看懂 final 的输入构造、额度和结束语义，降低后续修改 cue/parser 时误改协议的风险；不是减少模型调用，也不以本轮重构修复 close 实验故障。
 
@@ -158,4 +164,5 @@ def _record_final_phase(context, *, limits, output, generated_tokens,
 
 | 日期 | 变更内容 | 原因 |
 | --- | --- | --- |
+| 2026-09-22 | 在 codex/dtb-static-refactor 完成三个私有方法提取，phase 写出留在 handle；41 项新增行为测试先在原实现通过，完整本地门禁通过 | 保持原算法与请求生命周期；详见静态优化交付记录 |
 | 2026-09-10 | 基于 326aff3 提出 final handle 等价重构，识别延迟边界和 terminal 约束，确认 141 项现状测试通过 | 降低职责交叉和修改风险，不改变 cue/停止/额度/流协议 |

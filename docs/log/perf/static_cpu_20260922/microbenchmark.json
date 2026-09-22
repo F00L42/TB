@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "evidence": "local_synthetic_cpu_only",
+  "limitations": "No vLLM/model/NPU, HTTP, inference queue, quality or E2E measurement. Async batches contain prequeued independent responses; they do not model engine scheduling.",
+  "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "baseline_commit": "f342e1276a0d8b9c8b2c02f57917b19be936b799",
+  "candidate_head": "f342e1276a0d8b9c8b2c02f57917b19be936b799",
+  "candidate_dirty": true,
+  "baseline_source_sha256": {
+    "dtb/budgeting/scene_router.py": "4ba557e57408fcd0c047cce79ad9e1b26706190e152a3d01fd2371c4fea18927",
+    "dtb/integration/vllm/response_adapter.py": "5334b92f3fef3356a38f95c0975efb78856a6f63b5e92f9bf80c3dae3fe2ab1f"
+  },
+  "candidate_source_sha256": {
+    "dtb/budgeting/scene_router.py": "3b7dd9c13dfd03b828051536fa6530899e61b5f21c73016a663f1d33bc80c328",
+    "dtb/integration/vllm/response_adapter.py": "e8055948d28a663181e370b57427e8057b21f669c2b4b03c401f2420d370e29d"
+  },
+  "config_sha256": "f4c8a659c3d8ecd52893c2bb0f462ec30d7909b35bfb43e0c17bd44afa8cfb7a",
+  "repeats": 5,
+  "iterations": 5,
+  "routing": [
+    {
+      "characters": 1000,
+      "samples": {
+        "baseline_us": [
+          2891.68,
+          2760.06,
+          3084.78,
+          2604.56,
+          2563.04
+        ],
+        "candidate_us": [
+          2033.88,
+          1780.86,
+          1883.74,
+          1778.32,
+          2085.62
+        ]
+      },
+      "baseline_median_us": 2760.06,
+      "candidate_median_us": 1883.74,
+      "ratio_candidate_to_baseline": 0.6824996558045839
+    },
+    {
+      "characters": 16000,
+      "samples": {
+        "baseline_us": [
+          37577.58,
+          36755.58,
+          37195.22,
+          36782.36,
+          36615.66
+        ],
+        "candidate_us": [
+          27941.66,
+          27591.24,
+          27174.72,
+          27244.26,
+          27193.18
+        ]
+      },
+      "baseline_median_us": 36782.36,
+      "candidate_median_us": 27244.26,
+      "ratio_candidate_to_baseline": 0.7406881994521286
+    },
+    {
+      "characters": 64000,
+      "samples": {
+        "baseline_us": [
+          155806.02,
+          178933.26,
+          152961.12,
+          151718.16,
+          152559.9
+        ],
+        "candidate_us": [
+          109070.74,
+          109803.38,
+          117463.58,
+          108683.5,
+          108516.9
+        ]
+      },
+      "baseline_median_us": 152961.12,
+      "candidate_median_us": 109070.74,
+      "ratio_candidate_to_baseline": 0.713061855195621
+    }
+  ],
+  "aggregation": [
+    {
+      "requests": 1,
+      "chunks_per_request": 128,
+      "timing_includes_fixture_setup_and_assertions": true,
+      "samples": {
+        "baseline_us": [
+          1113.84,
+          889.2,
+          5965.18,
+          948.56,
+          5800.48
+        ],
+        "candidate_us": [
+          717.24,
+          706.44,
+          685.76,
+          4833.68,
+          5989.38
+        ]
+      },
+      "baseline_median_us": 1113.84,
+      "candidate_median_us": 717.24,
+      "ratio_candidate_to_baseline": 0.6439344968756734
+    },
+    {
+      "requests": 1,
+      "chunks_per_request": 2048,
+      "timing_includes_fixture_setup_and_assertions": true,
+      "samples": {
+        "baseline_us": [
+          10329.62,
+          15280.92,
+          10934.1,
+          11564.38,
+          10525.52
+        ],
+        "candidate_us": [
+          4192.58,
+          4291.54,
+          4302.72,
+          4358.98,
+          4465.32
+        ]
+      },
+      "baseline_median_us": 10934.1,
+      "candidate_median_us": 4302.72,
+      "ratio_candidate_to_baseline": 0.3935138694542761
+    },
+    {
+      "requests": 32,
+      "chunks_per_request": 128,
+      "timing_includes_fixture_setup_and_assertions": true,
+      "samples": {
+        "baseline_us": [
+          12736.82,
+          12706.76,
+          8699.76,
+          10089.34,
+          9214.9
+        ],
+        "candidate_us": [
+          7083.72,
+          7020.78,
+          7216.12,
+          7899.1,
+          7307.76
+        ]
+      },
+      "baseline_median_us": 10089.34,
+      "candidate_median_us": 7216.12,
+      "ratio_candidate_to_baseline": 0.7152222048221192
+    },
+    {
+      "requests": 32,
+      "chunks_per_request": 2048,
+      "timing_includes_fixture_setup_and_assertions": true,
+      "samples": {
+        "baseline_us": [
+          320505.22,
+          317614.1,
+          312544.76,
+          327581.98,
+          316110.32
+        ],
+        "candidate_us": [
+          121265.5,
+          123186.3,
+          123564.36,
+          120612.28,
+          120486.94
+        ]
+      },
+      "baseline_median_us": 317614.1,
+      "candidate_median_us": 121265.5,
+      "ratio_candidate_to_baseline": 0.381801374687081
+    }
+  ],
+  "route_equivalence": {
+    "equal_full_route_dicts": 633,
+    "input_sha256": {
+      "dtb_2026-02-11_ReAct白盒-单步规划_2026-08-07_09-38-12.csv": "414bd1dae1918e6d5e5f6ad42dba2184d40e012f03b7479604615421c5a96b0c",
+      "dtb_2026-02-11_ReAct白盒-整体规划_2026-08-07_10-49-29.csv": "4d83d9ae94983eecd6b33b5e631168ff2038c2aeaa2f445c194b5402bafc5383",
+      "dtb_2026-02-11_ReAct白盒-机器数据分析29题_2026-08-07_11-08-12.csv": "ab12e95d17c2f1a92fc210a47df68257ab357299f83ddcada2071eb92c477771",
+      "dtb_KPI配置保障专家-单网元用例_2026-08-07_11-32-51.csv": "4461d864c200e57d64289cf42c8f1822d7c33e5f2e907499a34888f6a3c824c1",
+      "dtb_NetQAD_中文测评集v4.0_复杂任务规划_云核E2E_单步规划_80条_2026-08-07_11-38-32.csv": "d86b9777bf23be067ebd3ed5efd615e1fd2e7dec31f5e8a85210dbf2c758b45b",
+      "dtb_NetQAD_中文测评集v4.0_复杂任务规划_云核E2E_规划模块_101条_2026-08-07_12-30-33.csv": "68732f5e918d0b70ba637fca527a990578426d4e835fe1b2631e7bb9d5dabc21",
+      "dtb_事件自闭环_25题_0514_2026-08-07_14-52-43.csv": "fa1feba3059205ad04b610ca58b657b2a7c972f2ff71a89b835cd2ba23940a3e",
+      "dtb_告警诊断_recipe_ReAct方案诊断_建议总结_11条_0508_2026-08-07_15-13-14.csv": "abd13f9c79d2401d14841d46d4e0bef3a0e0cb0278ffafbbb26c05e2ec5d9b49",
+      "dtb_告警诊断_recipe_ReAct方案诊断_结论总结_13条_2026-08-07_15-25-47.csv": "31dfd0ac2a10f12ecde512207da3914ef0a161f55aacf4333865231fbd4e7c18",
+      "dtb_复杂逻辑推理_性能告警_长文本根因推理_下沉47_2026-08-07_15-42-14.csv": "bd643e272cfc1b0b88bb2868837ebc4c46943a95d773dce658d2cc6f6c04cd7c",
+      "dtb_投诉专家-提参_电信工具调用_React_投诉助理_39题_zh_0403_慢思考模式_2026-08-07_18-39-38.csv": "07c2483d5174260dfe7bc279034215ab0f1d33c87541de9b42f4733a962815a0",
+      "dtb_投诉专家_分类_164题_zh_0203_2026-08-07_16-54-02.csv": "090b255c63411cbb5c4f9dd038e87ec3ff47f8537eb996b2f712e582e220c90f",
+      "dtb_投诉专家_分类_20题_en_0203_慢思考模式_2026-08-07_16-37-13.csv": "8f406b84dd76a60be94688fcf1d8938af0ccd28720dbdd911fb5ed90ec42f97f"
+    }
+  }
+}

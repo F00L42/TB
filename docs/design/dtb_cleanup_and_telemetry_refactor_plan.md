@@ -1,5 +1,10 @@
 # DTB 代码清理与 Telemetry 重构计划
 
+> 阅读状态（2026-09-22）：本文保留 2026-08-20 重构设计与实施记录，旧模块名、测试数量、
+> “当前 SHA”均属于当时快照。现有实现导航见 [DTB README](../../dtb/README.md)，
+> 三份部署 patch 的操作说明见[版本化目录](../../patches/vllm/v0.23.0/README.md)；
+> 部署时从实际文件重新计算 SHA，不复制本文历史 hash。
+
 ## 1. 设计目的
 
 本计划面向 Dynamic Think-Budget Control（下文统一简称 **DTB**）的生产实现，解决当前

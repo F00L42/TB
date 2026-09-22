@@ -1,0 +1,29 @@
++ git rev-parse HEAD:third_party/vllm
++ git -C third_party/vllm rev-parse HEAD
++ git -C third_party/vllm status --porcelain
++ git rev-parse HEAD:third_party/vllm-ascend
++ git -C third_party/vllm-ascend rev-parse HEAD
++ git -C third_party/vllm-ascend status --porcelain
++ git diff --check
+warning: in the working copy of 'dtb/budgeting/scene_router.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'dtb/integration/vllm/response_adapter.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'dtb/reasoning/generation_states.py', LF will be replaced by CRLF the next time Git touches it
++ C:\Users\F-O-O\AppData\Local\Python\pythoncore-3.14-64\python.exe -m compileall -q dtb tools/dtb tests
++ git -C third_party/vllm apply --check C:\Users\F-O-O\.codex\worktrees\dtb-static-refactor\TB\patches\vllm\v0.23.0\dtb_serving.patch
++ git -C third_party/vllm apply --check C:\Users\F-O-O\.codex\worktrees\dtb-static-refactor\TB\patches\vllm\v0.23.0\qwen3_coder_parser.patch
++ git -C third_party/vllm apply --check C:\Users\F-O-O\.codex\worktrees\dtb-static-refactor\TB\patches\vllm\v0.23.0\qwen3_reasoning_parser.patch
++ C:\Users\F-O-O\AppData\Local\Python\pythoncore-3.14-64\python.exe -X utf8 -m pytest -q tests --basetemp=C:\Users\F-O-O\.codex\worktrees\dtb-static-refactor\TB\.pytest_cache\dtb-check-576396b3095e45f5ac09431fcb03bc4c --tb=short
+........................................................................ [ 15%]
+.............................................................. [ 28%]
+........................................................................ [ 43%]
+............................................................ [ 56%]
+........................................................................ [ 71%]
+........................................................................ [ 86%]
+..............................................................           [100%]
+472 passed, 1966 subtests passed in 36.10s
+PASS: local static/no-model gate. Target-server validation is pending_remote.
+
+Post-documentation checks (no production source changes):
+PASS: 45 maintained local navigation targets; 50 targets including delivery documents.
+PASS: 13 protected files equal baseline after newline normalization; non-final state AST unchanged; route ranking/rejection tail unchanged.
+PASS: candidate source SHA-256 matches manifest; validation/benchmark scripts compile.

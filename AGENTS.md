@@ -34,6 +34,10 @@
 
 ## 推荐阅读顺序
 
+首次进入仓库先读 `README.md` 的任务导航；修改生产包时继续读 `dtb/AGENTS.md`。
+设计的已实现/候选/历史状态见 `docs/design/README.md`。本地交付检查统一入口为
+`python tools/dtb/check_static.py`；不以本地 PASS 宣称服务器验收完成。
+
 1. 本文件；分析 DTB 产品实验时继续读
    `docs/design/think_budget_generalization_plan.md`，分析 DEER 内部实现时再读
    `deer/AGENTS.md`。

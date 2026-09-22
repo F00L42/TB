@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 from abc import ABC
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from time import perf_counter
 from typing import Any, Optional, Type, TYPE_CHECKING
 
@@ -667,6 +668,16 @@ class _ConfidenceProbeState(_BaseState):
         return _ThinkingState
 
 
+@dataclass(frozen=True)
+class _FinalLimits:
+    """Submission-time values for final sampling and phase telemetry only."""
+
+    emitted_before_final: int
+    pending_boundary_tokens: int
+    external_remaining: int
+    answer_limit: int
+
+
 class _FinalAnswerState(_BaseState):
     """Continue freely after either a model or controller reasoning boundary."""
 
@@ -682,6 +693,73 @@ class _FinalAnswerState(_BaseState):
         if reason is None:
             raise RuntimeError(
                 "FinalAnswerState requires an explicit final_answer_reason")
+        await _FinalAnswerState._prepare_boundary(context, reason)
+        limits = _FinalAnswerState._resolve_limits(context)
+
+        params = context.request.to_sampling_params(
+            limits.answer_limit, context.default_sampling_params)
+        output_kind = _output_kind_name(
+            getattr(params, "output_kind", None))
+        prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
+        child_request_id = _BaseState.next_engine_request_id(
+            context, "final_answer")
+        child_prompt = context.engine_input()
+        engine_kwargs = context.engine_request_kwargs(
+            child_prompt, reasoning_ended=True)
+        controller_cpu_ms = (
+            (perf_counter() - controller_started) * 1000
+            if recorder is not None else 0.0
+        )
+        context.record_first_engine_submission()
+        consumed = await _FinalAnswerState._consume_stream(
+            context,
+            context.engine_client.generate(
+                child_prompt, params, child_request_id, **engine_kwargs,
+            ),
+            output_kind=output_kind,
+            child_request_id=child_request_id,
+        )
+        if consumed is None:
+            state.completion_status = "error"
+            return None
+        terminal_output, generated_tokens = consumed
+
+        await context.stream_final_terminal(
+            terminal_output,
+            phase="final_answer",
+            child_request_id=child_request_id,
+        )
+
+        state.final_answer_tokens += generated_tokens
+        state.completion_status = "success"
+        if recorder is not None:
+            wall_ms = (perf_counter() - phase_started) * 1000
+            recorder.record_phase(
+                parent_request_id=context.request_id,
+                child_request_id=child_request_id,
+                phase="final_answer",
+                round_id=state.probe_round,
+                wall_ms=wall_ms,
+                controller_cpu_ms=controller_cpu_ms,
+                prompt_tokens=prompt_tokens,
+                generated_tokens=generated_tokens,
+                visible=True,
+                output=terminal_output,
+                final_answer_reason=reason.value,
+                completion_token_limit=state.completion_token_limit,
+                emitted_completion_tokens_before=limits.emitted_before_final,
+                pending_boundary_tokens=limits.pending_boundary_tokens,
+                external_remaining_tokens=limits.external_remaining,
+                answer_limit=limits.answer_limit,
+            )
+        return None
+
+    @staticmethod
+    async def _prepare_boundary(
+        context: DtbRequestContext, reason: FinalAnswerReason,
+    ) -> None:
+        """Close the prompt; a parser boundary may still await an output template."""
+        state = context.request_state
         prompt_suffix = controller_final_suffix(reason)
         if state.reasoning_state is ReasoningState.OPEN:
             if prompt_suffix is None:
@@ -704,6 +782,10 @@ class _FinalAnswerState(_BaseState):
             raise RuntimeError(
                 "closed reasoning has no parser-visible boundary")
 
+    @staticmethod
+    def _resolve_limits(context: DtbRequestContext) -> _FinalLimits:
+        """Freeze native completion/context room before the final child starts."""
+        state = context.request_state
         remaining_context = _BaseState.remaining_context(context)
         emitted_before_final = state.emitted_completion_tokens
         pending_boundary_tokens = (
@@ -730,32 +812,30 @@ class _FinalAnswerState(_BaseState):
                 "no context or completion token budget remains for the "
                 "final answer")
 
-        params = context.request.to_sampling_params(
-            answer_limit, context.default_sampling_params)
-        output_kind = _output_kind_name(
-            getattr(params, "output_kind", None))
-        prompt_tokens = len(context.engine_prompt["prompt_token_ids"])
-        child_request_id = _BaseState.next_engine_request_id(
-            context, "final_answer")
-        child_prompt = context.engine_input()
-        engine_kwargs = context.engine_request_kwargs(
-            child_prompt, reasoning_ended=True)
-        controller_cpu_ms = (
-            (perf_counter() - controller_started) * 1000
-            if recorder is not None else 0.0
+        return _FinalLimits(
+            emitted_before_final, pending_boundary_tokens,
+            external_remaining, answer_limit,
         )
+
+    @staticmethod
+    async def _consume_stream(
+        context: DtbRequestContext,
+        generator: AsyncGenerator[RequestOutput, None],
+        *,
+        output_kind: str,
+        child_request_id: str,
+    ) -> tuple[RequestOutput, int] | None:
+        """Forward deltas; hold a normal terminal until EOF validates the tail.
+
+        None means an error terminal was already forwarded. Exceptions and
+        cancellation propagate to the existing state-machine owner.
+        """
+        state = context.request_state
         generated_tokens = 0
         last_output = None
         terminal_output = None
-        propagated_error = False
 
-        context.record_first_engine_submission()
-        async for result in context.engine_client.generate(
-            child_prompt,
-            params,
-            child_request_id,
-            **engine_kwargs,
-        ):
+        async for result in generator:
             if not context.reasoning_boundary_emitted:
                 # A hard limit can enter FinalAnswer before any visible
                 # thought chunk exists.  Use the first final output only as
@@ -795,45 +875,13 @@ class _FinalAnswerState(_BaseState):
                     next_state="error",
                     reasoning_boundary=state.reasoning_boundary,
                 )
-                propagated_error = True
-                break
+                return None
             terminal_output = result
         if last_output is None:
             raise RuntimeError(
                 "final_answer completed without a vLLM output")
-        if propagated_error:
-            state.completion_status = "error"
-            return None
         if terminal_output is None:
             raise RuntimeError(
                 "final_answer completed without a terminal output")
 
-        await context.stream_final_terminal(
-            terminal_output,
-            phase="final_answer",
-            child_request_id=child_request_id,
-        )
-
-        state.final_answer_tokens += generated_tokens
-        state.completion_status = "success"
-        if recorder is not None:
-            wall_ms = (perf_counter() - phase_started) * 1000
-            recorder.record_phase(
-                parent_request_id=context.request_id,
-                child_request_id=child_request_id,
-                phase="final_answer",
-                round_id=state.probe_round,
-                wall_ms=wall_ms,
-                controller_cpu_ms=controller_cpu_ms,
-                prompt_tokens=prompt_tokens,
-                generated_tokens=generated_tokens,
-                visible=True,
-                output=last_output,
-                final_answer_reason=reason.value,
-                completion_token_limit=state.completion_token_limit,
-                emitted_completion_tokens_before=emitted_before_final,
-                pending_boundary_tokens=pending_boundary_tokens,
-                external_remaining_tokens=external_remaining,
-                answer_limit=answer_limit,
-            )
-        return None
+        return terminal_output, generated_tokens

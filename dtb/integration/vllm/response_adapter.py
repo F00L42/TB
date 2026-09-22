@@ -44,23 +44,26 @@ async def stream_queue(
 async def aggregate_queue(
     queue: asyncio.Queue, context: DtbRequestContext
 ) -> AsyncIterator[RequestOutput]:
+    """Join owned deltas once, then yield one result to the native full parser."""
     item = await queue.get()
     if item is None:
         if context.orchestration_error:
             raise RuntimeError("DTB orchestration failed; see server logs")
         yield None
         return
+    text_parts = [item.outputs[0].text]
     while True:
         following = await queue.get()
         if following is None:
             if context.orchestration_error:
                 raise RuntimeError("DTB orchestration failed; see server logs")
             break
-        item.outputs[0].text += following.outputs[0].text
+        text_parts.append(following.outputs[0].text)
         item.outputs[0].token_ids.extend(following.outputs[0].token_ids)
         if following.outputs[0].finish_reason is not None:
             item.outputs[0].finish_reason = following.outputs[0].finish_reason
             item.outputs[0].stop_reason = following.outputs[0].stop_reason
+    item.outputs[0].text = "".join(text_parts)
     if item.outputs[0].finish_reason is None:
         item.outputs[0].finish_reason = "stop"
     item.finished = True
