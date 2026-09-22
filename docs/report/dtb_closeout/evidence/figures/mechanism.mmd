@@ -1,0 +1,21 @@
+flowchart LR
+    A["原生child增量观察"] --> B{"原生reasoning结束？"}
+    B -->|是| C["同child继续原生答案或工具"]
+    B -->|否| D{"达到介入阈值？"}
+    D -->|否| A
+    D -->|是| E["abort并drain，保留已接受前缀"]
+    E --> F{"自然结束抢先？"}
+    F -->|是| C
+    F -->|否| G{"剩余预算允许probe？"}
+    G -->|否：direct750实测路径| H["关闭reasoning并直接final"]
+    G -->|是：概念分支| I["hidden confidence probe"]
+    I --> J{"置信度接受？"}
+    J -->|是| H
+    J -->|否且仍有预算| K["继续思考，下一检查点"]
+    K --> L{"后续预算用尽？"}
+    L -->|是| H
+    L -->|否| I
+
+%% 此图是概念结构，不按比例编码时长。
+%% 399/a2 phase实测：阈值750，触发753，abort=1，drain尾部0，final168，无probe。
+%% probe概念分支没有从此direct750诊断推导性能或准确率。
