@@ -62,13 +62,15 @@ class DtbBudgetResolver:
     def intervention_threshold(
         self, prompt_text: str, config: DtbAlgorithmConfig,
         phase_recorder: DtbPhaseRecorder | None = None,
+        *, scene_info: dict[str, Any] | None = None,
     ) -> InterventionThreshold:
         """No difficulty/history/full decision on the streaming short path."""
         if config.fixed_check_length > 0:
-            return InterventionThreshold(config.fixed_check_length, "fixed_check_length")
+            return InterventionThreshold(config.fixed_check_length, "fixed_check_length", scene_info)
         if config.fixed_budget_tokens > 0 or not config.enable_scene_budget:
-            return InterventionThreshold(config.check_length, "runtime")
-        scene_info = self._match_scene(prompt_text, config, phase_recorder)
+            return InterventionThreshold(config.check_length, "runtime", scene_info)
+        if scene_info is None:
+            scene_info = self._match_scene(prompt_text, config, phase_recorder)
         if scene_info.get("scene_matched"):
             values = self.service_config.scenes.get(str(scene_info["scene"]), {})
             return InterventionThreshold(

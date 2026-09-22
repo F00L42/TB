@@ -30,6 +30,10 @@ class DtbObservabilityRuntime:
         from dtb.observability.phase_recorder import DtbPhaseRecorder
         return DtbPhaseRecorder(self.writer, policy_version)
 
+    def record_route(self, **record) -> None:
+        if self.writer is not None and self.config.mode is DtbTelemetryMode.PHASE:
+            self.writer.publish("DTB_ROUTE", {"schema": 1, **record})
+
     def create_stream_audit(self, request_id: str) -> DtbStreamAudit | None:
         if (
             self.writer is None

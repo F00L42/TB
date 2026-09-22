@@ -36,10 +36,16 @@ sha256sum dtb/config/budget_config_quant.yaml dtb/config/budget_config.yaml
 
 两行应在服务停止后执行；随后重启，并把相同 SHA 写入本轮 `manifest.json`。
 
-量化候选包含 5 个 fixed_v5 和 8 个 fixed_v4 复验点。当前 resolver 不支持由 YAML 声明的
-逐场景原生旁路；因此低收益场景仍是诊断候选，不能通过添加一个未实现的 `native` 字段冒充
-bypass。TP4 对齐实验若确认某场景无净收益或质量不合格，应先实现真正的 serving native
-bypass，再将其纳入发布配置。
+量化候选包含 5 个 fixed_v5 和 8 个 fixed_v4 复验点。现在支持 scene `action: native` 和
+`ROUTING.on_unmatched: native`，在 serving 中直接回原生生成；原有配置省略时保持旧行为。
+更换场景动作仍需同身份协议/质量/性能验收，现有量化候选没有自动改为 native。
+
+Agent 可选择 `ROUTING.mode: system_prefix`，启动编译有界 system/首 user 前缀规则；只看
+原始消息身份，不扫描历史正文。新增 Noemate `budget_config_noemate_750.yaml`（已测参数的
+自动路由候选）与 `budget_config_noemate_native.yaml`（保守全原生），均不替换默认文件。
+有效 fixed_budget_tokens 仍优先，单字段 fixed 覆盖不改变 native 动作。
+接口、离线覆盖率、部署升级/回滚和 pending_remote 验收见
+[Session A 部署手册](../docs/design/dtb_system_routing_deployment.md)。
 
 请求仍可使用既有 fixed override 字段。公网开关 `enable_think_budget` 为外部协议兼容字段，
 内部 Python 包和事件统一使用 DTB 命名。
@@ -50,7 +56,8 @@ bypass，再将其纳入发布配置。
 
 - `off`（默认）：不创建 event writer、phase recorder 或 stream audit。phase/delta 边界只检查
   可选引用，不读取 telemetry 时钟/metrics，不构造事件，不序列化、hash、复制 token 或写队列。
-- `phase`：异步写出 `DTB_PHASE` schema 3 和 `DTB_REQUEST_SUMMARY`。该模式会在请求协程中
+- `phase`：异步写出一次 `DTB_ROUTE` schema 1，以及 DTB 路径的 `DTB_PHASE` schema 3 和
+  `DTB_REQUEST_SUMMARY`；native route 不构造 phase/summary。该模式会在请求协程中
   计时、读取 metrics 并组装低基数 record；写出只做有界队列 `put_nowait`，后台线程负责 JSON
   和 stdout。队列满时丢事件并由后台标准 logger 限频告警，绝不阻塞或修改模型输出。
 - `stream_audit`：不创建 phase recorder，只对 `stream_request_ids` 白名单请求写
@@ -69,6 +76,8 @@ python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>
 ```
 
 提取器读取历史 `TB_PHASE` schema 1/2 与新 `DTB_PHASE` schema 3；生产写端不双写。
+`routes.jsonl` 与 request_index 的 route_* 列区分 native 合法无 phase、DTB 缺账本、重复路由及
+未知缺失。路由事件只表示意图，不能替代客户端完成/质量证据。
 
 ## vLLM patch
 

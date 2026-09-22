@@ -1,0 +1,84 @@
+# Noemate Qwen3.6-27B candidate only; restart required. See docs/design/dtb_system_routing_deployment.md.
+RUNTIME:
+  BUDGET_ENABLED: true
+  check_length: 750
+  min_think_budget: 1
+  think_stride: 256
+  num_thinking: 4
+  confidence_threshold: 0.95
+  percentile_step: 0.75
+  enable_value_min_confidence: false
+  value_min_bottom_k: 5
+  enable_safety_gate: false
+  baseline_time_limit: 90.0
+  enable_scene_budget: true
+  enable_history_budget: false
+  enable_difficulty_estimator: false
+  scene_override: ''
+  scene_match_min_score: 3.0
+  scene_match_min_margin: 1.0
+  difficulty_check_length_base: 400
+  difficulty_check_length_max: 6000
+  difficulty_min_think_base: 100
+  difficulty_min_think_max: 6000
+  difficulty_stride_base: 400
+  difficulty_stride_max: 6000
+  difficulty_num_thinking_base: 10
+  difficulty_num_thinking_max: 20
+  fixed_budget_tokens: 0
+  fixed_num_thinking: 0
+  fixed_think_stride: 0
+  fixed_check_length: 0
+  fixed_prob_th: 0.0
+  fixed_min_think_tokens: 0
+  history_budget_multiplier: 1.2
+  history_stride_percentile: 0.75
+  history_warmup_count: 3
+  history_warmup_strategy: moderate
+  new_task_unlimited: true
+  max_internal_calls: 20
+  max_thinking_tokens: 65536
+REASONING_PROTOCOL:
+  adapter: qwen3
+  think_end_token_id: 248069
+  tool_call_begin_token_id: 248058
+OBSERVABILITY:
+  mode: 'off'
+  queue_capacity: 2048
+  stream_request_ids: []
+HISTORY_STORE:
+  path: ../data/history/inference_history.jsonl
+  max_entries: 5000
+  max_age_days: 7
+  queue_capacity: 1024
+SCENES:
+  noemate_main:
+    action: native
+    match:
+      system_prefix: |-
+        # Agent 身份
+        你是核心网运维 Agent，负责理解用户输入，结合上下文和本轮用户偏好，选择合适的 Skill 处理核心网运维相关问题。
+  noemate_followup:
+    action: native
+    match:
+      system_prefix: 你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。
+      tools_empty: true
+  noemate_compaction:
+    action: native
+    match:
+      system_prefix: You are the conversation-compaction module of a multi-turn telecom network agent runtime.
+      tools_empty: true
+  general:
+    description: Unmatched identity; use ROUTING.on_unmatched.
+SCENE_PRIORITY:
+- noemate_main
+- noemate_followup
+- noemate_compaction
+- general
+DIFFICULTY_TIERS: {}
+HISTORY_NEW_TASK: {}
+HISTORY_WARM_START: {}
+HISTORY_HOT_START: {}
+ROUTING:
+  mode: system_prefix
+  on_unmatched: native

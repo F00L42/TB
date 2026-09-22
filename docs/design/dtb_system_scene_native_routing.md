@@ -1,5 +1,11 @@
 # System 场景规则与显式原生路由设计
 
+**2026-09-22 实现状态：** Session A 已实现本文的 system_prefix、scene.action、拒识动作、
+prepare 快照、serving 原生旁路及 DTB_ROUTE；新增 Noemate 750/全原生候选、离线覆盖审计和本地测试。
+部署与当前接口以 [Session A 交付手册](dtb_system_routing_deployment.md) 为准；目标服务器自动模式
+与 E2E 仍为 pending_remote。下文“当前实现”指 2026-09-11 设计基线，不代表新代码状态；
+Opencode 历史预算草案不自动套用到 Noemate。
+
 ## 1. 设计目的
 
 日期：2026-09-11；设计起点：工作区HEAD `0019df8`。本文细化 [Agent预算初稿](dtb_agent_scene_budget_plan.md)，本轮只写设计，不修改生产源码、patch或部署配置。
@@ -120,7 +126,8 @@ system_prefix首版要求scene预算开启、history/difficulty关闭、scene_ov
 
 ### 4.2 拟议YAML接口（实现后才有效）
 
-以下是接口草案片段，**当前loader不能加载ROUTING/match/action，不是现成部署文件**。完整Agent制品保留预算文档中的RUNTIME、协议、观测等区块。
+以下是最初接口草案片段；2026-09-22 的 loader 已支持这些字段，但片段仍不是完整部署文件。
+完整候选和当前预算选择见 Session A 交付手册，不能把旧 Agent 参数当作 Noemate 实測结果。
 
 ```yaml
 ROUTING:

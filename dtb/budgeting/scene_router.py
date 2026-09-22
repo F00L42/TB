@@ -2,10 +2,52 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import Any, Dict, Iterable
 
 from dtb.config.loader import load_dtb_service_config
 from dtb.config.schema import DtbServiceConfig
+from dtb.config.routing import FIRST_USER_PREFIX_LIMIT
+from dtb.integration.vllm.request_adapter import message_field, system_identity_view
+
+
+@dataclass(frozen=True)
+class DtbRouteDecision:
+    scene: str
+    matched: bool
+    action: str
+    reason: str
+    scene_info: dict[str, Any] | None = None
+
+
+def route_from_scene(info: dict[str, Any], service: DtbServiceConfig) -> DtbRouteDecision:
+    matched = bool(info.get("scene_matched"))
+    scene = str(info.get("scene", "general"))
+    action = (service.scenes[scene].get("action", "dtb") if matched else
+              "native" if service.routing.on_unmatched == "native" else "dtb")
+    return DtbRouteDecision(scene, matched, action,
+                            info.get("reject_reason") or "scene_match", info)
+
+
+def route_system_request(request: Any, service: DtbServiceConfig) -> DtbRouteDecision:
+    view = system_identity_view(getattr(request, "messages", None))
+    reason = view.reject_reason or "unknown_system_prefix"
+    if view.reject_reason is None:
+        for rule in service.scene_rules:
+            if not view.prefix.startswith(rule.system_prefix):
+                continue
+            reason = "first_user_guard"
+            if rule.first_user_prefix is not None:
+                content = message_field(view.first_user, "content")
+                if not isinstance(content, str) or not content[:FIRST_USER_PREFIX_LIMIT].startswith(rule.first_user_prefix):
+                    break
+            reason = "tools_guard"
+            if rule.tools_empty is not None and (not bool(getattr(request, "tools", None))) != rule.tools_empty:
+                break
+            return route_from_scene({"scene": rule.scene, "scene_matched": True,
+                                     "reject_reason": None}, service)
+    return route_from_scene({"scene": "general", "scene_matched": False,
+                             "reject_reason": reason}, service)
 
 
 _CODE_BLOCK_RE = re.compile(r"```[\s\S]*?```", re.MULTILINE)
