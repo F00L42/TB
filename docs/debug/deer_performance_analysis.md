@@ -719,6 +719,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-22 | 审计 [Noemate activation phase](../log/perf/noemate_activation_audit_20260922T031321Z/RESULT.md)：12请求/3256 SSE与grep日志38事件闭合，7次在751–753 token直接budget_final、零probe，5次原生同child完成 | 机制门通过，可切回off做冻结长短集验证；353/a2 final在2048总额度截断，7次abort的model_work_complete=false保留完整算力未知。无同轮Vanilla，不作性能/正确率非劣结论；附off smoke及610请求独立验证脚本，本地仅离线审计 |
 | 2026-09-21 | 审计 [Noemate 4c259c](../log/perf/noemate_direct750_off_20260921T064359Z/RESULT.md)：576 个 off 请求/223419 SSE 事件；筛出长178/259/319/353、短21/321/365/394，验收转为长请求可控与短路径非劣 | 用户确认环境不变、APC on、加载修复、所有日志未开启；direct750 有67/128次可见思考超过750，实际接管未证实；319平均快8.67%但集中单次；同轨迹8对短请求平均差−7.85ms，只是事后敏感性结果。先12请求真实phase，再独立长短验证，不宣称稳定加速或质量不退化 |
 | 2026-09-21 | 审阅 [Noemate 六试点的 12 次 Vanilla 思考](../log/perf/noemate_replay_20260920T012159Z/PILOT_SEMANTIC_REVIEW.md)，逐 token 标注分类完成、日志时间推导和算术纠错 | 750 支持开始试验，非统一语义安全边界；正确均值一次位于 751–758，512 前两次均有错误值。仅离线语义审阅，无新模型生成或正确率结论 |
 | 2026-09-21 | 更新 [Noemate 下一轮命令](../log/perf/noemate_replay_20260920T012159Z/RESULT.md#6-下一轮固定-h750对照有-probe-与直接答案)：8 条 phase + 32 条 off，在 H=750 下比较 probe750/direct750；补充 resolver→remaining budget→流式/非流式 final 的源码链 | 750 用于固定介入值的退出策略对照，非最优阈值结论；822 次 Vanilla 中 45.01% 超过 750，后缀空间 13.14% 仅为静态长度统计。system 匹配交其他任务；未运行服务器实验 |
