@@ -1,0 +1,18 @@
+listen: {host: "127.0.0.1", port: 9000}
+upstream:
+  base_url: "http://127.0.0.1:9001"
+  auth_mode: forward
+  trust_env: false
+capture:
+  output_root: "../artifacts/captures"
+  labels: {agent: unknown, scenario: validation, variant: baseline}
+# Optional absolute path to this server model's local tokenizer; no online download.
+tokenizer: {path: null}
+# Empty means byte-preserving passthrough; configured keys override Chat Completions POST fields.
+append_body: {}
+report:
+  timezone: Asia/Shanghai
+  live_interval_seconds: 0
+trajectories:
+  enabled: true
+  projection_profiles: []

@@ -2,11 +2,11 @@
 
 Exact usage on the model server::
 
-    python tools/construct_fixed_candidate.py docs/log/perf/run_<id> \
+    python tools/construct_fixed_candidate.py artifacts/perf/run_<id> \
       --vanilla-result test_result/vanilla_<scene>_<timestamp>.csv \
       --tokenizer /path/to/model \
       --candidate-label fixed_v1 \
-      --output-dir docs/debug/fixed_param
+      --output-dir artifacts/fixed_candidates
 
 When the exact tokenizer is unavailable, omit ``--tokenizer``.  The fallback
 uses the matching DTB result and its extracted ``requests.jsonl`` to calibrate
@@ -491,7 +491,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("docs/debug/fixed_param"),
+        default=Path("artifacts/fixed_candidates"),
         help=(
             "candidate directory; filename is always derived from the original "
             "test-set name"

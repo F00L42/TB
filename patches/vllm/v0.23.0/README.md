@@ -92,7 +92,7 @@ methods plus the unified parser, and all 60 recorded DTB parser chains:
 
 ```bash
 python tools/dtb/reasoning_tail_fidelity.py --apply-repo-patch \
-  --replay-dir docs/log/perf/agent_tool_call_run04_paired_replay/run_server_04_token_stop/replay
+  --replay-dir tests/fixtures/parser_tail
 python -m unittest discover -s tests -p test_qwen_reasoning_tail.py -v
 ```
 
@@ -102,40 +102,9 @@ returns 0 with 84 checks. The original source and tool patch remain read-only.
 Dependencies and the character tokenizer are stubbed; archived records retain
 their real text and IDs. This is not an HTTP/NPU or real-tokenizer pytest run.
 
-For an existing `915bec9` deployment, the first two patches are unchanged.
-Stop the serving process, check and apply **only the new reasoning patch**
-using an absolute patch path, then restart with the unchanged production launch
-command and audit configuration:
-
-```bash
-TB_ROOT=/opt/p00906181/TB
-VLLM_ROOT=/vllm-workspace/vllm
-git -C "$VLLM_ROOT" apply --check \
-  "$TB_ROOT/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch"
-git -C "$VLLM_ROOT" apply \
-  "$TB_ROOT/patches/vllm/v0.23.0/qwen3_reasoning_parser.patch"
-sha256sum "$VLLM_ROOT/vllm/reasoning/qwen3_reasoning_parser.py"
-# Expected LF source hash:
-# cdb64a46e7077ff6f2600ce02916cfbd4cdb5bb6f62937673013a68e6addea88
-```
-
-Do not reapply an already-applied patch, use `--reject`, change the default
-`include_stop_str_in_output`, or modify `stream_interval` (keep default 1).
-`include_stop_str_in_output=True` remains an isolated workaround/control, not
-the formal fix: it affects the detokenization of other request-owned stops too.
-
-In the prepared upstream virtual environment, with the test tokenizers already
-available, run the full native test file (no inference model weights required):
-
-```bash
-cd "$VLLM_ROOT"
-.venv/bin/python -m pytest tests/reasoning/test_qwen3_reasoning_parser.py -q
-```
-
-The native fixture uses its existing three Qwen tokenizer variants; it does not
-by itself prove Qwen3.6 runtime behavior. Repeat the existing line 5/10 server
-stream-audit replay, with a new run directory/ID and matching whitelist. Record
-the **reasoning parser** import path and SHA256 alongside the existing three
-source identities. Check public reasoning against the actual pre-parser prefix,
-not just controller raw/forwarded equality. See the detailed scope and server
-checks in [the design](../../../docs/design/dtb_reasoning_boundary_token_stop.md).
+For current deployment/rollback, upgrade the controller and serving patch together
+using the [deployment guide](../../../docs/design/dtb_system_routing_deployment.md).
+The old 915bec9 one-patch upgrade recipe is not valid for the current routing API.
+Target-server checks use the self-contained [delivery replay](../../../validation/replay/README.md).
+Record the actual parser import paths and SHA256, and compare public output with
+the pre-parser prefix in a separate allowlisted stream-audit run when diagnosing boundaries.

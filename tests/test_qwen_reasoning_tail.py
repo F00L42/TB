@@ -9,10 +9,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 GATE = ROOT / "tools/dtb/reasoning_tail_fidelity.py"
-REPLAY = ROOT / (
-    "docs/log/perf/agent_tool_call_run04_paired_replay/"
-    "run_server_04_token_stop/replay"
-)
+REPLAY = ROOT / "tests/fixtures/parser_tail"
 
 
 class QwenReasoningTailTests(unittest.TestCase):
@@ -24,7 +21,7 @@ class QwenReasoningTailTests(unittest.TestCase):
             command.extend(["--replay-dir", str(REPLAY)])
         if public:
             command.append("--require-public-fidelity")
-        result = subprocess.run(command, cwd=ROOT, capture_output=True,
+        result = subprocess.run(command, cwd=ROOT, stdin=subprocess.DEVNULL, capture_output=True,
                                 text=True, encoding="utf-8", check=False)
         self.assertIn(result.returncode, (0, 1), result.stderr)
         return result.returncode, json.loads(result.stdout)
@@ -46,7 +43,6 @@ class QwenReasoningTailTests(unittest.TestCase):
         self.assertFalse(any(item["group"] == "unchanged_controls"
                              for item in result["failures"]))
 
-    @unittest.skipUnless(REPLAY.is_dir(), "Uploaded server evidence unavailable")
     def test_all_archived_parser_chains_preserve_text_and_tools(self):
         code, result = self.run_gate(patched=True, archived=True)
         self.assertEqual(code, 0, result)

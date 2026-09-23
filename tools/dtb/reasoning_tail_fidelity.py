@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import ast
 from collections import defaultdict
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -241,14 +242,19 @@ def run(source, replay_dir=None, tool_parser_source=None, server_logs=None,
         raw = defaultdict(list)
         log_paths = server_logs or sorted(replay_dir.glob("server_filtered_part_*"))
         for path in log_paths:
-            for line in path.read_text(encoding="utf-8").splitlines():
+            opener = gzip.open if path.suffix == ".gz" else open
+            with opener(path, "rt", encoding="utf-8") as stream:
+                log_lines = stream.read().splitlines()
+            for line in log_lines:
                 if "DTB_STREAM_AUDIT" not in line:
                     continue
                 record = json.loads(line.split("DTB_STREAM_AUDIT", 1)[1])
                 if record["phase"] in ("initial_think", "final_answer"):
                     raw[record["parent_request_id"]].append(record)
         archive_count = sum(row["variant"] == "dtb" for row in rows)
-        cases_path = replay_dir.parent.parent / "input/cases.jsonl"
+        cases_path = replay_dir / "cases.jsonl"
+        if not cases_path.exists():
+            cases_path = replay_dir.parent.parent / "input/cases.jsonl"
         selected_lines = {row["line_no"] for row in rows if row["variant"] == "dtb"}
         cases_by_line = {
             number: json.loads(line)

@@ -1,0 +1,307 @@
+QA_ID,问题
+TC0000000204," You are an expert in diagnosing faults in cloud core networks and are currently handling a ""work order"" based on the ""alarm information"". According to the current progress (""execution records""), you need to review your ""diagnostic approach"" and update it. 
+
+## Work Order {""alarmId"":""20072"",""locationInformation"":""M3UA Route Name=M3RT1,Alarm Cause=Route offline"",""raisedTime"":""2026-02-05 17:22:19"",""probableCause"":"""",""severity"":""1"",""additionalInformation"":""-"",""neName"":""181usc30055867"",""neType"":"""",""alarmName"":""M3UA Route Unavailable"",""nativeMoName"":""181usc30055867"",""csn"":""211422"",""cleared"":0}
+
+
+## Alarm Information
+### Definition of Alarm Parameters in Work Orders | Name | Meaning |
+| --- | --- |
+| M3UA Route Name | Indicates the name of the M3UA route for which the alarm is generated. This parameter is defined by running ADD M3RT. |
+| Alarm Cause | Indicates the cause why the alarm is generated, helping fault identification and troubleshooting.<br>Value:<br>   M3UA link set fault<br>   Route transmission is barred<br>   Route offline<br>   Other reasons |
+### Alarm Steps Check the M3UA route status.
+    1. In the MML Command - USC window, run DSP M3RT to check the M3UA route status. Perform the following operations based on the parameter values:
+        When Route State is Available, Offline Route Flag is Online, and other parameter values are NULL, go to Step 2.
+        When Link Set State is Down, go to Step 3.
+        When Transfer Prohibited Status is Transfer prohibited, go to Step 6.
+        When Offline Route Flag is Offline, go to Step 10.
+    2. Manually clear the alarm. The alarm handling is complete.
+Check whether ALM-20074 M3UA Linkset Fault is generated.
+    3. Check whether ALM-20074 M3UA Linkset Fault is displayed in the Browse Alarms window.
+        Yes: Go to Step 4.
+        No: Go to Step 6.
+    4. Rectify the fault by following the procedure for handling ALM-20074 M3UA Linkset Fault.
+    5. Check whether the alarm is cleared.
+        Yes: No further action is required.
+        No: Go to Step 6.
+Check whether the route transmission is prohibited.
+    6. Run LST M3RT to query the M3UA link set through which the M3UA link passes.
+    7. Run LST M3LKS to query the M3UA application servers neighboring to the M3UA application server on the M3UA link set obtained in Step 6.
+    8. Obtain the destination signaling points (DSPs) based on the neighboring M3UA application servers obtained in Step 7.
+    9. Notify maintenance engineers at the DSPs obtained in Step 8 to rectify the fault. For example, if the route between the STP and SP is unreachable, the STP sends the USC a Destination Unavailable message. In this case, notify the STP maintenance engineers to rectify the fault.
+Check whether the M3UA route is online.
+    10. In the MML Command - USC window, run ONL M3RT to online the M3UA route.
+    11. Check whether Offline Route Flag is Online.
+    12. Check whether the alarm is cleared.
+        Yes: No further action is required.
+        No: Go to Step 13.
+Collect fault-related information.
+    13. Collect the following information, and contact Huawei technical support engineers:
+        Alarm logs: Run LST ACTALM on the CSP MML command page to obtain alarm logs.
+        Operation logs: Run LST OPTLOG in the CSP MML command page to obtain operation logs.
+
+
+Previous diagnostic approach Run DSP M3RT with route name M3RT1 to check M3UA route status. If Route State is Available and Offline Route Flag is Online, manually clear the alarm (requires manual intervention, diagnosis ends). If Link Set State is Down, check for ALM-20074 using IsHaveOtherAlarm. If ALM-20074 exists, execute DiagnosisAlarm for ALM-20074. After rectification, check if alarm cleared via IsAlarmCleared. If cleared, complete; else proceed to LST M3RT to query M3UA link set. Use LST M3LKS to find neighboring M3UA application servers, derive destination signaling points (DSPs), and notify maintenance engineers at DSPs (manual action required, diagnosis ends). If Transfer Prohibited Status is set, follow the same path as above. If Offline Route Flag is Offline, run ONL M3RT to online the route. Recheck Offline Route Flag via DSP M3RT and verify alarm clearance with IsAlarmCleared. If unresolved, collect alarm logs via LST ACTALM and operation logs via LST OPTLOG, then contact Huawei support.
+
+
+## Executed Records step1：
+Tool Name：getAlarmInfo
+Tool Description：Based on the information provided by the user, query the alarm details
+Tool Output：{""alarmId"":""20072"",""locationInformation"":""M3UA Route Name=M3RT1,Alarm Cause=Route offline"",""raisedTime"":""2026-02-05 17:22:19"",""probableCause"":"""",""severity"":""1"",""additionalInformation"":""-"",""neName"":""181usc30055867"",""neType"":"""",""alarmName"":""M3UA Route Unavailable"",""nativeMoName"":""181usc30055867"",""csn"":""211422"",""cleared"":0}
+
+step2：
+Tool Name：DSP M3RT
+Tool Description：Run DSP M3RT with route name M3RT1 to check M3UA route status
+Tool Output：{""actionResult"":""{""errorCode"":null,""errorMsg"":null,""result"":""+++    CGP/*MEID:003 MENAME:181cspn30055867*/        2026-02-05 17:27:15+08:00\\
+O&M    #9370\\
+%%/*1879369964 MEID=003*/DSP M3RT:RTNM=\""M3RT1\"";%%\\
+RETCODE = 0  Operation succeeded\\
+\\
+is as follows\
+-----------------\
+ Route Name  Application Server name  Transfer Prohibited Status  Link Set State  Offline Route Flag  Route State  SLS(Hex)  Consistency\
+ M3RT1       ASNM_01                Transfer allowed            Normal          Offline             Unavailable  NULL      Consistent \
+(Number of results = 1)\\
+---    END\\
+"",""conclusionBeDrawn"":true,""conclusion"":""The M3UA route is unavailable.""}""}
+
+
+## API List [{""name"":""LST OP"",""description"":""This command is used to query information about local users.""},{""name"":""DSP M3RT"",""description"":""DSP M3RT is used to query the status information about an M3UA route.""},{""name"":""LST M3LKS"",""description"":""LST M3LKS is used to query M3UA linkset data records in the configuration database.   To query the configuration information about all M3UA linksets, do not specify any parameter.   To query the configuration information about a specific M3UA linkset, specify Linkset name or other related parameters.   The command supports fuzzy search. When you enter a complete string of characters, the system performs an accurate search. When you enter a string which contains a wildcard ""%"", the system performs a fuzzy search. When setting this type of parameters, note the following:     Only digits 0-9, lowercase letters a-z, uppercase letters A-Z, periods (.), hyphens (-), underscores (_), and non-consecutive spaces are allowed in the parameter value.     A wildcard ""%"" (if specified) can be placed at any place of a string. For example, City A%, %City A, Area% of City A, 1390123%, %1390123, and 139%0123 are all valid values.     Fuzzy search supports only one query-specific parameter at a time although a command has multiple query-specific parameters.""},{""name"":""LST M3RT"",""description"":""LST M3RT is used to query the configuration of M3UA route data records.   To query general information about all M3UA route data records, do not specify any parameter.   To query detailed information about an M3UA route data record, specify Route name or other parameters.   The command supports fuzzy search. When you enter a complete string of characters, the system performs an accurate search. When you enter a string that contains a wildcard ""%"", the system performs a fuzzy search. When setting this type of parameters, note the following:     Only digits 0-9, lowercase letters a-z, uppercase letters A-Z, periods (.), hyphens (-), underscores (_), and non-consecutive spaces are allowed in the parameter value.     A wildcard ""%"" (if specified) can be placed at any place of a string. For example, City A%, %City A, Area% of City A, 1390123%, %1390123, and 139%0123 are all valid values.     Fuzzy search supports only one query-specific parameter at a time although a command has multiple query-specific parameters.""},{""name"":""LST ACTALM"",""description"":""This command is used to list active alarms in the system. You can log in to the OM Portal and choose Monitoring > Alarms > Active Alarms to view the alarms.Note:This command can be used to list not only fault alarms (displayed on the Monitoring > Alarms > Active Alarms page of the OM Portal) but also event alarms and indeterminate alarms. Fault alarms at various levels impact the system differently. Event alarms have no impact on the system, while indeterminate alarms have uncertain impacts on the system. Therefore, these two types of alarms are not displayed on the OM Portal.""},{""name"":""LST OPTLOG"",""description"":""This command is used to list operation logs.You can also log in to the OM Portal and choose Security > Logs > Operation Logs to obtain operation logs.""},{""name"":""ONL M3RT"",""description"":""This command is highly dangerous and must not be executed!""},{""apiName"":""IsAlarmCleared"",""description"":""This tool is used to check whether an alarm has been cleared. It allows you to wait for a specified time (e.g., xx minutes) before checking again to see if the alarm has been cleared. For example: check/check whether the alarm is cleared, wait for 5 minutes and then check whether the alarm is cleared, or check whether ALM-xx is cleared. Note: Operations such as ""viewing alarm information"" or ""viewing active alarms,"" which involve viewing the alarm details themselves, do not fall under the category of checking whether an alarm has been cleared.""},{""apiName"":""DiagnosisAlarm"",""description"":""This tool is used to handle alarms according to the processing procedures of other alarms. For example, it can be used to troubleshoot the alarm as suggested by ALM-XX, process the alarm according to ALM-XX, handle the ALM-XX alarm, eliminate the alarm following the steps corresponding to the root alarm, or remove associated alarms based on the help information of the corresponding alarm.""},{""apiName"":""IsHaveOtherAlarm"",""description"":""This tool is used to query whether the system has generated certain alarms. It is only applicable for queries that provide alarm IDs in the format of ""ALM-XXX"". Simply provide the alarm ID you want to query, such as ""ALM-123"" for a single alarm or ""ALM-123, ALM-456"" for multiple alarms. The tool also supports filtering the queried alarms based on specified conditions, for example, checking whether there are ALM-XXX alarms on processes with the prefix `npu_INFER_`.""},{""apiName"":""IsHaveOtherEvent"",""description"":""This tool is used to check whether a certain event has occurred. For example: to check if there is an XX event.""}]
+
+
+## Requirements
+1. The processing steps in the ""Alarm Information"" form a decision tree. Each command, operation, and even verb encountered based on its jump conditions needs to be analyzed and can be classified into three categories: (a) those with corresponding APIs in the API list, including high-risk operations, which do not require manual intervention; (b) those without corresponding APIs in the API list and require manual intervention (such as ""Contact Operations and Maintenance"" or ""On-site Reset""); (c) those without corresponding APIs in the API list and are pure analysis/observation behaviors that do not require manual intervention (such as ""Observe if it has recovered"" or ""Determine if it is connected"").
+- Actions in category (a) should be automated using their corresponding APIs.
+- Actions in category (b) cannot be automated and require the diagnosis to end at this point.
+- Actions in category (c) need to be inferred based on known information (alarm information, work orders, executed records). If an objective judgment with unclear criteria is encountered (such as ""Determine if the configuration is correct"" or ""Whether it complies with the current network standards""), the diagnosis must be terminated; only when the judgment conditions are specific and quantifiable (such as ""Determine if the threshold is greater than 80"") can it continue.
+2. The ""Executed Records"" list contains all operations that have been executed. Any operation not listed separately has not been executed.
+3. When planning, retain key instantiated data (such as MML commands, values, process IDs, NE names, IP addresses, etc.), and do not lose or fabricate any critical information.
+4. The work order already contains all alarm information, so there is no need to query ""Alarm Information"", ""Alarm Parameters"", ""Alarm Cause"", ""Active Alarms"", ""Prompt Information"", etc. separately.
+5. Operations such as ""Log in to XX system"", ""Log in to XX operation and maintenance interface"", ""Log in to XX client"", etc., should be ignored. For example, ""Log in to the OMU client and execute the PING command to observe the connection status"" is equivalent to ""Execute the PING command to observe the connection status"".
+6. The result should be output in JSON format: ```json
+{{
+""current_progress"": <str, Analysis of the current diagnostic progress>,
+""finished"": <bool, Whether the diagnosis should be ended>,
+""problems_in_previous_plan"": <str, What problems were there in the previous diagnostic approach based on the executed records? There may be no problems. If the diagnosis is completed, write null>,
+""how_to_plan_better"": <str, Based on `problems_in_previous_plan`, how to improve the diagnostic approach. If the diagnosis is completed, write null>,
+""plan"": <str, The updated diagnostic approach based on `how_to_plan_better`, do not mention any step numbers, just state what operations need to be done in sequence. If the diagnosis is completed, write null. Do not omit any operations! Do not omit any APIs listed in the API list in plain text! >
+}}
+```  
+"
+TC0000000201," You are an expert in diagnosing faults in cloud core networks and are currently handling a ""work order"" based on the ""alarm information"". According to the current progress (""execution records""), you need to review your ""diagnostic approach"" and update it. 
+
+## Work Order {""alarmId"":""86055"",""locationInformation"":""service name=ICTLog Northbound Service,object name=CloudUDN_Instance_01"",""raisedTime"":""2026-02-04 15:08:31"",""probableCause"":"""",""severity"":""1"",""additionalInformation"":""Remote HDFS URL=hdfs://192.168.1.100:8020/user/ictlog/northbound"",""neName"":""181cloududn30055867"",""neType"":"""",""alarmName"":""File Upload Failure for ICTLog Northbound Feature"",""nativeMoName"":""181cloududn30055867"",""csn"":""207259"",""cleared"":0}
+
+
+## Alarm Information
+### Definition of Alarm Parameters in Work Orders | Parameter Name | Meaning |
+| --- | --- |
+| Alarm Severity | Indicates the range and degree of the impact of the alarm. Operators can preferentially handle critical and major alarms based on alarm severities. |
+| Whether Cleared | Indicates the status of the current alarm.<br>   Cleared: The fault that triggered the alarm has been rectified.<br>   Not Cleared: The fault that triggered the alarm has not been rectified. |
+| Alarm ID | Uniquely identifies the alarm. |
+| Raised | Indicates the time when the alarm was generated. |
+| Alarm Name | Indicates the alarm name. |
+| Cleared | Indicates the time when the alarm was cleared. An alarm can be cleared either manually or automatically. |
+| Serial No. | Indicates the serial number of the alarm. The system uses this number to record the alarm as an event. |
+| Event Type | Indicates the fault type of the alarm. |
+| Repeat Times | Indicates the total number of times the system has reported this alarm before the alarm is cleared. |
+| Additional Information | Provides information required to locate the fault that triggered the alarm. For details about the parameters in the additional information, see the table below. |
+| Location Info | Indicates the cause and object of the alarm. For details about the parameters in the location information, see the table below. |
+| Application Name | Indicates the name of the application for which this alarm is generated. |
+| Parameter Name |  | Meaning |
+| --- | --- | --- |
+| Location Info | service name | Indicates the name of the service for which the alarm is generated. |
+|  | object name | Indicates the name of the instance for which the alarm is generated. |
+| Additional Information | Remote HDFS URL | Indicates the URL for logging in to the peer HDFS server and the path to which ICTLog northbound files are uploaded. |
+### Alarm Steps   1. Check active alarms.
+     1. Log in to the OM portal and choose Monitoring > Alarms > Active Alarms.
+     2. Click  in the Details column to check the locating information and additional information.
+  2. Choose Application Configuration > Service Configuration > ICTLog Data Openness > ICTLog Data Northbound > Third-party Interconnection Configuration > Distributed Copy. Check whether the IP address, port number, and upload path of the peer HDFS server are correct.
+      Yes: Go to 4.
+      No: Change the upload directory on the peer HDFS server and then go to 3.
+  3. Check whether the alarm is cleared.
+      Yes: The alarm handling is complete, and no further action is required.
+      No: Go to 4.
+  4. Contact peer O&M engineers to check whether the configured storage directory exists on the peer HDFS server, whether you have the read/write permission on this directory, whether the quota for this directory is used up, and whether there is available disk space.
+      Yes: Go to Step 6.
+      No: Contact peer O&M engineers to modify the permissions or quota, or release disk space. Then, go to 5.
+  5. Check whether the alarm is cleared.
+      Yes: The alarm handling is complete, and no further action is required.
+      No: Go to 6.
+  6. Collect fault information, and contact Huawei technical support.
+     1. Choose Monitoring > Alarms > Active Alarms, search for the alarm using its ID, and click Export to export the alarm information. 
+Note:<BR>After you select an alarm and click Export, information about all alarms will be exported. You can export the information about a single alarm only after searching for the alarm using its ID.
+     2. Choose Monitoring > Run Logs > Service Logs. On the displayed page, select the corresponding service, and collect the logs that were generated from one day before the alarm was reported.
+
+
+Previous diagnostic approach First, check if the alarm with ID 86055 is cleared using the IsAlarmCleared API. If cleared, the alarm is resolved. If not cleared, manually check the HDFS configuration parameters (IP address, port number, and upload path) in the service configuration. If the configuration is correct, proceed to contact peer O&M engineers to verify the existence of the storage directory, read/write permissions, quota usage, and disk space availability (manual step). If the configuration is incorrect, manually adjust the upload directory path and recheck the alarm status using IsAlarmCleared. If the alarm is still not cleared after configuration changes, escalate by collecting logs via Monitoring > Run Logs > Service Logs (manual step) and contact Huawei technical support.
+
+
+## Executed Records step1：
+Tool Name：getAlarmInfo
+Tool Description：Based on the information provided by the user, query the alarm details
+Tool Output：{""alarmId"":""86055"",""locationInformation"":""service name=ICTLog Northbound Service,object name=CloudUDN_Instance_01"",""raisedTime"":""2026-02-04 15:08:31"",""probableCause"":"""",""severity"":""1"",""additionalInformation"":""Remote HDFS URL=hdfs://192.168.1.100:8020/user/ictlog/northbound"",""neName"":""181cloududn30055867"",""neType"":"""",""alarmName"":""File Upload Failure for ICTLog Northbound Feature"",""nativeMoName"":""181cloududn30055867"",""csn"":""207259"",""cleared"":0}
+
+
+## API List [{""apiName"":""IsAlarmCleared"",""description"":""This tool is used to check whether an alarm has been cleared. It allows you to wait for a specified time (e.g., xx minutes) before checking again to see if the alarm has been cleared. For example: check/check whether the alarm is cleared, wait for 5 minutes and then check whether the alarm is cleared, or check whether ALM-xx is cleared. Note: Operations such as ""viewing alarm information"" or ""viewing active alarms,"" which involve viewing the alarm details themselves, do not fall under the category of checking whether an alarm has been cleared.""},{""apiName"":""DiagnosisAlarm"",""description"":""This tool is used to handle alarms according to the processing procedures of other alarms. For example, it can be used to troubleshoot the alarm as suggested by ALM-XX, process the alarm according to ALM-XX, handle the ALM-XX alarm, eliminate the alarm following the steps corresponding to the root alarm, or remove associated alarms based on the help information of the corresponding alarm.""},{""apiName"":""IsHaveOtherAlarm"",""description"":""This tool is used to query whether the system has generated certain alarms. It is only applicable for queries that provide alarm IDs in the format of ""ALM-XXX"". Simply provide the alarm ID you want to query, such as ""ALM-123"" for a single alarm or ""ALM-123, ALM-456"" for multiple alarms. The tool also supports filtering the queried alarms based on specified conditions, for example, checking whether there are ALM-XXX alarms on processes with the prefix `npu_INFER_`.""},{""apiName"":""IsHaveOtherEvent"",""description"":""This tool is used to check whether a certain event has occurred. For example: to check if there is an XX event.""}]
+
+
+## Requirements
+1. The processing steps in the ""Alarm Information"" form a decision tree. Each command, operation, and even verb encountered based on its jump conditions needs to be analyzed and can be classified into three categories: (a) those with corresponding APIs in the API list, including high-risk operations, which do not require manual intervention; (b) those without corresponding APIs in the API list and require manual intervention (such as ""Contact Operations and Maintenance"" or ""On-site Reset""); (c) those without corresponding APIs in the API list and are pure analysis/observation behaviors that do not require manual intervention (such as ""Observe if it has recovered"" or ""Determine if it is connected"").
+- Actions in category (a) should be automated using their corresponding APIs.
+- Actions in category (b) cannot be automated and require the diagnosis to end at this point.
+- Actions in category (c) need to be inferred based on known information (alarm information, work orders, executed records). If an objective judgment with unclear criteria is encountered (such as ""Determine if the configuration is correct"" or ""Whether it complies with the current network standards""), the diagnosis must be terminated; only when the judgment conditions are specific and quantifiable (such as ""Determine if the threshold is greater than 80"") can it continue.
+2. The ""Executed Records"" list contains all operations that have been executed. Any operation not listed separately has not been executed.
+3. When planning, retain key instantiated data (such as MML commands, values, process IDs, NE names, IP addresses, etc.), and do not lose or fabricate any critical information.
+4. The work order already contains all alarm information, so there is no need to query ""Alarm Information"", ""Alarm Parameters"", ""Alarm Cause"", ""Active Alarms"", ""Prompt Information"", etc. separately.
+5. Operations such as ""Log in to XX system"", ""Log in to XX operation and maintenance interface"", ""Log in to XX client"", etc., should be ignored. For example, ""Log in to the OMU client and execute the PING command to observe the connection status"" is equivalent to ""Execute the PING command to observe the connection status"".
+6. The result should be output in JSON format: ```json
+{{
+""current_progress"": <str, Analysis of the current diagnostic progress>,
+""finished"": <bool, Whether the diagnosis should be ended>,
+""problems_in_previous_plan"": <str, What problems were there in the previous diagnostic approach based on the executed records? There may be no problems. If the diagnosis is completed, write null>,
+""how_to_plan_better"": <str, Based on `problems_in_previous_plan`, how to improve the diagnostic approach. If the diagnosis is completed, write null>,
+""plan"": <str, The updated diagnostic approach based on `how_to_plan_better`, do not mention any step numbers, just state what operations need to be done in sequence. If the diagnosis is completed, write null. Do not omit any operations! Do not omit any APIs listed in the API list in plain text! >
+}}
+```  
+"
+TC0000000212,"You are an expert in diagnosing faults in cloud core networks and are currently handling a """"work order"""" based on the """"alarm information"""". According to the current progress (""""execution records""""), you need to review your """"diagnostic approach"""" and update it. 
+
+## Work Order {""""alarmId"""":""""135201"""",""""locationInformation"""":""""License file name=license_v1.0.0.lic,Application ID=APP-12345"""",""""raisedTime"""":""""2026-02-05 18:41:29"""",""""probableCause"""":"""""""",""""severity"""":""""1"""",""""additionalInformation"""":""""Remaining days in the grace period=5,Alarm Source=LicenseServicePod,Alarm Source Location=192.168.1.100"""",""""neName"""":""""unctest1225"""",""""neType"""":"""""""",""""alarmName"""":""""License File Expired"""",""""nativeMoName"""":""""unctest1225"""",""""csn"""":""""211590"""",""""cleared"""":0}
+
+
+## Alarm Information
+### Definition of Alarm Parameters in Work Orders | Name |  | Meaning |
+| --- | --- | --- |
+| Location Info | License file name | Indicates the name of the license file that has expired. |
+|  | Application ID | Indicates the ID of the application whose license file has expired. |
+| Additional Info | Remaining days in the grace period | Indicates the remaining days within which the expired license file is still available. |
+|  | Alarm Source | Indicates the name of the service pod for which the alarm was generated. |
+|  | Alarm Source Location | Indicates the IP address for which the alarm was generated. (This parameter is unavailable when VM containers are used.) |
+### Alarm Steps   1. Check active alarms.
+     1. Log in to the OM Portal and choose Monitoring > Alarms > Active Alarms.
+     2. Locate this alarm and click  in the Details column to check the application name, location information, and additional information.
+  2. Choose Application Lifecycle > Licenses, and click the application name indicated by the application ID in the location information.
+  3. Check the validity period of the license file in the activation information to determine whether the license file has expired.
+      If it has expired, go to Step 4. 
+      If it has not expired, go to Step 5. 
+  4. Upload a new license file on the License File Management page, and click Update on the License Management page to update and activate the new license file. Wait for 5 minutes, and check whether the alarm is cleared.
+      If it is cleared, no further action is required.
+      If it is not cleared, go to Step 5. 
+  5. Collect alarm information and logs and send them to technical support engineers.
+     1. Choose Monitoring > Alarms > Active Alarms, search for this alarm using its ID, and click Export to export the alarm information. 
+Note:<BR>After you select an alarm and click Export, the information about all alarms will be exported. You can export the information about this alarm only after searching for the alarm using its ID.
+     2. Choose Monitoring > Run Logs > Service Logs. On the displayed Service Logs page, collect the license logs that were generated from one day before when the alarm was reported until now.
+Note:<BR>In third-party CaaS scenarios, choose Monitoring > Run Logs > Download, select the target service, select the logs to be collected, and click Batch Download to collect service logs. This process also applies when full-stack bare metal servers are deployed.
+
+
+Previous diagnostic approach First, use IsAlarmCleared with alarmId '135201' to check if the alarm is cleared. If cleared, the process ends. If not, execute DiagnosisAlarm for the 'License File Expired' alarm (alarmId 135201) to trigger automated steps. This process requires manually uploading a new license file for Application ID APP-12345 on LicenseServicePod (IP 192.168.1.100), which terminates the automated diagnosis. After manual upload, wait 5 minutes and recheck with IsAlarmCleared. If cleared, the process ends. If not cleared, collect logs via exporting alarm details (using alarmId 135201) and gathering service logs from LicenseServicePod's logs since 2026-02-05 18:41:29. These log collection steps require manual intervention to send to technical support, terminating further automated diagnosis.
+
+
+## Executed Records step1：
+Tool Name：getAlarmInfo
+Tool Description：Based on the information provided by the user, query the alarm details
+Tool Output：{""""alarmId"""":""""135201"""",""""locationInformation"""":""""License file name=license_v1.0.0.lic,Application ID=APP-12345"""",""""raisedTime"""":""""2026-02-05 18:41:29"""",""""probableCause"""":"""""""",""""severity"""":""""1"""",""""additionalInformation"""":""""Remaining days in the grace period=5,Alarm Source=LicenseServicePod,Alarm Source Location=192.168.1.100"""",""""neName"""":""""unctest1225"""",""""neType"""":"""""""",""""alarmName"""":""""License File Expired"""",""""nativeMoName"""":""""unctest1225"""",""""csn"""":""""211590"""",""""cleared"""":0}
+
+
+
+## API List [{""""apiName"""":""""IsAlarmCleared"""",""""description"""":""""This tool is used to check whether an alarm has been cleared. It allows you to wait for a specified time (e.g., xx minutes) before checking again to see if the alarm has been cleared. For example: check/check whether the alarm is cleared, wait for 5 minutes and then check whether the alarm is cleared, or check whether ALM-xx is cleared. Note: Operations such as \""""viewing alarm information\"""" or \""""viewing active alarms,\"""" which involve viewing the alarm details themselves, do not fall under the category of checking whether an alarm has been cleared.""""},{""""apiName"""":""""DiagnosisAlarm"""",""""description"""":""""This tool is used to handle alarms according to the processing procedures of other alarms. For example, it can be used to troubleshoot the alarm as suggested by ALM-XX, process the alarm according to ALM-XX, handle the ALM-XX alarm, eliminate the alarm following the steps corresponding to the root alarm, or remove associated alarms based on the help information of the corresponding alarm.""""},{""""apiName"""":""""IsHaveOtherAlarm"""",""""description"""":""""This tool is used to query whether the system has generated certain alarms. It is only applicable for queries that provide alarm IDs in the format of \""""ALM-XXX\"""". Simply provide the alarm ID you want to query, such as \""""ALM-123\"""" for a single alarm or \""""ALM-123, ALM-456\"""" for multiple alarms. The tool also supports filtering the queried alarms based on specified conditions, for example, checking whether there are ALM-XXX alarms on processes with the prefix `npu_INFER_`.""""},{""""apiName"""":""""IsHaveOtherEvent"""",""""description"""":""""This tool is used to check whether a certain event has occurred. For example: to check if there is an XX event.""""}]
+
+
+## Requirements
+1. The processing steps in the """"Alarm Information"""" form a decision tree. Each command, operation, and even verb encountered based on its jump conditions needs to be analyzed and can be classified into three categories: (a) those with corresponding APIs in the API list, including high-risk operations, which do not require manual intervention; (b) those without corresponding APIs in the API list and require manual intervention (such as """"Contact Operations and Maintenance"""" or """"On-site Reset""""); (c) those without corresponding APIs in the API list and are pure analysis/observation behaviors that do not require manual intervention (such as """"Observe if it has recovered"""" or """"Determine if it is connected"""").
+- Actions in category (a) should be automated using their corresponding APIs.
+- Actions in category (b) cannot be automated and require the diagnosis to end at this point.
+- Actions in category (c) need to be inferred based on known information (alarm information, work orders, executed records). If an objective judgment with unclear criteria is encountered (such as """"Determine if the configuration is correct"""" or """"Whether it complies with the current network standards""""), the diagnosis must be terminated; only when the judgment conditions are specific and quantifiable (such as """"Determine if the threshold is greater than 80"""") can it continue.
+2. The """"Executed Records"""" list contains all operations that have been executed. Any operation not listed separately has not been executed.
+3. When planning, retain key instantiated data (such as MML commands, values, process IDs, NE names, IP addresses, etc.), and do not lose or fabricate any critical information.
+4. The work order already contains all alarm information, so there is no need to query """"Alarm Information"""", """"Alarm Parameters"""", """"Alarm Cause"""", """"Active Alarms"""", """"Prompt Information"""", etc. separately.
+5. Operations such as """"Log in to XX system"""", """"Log in to XX operation and maintenance interface"""", """"Log in to XX client"""", etc., should be ignored. For example, """"Log in to the OMU client and execute the PING command to observe the connection status"""" is equivalent to """"Execute the PING command to observe the connection status"""".
+6. The result should be output in JSON format: ```json
+{{
+""""current_progress"""": <str, Analysis of the current diagnostic progress>,
+""""finished"""": <bool, Whether the diagnosis should be ended>,
+""""problems_in_previous_plan"""": <str, What problems were there in the previous diagnostic approach based on the executed records? There may be no problems. If the diagnosis is completed, write null>,
+""""how_to_plan_better"""": <str, Based on `problems_in_previous_plan`, how to improve the diagnostic approach. If the diagnosis is completed, write null>,
+""""plan"""": <str, The updated diagnostic approach based on `how_to_plan_better`, do not mention any step numbers, just state what operations need to be done in sequence. If the diagnosis is completed, write null. Do not omit any operations! Do not omit any APIs listed in the API list in plain text! >
+}}
+```  
+
+"
+TC0000000216," You are an expert in diagnosing faults in cloud core networks and are currently handling a ""work order"" based on the ""alarm information"". According to the current progress (""execution records""), you need to review your ""diagnostic approach"" and update it. 
+
+## Work Order {""alarmId"":""86055"",""locationInformation"":""service name=ICTLogNorthboundService,object name=CloudUDN_Instance_01"",""raisedTime"":""2026-02-05 20:58:44"",""probableCause"":"""",""severity"":""1"",""additionalInformation"":""Remote HDFS URL=hdfs://192.168.1.100:9000/upload/ictlog"",""neName"":""181cloududn30055867"",""neType"":"""",""alarmName"":""File Upload Failure for ICTLog Northbound Feature"",""nativeMoName"":""181cloududn30055867"",""csn"":""211890"",""cleared"":0}
+
+
+## Alarm Information
+### Definition of Alarm Parameters in Work Orders | Parameter Name | Meaning |
+| --- | --- |
+| Alarm Severity | Indicates the range and degree of the impact of the alarm. Operators can preferentially handle critical and major alarms based on alarm severities. |
+| Whether Cleared | Indicates the status of the current alarm.<br>   Cleared: The fault that triggered the alarm has been rectified.<br>   Not Cleared: The fault that triggered the alarm has not been rectified. |
+| Alarm ID | Uniquely identifies the alarm. |
+| Raised | Indicates the time when the alarm was generated. |
+| Alarm Name | Indicates the alarm name. |
+| Cleared | Indicates the time when the alarm was cleared. An alarm can be cleared either manually or automatically. |
+| Serial No. | Indicates the serial number of the alarm. The system uses this number to record the alarm as an event. |
+| Event Type | Indicates the fault type of the alarm. |
+| Repeat Times | Indicates the total number of times the system has reported this alarm before the alarm is cleared. |
+| Additional Information | Provides information required to locate the fault that triggered the alarm. For details about the parameters in the additional information, see the table below. |
+| Location Info | Indicates the cause and object of the alarm. For details about the parameters in the location information, see the table below. |
+| Application Name | Indicates the name of the application for which this alarm is generated. |
+| Parameter Name |  | Meaning |
+| --- | --- | --- |
+| Location Info | service name | Indicates the name of the service for which the alarm is generated. |
+|  | object name | Indicates the name of the instance for which the alarm is generated. |
+| Additional Information | Remote HDFS URL | Indicates the URL for logging in to the peer HDFS server and the path to which ICTLog northbound files are uploaded. |
+### Alarm Steps   1. Check active alarms.
+     1. Log in to the OM portal and choose Monitoring > Alarms > Active Alarms.
+     2. Click  in the Details column to check the locating information and additional information.
+  2. Choose Application Configuration > Service Configuration > ICTLog Data Openness > ICTLog Data Northbound > Third-party Interconnection Configuration > Distributed Copy. Check whether the IP address, port number, and upload path of the peer HDFS server are correct.
+      Yes: Go to 4.
+      No: Change the upload directory on the peer HDFS server and then go to 3.
+  3. Check whether the alarm is cleared.
+      Yes: The alarm handling is complete, and no further action is required.
+      No: Go to 4.
+  4. Contact peer O&M engineers to check whether the configured storage directory exists on the peer HDFS server, whether you have the read/write permission on this directory, whether the quota for this directory is used up, and whether there is available disk space.
+      Yes: Go to Step 6.
+      No: Contact peer O&M engineers to modify the permissions or quota, or release disk space. Then, go to 5.
+  5. Check whether the alarm is cleared.
+      Yes: The alarm handling is complete, and no further action is required.
+      No: Go to 6.
+  6. Collect fault information, and contact Huawei technical support.
+     1. Choose Monitoring > Alarms > Active Alarms, search for the alarm using its ID, and click Export to export the alarm information. 
+Note:<BR>After you select an alarm and click Export, information about all alarms will be exported. You can export the information about a single alarm only after searching for the alarm using its ID.
+     2. Choose Monitoring > Run Logs > Service Logs. On the displayed page, select the corresponding service, and collect the logs that were generated from one day before the alarm was reported.
+
+
+Previous diagnostic approach First, check if the alarm with ID 86055 is cleared using the IsAlarmCleared API. If cleared, the alarm handling is complete. If not cleared, manually verify the HDFS server's IP, port, and upload path configuration in the service configuration (Application Configuration > Service Configuration > ICTLog Data Openness > ICTLog Data Northbound > Third-party Interconnection Configuration > Distributed Copy). If the configuration is correct, contact the peer O&M engineers to check the storage directory's existence, permissions, quota, and disk space. If these checks confirm issues (directory does not exist, permissions denied, quota exceeded, or insufficient space), manually request the O&M engineers to resolve them and then check if the alarm is cleared using IsAlarmCleared. If cleared after resolution, the issue is resolved. If not, collect logs via the Monitoring > Run Logs > Service Logs interface (exporting logs from one day before the alarm) and contact Huawei technical support. If the initial configuration check reveals incorrect settings, manually update the upload directory on the peer HDFS server, then check again using IsAlarmCleared. If cleared after the update, the alarm is resolved. If not, proceed to contact the peer O&M engineers for further checks and repeat the process.
+
+
+## Executed Records step1：
+Tool Name：getAlarmInfo
+Tool Description：Based on the information provided by the user, query the alarm details
+Tool Output：{""alarmId"":""86055"",""locationInformation"":""service name=ICTLogNorthboundService,object name=CloudUDN_Instance_01"",""raisedTime"":""2026-02-05 20:58:44"",""probableCause"":"""",""severity"":""1"",""additionalInformation"":""Remote HDFS URL=hdfs://192.168.1.100:9000/upload/ictlog"",""neName"":""181cloududn30055867"",""neType"":"""",""alarmName"":""File Upload Failure for ICTLog Northbound Feature"",""nativeMoName"":""181cloududn30055867"",""csn"":""211890"",""cleared"":0}
+
+
+## API List [{""apiName"":""IsAlarmCleared"",""description"":""This tool is used to check whether an alarm has been cleared. It allows you to wait for a specified time (e.g., xx minutes) before checking again to see if the alarm has been cleared. For example: check/check whether the alarm is cleared, wait for 5 minutes and then check whether the alarm is cleared, or check whether ALM-xx is cleared. Note: Operations such as \""viewing alarm information\"" or \""viewing active alarms,\"" which involve viewing the alarm details themselves, do not fall under the category of checking whether an alarm has been cleared.""},{""apiName"":""DiagnosisAlarm"",""description"":""This tool is used to handle alarms according to the processing procedures of other alarms. For example, it can be used to troubleshoot the alarm as suggested by ALM-XX, process the alarm according to ALM-XX, handle the ALM-XX alarm, eliminate the alarm following the steps corresponding to the root alarm, or remove associated alarms based on the help information of the corresponding alarm.""},{""apiName"":""IsHaveOtherAlarm"",""description"":""This tool is used to query whether the system has generated certain alarms. It is only applicable for queries that provide alarm IDs in the format of \""ALM-XXX\"". Simply provide the alarm ID you want to query, such as \""ALM-123\"" for a single alarm or \""ALM-123, ALM-456\"" for multiple alarms. The tool also supports filtering the queried alarms based on specified conditions, for example, checking whether there are ALM-XXX alarms on processes with the prefix `npu_INFER_`.""},{""apiName"":""IsHaveOtherEvent"",""description"":""This tool is used to check whether a certain event has occurred. For example: to check if there is an XX event.""}]
+
+
+## Requirements
+1. The processing steps in the ""Alarm Information"" form a decision tree. Each command, operation, and even verb encountered based on its jump conditions needs to be analyzed and can be classified into three categories: (a) those with corresponding APIs in the API list, including high-risk operations, which do not require manual intervention; (b) those without corresponding APIs in the API list and require manual intervention (such as ""Contact Operations and Maintenance"" or ""On-site Reset""); (c) those without corresponding APIs in the API list and are pure analysis/observation behaviors that do not require manual intervention (such as ""Observe if it has recovered"" or ""Determine if it is connected"").
+- Actions in category (a) should be automated using their corresponding APIs.
+- Actions in category (b) cannot be automated and require the diagnosis to end at this point.
+- Actions in category (c) need to be inferred based on known information (alarm information, work orders, executed records). If an objective judgment with unclear criteria is encountered (such as ""Determine if the configuration is correct"" or ""Whether it complies with the current network standards""), the diagnosis must be terminated; only when the judgment conditions are specific and quantifiable (such as ""Determine if the threshold is greater than 80"") can it continue.
+2. The ""Executed Records"" list contains all operations that have been executed. Any operation not listed separately has not been executed.
+3. When planning, retain key instantiated data (such as MML commands, values, process IDs, NE names, IP addresses, etc.), and do not lose or fabricate any critical information.
+4. The work order already contains all alarm information, so there is no need to query ""Alarm Information"", ""Alarm Parameters"", ""Alarm Cause"", ""Active Alarms"", ""Prompt Information"", etc. separately.
+5. Operations such as ""Log in to XX system"", ""Log in to XX operation and maintenance interface"", ""Log in to XX client"", etc., should be ignored. For example, ""Log in to the OMU client and execute the PING command to observe the connection status"" is equivalent to ""Execute the PING command to observe the connection status"".
+6. The result should be output in JSON format: ```json
+{{
+""current_progress"": <str, Analysis of the current diagnostic progress>,
+""finished"": <bool, Whether the diagnosis should be ended>,
+""problems_in_previous_plan"": <str, What problems were there in the previous diagnostic approach based on the executed records? There may be no problems. If the diagnosis is completed, write null>,
+""how_to_plan_better"": <str, Based on `problems_in_previous_plan`, how to improve the diagnostic approach. If the diagnosis is completed, write null>,
+""plan"": <str, The updated diagnostic approach based on `how_to_plan_better`, do not mention any step numbers, just state what operations need to be done in sequence. If the diagnosis is completed, write null. Do not omit any operations! Do not omit any APIs listed in the API list in plain text! >
+}}
+```  
+"

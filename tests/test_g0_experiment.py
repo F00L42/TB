@@ -13,7 +13,7 @@ from tools.dtb.g0_runtime import Runtime
 from tools.dtb.g0_support import (digest, fresh_directory, load_fixtures,
                                   load_profiles, prepare_inputs, write_json)
 
-INPUTS = g0.REPO / "docs/log/perf/agent_minimum_intervention/input/g0"
+INPUTS = g0.REPO / "tests/fixtures/intervention/g0"
 
 
 class FakeRuntime:
@@ -195,12 +195,25 @@ def test_source_locator_counts_physical_blank_lines(tmp_path):
         prepare_inputs(tmp_path,tmp_path/"spec.json",tmp_path/"duplicate")
 
 
-def test_prepared_inputs_exactly_match_archived_sources(tmp_path):
-    out = prepare_inputs(g0.REPO,INPUTS/"request_selection.json",tmp_path/"regenerated")
-    original = [json.loads(line) for line in (INPUTS/"prepared/requests.jsonl").read_text(encoding="utf-8").splitlines()]
-    regenerated = [json.loads(line) for line in (out/"requests.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert len(original) == 14
-    assert original == regenerated
+def test_prepared_inputs_preserve_bodies_and_selection_order(tmp_path):
+    # The former 14-request server capture is retired. Exercise exact extraction
+    # on the shipped independent inputs, including null/tool/multiturn bodies.
+    dataset = g0.REPO / "validation/replay/cases.jsonl"
+    cases = [json.loads(line) for line in dataset.read_text(encoding="utf-8").splitlines()]
+    records = [{"request_id":r["case_id"], "request_body":r["request_body"]} for r in cases]
+    ledger = [{"request_id":r["request_id"],"source_file":"source.jsonl","source_line":i,
+               "tool_names":["lookup_alarm"] if i == 3 else []} for i,r in enumerate(records,1)]
+    for name,rows in (("source.jsonl",records),("ledger.jsonl",ledger)):
+        (tmp_path/name).write_text(''.join(json.dumps(r,ensure_ascii=False)+'\n' for r in rows),encoding="utf-8")
+    selected = [r["request_id"] for r in reversed(records)]
+    write_json(tmp_path/"selection.json", {"schema":1,"correlation":"ledger.jsonl",
+                                          "proxy_run":".","request_ids":selected})
+    out = prepare_inputs(tmp_path,tmp_path/"selection.json",tmp_path/"regenerated")
+    actual = [json.loads(line) for line in (out/"requests.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [r["request_id"] for r in actual] == selected
+    assert [r["request_body"] for r in actual] == [r["request_body"] for r in reversed(records)]
+    assert all(r["request_body_sha256"] == digest(r["request_body"]) for r in actual)
+    assert actual[-3]["replay_expectation"]["expected_tool_names"] == ["lookup_alarm"]
 
 
 class CachedTestTokenizer:

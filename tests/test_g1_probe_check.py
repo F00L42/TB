@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-SOURCE = Path(__file__).resolve().parents[1]/"docs/log/perf/agent_minimum_intervention/run_server_03/check_probe.py"
+SOURCE = Path(__file__).resolve().parents[1]/"tools/dtb/check_probe.py"
 spec = importlib.util.spec_from_file_location("g1_probe_check", SOURCE)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)

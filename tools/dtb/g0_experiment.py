@@ -243,7 +243,7 @@ def capture_server(args):
 def run_batch(args):
     """Continue after expected H0 failures and save every child's real exit code."""
     out = fresh_directory(args.output_dir)
-    inputs = REPO / "docs/log/perf/agent_minimum_intervention/input/g0"
+    inputs = REPO / "tests/fixtures/intervention/g0"
     tasks = [
         ("H0", "legacy_profiles.json", "legacy_fixtures.jsonl", ["--profile-ids","H0-skip-false","--stop-control"]),
         ("H1", "legacy_profiles.json", "legacy_fixtures.jsonl", ["--profile-ids","H1-skip-true","--stop-control"]),

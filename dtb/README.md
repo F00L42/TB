@@ -46,7 +46,7 @@ flowchart LR
 默认 `legacy_text` 模式仍由 `visible_user_text()` 选择最近的非空 user 消息，必要时回退到
 serving 的完整 prompt；`system_prefix` 模式从原始 messages 提取有界 system 身份，复用启动时
 编译的规则。两种模式均支持 scene `action: native` 与拒识后的原生动作。
-Qwen 流式协议需要绑定并验证 parser；GLM 适配状态见设计索引。
+Qwen 流式协议需要绑定并验证 parser；其他模型必须单独验收协议适配。
 
 ## 配置生命周期
 
@@ -77,7 +77,7 @@ Agent 可选择 `ROUTING.mode: system_prefix`，启动编译有界 system/首 us
 自动路由候选）与 `budget_config_noemate_native.yaml`（保守全原生），均不替换默认文件。
 有效 fixed_budget_tokens 仍优先，单字段 fixed 覆盖不改变 native 动作。
 接口、离线覆盖率、部署升级/回滚和 pending_remote 验收见
-[Session A 部署手册](../docs/design/dtb_system_routing_deployment.md)。
+[system 路由部署手册](../docs/design/dtb_system_routing_deployment.md)。
 
 请求仍可使用既有 fixed override 字段。公网开关 `enable_think_budget` 为外部协议兼容字段，
 内部 Python 包和事件统一使用 DTB 命名。
@@ -104,7 +104,7 @@ Agent 可选择 `ROUTING.mode: system_prefix`，启动编译有界 system/首 us
 提取共享日志：
 
 ```bash
-python tools/extract_dtb_phase_metrics.py docs/log/perf/<run_id>
+python tools/extract_dtb_phase_metrics.py artifacts/perf/<run_id>
 ```
 
 提取器读取历史 `TB_PHASE` schema 1/2 与新 `DTB_PHASE` schema 3；生产写端不双写。

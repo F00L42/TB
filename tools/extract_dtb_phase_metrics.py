@@ -2,7 +2,7 @@
 
 Usage:
 
-    python tools/extract_dtb_phase_metrics.py docs/log/perf/run_<id>
+    python tools/extract_dtb_phase_metrics.py artifacts/perf/run_<id>
 
 The run directory must contain ``server.log`` at its root and exactly one
 ``_SUMMARY.csv`` somewhere below it. Every concrete result filename referenced

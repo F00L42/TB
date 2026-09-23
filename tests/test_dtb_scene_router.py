@@ -86,8 +86,7 @@ class SceneClassifierTests(unittest.TestCase):
     ) -> None:
         root = Path(__file__).resolve().parents[1]
         result_dir = (
-            root / "docs" / "log" / "perf" / "run_06_v3"
-            / "test_result"
+            root / "tests/fixtures/scenes/run_06_v3"
         )
         definitions = load_dtb_service_config().scenes
 
@@ -124,8 +123,7 @@ class SceneClassifierTests(unittest.TestCase):
         self,
     ) -> None:
         root = Path(__file__).resolve().parents[1]
-        path = next(
-            (root / "docs" / "log").rglob("dtb_*07-27*.csv"))
+        path = root / "tests/fixtures/scenes/legacy_regressions.csv"
         with path.open("r", encoding="utf-8-sig", newline="") as stream:
             rows = {row["QA_ID"]: row for row in csv.DictReader(stream)}
 
@@ -156,8 +154,7 @@ class SceneClassifierTests(unittest.TestCase):
     ) -> None:
         root = Path(__file__).resolve().parents[1]
         result_dir = (
-            root / "docs" / "log" / "perf" / "run_06_v3"
-            / "test_result"
+            root / "tests/fixtures/scenes/run_06_v3"
         )
         expected_by_path = {
             path: scene

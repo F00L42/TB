@@ -103,7 +103,7 @@ class SceneConfigTests(unittest.TestCase):
     def test_full_replay_reaches_frozen_budget_without_telemetry(self) -> None:
         result_dir = (
             Path(__file__).resolve().parents[1]
-            / "docs/log/perf/run_06_v3/test_result"
+            / "tests/fixtures/scenes/run_06_v3"
         )
         total = 0
         for scene, pattern in _DATASET_PATTERNS.items():
@@ -172,7 +172,7 @@ class QuantSceneConfigTests(unittest.TestCase):
     def test_quant_candidate_routes_full_product_replay(self) -> None:
         result_dir = (
             Path(__file__).resolve().parents[1]
-            / "docs/log/perf/run_06_v3/test_result"
+            / "tests/fixtures/scenes/run_06_v3"
         )
         total = 0
         for scene, pattern in _DATASET_PATTERNS.items():

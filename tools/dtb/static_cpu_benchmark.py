@@ -87,7 +87,7 @@ async def aggregate_batch(function, *, requests, chunks):
 
 
 def replay_routes(baseline, config):
-    directory = ROOT / "docs/log/perf/run_06_v3/test_result"
+    directory = ROOT / "tests/fixtures/scenes/run_06_v3"
     paths = sorted(directory.glob("dtb_*.csv"))
     if len(paths) != 13:
         raise RuntimeError("route equivalence requires the 13 frozen run_06_v3 CSVs")
