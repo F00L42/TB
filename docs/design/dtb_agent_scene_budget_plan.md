@@ -1,5 +1,9 @@
 # Agent 专用自动场景预算方案（初稿）
 
+2026-09-22 更新：system_prefix/native 运行时接口已由 Session A 实现，见
+[部署与验收手册](dtb_system_routing_deployment.md)。本文保留 Opencode/run-06 的历史预算提案；
+新交付的 Noemate 候选依据 Noemate 数据单列，不把本文 T500/T850 当成已验收的生产参数。
+
 ## 1. 设计目的与边界
 
 设计日期：2026-09-11。源码起点为工作区 HEAD `0019df8`；实验依据为 Vanilla run-06、DTB run-06-closed（close+.90）及最低介入值 G1 回放。工作区未提交的其他设计/分析改动不作为已部署实现。

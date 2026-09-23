@@ -96,6 +96,27 @@ class DtbHistoryStoreConfig:
 
 
 @dataclass(frozen=True)
+class DtbRoutingConfig:
+    mode: str = "legacy_text"
+    on_unmatched: str = "budget"
+
+    def __post_init__(self) -> None:
+        if self.mode not in ("legacy_text", "system_prefix"):
+            raise ValueError("ROUTING.mode must be legacy_text or system_prefix")
+        if self.on_unmatched not in ("budget", "native"):
+            raise ValueError("ROUTING.on_unmatched must be budget or native")
+
+
+@dataclass(frozen=True)
+class CompiledSceneRule:
+    scene: str
+    action: str
+    system_prefix: str
+    first_user_prefix: str | None = None
+    tools_empty: bool | None = None
+
+
+@dataclass(frozen=True)
 class DtbServiceConfig:
     """Immutable startup snapshot of YAML configuration."""
 
@@ -109,6 +130,9 @@ class DtbServiceConfig:
     history_new_task: Mapping[str, Any]
     history_warm_start: Mapping[str, Any]
     history_hot_start: Mapping[str, Any]
+    routing: DtbRoutingConfig = DtbRoutingConfig()
+    scene_rules: tuple[CompiledSceneRule, ...] = ()
+    explicit_native_routing: bool = False
 
 
 @dataclass(frozen=True)

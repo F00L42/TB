@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | 理解当前实现、修改生产代码 | [DTB 说明](dtb/README.md)、[代码导航](dtb/AGENTS.md) | `dtb/request_controller.py` 与目标模块 |
 | 配置或部署 Qwen/vLLM-Ascend | [DTB 配置](dtb/README.md#配置生命周期)、[patch 操作](patches/vllm/v0.23.0/README.md) | `dtb/config/budget_config.yaml`、固定上游源码 |
+| 配置 system 身份与原生分流 | [system 路由部署手册](docs/design/dtb_system_routing_deployment.md) | Noemate 750 / 全原生候选；controller 与 serving patch 成对升级 |
 | 理解设计的实现状态 | [设计索引](docs/design/README.md) | 每份文档的状态和基线，再核对源码 |
 | 分析新服务器实验 | [仓库约束](AGENTS.md)、[泛化实验流程](docs/design/think_budget_generalization_plan.md) | 对应 run 的 manifest、请求明细、提取清单、RESULT |
 | 采集 Agent 请求 | [观测代理](proxy/README-observation.md)、[proxy 约束](proxy/AGENTS.md) | `proxy/observation/` |

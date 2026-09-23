@@ -29,65 +29,74 @@
 +        self.cot_controller = CoTController()
 +        self.dtb_request_controller = DtbRequestController()
          self.python_tool = None
-@@ -271,1 +276,68 @@
+@@ -271,1 +276,77 @@
 +        # Server-side master switch: when disabled, continue through native
 +        # vLLM as a single generation without constructing controller state.
 +        if (request.enable_think_budget
 +                and self.dtb_request_controller.is_enabled()):
-+            assert len(engine_inputs) == 1
-+            completion_token_limit = get_max_tokens(
-+                self.model_config.max_model_len,
-+                request.max_completion_tokens
-+                if request.max_completion_tokens is not None
-+                else request.max_tokens,
-+                self._extract_prompt_len(engine_inputs[0]),
-+                self.default_sampling_params,
-+                self.override_max_tokens,
-+                truncate_prompt_tokens=request.truncate_prompt_tokens,
-+            )
-+            prompt_components = self._extract_prompt_components(engine_inputs[0])
-+            trace_headers = (
-+                None if raw_request is None
-+                else await self._get_trace_headers(raw_request.headers)
-+            )
-+            if (not request.include_reasoning
-+                    or request._grammar_from_tool_parser):
-+                reasoning_ended = True
-+            elif reasoning_parser:
-+                reasoning_ended = reasoning_parser.is_reasoning_end(
-+                    prompt_components.token_ids or [])
-+            else:
-+                reasoning_ended = None
-+
-+            response_parser = None
-+            if self.parser_cls is not None:
-+                response_parser = self.parser_cls(
-+                    tokenizer,
-+                    request.tools,
-+                    chat_template_kwargs=chat_template_kwargs,
++            try:
++                prepared = self.dtb_request_controller.prepare_request_route(
++                    request, conversation,
++                    self._extract_prompt_text(engine_inputs[0])
++                    if self.dtb_request_controller.service_config.routing.mode == "legacy_text"
++                    else None,
++                    request_id=request_id)
++            except ValueError as exc:
++                return self.create_error_response(str(exc))
++            if prepared.route.action == "dtb":
++                assert len(engine_inputs) == 1
++                completion_token_limit = get_max_tokens(
++                    self.model_config.max_model_len,
++                    request.max_completion_tokens
++                    if request.max_completion_tokens is not None
++                    else request.max_tokens,
++                    self._extract_prompt_len(engine_inputs[0]),
++                    self.default_sampling_params,
++                    self.override_max_tokens,
++                    truncate_prompt_tokens=request.truncate_prompt_tokens,
 +                )
++                prompt_components = self._extract_prompt_components(engine_inputs[0])
++                trace_headers = (
++                    None if raw_request is None
++                    else await self._get_trace_headers(raw_request.headers)
++                )
++                if (not request.include_reasoning
++                        or request._grammar_from_tool_parser):
++                    reasoning_ended = True
++                elif reasoning_parser:
++                    reasoning_ended = reasoning_parser.is_reasoning_end(
++                        prompt_components.token_ids or [])
++                else:
++                    reasoning_ended = None
 +
-+            # Keep the controller's stable 7-argument ABI. This private
-+            # server-process object never enters the public request model.
-+            object.__setattr__(request, "_dtb_route_identity", {
-+                "model_name": model_name,
-+                "lora_request": lora_request,
-+                "data_parallel_rank": data_parallel_rank,
-+                "trace_headers": trace_headers,
-+                "prompt_text": prompt_components.text,
-+                "reasoning_ended": reasoning_ended,
-+                "reasoning_parser_kwargs": (
-+                    {"chat_template_kwargs": chat_template_kwargs}
-+                    if reasoning_parser else None
-+                ),
-+                "reasoning_parser": reasoning_parser,
-+                "response_parser": response_parser,
-+                "chat_template_kwargs": chat_template_kwargs,
-+                "completion_token_limit": completion_token_limit,
-+            })
-+            return await self.dtb_request_controller.handle_request(
-+                self, conversation, engine_inputs,
-+                request, request_id, tokenizer, request_metadata)
++                response_parser = None
++                if self.parser_cls is not None:
++                    response_parser = self.parser_cls(
++                        tokenizer,
++                        request.tools,
++                        chat_template_kwargs=chat_template_kwargs,
++                    )
++
++                # Private parser/generation context stays inside the server process.
++                object.__setattr__(request, "_dtb_route_identity", {
++                    "model_name": model_name,
++                    "lora_request": lora_request,
++                    "data_parallel_rank": data_parallel_rank,
++                    "trace_headers": trace_headers,
++                    "prompt_text": prompt_components.text,
++                    "reasoning_ended": reasoning_ended,
++                    "reasoning_parser_kwargs": (
++                        {"chat_template_kwargs": chat_template_kwargs}
++                        if reasoning_parser else None
++                    ),
++                    "reasoning_parser": reasoning_parser,
++                    "response_parser": response_parser,
++                    "chat_template_kwargs": chat_template_kwargs,
++                    "completion_token_limit": completion_token_limit,
++                })
++                return await self.dtb_request_controller.handle_request(
++                    self, conversation, engine_inputs,
++                    request, request_id, tokenizer, request_metadata, prepared=prepared)
 +
 +        # DTB wins when both flags are true. If its server switch is
 +        # disabled, fall through to native vLLM rather than another controller.

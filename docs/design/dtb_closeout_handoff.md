@@ -49,7 +49,10 @@ A/B/C/D可并行；E先做讲述结构与占位页，最终版等待B和实际E2
 
 **目的：** agent无需手动给每次请求传fixed参数，系统按配置识别身份并选择DTB预算或真正原生生成。
 
-已存在 [System场景与原生路由设计](dtb_system_scene_native_routing.md) 和 [Agent配置初稿](dtb_agent_scene_budget_plan.md)。当前基线只有设计，未在dtb源码找到system_prefix匹配能力；新session先查已有子任务进度，不能只加YAML便宣布支持。
+已存在 [System场景与原生路由设计](dtb_system_scene_native_routing.md) 和 [Agent配置初稿](dtb_agent_scene_budget_plan.md)。
+**2026-09-22 Session A 已实现并完成本地验证**：system_prefix 匹配、真正 native 分流、Noemate
+候选与 12,214 请求离线路由审计；交付入口为 [部署/回滚手册](dtb_system_routing_deployment.md)。
+服务器自动 phase/off 和任务 E2E 仍为 pending_remote；原 fixed 实验不作为自动模式验收。
 
 交付内容：
 

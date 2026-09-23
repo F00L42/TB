@@ -9,6 +9,8 @@ from typing import Any, Mapping
 
 import yaml
 
+from dtb.config.routing import compile_routing
+
 from dtb.config.schema import (
     DtbAlgorithmConfig,
     DtbHistoryStoreConfig,
@@ -62,7 +64,7 @@ def load_dtb_service_config(path: str | Path = DEFAULT_CONFIG_PATH) -> DtbServic
     root = _mapping(raw, "top-level value")
     allowed_top_level = {
         "RUNTIME", "REASONING_PROTOCOL", "OBSERVABILITY",
-        "SCENES", "SCENE_PRIORITY",
+        "SCENES", "SCENE_PRIORITY", "ROUTING",
         "DIFFICULTY_TIERS", "HISTORY_STORE", "HISTORY_NEW_TASK",
         "HISTORY_WARM_START", "HISTORY_HOT_START",
     }
@@ -172,6 +174,8 @@ def load_dtb_service_config(path: str | Path = DEFAULT_CONFIG_PATH) -> DtbServic
     )
 
     scenes = _mapping(root.get("SCENES"), "SCENES")
+    routing, scene_rules, explicit_native_routing = compile_routing(
+        root.get("ROUTING", {}), scenes, algorithm)
     priority = root.get("SCENE_PRIORITY")
     if not isinstance(priority, list) or not all(
         isinstance(item, str) and item for item in priority
@@ -185,6 +189,9 @@ def load_dtb_service_config(path: str | Path = DEFAULT_CONFIG_PATH) -> DtbServic
         reasoning_protocol=reasoning_protocol,
         observability=observability,
         history_store=history_store,
+        routing=routing,
+        scene_rules=scene_rules,
+        explicit_native_routing=explicit_native_routing,
         scenes=_frozen_mapping({
             name: _frozen_mapping(_mapping(value, f"SCENES.{name}"))
             for name, value in scenes.items()

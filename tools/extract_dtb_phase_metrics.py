@@ -120,6 +120,7 @@ def _parse_phase_line(line: str, line_number: int) -> PhaseEntry | None:
 def scan_server_log(
     lines: Iterable[str],
     tracked_request_ids: set[str] | None = None,
+    *, route_entries: list[PhaseEntry] | None = None,
 ) -> tuple[list[PhaseEntry], dict[str, LogRange]]:
     """Parse phases and locate exact tracked request IDs in one log pass.
 
@@ -133,6 +134,15 @@ def scan_server_log(
     entries: list[PhaseEntry] = []
 
     for line_number, line in enumerate(lines, 1):
+        if route_entries is not None and "DTB_ROUTE " in line:
+            try:
+                route = json.loads(line.split("DTB_ROUTE ", 1)[1])
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"invalid DTB route JSON at log line {line_number}") from exc
+            if (route.get("schema") != 1 or not route.get("parent_request_id")
+                    or route.get("action") not in ("native", "dtb")):
+                raise ValueError(f"invalid DTB route at log line {line_number}")
+            route_entries.append(PhaseEntry(route, line_number))
         entry = _parse_phase_line(line, line_number)
         matched_ids: set[str] = set()
         if entry is not None:
@@ -559,6 +569,7 @@ def write_bound_outputs(
     output_dir: Path,
     server_log: Path,
     summary_path: Path,
+    route_entries: list[PhaseEntry] | None = None,
 ) -> dict[str, object]:
     """Write one isolated extraction directory per concrete result CSV."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -571,6 +582,9 @@ def write_bound_outputs(
         for request_id in spec.request_rows
     }
     entries_by_result: dict[str, list[PhaseEntry]] = defaultdict(list)
+    routes_by_request: dict[str, list[dict]] = defaultdict(list)
+    for entry in route_entries or ():
+        routes_by_request[str(entry.record["parent_request_id"])].append(entry.record)
     for entry in entries:
         request_id = str(entry.record["parent_request_id"])
         owner = owner_by_request_id.get(request_id)
@@ -588,6 +602,9 @@ def write_bound_outputs(
         result_output_dir = extracted_dir / spec.source_path.stem
         result_output_dir.mkdir(parents=True, exist_ok=True)
         _write_jsonl(result_output_dir / "controller_phases.jsonl", records)
+        result_routes = [route for request_id in spec.request_rows
+                         for route in routes_by_request.get(request_id, ())]
+        _write_jsonl(result_output_dir / "routes.jsonl", result_routes)
 
         request_summaries = summarize_requests(records)
         for request_summary in request_summaries:
@@ -619,6 +636,15 @@ def write_bound_outputs(
                 phase_entries_by_request.get(row.request_id, [])
                 if row.request_id else [])
             log_range = ranges.get(row.request_id) if row.request_id else None
+            routes = routes_by_request.get(row.request_id, [])
+            route = routes[0] if len(routes) == 1 else {}
+            action = route.get("action", "")
+            route_status = (
+                "duplicate_route" if len(routes) > 1 else
+                "route_missing" if not routes else
+                "native_with_unexpected_phase" if action == "native" and phase_request_entries else
+                "native_no_phase_expected" if action == "native" else
+                "dtb_phase_present" if phase_request_entries else "dtb_phase_missing")
             request_index.append({
                 "result_file": spec.result_file,
                 "result_row": row.row_number,
@@ -633,6 +659,11 @@ def write_bound_outputs(
                 "last_matching_log_line": (
                     log_range.last_line if log_range else None),
                 "phase_records": len(phase_request_entries),
+                "route_records": len(routes),
+                "route_action": action,
+                "route_scene": route.get("scene", ""),
+                "route_reason": route.get("reason", ""),
+                "route_status": route_status,
                 "first_phase_log_line": (
                     min(entry.line_number for entry in phase_request_entries)
                     if phase_request_entries else None),
@@ -663,6 +694,14 @@ def write_bound_outputs(
             "requests_with_tb_phase": matched_phase_request_count,
             "requests_without_tb_phase": len(request_ids) - matched_phase_request_count,
             "phase_records": len(result_entries),
+            "route_records": len(result_routes),
+            "requests_with_route": sum(bool(routes_by_request.get(rid)) for rid in request_ids),
+            "route_status_counts": {
+                status: sum(item["route_status"] == status for item in request_index
+                            if item["result_file"] == spec.result_file)
+                for status in {item["route_status"] for item in request_index
+                               if item["result_file"] == spec.result_file}
+            },
             "first_matching_log_line": first_log_line,
             "last_matching_log_line": last_log_line,
             "first_phase_log_line": (
@@ -684,6 +723,7 @@ def write_bound_outputs(
         "first_matching_log_line",
         "last_matching_log_line",
         "phase_records",
+        "route_records", "route_action", "route_scene", "route_reason", "route_status",
         "first_phase_log_line",
         "last_phase_log_line",
     ]
@@ -706,6 +746,9 @@ def write_bound_outputs(
         "request_ids": len(owner_by_request_id),
         "total_phase_records_in_log": len(entries),
         "selected_phase_records": selected_phase_count,
+        "total_route_records_in_log": len(route_entries or ()),
+        "selected_route_records": sum(len(routes_by_request.get(rid, ())) for rid in owner_by_request_id),
+        "route_coverage_note": "Missing routes are unknown (including legacy/off/disabled); never infer native from absence. Native route is intent, not generation success.",
         "excluded_phase_records": len(entries) - selected_phase_count,
         "total_phase_parent_requests": len(all_phase_request_ids),
         "excluded_phase_parent_requests": len(
@@ -751,7 +794,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         }
         with server_log.open(
             "r", encoding="utf-8", errors="replace") as file:
-            entries, ranges = scan_server_log(file, tracked_request_ids)
+            route_entries: list[PhaseEntry] = []
+            entries, ranges = scan_server_log(file, tracked_request_ids, route_entries=route_entries)
         manifest = write_bound_outputs(
             entries,
             ranges,
@@ -759,6 +803,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             args.run_dir,
             server_log,
             summary_path,
+            route_entries,
         )
     except (OSError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc

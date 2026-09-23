@@ -9,6 +9,7 @@
 | --- | --- | --- |
 | 请求覆盖、路由身份、任务清理 | `request_controller.py::DtbRequestController` | `test_dtb_token_prompt.py`、`test_dtb_prompt_copy.py` |
 | YAML 生命周期和校验 | `config/loader.py`、`config/schema.py` | `test_dtb_config.py` |
+| system 身份、动作优先级、原生分流 | `request_controller.py::prepare_request_route`、`budgeting/scene_router.py::route_system_request`、`config/routing.py` | `test_dtb_system_routing.py` |
 | 场景拒识、分数、优先级 | `budgeting/scene_router.py::classify_scene` | `test_dtb_scene_router.py`、`test_dtb_static_cpu.py` |
 | 阈值/预算分支/来源 | `budgeting/budget_resolver.py::DtbBudgetResolver` | `test_dtb_budget_resolution.py`、`test_dtb_scene_config.py` |
 | 原生观察、介入、abort/drain | `reasoning/deferred_observation.py::_DeferredInterventionState` | `test_dtb_intervention.py` |
@@ -27,7 +28,8 @@
 
 - controller / 不可变 service config / budget resolver / telemetry writer 是服务级对象。
   `DtbRequestContext`、`DtbRequestState`、队列、可变 prompt、预算结果和 suffix cache 属于单请求。
-- 流式先运行原生 observation；满足既有协议/阈值/容量条件后才触发完整预算决策和接管。
+- serving 先准备一次路由；`native` 直接进入原生代码，不构造 DTB context/队列/状态机。
+  `dtb` 复用 prepare 的快照，流式先运行原生 observation；满足既有协议/阈值/容量条件后才触发完整预算决策和接管。
   非流式直接走三状态路径。不能把“每个请求都先 think→probe→final”当作当前行为。
 - producer 与 parser consumer 独立运行，让观察者及时消费引擎输出。不要合并 DELTA、改成
   直通生成器、修改队列容量或加入并行 child 来消除表面上的 await/队列成本。
@@ -40,6 +42,9 @@
   error terminal、取消和异常不能包装为成功。
 - 关键词 LRU 最多保存 2048 条不可变规则，只缓存配置字符串，不缓存请求文本、分类结果或
   tokenizer。请求的 casefold 文本和匹配列表保持局部。缓存冷启动可重复构造等价规则。
+- 上述关键词优化用于 `legacy_text`；`system_prefix` 使用服务级编译规则和精确前缀匹配，
+  不经过关键词评分。system/首 user 的大小写、空白、BOM 不归一化；有效 fixed 总预算优先，
+  单字段 fixed 覆盖不改变 native 动作。优先级及边界见[部署手册](../docs/design/dtb_system_routing_deployment.md)。
 - history store 和 token-filter 的兼容 setter 有进程级状态。生产路径不会按请求调用 setter；
   不要将它们用于不同并发请求的动态配置。改变隔离语义需另做行为设计。
 

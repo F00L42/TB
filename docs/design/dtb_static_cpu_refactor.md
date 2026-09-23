@@ -1,5 +1,10 @@
 # DTB 静态 CPU 优化与可读性重构
 
+> 2026-09-23 整合更新：本分支已将 system 路由 `34f39983` 合入静态优化 `5360067a`。
+> 下文第 1–7 节记录 2026-09-22 静态优化及其原始证据；当时的“配置/patch 不变”、
+> 472 项测试和关键词微基准不代表加入路由后的整体验收。现行接口见
+> [system 路由部署手册](dtb_system_routing_deployment.md)，合并验证见第 8 节。
+
 ## 1. 目的与交付边界
 
 日期：2026-09-22。起点为开发分支与远端一致的最新提交
@@ -116,3 +121,31 @@ hash。用同身份 `off` 比较 E2E，必要时单独 `phase` 对账，不把�
 | 日期 | 变更 | 依据 |
 | --- | --- | --- |
 | 2026-09-22 | 有界关键词规则缓存、局部 casefold、饱和结构扫描、非流式一次合并；final 私有职责提取；导航与验证入口 | 固定 f342e127、完整回归和本地 CPU/路由差分证据；服务器 pending_remote |
+| 2026-09-23 | 合入 system 路由 34f39983，保留静态优化并更新实现状态、路由流程与归属说明 | 525 项测试 / 1966 子测试通过；整合范围和服务器边界见第 8 节 |
+
+## 8. System 路由合并验证（2026-09-23）
+
+合并的两份提交为静态优化 `5360067a73c68a7321c660ddc05a567bf46a0bc5` 和 system 路由
+`34f3998310e28f6e113f895bb3f28e5fd4ec8edd`，共同起点为 f342e127。只合入指定路由提交，
+未连带合入开发分支上的其他后续工作。唯一文本冲突在 `scene_router.py` 的导入区，保留
+`dataclass`、`lru_cache`、`islice` 三项导入；没有改写两边的函数实现。
+
+当前能力包括 system 精确前缀/guard、scene/native 动作、prepare 快照、Noemate 两套候选、
+DTB_ROUTE 与提取器路由归属；默认配置仍是 legacy_text，候选不会自动替换规范 YAML。
+system 模式不使用关键词分类；原静态路由微基准只衡量 legacy 分类调用，不能推广到 system 路径。
+现行部署与回滚必须遵循[system 路由手册](dtb_system_routing_deployment.md)，controller 与新版
+serving patch 成对升级。第 6 节回退到 f342e127 的说明属于原静态候选，不能只将当前 controller
+退回旧版却保留新版 serving patch。
+
+本地整合验证：
+
+- `python tools/dtb/check_static.py`：**525 passed / 1966 subtests passed**；固定上游干净，
+  三份 patch 的 `git apply --check`、Python 静态编译与导航链接检查通过。
+- AST 核对：scene_router 的 6 个原优化符号与 5360067a 一致，3 个 system 路由符号与
+  34f39983 一致；其他 8 个路由生产 Python/serving patch 文件与 34f39983 完全一致。
+- final 状态与 response adapter 文件保持 5360067a 的实现；system/new serving tests 与
+  原有 633 条产品场景、parser、取消、额度及聚合回归一起通过。
+- 更新根导航、DTB 导航、设计状态表和 README 的 native 分流流程；历史 CPU 结果与离线路由
+  审计文件按各自原身份保留，本次未重跑 12,214 份捕获审计或宣称取得新的 CPU 加速比例。
+
+真实自动路由的 HTTP/NPU/任务质量/E2E 仍为 `pending_remote`，本地合并通过不替代服务器验收。

@@ -81,6 +81,9 @@
    任何请求归属不闭合或 variant 分支断言失败时，该 run 只能用于排障，不能参与性能
    排名。Vanilla 没有 phase 是合法状态；`off` 正式 DTB run 没有 phase 也是设计状态，
    但不能用于分支或模型总工作量裁决。
+   system/显式 native 路由还需审计 `DTB_ROUTE`、`routes.jsonl` 与 request_index 的
+   `route_*` 列：native route 无 phase 合法，缺少 route 不能推断 native；路由意图不代表
+   生成成功。具体归属状态见 `docs/design/dtb_system_routing_deployment.md` 第 3 节。
 4. **再做请求级配对。** 使用规范化数据集标识和 `QA_ID` 配对 Vanilla/候选；拒绝缺失、
    重复或样本集合不同的静默比较，并核对相同 ID 的问题与参考答案或 manifest 数据集
    哈希。优先报告逐场景 paired E2E、13 场景等权宏平均、请求加权结果、P50/P95、
@@ -116,7 +119,8 @@ reasoning boundary、外部剩余额度和实际 `answer_limit`，以便审计�
 DTB telemetry 由 `dtb/config/budget_config.yaml` 的 `OBSERVABILITY.mode` 在服务启动时确定：
 
 - `off` 是生产和正式性能排名默认值，不创建 recorder/writer，日志中不得出现 DTB 成功事件；
-- `phase` 写 `DTB_PHASE` schema 3 和 `DTB_REQUEST_SUMMARY`，用于单独的归属与 phase 账本 run；
+- `phase` 为开启路由的请求写一次 `DTB_ROUTE` schema 1；DTB 路径另写 `DTB_PHASE`
+  schema 3 和 `DTB_REQUEST_SUMMARY`，native route 不伪造 phase/summary，均用于单独的归属与账本 run；
 - `stream_audit` 不创建 phase recorder，只对 `stream_request_ids` 显式白名单写
   `DTB_STREAM_AUDIT`。该事件可能含正文和 token ID，只能用于隔离排障。
 

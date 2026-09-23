@@ -233,6 +233,7 @@ def test_facade_never_decodes_and_preserves_native_response_metadata(
         ), observability=DtbObservabilityConfig(
             mode=DtbTelemetryMode.PHASE if phase else DtbTelemetryMode.OFF))
         controller = DtbRequestController(service_config=config)
+        controller.observability.record_route = Mock(wraps=controller.observability.record_route)
         context.tokenizer.decode = Mock(side_effect=AssertionError("unexpected decode"))
         conversation = [{"role": "user", "content": "latest user"}] if has_user else []
         expected_source = ("latest_user_message" if has_user else
@@ -274,7 +275,10 @@ def test_facade_never_decodes_and_preserves_native_response_metadata(
             assert recorder is not None
             modules = recorder.module_snapshot()
             assert modules["controller.entry_to_first_submit"]["calls"] == 1
-            assert modules["decision.select_text"]["calls"] == 1
+            # Selection moved into the once-only pre-serving route interval.
+            controller.observability.record_route.assert_called_once()
+            assert controller.observability.record_route.call_args.kwargs["action"] == "dtb"
+            assert "decision.select_text" not in modules
             assert "decision.decode_prompt" not in modules
         else:
             assert controller.observability.writer is None

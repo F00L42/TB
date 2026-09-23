@@ -4,22 +4,24 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import AsyncGenerator
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any, TYPE_CHECKING
 
-from dtb.budgeting.budget_resolver import DtbBudgetResolver
+from dtb.budgeting.budget_resolver import DtbBudgetResolver, InterventionThreshold
+from dtb.budgeting.scene_router import DtbRouteDecision, route_from_scene, route_system_request
 from dtb.config.loader import load_dtb_service_config
 from dtb.config.schema import (
     DtbAlgorithmConfig,
     DtbAlgorithmPolicy,
     DtbServiceConfig,
+    DtbTelemetryMode,
 )
 from dtb.history.store import (
     AsyncHistoryRecorder,
     HistoryOutcome,
     configure_history_store,
 )
-from dtb.integration.vllm.request_adapter import extract_prompt_text_views
+from dtb.integration.vllm.request_adapter import PromptTextViews, extract_prompt_text_views
 from dtb.integration.vllm.response_adapter import (
     aggregate_queue,
     native_chat_response,
@@ -44,6 +46,14 @@ if TYPE_CHECKING:
 
 class DtbConfigError(ValueError):
     pass
+
+
+@dataclass(frozen=True)
+class PreparedDtbRequest:
+    config: DtbAlgorithmConfig
+    route: DtbRouteDecision
+    threshold: InterventionThreshold | None = None
+    text_views: PromptTextViews | None = None
 
 
 _FIXED_REQUEST_FIELDS = frozenset({
@@ -114,6 +124,53 @@ class DtbRequestController:
 
     def is_enabled(self) -> bool:
         return self.service_config.algorithm.budget_enabled
+
+    def prepare_request_route(
+        self, request: ChatCompletionRequest, conversation: list,
+        initial_text: str | None = None, *, request_id: str = "",
+    ) -> PreparedDtbRequest:
+        """Prepare once before serving constructs any DTB-only request state."""
+        if not self.is_enabled() or not getattr(request, "enable_think_budget", True):
+            return PreparedDtbRequest(self.service_config.algorithm,
+                                      DtbRouteDecision("general", False, "native", "disabled"))
+        phase = self.service_config.observability.mode is DtbTelemetryMode.PHASE
+        started = time.perf_counter() if phase else None
+        config = self._build_algorithm_config(request)
+        service = self.service_config
+        system_mode = service.routing.mode == "system_prefix"
+        views = None
+        threshold = None
+        if system_mode and config.fixed_budget_tokens > 0:
+            info = {"scene": "general", "scene_matched": False, "reject_reason": "fixed_budget"}
+            route = DtbRouteDecision("general", False, "dtb", "fixed_budget", info)
+        elif system_mode:
+            route = route_system_request(request, service)
+        else:
+            views = extract_prompt_text_views(conversation, initial_text)
+            if config.fixed_budget_tokens > 0 or not service.explicit_native_routing:
+                # Preserve legacy fixed-threshold short-circuit and lazy full decision.
+                threshold = (self.budget_resolver.intervention_threshold(
+                    views.classification_text, config) if getattr(request, "stream", False) else None)
+                info = threshold.scene_info if threshold is not None else None
+                route = (route_from_scene(info, service) if info is not None else
+                         DtbRouteDecision("general", False, "dtb",
+                                          "fixed_budget" if config.fixed_budget_tokens > 0 else "legacy_deferred"))
+            else:
+                route = route_from_scene(self.budget_resolver._match_scene(
+                    views.classification_text, config, None), service)
+        if route.action == "dtb" and route.scene_info is not None and threshold is None:
+            threshold = self.budget_resolver.intervention_threshold(
+                "" if system_mode else views.classification_text, config,
+                scene_info=route.scene_info)
+        if phase:
+            self.observability.record_route(
+                parent_request_id=request_id, mode=service.routing.mode,
+                scene=route.scene, matched=route.matched, action=route.action,
+                reason=route.reason, wall_ms=(time.perf_counter() - started) * 1000,
+                threshold=threshold.tokens if threshold else None,
+                threshold_source=threshold.source if threshold else None,
+            )
+        return PreparedDtbRequest(config, route, threshold, views)
 
     @staticmethod
     def _validate_request_override(name: str, value: Any) -> None:
@@ -238,22 +295,32 @@ class DtbRequestController:
         model_name: str | None = None,
         lora_request: Any = None,
         data_parallel_rank: int | None = None,
+        prepared: PreparedDtbRequest | None = None,
     ) -> Any:
-        phase_recorder = self.observability.create_phase_recorder(
-            self.policy.version)
-        controller_entry_started_at = (
-            time.perf_counter() if phase_recorder is not None else None
-        )
         if not getattr(request, "stream", False) and getattr(request, "n", None) not in (None, 1):
             return serving_chat.create_error_response("DTB currently supports only n=1")
         try:
-            config = self._build_algorithm_config(request)
+            if prepared is None:
+                identity = getattr(request, self.ROUTING_CONTEXT_ATTR, None)
+                initial_text = identity.get("prompt_text") if isinstance(identity, dict) else None
+                if initial_text is None and engine_inputs:
+                    initial_text = engine_inputs[0].get("prompt")
+                prepared = self.prepare_request_route(
+                    request, conversation, initial_text, request_id=request_id)
+            config = prepared.config
         except (DtbConfigError, ValueError) as exc:
             return serving_chat.create_error_response(str(exc))
         if not config.budget_enabled:
             return serving_chat.create_error_response(
                 "DTB is disabled by server configuration"
             )
+
+        if prepared.route.action != "dtb":
+            return serving_chat.create_error_response(
+                "native route must fall through in the DTB serving patch")
+        phase_recorder = self.observability.create_phase_recorder(self.policy.version)
+        controller_entry_started_at = (
+            time.perf_counter() if phase_recorder is not None else None)
 
         policy = self.policy
         route_identity = getattr(request, self.ROUTING_CONTEXT_ATTR, None)
@@ -354,12 +421,12 @@ class DtbRequestController:
         prompt_token_ids = engine_inputs[0].get("prompt_token_ids", [])
         if engine_prompt_text is None:
             engine_prompt_text = engine_inputs[0].get("prompt")
-        if phase_recorder is None:
-            text_views = extract_prompt_text_views(conversation, engine_prompt_text)
+        if self.service_config.routing.mode == "system_prefix":
+            text_views = PromptTextViews("", "system_prefix", engine_prompt_text,
+                                        "serving_prompt" if engine_prompt_text is not None else "missing")
         else:
-            with phase_recorder.measure("decision.select_text"):
-                text_views = extract_prompt_text_views(
-                    conversation, engine_prompt_text)
+            text_views = replace(prepared.text_views, initial_text=engine_prompt_text,
+                                 initial_text_source="serving_prompt" if engine_prompt_text is not None else "missing")
         classification_text = text_views.classification_text
         remaining_context = max(
             1,
@@ -367,11 +434,7 @@ class DtbRequestController:
         )
         hard_token_limit = min(remaining_context, completion_token_limit)
 
-        threshold = (
-            self.budget_resolver.intervention_threshold(
-                classification_text, config, phase_recorder)
-            if request.stream else None
-        )
+        threshold = prepared.threshold
 
         def resolve_decision():
             if phase_recorder is None:
@@ -389,6 +452,8 @@ class DtbRequestController:
                     "classification_input_chars": len(classification_text),
                     "initial_text_source": text_views.initial_text_source,
                     "completion_token_limit": completion_token_limit,
+                    "route_action": prepared.route.action,
+                    "route_reason": prepared.route.reason,
                 }
                 with phase_recorder.measure("decision.total"):
                     decision = self.budget_resolver.resolve(

@@ -4,6 +4,40 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from dtb.config.routing import MESSAGE_LIMIT, SYSTEM_PREFIX_LIMIT
+
+
+def message_field(message: Any, field: str) -> Any:
+    return message.get(field) if isinstance(message, dict) else getattr(message, field, None)
+
+
+@dataclass(frozen=True)
+class SystemIdentityView:
+    prefix: str = ""
+    first_user: Any = None
+    reject_reason: str | None = None
+
+
+def system_identity_view(messages: Any) -> SystemIdentityView:
+    """Read bounded role metadata and one system head, never history bodies."""
+    if not isinstance(messages, (list, tuple)) or not messages:
+        return SystemIdentityView(reject_reason="missing_messages")
+    if len(messages) > MESSAGE_LIMIT:
+        return SystemIdentityView(reject_reason="message_limit")
+    if message_field(messages[0], "role") != "system":
+        return SystemIdentityView(reject_reason="missing_leading_system")
+    first_user = None
+    for index, message in enumerate(messages):
+        role = message_field(message, "role")
+        if role == "developer" or (index > 0 and role == "system"):
+            return SystemIdentityView(reject_reason="conflicting_instruction_roles")
+        if role == "user" and first_user is None:
+            first_user = message
+    content = message_field(messages[0], "content")
+    if not isinstance(content, str):
+        return SystemIdentityView(reject_reason="unsupported_system_content")
+    return SystemIdentityView(content[:SYSTEM_PREFIX_LIMIT], first_user)
+
 
 def merge_stop_token_ids(params: Any, required_ids: tuple[int, ...]) -> None:
     """Mutate a post-init vLLM SamplingParams stop set atomically.

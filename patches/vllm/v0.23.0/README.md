@@ -30,6 +30,11 @@ is not a valid DTB deployment.
 - `dtb_serving.patch` adds the external `enable_think_budget` protocol field
   and routes enabled requests to `DtbRequestController`. A false request flag
   or false server master switch remains on vLLM's native single-generate path.
+  Enabled requests first call `prepare_request_route()` once. A `native` action
+  falls through to that same native serving code without creating DTB context,
+  queues, response parser copies or budget decisions; `dtb` passes the prepared
+  snapshot to `handle_request()`. This patch and controller must be upgraded
+  together. See the [system routing deployment and rollback guide](../../../docs/design/dtb_system_routing_deployment.md).
   The enabled route resolves the whole assistant completion limit with vLLM's
   native `get_max_tokens()` before passing it through private route identity.
 - `qwen3_coder_parser.patch` replaces the partition-sensitive progressive XML

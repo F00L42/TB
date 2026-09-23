@@ -1,7 +1,7 @@
 # 设计文档索引
 
-状态核对基线：`f342e1276a0d8b9c8b2c02f57917b19be936b799`，加上
-`codex/dtb-static-refactor` 的静态优化。日期：2026-09-22。
+状态核对基线：静态优化 `5360067a` 与 system 路由 `34f39983` 已在
+`codex/dtb-static-refactor` 合并。日期：2026-09-23。
 此处的“已实现”只表示代码存在；每次服务器验收的模型、参数、SHA 和质量结论仍以该 run 的
 `RESULT.md` 为准。文档中的历史哈希、旧路径、测试数不能作为当前部署身份。
 
@@ -20,8 +20,9 @@
 | [包清理和 Telemetry](dtb_cleanup_and_telemetry_refactor_plan.md) | 2026-08-20 P0–P4 已实施，记录旧实现/制品哈希 | `dtb/`、`observability/`；历史 P5 状态不代替后来各 run 的验收 |
 | [泛化实验流程](think_budget_generalization_plan.md) | 当前实验/完整性/质量/配对统计规范 | 根 AGENTS 指定的第 6 节；不据旧 run 推算新模型基线 |
 | [Agent 多轮实验](agent_multiturn_dtb_experiment_plan.md) | 实验流程，含历史扫描候选 | 先读页首更新和 [proxy 约束](../../proxy/AGENTS.md) |
-| [Agent 自动预算初稿](dtb_agent_scene_budget_plan.md) | 待实现设计；其性能门槛为目标 | 不存在已交付的 system 身份自动策略；不等同于当前 user-text 分类 |
-| [System 规则与原生路由](dtb_system_scene_native_routing.md) | 基线未实现，本分支未增加这项能力 | 当前 `visible_user_text()` 和 scene resolver；其他工作区改动需独立合入验收 |
+| [Agent 自动预算初稿](dtb_agent_scene_budget_plan.md) | system 自动路由已实现；历史参数与性能目标仍需场景验收 | 原方案不能自动套用到 Noemate；现行候选见部署手册 |
+| [System 规则与原生路由](dtb_system_scene_native_routing.md) | `34f39983` 已实现并合入；服务器 pending_remote | `prepare_request_route()`、`route_system_request()`、启动规则编译 |
+| [System 路由部署与回滚](dtb_system_routing_deployment.md) | 当前接口/配置/优先级与服务器验收命令 | Noemate 750 / 全原生候选、DTB_ROUTE；controller 与 serving patch 成对升级 |
 | [GLM-5.3 加速计划](dtb_glm53_agent_acceleration_plan.md) | tokenizer/源码分析和适配计划，非 GLM 生产验收 | `ReasoningProtocolAdapter` 当前只有 QWEN3；不能只换 token ID |
 | [Qwen/GLM parser 对比](dtb_qwen36_glm53_parser_comparison.md) | 固定源码和 tokenizer 诊断 | 上游 parser；离线回放不等于 GLM/NPU 性能 |
 | [通用 Agent 观测代理](general_agent_observation_proxy.md) | 首版已实现；剩余设计见 §7.4 | [使用说明](../../proxy/README-observation.md) |

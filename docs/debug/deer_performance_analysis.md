@@ -719,6 +719,7 @@ threshold/budget 实验分开。
 
 | 日期 | 变更 | 原因 |
 |---|---|---|
+| 2026-09-22 | 完成 [Session A system 路由](../design/dtb_system_routing_deployment.md)：有界 system 前缀、scene/native 动作、prepare 快照与 DTB_ROUTE，提供 Noemate 750/全原生候选 | 离线 12,214 输入全部命中（8,306 DTB / 3,908 native），468 本地测试与 1,966 子测试通过；只证明已见模板路由和 CPU/协议行为，750 不推广至未知任务，服务器自动 phase/off 与 E2E pending_remote |
 | 2026-09-22 | 整理 [DTB收尾与多session交接](../design/dtb_closeout_handoff.md)：自动system场景配置、分布/成功轨迹、同步E2E、独立观察器分支和PPT五项交付 | 用户将当前目标明确为存在可解释的正确压缩案例，E2E同步执行；此前个别失败/严格短请求非劣未过不再作为测试阻塞条件，失败事实及统计边界保留。补充观察器模块去耦、已输出token不可回退、部署回滚与跨session提交依赖 |
 | 2026-09-22 | 审计 [Noemate 884a00 off冒烟与冻结小集](../log/perf/noemate_guardrail_main_20260922T070000Z/RESULT.md)：628请求/128661 SSE全量核对，全部232次DTB可见思考≤753，319平均快44.73%、10/10对更快 | off压缩得到支持；178有6/10次final漏4条严重告警，399有2次错误总和/1次未聚合（其中一次错误仅533思考token，不能全归因强退）。短集37同输出对平均差+0.10ms、首输出上界小，但8组E2E非劣均未证明。转定向语义/观察路径复验，不直接进入并发5或端到端发布验收；无新服务器执行 |
 | 2026-09-22 | 审计 [Noemate activation phase](../log/perf/noemate_activation_audit_20260922T031321Z/RESULT.md)：12请求/3256 SSE与grep日志38事件闭合，7次在751–753 token直接budget_final、零probe，5次原生同child完成 | 机制门通过，可切回off做冻结长短集验证；353/a2 final在2048总额度截断，7次abort的model_work_complete=false保留完整算力未知。无同轮Vanilla，不作性能/正确率非劣结论；附off smoke及610请求独立验证脚本，本地仅离线审计 |
@@ -766,3 +767,4 @@ threshold/budget 实验分开。
 | 2026-07-21 | 纳入 v0.23.0 最新 DTB 汇总；落地 phase ledger、浅拷贝/日志优化、v0.23.0 调用上下文透传、manifest 模板与日志提取工具 | 先获得隐藏 probe 与 child phase 的请求级证据，再对 2000–4000 token probe 做质量约束消融 |
 | 2026-07-20 | 重写性能分析；建立完整成本模型、优化优先级和服务器 runbook | 校正早期文档对 scheduler slot、KV cache 和 MTP 因果的过度推断，并纳入新日志证据 |
 | 2026-09-22 | 基于 f342e127 在 codex/dtb-static-refactor 完成路由规则缓存/局部 casefold、非流式文本一次合并、final 私有方法提取和文档导航；472 tests 与 1966 subtests 通过，633 条完整路由字典与基线一致 | [静态优化设计](../design/dtb_static_cpu_refactor.md)与[本地 CPU 证据](../log/perf/static_cpu_20260922/RESULT.md)可复算；算法、配置、patch 不变，真实并发 E2E/质量/内存仍为 pending_remote |
+| 2026-09-23 | 将 system 路由 34f39983 合入静态优化 5360067a，保留两边函数行为，统一当前路由流程与设计状态 | 完整本地门禁 525 tests / 1966 subtests、三份 patch 检查通过；[整合记录](../design/dtb_static_cpu_refactor.md#8-system-路由合并验证2026-09-23)，自动 HTTP/NPU/任务 E2E 仍为 pending_remote |
