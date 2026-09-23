@@ -1,7 +1,9 @@
 # 回归 fixtures
 
 这些输入从清理前 commit cb6d67dee5a65ad50959330e4c58d246ded35226 投影，来源路径、原 SHA256、
-投影规则、保留字节与 SHA256 见 [provenance.json](provenance.json)。不包含可用于新服务器排名的历史指标。
+投影规则、保留字节与 SHA256 见 [provenance.json](provenance.json)。来源 SHA256 按该提交的原始 Git blob
+计算，不使用受 core.autocrlf 影响的工作区副本。JSON/JSONL 序列化行尾为 LF；CSV 问题正文保留源值，
+其中事件自闭环样本原本包含 CRLF，不进行文本归一化。不包含可用于新服务器排名的历史指标。
 
 | 目录 | 保留内容 | 验证目的 |
 | --- | --- | --- |

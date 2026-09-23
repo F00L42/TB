@@ -44,6 +44,8 @@ legacy 路由 1k/16k/64k 字符的中位操作时间分别减少约 42%/35%/35%�
 环境是 Windows/Python 3.14.7，5×5 次局部重复，包含 fixture 构造/断言；并未模拟引擎调度。
 记录的 candidate_dirty=true 表示在本次清理提交前执行；候选 SHA 按本地源码字节/换行计算，
 绑定本次实现，不能把该数字标为服务器收益。
+后续统一了源码/文档/JSON 的 LF 行尾，并修正 fixture 来源哈希为原提交 Git blob 的哈希；
+CSV 问题正文保留原始换行。该格式修正不改变 Python 逻辑，但与上述 Windows 微基准当时的文件字节哈希可能不同。
 
 ## 服务器最小验收：pending_remote
 

@@ -1,6 +1,7 @@
-# Frozen inputs are byte-exact, including prompt trailing whitespace and CRLF.
-# Do not normalize test data or let core.autocrlf invalidate provenance.
-tests/fixtures/** -text -whitespace
-tests/fixtures/*.md text eol=lf whitespace
-tests/fixtures/provenance.json text eol=lf whitespace
+# Use LF in Git and on checkout, including Windows with core.autocrlf=true.
+* text=auto eol=lf
 *.gz binary
+
+# CSV questions are frozen data: embedded newlines/trailing spaces belong to
+# the original prompt. Their byte hashes are checked by check_static.py.
+tests/fixtures/**/*.csv -text -whitespace

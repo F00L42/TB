@@ -44,6 +44,29 @@ def check_fixtures():
     print(f"PASS: {len(manifest['files'])} preserved fixture hashes", flush=True)
 
 
+def check_line_endings():
+    """Reject CR in text files; frozen CSV prompt bytes have their own hash gate."""
+    names = run(["git", "ls-files", "-z"], capture=True).stdout.split("\0")
+    checked = 0
+    for name in names:
+        path = ROOT / name
+        if not name or not path.is_file():
+            continue  # Git submodules are checked independently below.
+        data = path.read_bytes()
+        if b"\0" in data:
+            continue
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        if name.startswith("tests/fixtures/") and path.suffix == ".csv":
+            continue  # Original prompt CRLF and whitespace must not be rewritten.
+        if b"\r" in data:
+            raise RuntimeError(f"Non-LF text: {name}; save with LF line endings")
+        checked += 1
+    print(f"PASS: {checked} tracked text files use LF (frozen CSV data excluded)", flush=True)
+
+
 def run(command, *, capture=False):
     print("+ " + " ".join(str(arg) for arg in command), flush=True)
     return subprocess.run(
@@ -58,6 +81,7 @@ def main():
     args = parser.parse_args()
     check_navigation()
     check_fixtures()
+    check_line_endings()
     # Check the checkout against this commit's gitlink, not a moving branch/tag.
     for name in ("vllm", "vllm-ascend"):
         relative = f"third_party/{name}"
