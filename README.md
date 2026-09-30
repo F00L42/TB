@@ -12,6 +12,7 @@ DTB 在 vLLM 服务内控制思考预算，目标是在保持答案质量和原�
 | 服务器流式/非流式、质量和配对耗时检查 | [7 条 replay 数据与矩阵](validation/replay/README.md) |
 | 无模型回归与数据来源 | [fixtures](tests/fixtures/README.md)、[测试门禁](tools/dtb/check_static.py) |
 | 正式性能实验 | [实验与证据契约](docs/design/think_budget_generalization_plan.md)、[服务器 runbook](docs/debug/deer_performance_analysis.md) |
+| 最终汇报 | [五页演示稿](docs/report/closeout/presentation/README.md)、[内容稿与案例选择](docs/report/closeout/outlines.md)、[固定来源索引](docs/report/closeout/sources.md) |
 
 ## 本地验证
 
