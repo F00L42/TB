@@ -101,6 +101,26 @@ function scatter(s, points, threshold, xMax, yMax, box, markerSize) {
   applyPresentationChartFont(chart, { fontFamily: F });
   return chart;
 }
+function segmentedDevelopmentScatter(s) {
+  // Two native charts retain the actual token values. The package repair sets
+  // identical plot rectangles, so the ranges touch and have equal plot height.
+  const chartHeight = 185;
+  const plotHeight = chartHeight * 0.73;
+  const axis = { textStyle: { typeface: F, fontSize: 19, fill: C.muted }, line: { fill: '#CDD8DE', width: 1 } };
+  for (const upper of [true, false]) {
+    const points = devPoints.filter(r => upper ? r.y > 850 : r.y <= 850);
+    const series = [{ name: upper ? '研发 >850 token' : '研发 ≤850 token', xValues: points.map(r => r.x), values: points.map(r => r.y), fill: upper ? C.gold : C.gray, line: { fill: 'none', width: 0 }, marker: { symbol: 'circle', size: upper ? 6 : 4 } }];
+    if (upper) series.push({ name: '850 token 分段界线', xValues: [0, 400], values: [850, 850], line: { fill: C.gold, width: 1.4 }, marker: { symbol: 'none' } });
+    const chart = s.charts.add('scatter', {
+      position: { left: 74, top: 220 + (upper ? 0 : plotHeight), width: 925, height: chartHeight },
+      series, scatterOptions: { style: 'lineWithMarkers' }, hasLegend: false,
+      xAxis: { ...axis, min: 0, max: 400, majorUnit: 100, numberFormatCode: '0', tickLabelPosition: upper ? 'none' : 'nextTo', majorGridlines: null, line: { fill: upper ? 'none' : '#CDD8DE', width: upper ? 0 : 1 } },
+      yAxis: { ...axis, min: upper ? 850 : 0, max: upper ? 3500 : 850, majorUnit: upper ? 1000 : 500, numberFormatCode: '#,##0', majorGridlines: { fill: C.grid, width: 1 } },
+      dataLabels: { showValue: false, textStyle: { typeface: F, fontSize: 18 } }, chartFill: 'none', plotAreaFill: 'none', chartLine: { fill: 'none', width: 0 }, plotAreaLine: { fill: 'none', width: 0 },
+    });
+    applyPresentationChartFont(chart, { fontFamily: F });
+  }
+}
 function comparison(s, values, box, max, unit) {
   const chart = s.charts.add('bar', {
     position: box, categories: ['DTB', 'Vanilla'],
@@ -117,23 +137,39 @@ function comparison(s, values, box, max, unit) {
 
 // 1. Background and the algorithm, not a cover slide.
 {
-  const s = slide('动态思考预算控制（DTB）', '目标：在质量不退化的前提下，减少 Agent 等待模型思考的时间', 1, 'DTB 集成在 vLLM 服务内，复用原生 reasoning / tool parser');
-  t(s, '为什么需要控制', 74, 223, 600, 50, 32, C.ink, true);
-  t(s, '工具结果已经返回，模型仍可能\n继续复述、检查和反思。', 74, 290, 620, 100, 31);
-  t(s, '这些额外生成会累积为 Agent 等待。', 74, 402, 620, 52, 27, C.muted);
-  t(s, '按场景确定预算，按需判断继续', 810, 223, 710, 50, 32, C.teal, true);
-  t(s, '先观察原生生成。需要介入时，\n用隐藏试答的 token 概率评分辅助决策。', 810, 290, 700, 100, 31);
-  t(s, '试答评分用于决策，不等于答案正确概率。', 810, 402, 700, 52, 24, C.muted);
-  const a = node(s, '继续思考', 180, 564, 260, 83);
-  const b = node(s, '隐藏试答与评分', 664, 564, 280, 83, true);
-  const c = node(s, '生成最终答案', 1180, 564, 280, 83);
-  arrow(s, a, b); arrow(s, b, c);
-  t(s, '达到检查条件', 448, 520, 214, 35, 23, C.muted, false, 'center');
-  t(s, '评分满足条件', 953, 520, 215, 35, 23, C.muted, false, 'center');
-  arrow(s, b, a, { kind: 'elbow', fromSide: 'bottom', toSide: 'bottom', line: { fill: C.muted, width: 2, style: 'dashed' } });
-  t(s, '未接受且预算仍有余量，继续思考', 215, 706, 765, 46, 26, C.muted, false, 'center');
-  t(s, '自然结束或预算用尽时，无需试答', 990, 705, 535, 65, 24, C.muted);
-  notes(s, '背景沿用参考方案的四项技术组织。未引用缺乏对照的“思考增加4倍”“提速40%”。图为算法职责示意：并非每请求都进行隐藏试答，达到总预算可直接final，短请求同一child自然完成。probe接受后进入final生成，不保证复用试答全文。history/difficulty默认关闭；未实现在线学习或语义重复检测。完整架构：请求路由与预算配置、原生观察、thinking/probe/final状态、原生parser。', ['R01', 'C01', 'C02', 'C05', 'C07', 'C08', 'S13']);
+  const s = slide('动态思考预算控制（DTB）', '按场景设置预算，在生成过程中决定继续思考或收束为答案', 1, '目标是净 E2E 收益；试答评分用于生成决策，不等于答案正确概率');
+  t(s, '背景与问题', 74, 208, 510, 46, 33, C.ink, true);
+  t(s, '同一任务的思考步骤与耗时存在波动，\nAgent 多轮调用会累积这些等待。', 74, 269, 535, 85, 27);
+  t(s, '信息已经足够，模型仍可能反复推敲，\n思考越长，并不意味着任务收益越大。', 74, 366, 535, 85, 27);
+  rule(s, 74, 473, 527);
+  t(s, '核心思想', 74, 494, 510, 43, 31, C.teal, true);
+  t(s, '用预算约束思考长度，\n用生成中检查决定是否继续。', 74, 550, 535, 80, 29, C.ink, true);
+  t(s, '质量与协议正确是前提，\n收益按客户端端到端耗时衡量。', 74, 650, 535, 78, 26, C.muted);
+  t(s, '实现位置：vLLM 服务内部', 74, 758, 535, 41, 26, C.teal, true);
+
+  t(s, '整体架构：场景预算与生成中检查', 668, 207, 858, 46, 32, C.ink, true);
+  const query = node(s, 'Agent 请求', 670, 285, 180, 76, false, 25);
+  const route = node(s, '场景识别\n与路由', 899, 285, 210, 76, false, 26);
+  const budget = node(s, '预算参数\n阈值 / 步长 / 上限', 1158, 285, 367, 76, true, 25);
+  const engine = node(s, 'vLLM 生成与观察', 972.5, 442, 285, 79, false, 27);
+  const probe = node(s, '隐藏试答\nToken 概率评分', 990, 622, 250, 88, true, 25);
+  const thinking = node(s, '继续思考', 670, 622, 206, 88, false, 27);
+  const final = node(s, '引导收束\n最终生成', 1342, 622, 183, 88, false, 26);
+  const parser = node(s, '原生 reasoning / tool parser 与响应输出', 924, 760, 601, 53, false, 24);
+  arrow(s, query, route); arrow(s, route, budget);
+  arrow(s, budget, engine, { kind: 'elbow', fromSide: 'bottom', toSide: 'top' });
+  arrow(s, engine, probe, { fromSide: 'bottom', toSide: 'top' });
+  t(s, '满足检查条件', 1131, 548, 145, 37, 22, C.muted);
+  arrow(s, probe, thinking, { fromSide: 'left', toSide: 'right' });
+  t(s, '评分不足\n且有预算', 877, 610, 109, 48, 20, C.muted, false, 'center');
+  arrow(s, thinking, engine, { kind: 'elbow', fromSide: 'top', toSide: 'left', line: { fill: C.muted, width: 2, style: 'dashed' } });
+  arrow(s, probe, final);
+  t(s, '评分达标', 1241, 624, 101, 30, 20, C.muted, false, 'center');
+  arrow(s, engine, final, { kind: 'elbow', fromSide: 'right', toSide: 'top' });
+  t(s, '预算耗尽', 1327, 498, 192, 33, 22, C.muted, false, 'center');
+  arrow(s, final, parser, { kind: 'elbow', fromSide: 'bottom', toSide: 'top' });
+  t(s, '原生分流或自然结束\n沿原生路径完成响应', 669, 756, 246, 59, 21, C.muted);
+  notes(s, '采用R01的“背景与问题、核心思想、实现方式、整体架构”紧凑组织，改写为当前服务内控制链。问题为原方案的定性动机和S13报告阶段反复计数记录，不引用缺乏同条件原始对照的“增加4倍”“提速40%”“261至419秒”。\n架构主图按职责组织：场景识别和native分流、阈值/步长/上限配置、vLLM原生生成观察、隐藏试答与token概率评分、继续思考或cue引导final、原生parser输出。预算参数是配置职责；流式观察触发后才裁决完整预算。非流式直接进入三状态，并非每请求都先观察。达到总预算可直接final，短请求同一child自然完成，显式native绕过DTB。probe接受后进入final生成，不保证复用试答全文。\n源码：request_controller.py:128–173；budget_resolver.py:62–78,157–214,336–358；deferred_observation.py:128–146,226–305；generation_states.py:401–428,531–584,613–668,758–780；response_adapter.py:73–101。difficulty/history有实现但默认关闭（budget_config.yaml:14–16），从主图省略。原图中的在线学习最优预算、信息增益、语义重复/工具循环检测、熵变化、人工接管、Planning/反思/Tool独立子预算未纳入当前主图。', ['R01', 'C01', 'C02', 'C03', 'C05', 'C06', 'C07', 'C08', 'P01', 'P03', 'P05', 'S13']);
 }
 // 2. Four historical engineering milestones, one simple timeline.
 {
@@ -162,9 +198,9 @@ function comparison(s, values, box, max, unit) {
 {
   const s = slide('抓大放小：先观察，按需接管', '研发 Agent 全链路请求（含标题），Vanilla-06 共 391 条有效请求', 3, '历史长度分布不等于实际介入率或可节省比例；11 条长尾中有 9 条标题请求');
   t(s, '可见思考长度 / token', 74, 195, 620, 32, 20, C.muted);
-  scatter(s, devPoints, 850, 400, 3500, { left: 74, top: 232, width: 925, height: 306 }, 4);
+  segmentedDevelopmentScatter(s);
   t(s, '请求发起序号', 665, 539, 332, 31, 20, C.muted, false, 'right');
-  t(s, '金线：850 token 介入参考', 85, 539, 515, 31, 20, C.gold);
+  t(s, '分段等高：0–850 / 850–3500 token', 85, 539, 590, 31, 20, C.gold);
   t(s, '97.19%', 1090, 215, 415, 83, 59, C.teal, true);
   t(s, '请求思考不超过 850 token', 1090, 300, 420, 40, 26, C.muted);
   t(s, '2.81% 的长尾', 1090, 370, 420, 55, 34, C.gold, true);
@@ -182,7 +218,7 @@ function comparison(s, values, box, max, unit) {
   for (let i = 0; i < nodes.length - 1; i++) arrow(s, nodes[i], nodes[i + 1]);
   arrow(s, nodes[3], nodes[2], { kind: 'elbow', fromSide: 'bottom', toSide: 'bottom', line: { fill: C.gold, width: 2, style: 'dashed' } });
   t(s, 'abort / drain，前缀＋cue 写入新 prompt 后续写', 340, 777, 1035, 32, 23, C.gold, false, 'center');
-  notes(s, '研发点集S10的vanilla_chronological_requests逐ID对照S11。392总请求中7774ec46a9f245c9无有效SSE，分布排除后391。380≤850，11>850；全部52112思考token，长尾20263，占38.883558%。11条中9标题、2业务。业务382条中仅2>850。长尾完整思考和超阈值10913均不等于可安全删除量。长度是历史本地重编码。采用连续线性轴0至3500，全部391点，无断轴。\n管道是vLLM0.23.0固定源码的逻辑输出路径，不代表独立进程数量。EngineCore输出经output_queue、Msgpack/ZeroMQ、EngineCoreClient AsyncMPClient接收，再由AsyncLLM.output_handler和OutputProcessor detokenize/检查stop，进入每请求RequestOutputCollector，AsyncLLM.generate yield。DTB增量观察后经stream_output/result_queue/stream_queue，交给原生chat_completion_stream_generator parser.parse_delta，序列化SSE。HTTP具体组件为FastAPI StreamingResponse与Uvicorn，客户端库不固定。\n虚线控制先进入AsyncLLM请求接口，再经EngineCoreClient到EngineCore。触发且安全接管时abort并drain，保留已接受前缀。强制final分支将answer cue及闭合标记写入内部prompt，启动新的final child，继续同一个外部HTTP响应。cue不写入用户SSE，不修改已发内容；可能有batch/在途尾部，不是任意token精确硬截断。通用路径也可能hidden probe或继续思考。短请求沿同一child完成，仍有观察成本；明确native路由则绕过DTB段。非流式不使用这个观察路径。跨进程与HTTP完整组件表及行号见sources.md。', ['S10', 'S11', 'S13', 'V01', 'C06', 'C05', 'U01', 'U02', 'U03', 'U04', 'U05', 'U06', 'U07', 'P01', 'P02', 'P03', 'P04']);
+  notes(s, '研发点集S10的vanilla_chronological_requests逐ID对照S11。392总请求中7774ec46a9f245c9无有效SSE，分布排除后391。380≤850，11>850；全部52112思考token，长尾20263，占38.883558%。11条中9标题、2业务。业务382条中仅2>850。长尾完整思考和超阈值10913均不等于可安全删除量。长度是历史本地重编码。采用850处分段线性纵轴，下半段0–850，上半段850–3500，两段绘图区等高且在850处相接。使用两个原生散点图保留原始token值，380个短点与11个长点合计391，无删除、无数值映射。各段分别线性，不跨段比较视觉距离或斜率。\n管道是vLLM0.23.0固定源码的逻辑输出路径，不代表独立进程数量。EngineCore输出经output_queue、Msgpack/ZeroMQ、EngineCoreClient AsyncMPClient接收，再由AsyncLLM.output_handler和OutputProcessor detokenize/检查stop，进入每请求RequestOutputCollector，AsyncLLM.generate yield。DTB增量观察后经stream_output/result_queue/stream_queue，交给原生chat_completion_stream_generator parser.parse_delta，序列化SSE。HTTP具体组件为FastAPI StreamingResponse与Uvicorn，客户端库不固定。\n虚线控制先进入AsyncLLM请求接口，再经EngineCoreClient到EngineCore。触发且安全接管时abort并drain，保留已接受前缀。强制final分支将answer cue及闭合标记写入内部prompt，启动新的final child，继续同一个外部HTTP响应。cue不写入用户SSE，不修改已发内容；可能有batch/在途尾部，不是任意token精确硬截断。通用路径也可能hidden probe或继续思考。短请求沿同一child完成，仍有观察成本；明确native路由则绕过DTB段。非流式不使用这个观察路径。跨进程与HTTP完整组件表及行号见sources.md。', ['S10', 'S11', 'S13', 'V01', 'C06', 'C05', 'U01', 'U02', 'U03', 'U04', 'U05', 'U06', 'U07', 'P01', 'P02', 'P03', 'P04']);
 }
 // 4. One background distribution and two clearly scoped comparisons.
 {
@@ -228,7 +264,7 @@ const repaired = path.join(build, `markers-${revision}.pptx`);
 const validatedPath = path.join(build, 'release', `DTB_closeout_20260930_${revision}.pptx`);
 await fs.mkdir(path.dirname(validatedPath), { recursive: true });
 await (await PresentationFile.exportPptx(p)).save(draft);
-// Explicitly encode marker fills and zero-width sample lines for Office rendering.
+// Encode marker fills, zero-width sample lines, and equal adjoining plot areas.
 execFileSync(process.env.RUNTIME_PYTHON, [path.join(here, 'repair_chart_markers.py'), draft, repaired], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 const receipt = await finalizePresentation({
   workspaceDir: build, candidatePath: repaired, finalPath: validatedPath,
@@ -242,4 +278,4 @@ const receipt = await finalizePresentation({
 });
 await fs.copyFile(validatedPath, finalPath);
 await fs.writeFile(path.join(build, `deck-${revision}.json`), JSON.stringify(p.toProto()));
-console.log(JSON.stringify({ output: finalPath, slides: 5, nativeCharts: 4, samplePoints: [391, 8277], receipt: path.join(build, `validation-${revision}.json`) }));
+console.log(JSON.stringify({ output: finalPath, slides: 5, nativeCharts: 5, samplePoints: [391, 8277], receipt: path.join(build, `validation-${revision}.json`) }));

@@ -1,18 +1,35 @@
 # 汇报引用源索引
 
-## 第 3、4 页分布图的分工与风格（2026-09-28）
+## 第 1 页紧凑背景与框架改写（2026-09-30）
+
+已实际查看 R01 原页，继承“背景与问题、核心思想、实现方式、整体架构”的组织方式，框架按当前服务内实现重画。
+源码仍固定到 `f5512aa35152a13a9ee164a64928674badc26ceb`，本轮不修改实现。主图只包含以下职责：
+
+| 图中职责 | 源码定位 |
+| --- | --- |
+| 场景识别、native 分流 | P01 `request_controller.py:128–173`；C03 |
+| 阈值、步长、上限配置与裁决 | P05 `budget_resolver.py:62–78,157–214,336–358`；完整预算在流式观察触发后裁决 |
+| 原生生成与观察、短请求自然完成 | C06 `deferred_observation.py:128–146,226–305` |
+| 隐藏试答、token 概率评分、继续思考 | C05 `generation_states.py:401–428,531–584,613–668`；C08 |
+| cue 引导最终生成、原生 parser 输出 | C05 `generation_states.py:758–780`；P03 `response_adapter.py:73–101` |
+
+history/difficulty 已实现但默认关闭（C07），不放主图。原图中的在线学习最优预算、信息增益、语义重复/工具循环检测、熵变化、人工接管、Planning/反思/Tool 独立子预算不列为当前实现。
+参考材料中缺乏同条件原始对照的 4 倍、40% 和耗时数字不上屏；问题动机保留定性表述，S13 的 case37 支撑“已有信息仍反复推敲”。
+
+## 第 3、4 页分布图的分工与风格（2026-09-30）
 
 第 3 页采用辅助研发 Vanilla-06 的 391 条分布，第 4 页采用 Noemate 的 8,277 条主 Agent 分布。
-下列两张历史图已实际查看；本轮只更新构图要求和数据入口，没有修改图片或 PPTX。
+下列两张历史图已实际查看；交付演示稿依据精简点数据重画，历史源图不作修改。
 
 | ID | 固定图源 | 本稿使用方式 |
 | --- | --- | --- |
-| V01 | [研发思考长度长尾与 850 阈值](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/sum0911/统计图/思考长度长尾与850阈值.png) | 第 3 页数据与旧图参照。同目录有同名 PPTX；移除宽分段隔带及右侧放大图，默认连续线性轴，只留细 850 阈值线 |
+| V01 | [研发思考长度长尾与 850 阈值](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/sum0911/统计图/思考长度长尾与850阈值.png) | 第 3 页数据与旧图参照。同目录有同名 PPTX；下段 0–850、上段 850–3,500 各占一半绘图区，850 处一条细分界线；无宽隔带或右侧放大图 |
 | V02 | [Noemate Vanilla 思考长度分布](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/dtb_closeout/evidence/figures/vanilla_distribution.png) | 第 4 页图源与两图统一风格参照。同目录有同名 PPTX；连续线性轴、浅色普通点、金色长点、细 750 阈值线 |
 
 V01/V02 的 PNG Git blob 哈希已纳入本轮更新的 `evidence/source_manifest.json`，未把大图复制进交付证据目录。
 研发点数据在 [development_distribution.csv](evidence/development_distribution.csv)，来自 S10 的 `vanilla_chronological_requests`，逐 ID 对照 S11。
 Noemate 点数据仍为 [noemate_distribution.csv](evidence/noemate_distribution.csv)。统一外观不代表两组实验可以直接比较性能。
+研发图采用两个相接的原生散点图区，不映射 token 数值；两段内各自线性，图下注明分段等高，不能跨段比较视觉距离或斜率。Noemate 保持连续线性轴。
 
 ## 第 3 页管道示意源码核对（2026-09-28）
 
@@ -38,6 +55,7 @@ Noemate 点数据仍为 [noemate_distribution.csv](evidence/noemate_distribution
 | P02 | [dtb/reasoning/request_context.py](https://github.com/F00L42/TB/blob/f5512aa35152a13a9ee164a64928674badc26ceb/dtb/reasoning/request_context.py#L159) | `stream_output` 159–207：输出额度及队列；`close_reasoning` 388–403：cue、闭合 token 与分隔符进入内部 prompt |
 | P03 | [dtb/integration/vllm/response_adapter.py](https://github.com/F00L42/TB/blob/f5512aa35152a13a9ee164a64928674badc26ceb/dtb/integration/vllm/response_adapter.py#L32) | `stream_queue` 32–41、`native_chat_response` 73–97：保持原生 chat_completion_stream_generator / parser 路径 |
 | P04 | [dtb_serving.patch](https://github.com/F00L42/TB/blob/f5512aa35152a13a9ee164a64928674badc26ceb/patches/vllm/v0.23.0/dtb_serving.patch#L97) | 97–99：serving 分派到 DTB controller；native 动作继续走原生路径 |
+| P05 | [dtb/budgeting/budget_resolver.py](https://github.com/F00L42/TB/blob/f5512aa35152a13a9ee164a64928674badc26ceb/dtb/budgeting/budget_resolver.py#L62) | 第 1 页预算参数补充：62–78 阈值；157–214 固定/场景预算；336–358 请求/场景硬上限 |
 | C06（补充定位） | [deferred_observation.py](https://github.com/F00L42/TB/blob/f5512aa35152a13a9ee164a64928674badc26ceb/dtb/reasoning/deferred_observation.py#L193) | 193–214：abort/drain；226–243：观察、阈值和自然边界；256–297：接管尾部、保留前缀、选择 probe 或 final |
 | C05（补充定位） | [generation_states.py](https://github.com/F00L42/TB/blob/f5512aa35152a13a9ee164a64928674badc26ceb/dtb/reasoning/generation_states.py#L758) | `_prepare_boundary` 758–780：内部 answer cue；final 704–718：新 child_request_id 与新的 generate |
 
