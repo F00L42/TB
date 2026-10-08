@@ -115,7 +115,7 @@ git show 32ab2268335e00d79e0aeda4395c6ecdc06d81eb:docs/report/agent_dtb_demo_dat
 | N353M | [docs/log/perf/noemate_guardrail_main_20260922T070000Z/long_l353_measured/manifest.json](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_guardrail_main_20260922T070000Z/long_l353_measured/manifest.json) | 10 次固定输入、交替 V/D 回放 manifest |
 | N399S | [docs/log/perf/noemate_guardrail_main_20260922T070000Z/long_l399_measured/summary.jsonl](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_guardrail_main_20260922T070000Z/long_l399_measured/summary.jsonl) | 20 条 summary；按 client_request_id 与 attempt 对账 |
 | N399M | [docs/log/perf/noemate_guardrail_main_20260922T070000Z/long_l399_measured/manifest.json](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_guardrail_main_20260922T070000Z/long_l399_measured/manifest.json) | 10 次固定输入、交替 V/D 回放 manifest |
-| S06 | [docs/report/dtb_closeout/evidence/cards/l178_a1.json](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/dtb_closeout/evidence/cards/l178_a1.json) | 178/a1 的 pair、vanilla、dtb、parameters、semantic_verdict；主成功例 |
+| S06 | [docs/report/dtb_closeout/evidence/cards/l178_a1.json](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/dtb_closeout/evidence/cards/l178_a1.json) | 178/a1 的 pair、vanilla、dtb、parameters、semantic_verdict；讲者备注中的输出示例 |
 | S07 | [docs/report/dtb_closeout/evidence/cards/l178_a3.json](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/dtb_closeout/evidence/cards/l178_a3.json) | 178/a3；缺严重组的失败对照，只供审阅 |
 | S08 | [docs/report/dtb_closeout/evidence/cards/l399_a10.json](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/dtb_closeout/evidence/cards/l399_a10.json) | 399/a10；日期限制下的数值汇总，只供审阅 |
 | S09 | [docs/report/dtb_closeout/evidence/review/requests/l178.json](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/report/dtb_closeout/evidence/review/requests/l178.json) | messages[32,34,...,54]；12 条告警原输入 |
@@ -148,7 +148,36 @@ git show 32ab2268335e00d79e0aeda4395c6ecdc06d81eb:docs/report/agent_dtb_demo_dat
 ## 取数与证据边界
 
 - 未 checkout 历史分支、未复制历史大目录、未调用模型。
-- 主成功样例是 178/a1；178/a3 与 399/a10 是审阅对照。319 不作为质量成功例。
+- 第 4 页主效果使用全部 50 对长请求回放。178/a1 为备注中的输出示例，178/a3 与 399/a10 为审阅对照；319 不作为质量成功例。
 - 第 2 页的故障计数引用已提交工程复盘；本次未重新执行这些 parser/服务器回放。
 - 第 4 页的请求耗时与总账由脚本复算；业务质量沿用带边界的历史规则核对和审核。
 - 复算命令与检查范围见 [精简证据说明](evidence/README.md)。
+
+## 第 4 页 Noemate 回放集合与实际触发边界（2026-10-08）
+
+[演示稿 r9](presentation/DTB_closeout_20260930_r9.pptx) 按用户确认，以**“Noemate 长请求回放（50 对）”**展示全部 5 个冻结输入 × 10 对回放的平均 E2E：24.8744579→18.51114568 秒，下降 25.5817%；178/a1 留作备注示例。该集合有同轮耗时配对，没有逐请求的实际触发证明。以下历史来源继续固定在 `debug_agent` 提交 `32ab2268335e00d79e0aeda4395c6ecdc06d81eb`；没有重新执行服务器实验。
+
+| ID | 固定来源 | 本次核对字段 / 用途 |
+| --- | --- | --- |
+| S24 | [Noemate off 主实验 RESULT](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_guardrail_main_20260922T070000Z/RESULT.md) | §2 身份、off 与交替配对；§3 明确无逐请求 phase；§4 五个输入各 10 对；§5 质量反例 |
+| S25 | [实际 phase 轮 manifest](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_activation_audit_20260922T031321Z/direct750/manifest.json) | `selected_lines` 为 6 个输入、`repetitions=2`、`variants=["dtb"]`；没有 Vanilla 对照 |
+| S26 | [实际 phase 轮 paired_summary](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_activation_audit_20260922T031321Z/direct750/paired_summary.json) | `request_count=12`、`all_pairs.pairs=0`、`latency_ranking_valid=false`；零值加速字段不是测得 0% 收益 |
+| S27 | [实际 phase 轮 audit_summary](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_activation_audit_20260922T031321Z/audit_summary.json) | `branches.budget_final=7`、`native_complete=5`、`hidden_probe_tokens=0`；服务事件与客户端身份闭合范围 |
+| S28 | [实际 phase 轮 request_audit](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_activation_audit_20260922T031321Z/request_audit.json) | 逐 `parent_request_id` 的 `branch`、`phase_counts`、`intervention`；关联 serverlog 原行号 |
+| S29 | [实际 phase 轮 RESULT](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_activation_audit_20260922T031321Z/RESULT.md) | §2 只有 DTB、无独立预热；§4 七次 `budget_final`、`final_answer_reason=budget_exhausted`；§5–6 账本与质量边界 |
+| S30 | [更早 direct750 off 轮 RESULT](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_direct750_off_20260921T064359Z/RESULT.md) | §2 用户确认实际日志未开启；名含 phase 的目录不能当实际 phase 证据；§4 长输入探索选样规则 |
+| S31 | [off 主实验 request_metrics](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_guardrail_main_20260922T070000Z/request_metrics.json) | 628 条中按 `group=long`、`stage=measured` 取 100 条；以 `client_request_id` 对账 `reasoning_tokens`、`elapsed_ms`、终止与异常 |
+| S32 | [off 主实验 semantic_checks](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_guardrail_main_20260922T070000Z/semantic_checks.json) | `scope` 仅字面告警覆盖与显式算术；`requests` 为逐次有限检查，不能等同完整业务质量通过 |
+| S33 | [冻结候选 selection](https://github.com/F00L42/TB/blob/32ab2268335e00d79e0aeda4395c6ecdc06d81eb/docs/log/perf/noemate_activation_audit_20260922T031321Z/selection.json) | `long_candidates=[178,259,319,353]`、`semantic_boundary=[399]`；此前探索选样、后续轮冻结，非总体分布或独立 holdout |
+
+复算入口仍为 **S04** 的 `pairs[group="long"]`，50 对分别由既有 **N178S/N178M、N259S/N259M、N319S/N319M、N353S/N353M、N399S/N399M** 的原 summary/manifest 核实。本次逐 ID 核对 `v_ms/d_ms` 与 summary 的 `elapsed_ms`，再对照 S31 的 `reasoning_tokens`；未混入预热、smoke、短请求，也未过滤慢请求、截断或动作变化。
+
+| 数据集合 | 原字段 / 过滤 | 复算结果 | 使用边界 |
+| --- | --- | --- | --- |
+| 冻结长请求全 50 对 | S04 `group=long` | E2E 总量 1,243.722895→925.557284 s；均值 24.8744579→18.51114568 s；`(1−ΣD/ΣV)×100%=25.5817%`；43/50 更快 | r9 正文采用的回放时延效果；未逐请求确认实际早退 |
+| 48 对长度代理 | 上述集合再取 `750<=d_reasoning<=753` | 均值 25.045980→18.655950 s；下降 25.5132% | 仅备查，正文不使用；事后长度筛选不能确认触发 |
+| 7 次实际预算接管 | S19 `all_requests` / S28 中 `intervention_status=triggered`、`abort_count=1`、`post_drain_branch=budget_final`，且有 `final_answer` | 7 次，0 probe，Vanilla 配对数为 0 | 机制证据；不能跨 run 或跨 off/phase 补对计算加速率 |
+
+早退定义的源码边界沿用 **C06 272–295 行**与 **C05 665–668 行**：自然完成、模型边界、进入 probe、预算耗尽 final 是不同结果；probe 还须核对接受并转 final。只有 capture 思考大于 750 或输出约为 750，均不能代替实际状态证据。
+
+本节是补充来源索引，未改写既有 `evidence/source_manifest.json` 或提取脚本。2026-10-08 离线核对的完整数值、配对 ID 及所读数据 blob SHA-256 留在本地审计产物 `artifacts/closeout-review/20261008/noemate-trigger-audit.json`；该 ignored 文件不作为交付依赖，以上固定 Git 来源与字段可独立复算。质量问题和未闭合项只记录在大纲审阅、讲者备注中，不新增演示页脚声明。

@@ -1,4 +1,4 @@
-"""Set scatter marker fills and adjoining equal-height segmented plot rectangles."""
+"""Set editable scatter styles and absolute plot positions for Office rendering."""
 from pathlib import Path
 import sys
 import zipfile
@@ -29,9 +29,14 @@ def main(src: str, dst: str) -> None:
                         layout.remove(child)
                     manual = E.SubElement(layout, "{" + NS["c"] + "}manualLayout")
                     E.SubElement(manual, "{" + NS["c"] + "}layoutTarget", val="inner")
+                    # factor x/y are offsets from Office's automatic layout,
+                    # which differs with tick-label widths and visible axes.
+                    # edge anchors the plot to the chart frame instead.
                     for axis in ("x", "y", "w", "h"):
-                        E.SubElement(manual, "{" + NS["c"] + "}" + axis + "Mode", val="factor")
-                    for axis, value in {"x": "0.082", "y": "0.07", "w": "0.898", "h": "0.73"}.items():
+                        E.SubElement(manual, "{" + NS["c"] + "}" + axis + "Mode",
+                                     val="edge" if axis in ("x", "y") else "factor")
+                    for axis, value in {"x": str(75.85 / 975), "y": str(12.95 / 235),
+                                        "w": str(830.65 / 975), "h": str(135.05 / 235)}.items():
                         E.SubElement(manual, "{" + NS["c"] + "}" + axis, val=value)
                     segmented += 1
                 for ser in root.findall(".//c:scatterChart/c:ser", NS):
@@ -49,10 +54,17 @@ def main(src: str, dst: str) -> None:
                         mstyle = E.SubElement(marker, "{" + NS["c"] + "}spPr")
                     for child in list(mstyle):
                         mstyle.remove(child)
-                    E.SubElement(E.SubElement(mstyle, "{" + NS["a"] + "}solidFill"),
-                                 "{" + NS["a"] + "}srgbClr", val=color)
-                    E.SubElement(E.SubElement(mstyle, "{" + NS["a"] + "}ln", w="0"),
-                                 "{" + NS["a"] + "}noFill")
+                    name = "".join(ser.find("c:tx", NS).itertext())
+                    if name.startswith("研发 ≤"):
+                        E.SubElement(mstyle, "{" + NS["a"] + "}noFill")
+                        outline = E.SubElement(mstyle, "{" + NS["a"] + "}ln", w="9525")
+                        E.SubElement(E.SubElement(outline, "{" + NS["a"] + "}solidFill"),
+                                     "{" + NS["a"] + "}srgbClr", val="819CAC")
+                    else:
+                        E.SubElement(E.SubElement(mstyle, "{" + NS["a"] + "}solidFill"),
+                                     "{" + NS["a"] + "}srgbClr", val=color)
+                        E.SubElement(E.SubElement(mstyle, "{" + NS["a"] + "}ln", w="0"),
+                                     "{" + NS["a"] + "}noFill")
                     changed += 1
                 data = E.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
             zout.writestr(item, data)

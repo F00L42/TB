@@ -10,7 +10,23 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const report = path.dirname(here);
 const root = path.resolve(report, '../../..');
 const runtime = process.env.RUNTIME_ROOT ?? path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies');
-const skill = process.env.PRESENTATIONS_SKILL ?? path.join(os.homedir(), '.codex/plugins/cache/openai-primary-runtime/presentations/26.909.12148/skills/presentations');
+async function resolvePresentationSkill() {
+  if (process.env.PRESENTATIONS_SKILL !== undefined) return process.env.PRESENTATIONS_SKILL;
+  const plugins = path.join(os.homedir(), '.codex/plugins/cache/openai-primary-runtime/presentations');
+  const versions = (await fs.readdir(plugins))
+    .filter(version => /^\d+(?:\.\d+)*$/.test(version))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+  for (const version of versions) {
+    const candidate = path.join(plugins, version, 'skills/presentations');
+    try {
+      if ((await fs.stat(path.join(candidate, 'container_tools/artifact_tool_utils.mjs'))).isFile()) return candidate;
+    } catch (error) {
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+    }
+  }
+  throw new Error(`No presentations skill found in ${plugins}; set PRESENTATIONS_SKILL explicitly.`);
+}
+const skill = await resolvePresentationSkill();
 process.env.RUNTIME_NODE_MODULES = path.join(runtime, 'node/node_modules');
 process.env.RUNTIME_NODE = path.join(runtime, 'node/bin/node.exe');
 process.env.RUNTIME_PYTHON = path.join(runtime, 'python/python.exe');
@@ -42,7 +58,15 @@ const start = Date.parse(noe[0].started_at_utc);
 const devPoints = dev.map(r => ({ x: Number(r.sequence), y: Number(r.reasoning_tokens) }));
 const noePoints = noe.map(r => ({ x: Number(((Date.parse(r.started_at_utc) - start) / 3600000).toFixed(8)), y: Number(r.reasoning_tokens) }));
 if (devPoints.length !== 391 || noePoints.length !== 8277) throw new Error('Distribution count mismatch');
-const noemateBefore = 24.794401, noemateAfter = 18.603930;
+const noematePairs = await readJson('noemate_long_pairs.json');
+const noemateKeys = new Set(noematePairs.map(p => `${p.line}/${p.attempt}`));
+if (noematePairs.length !== 50 || noemateKeys.size !== 50 ||
+    ![178, 259, 319, 353, 399].every(line => Array.from({ length: 10 }, (_, i) => i + 1).every(a => noemateKeys.has(`${line}/${a}`)))) {
+  throw new Error('Noemate frozen pair membership mismatch');
+}
+const noemateBefore = noematePairs.reduce((sum, p) => sum + p.v_ms, 0) / 50000;
+const noemateAfter = noematePairs.reduce((sum, p) => sum + p.d_ms, 0) / 50000;
+const noemateReplayNote = 'Noemate长请求回放：178、259、319、353、399各10对，共50对、100请求，均值24.8744579→18.51114568秒。按1−ΣDTB/ΣVanilla计算下降25.58171215%，43/50对更快，非逐对降幅的平均值。全部回放保留，包含慢请求、失败、截断和工具动作变化。off、单并发、stream、temperature0.2/top_p1/max_tokens2048/seed20260918，fixed check/budget750。这是冻结的5输入重复执行，不能称50个独立问题或已确认早退请求集合。V/DTB length为9/4次、工具调用0/1次，存在字段遗漏、建议错误和待完成语义审核，仅表示该组请求时延变化，不证明整体无损收益。逐对证据见evidence/noemate_long_pairs.json，v_ms/d_ms对应各N*S的elapsed_ms。单例178/a1仅作备注备查。\n';
 const devBefore = data.development.totals.vanilla.llm_e2e_s;
 const devAfter = data.development.totals.run08.llm_e2e_s;
 const pct = (a, b) => ((1 - b / a) * 100).toFixed(2);
@@ -50,6 +74,7 @@ const pct = (a, b) => ((1 - b / a) * 100).toFixed(2);
 const F = 'Microsoft YaHei';
 const C = { ink: '#142C3D', muted: '#536B7C', gray: '#BCCBD3', teal: '#087F7C', gold: '#B16A16', grid: '#E8EFF2', light: '#F2F7F8', warm: '#FFF4E4' };
 const p = Presentation.create({ slideSize: { width: 1600, height: 900 } });
+const slideFootnotes = new WeakMap();
 const t = (s, text, x, y, w, h, size = 28, color = C.ink, bold = false, align = 'left') => {
   const shape = s.shapes.add({ geometry: 'textbox', name: text.slice(0, 70), position: { left: x, top: y, width: w, height: h }, fill: 'none', line: { fill: 'none', width: 0 } });
   shape.text = text;
@@ -68,8 +93,7 @@ function slide(title, subtitle, n, foot) {
   const s = p.slides.add(); s.background.fill = '#FFFFFF';
   t(s, title, 72, 44, 1456, 74, 48, C.ink, true);
   if (subtitle) t(s, subtitle, 74, 127, 1450, 45, 28, C.muted);
-  rule(s, 74, 829, 1452);
-  if (foot) t(s, foot, 74, 842, 1390, 34, 18, C.muted);
+  if (foot) slideFootnotes.set(s, foot);
   t(s, String(n).padStart(2, '0'), 1478, 842, 48, 34, 19, C.muted, false, 'right');
   return s;
 }
@@ -81,7 +105,8 @@ function notes(s, text, ids) {
     if (!line) throw new Error(`Missing source: ${id}`);
     return line;
   });
-  s.speakerNotes.textFrame.setText(`${text}\n\n引用来源\n${refs.join('\n\n')}\n\n详细口径及反例：docs/report/closeout/outlines.md；本地精简证据：docs/report/closeout/evidence/。`);
+  const footnote = slideFootnotes.get(s);
+  s.speakerNotes.textFrame.setText(`${footnote ? footnote + '\n\n' : ''}${text}\n\n引用来源\n${refs.join('\n\n')}\n\n详细口径及反例：docs/report/closeout/outlines.md；本地精简证据：docs/report/closeout/evidence/。`);
 }
 function scatter(s, points, threshold, xMax, yMax, box, markerSize) {
   const low = points.filter(r => r.y <= threshold), high = points.filter(r => r.y > threshold);
@@ -104,17 +129,17 @@ function scatter(s, points, threshold, xMax, yMax, box, markerSize) {
 function segmentedDevelopmentScatter(s) {
   // Two native charts retain the actual token values. The package repair sets
   // identical plot rectangles, so the ranges touch and have equal plot height.
-  const chartHeight = 185;
-  const plotHeight = chartHeight * 0.73;
+  const chartHeight = 235;
+  const plotHeight = 135.05;
   const axis = { textStyle: { typeface: F, fontSize: 19, fill: C.muted }, line: { fill: '#CDD8DE', width: 1 } };
   for (const upper of [true, false]) {
     const points = devPoints.filter(r => upper ? r.y > 850 : r.y <= 850);
-    const series = [{ name: upper ? '研发 >850 token' : '研发 ≤850 token', xValues: points.map(r => r.x), values: points.map(r => r.y), fill: upper ? C.gold : C.gray, line: { fill: 'none', width: 0 }, marker: { symbol: 'circle', size: upper ? 6 : 4 } }];
+    const series = [{ name: upper ? '研发 >850 token' : '研发 ≤850 token', xValues: points.map(r => r.x), values: points.map(r => r.y), fill: upper ? C.gold : C.gray, line: { fill: 'none', width: 0 }, marker: { symbol: 'circle', size: upper ? 6 : 5 } }];
     if (upper) series.push({ name: '850 token 分段界线', xValues: [0, 400], values: [850, 850], line: { fill: C.gold, width: 1.4 }, marker: { symbol: 'none' } });
     const chart = s.charts.add('scatter', {
-      position: { left: 74, top: 220 + (upper ? 0 : plotHeight), width: 925, height: chartHeight },
+      position: { left: 74, top: 220 + (upper ? 0 : plotHeight), width: 975, height: chartHeight },
       series, scatterOptions: { style: 'lineWithMarkers' }, hasLegend: false,
-      xAxis: { ...axis, min: 0, max: 400, majorUnit: 100, numberFormatCode: '0', tickLabelPosition: upper ? 'none' : 'nextTo', majorGridlines: null, line: { fill: upper ? 'none' : '#CDD8DE', width: upper ? 0 : 1 } },
+      xAxis: { ...axis, min: 0, max: 400, majorUnit: 100, numberFormatCode: '0', tickLabelPosition: upper ? 'none' : 'nextTo', majorGridlines: null, line: { fill: upper ? C.gold : '#CDD8DE', width: upper ? 1.4 : 1 } },
       yAxis: { ...axis, min: upper ? 850 : 0, max: upper ? 3500 : 850, majorUnit: upper ? 1000 : 500, numberFormatCode: '#,##0', majorGridlines: { fill: C.grid, width: 1 } },
       dataLabels: { showValue: false, textStyle: { typeface: F, fontSize: 18 } }, chartFill: 'none', plotAreaFill: 'none', chartLine: { fill: 'none', width: 0 }, plotAreaLine: { fill: 'none', width: 0 },
     });
@@ -222,7 +247,7 @@ function comparison(s, values, box, max, unit) {
 }
 // 4. One background distribution and two clearly scoped comparisons.
 {
-  const s = slide('历史回放与研发任务的效果', 'Noemate 单请求样例与研发任务组，分别展示请求等待和累计 LLM 耗时', 4, '历史观测；178/a1 为选取样例，研发调用轨迹不同，均不代表整体质量不退化');
+  const s = slide('历史回放与研发任务的效果', 'Noemate 回放请求与研发任务组，分别展示请求时延和累计 LLM 耗时', 4, '历史观测；Noemate 为冻结长请求回放集合，研发调用轨迹不同，均不代表整体质量不退化');
   t(s, 'Noemate 主 Agent 思考分布', 74, 205, 700, 47, 30, C.ink, true);
   t(s, '8,277 条有效请求', 74, 263, 700, 37, 24, C.muted);
   t(s, '可见思考长度 / token', 74, 312, 655, 29, 19, C.muted);
@@ -230,17 +255,17 @@ function comparison(s, values, box, max, unit) {
   t(s, '距首请求小时数', 435, 665, 310, 31, 20, C.muted, false, 'right');
   t(s, '金线：750 token', 80, 665, 355, 31, 20, C.gold);
   t(s, '94.99% ≤750 token', 74, 725, 670, 63, 38, C.teal, true);
-  t(s, 'Noemate 告警分类 178/a1', 823, 205, 650, 47, 30, C.ink, true);
-  t(s, '单请求 E2E / 秒', 823, 265, 392, 36, 24, C.muted);
+  t(s, 'Noemate 长请求回放（50 对）', 823, 205, 650, 47, 30, C.ink, true);
+  t(s, '平均请求 E2E / 秒', 823, 265, 392, 36, 24, C.muted);
   t(s, `−${pct(noemateBefore, noemateAfter)}%`, 1257, 258, 268, 53, 38, C.teal, true, 'right');
-  comparison(s, [noemateBefore, noemateAfter], { left: 808, top: 316, width: 715, height: 147 }, 31, '请求 E2E / 秒');
-  t(s, 'final 保留 12 条告警及分类字段', 824, 467, 700, 40, 27, C.teal, true);
+  comparison(s, [noemateBefore, noemateAfter], { left: 808, top: 316, width: 715, height: 147 }, 31, '平均请求 E2E / 秒');
+  t(s, '5 个输入 × 10 对回放', 824, 467, 700, 40, 27, C.teal, true);
   rule(s, 824, 536, 700);
   t(s, '辅助研发 9 任务', 823, 564, 650, 45, 30, C.ink, true);
   t(s, '累计 LLM E2E / 秒', 823, 619, 450, 36, 24, C.muted);
   t(s, `−${pct(devBefore, devAfter)}%`, 1257, 611, 268, 53, 38, C.teal, true, 'right');
   comparison(s, [devBefore, devAfter], { left: 808, top: 668, width: 715, height: 145 }, 3700, '累计 LLM E2E / 秒');
-  notes(s, 'Noemate分布：12214捕获，主Agent8306；排除29后8277。≤750为7862=94.9861%，>750为415=5.0139%；P50/95/99=207/753/1002，max1841。横轴由UTC时间差计算到小时，全部点，连续线性0–2000。采集baseline标签缺完整服务端native及权重身份，不称当前交付原生行为。分布不是收益证明。\n178/a1：24.794401秒对18.603930秒，减少24.9672%。固定同输入重复中的一次选例，off、stream、temperature0.2/top_p1/max_tokens2048/seed20260918；budget/check750，min1，stride256，probe4，prob0.95。vanilla ID dtbtool-l178-a1-vanilla-main_20260922T070000Z_long_l178_measured；DTB ID同前缀dtb。12条输入真值包含ID、名称、级别、时间、网元，严重/重要/次要各4条，DTB final字段完整。其他attempt存在遗漏、建议错误和草稿泄漏，不能推整体质量不降。正文长度亦变化，延迟变化不能全部归因于reasoning。\n研发Vanilla-06对run08：按case配对9个相同主任务输入，累计LLM E2E2902.454646秒对2566.696963秒，减少11.5681%。请求392对350，后续轨迹不同。该值是各请求metrics.e2e_ms之和，不是任务wall time。平台start-end只减少3.95%。全通过任务4/9对4/9，但通过集合变化，case36回退，case29测试范围变化，不能宣称质量持平。run08缺完整manifest与显式seed，属于历史观测。\n图表用原始未四舍五入数据计算百分比，显示2位小数。', ['S01', 'S02', 'S03', 'V02', 'S06', 'S07', 'S09', 'N178S', 'N178M', 'S10', 'S11', 'S13', 'S15']);
+  notes(s, noemateReplayNote + 'Noemate分布：12214捕获，主Agent8306；排除29后8277。≤750为7862=94.9861%，>750为415=5.0139%；P50/95/99=207/753/1002，max1841。横轴由UTC时间差计算到小时，全部点，连续线性0–2000。采集baseline标签缺完整服务端native及权重身份，不称当前交付原生行为。分布不是收益证明。\n178/a1：24.794401秒对18.603930秒，减少24.9672%。固定同输入重复中的一次选例，off、stream、temperature0.2/top_p1/max_tokens2048/seed20260918；budget/check750，min1，stride256，probe4，prob0.95。vanilla ID dtbtool-l178-a1-vanilla-main_20260922T070000Z_long_l178_measured；DTB ID同前缀dtb。12条输入真值包含ID、名称、级别、时间、网元，严重/重要/次要各4条，DTB final字段完整。其他attempt存在遗漏、建议错误和草稿泄漏，不能推整体质量不降。正文长度亦变化，延迟变化不能全部归因于reasoning。\n研发Vanilla-06对run08：按case配对9个相同主任务输入，累计LLM E2E2902.454646秒对2566.696963秒，减少11.5681%。请求392对350，后续轨迹不同。该值是各请求metrics.e2e_ms之和，不是任务wall time。平台start-end只减少3.95%。全通过任务4/9对4/9，但通过集合变化，case36回退，case29测试范围变化，不能宣称质量持平。run08缺完整manifest与显式seed，属于历史观测。\n图表用原始未四舍五入数据计算百分比，显示2位小数。', ['S01', 'S02', 'S03', 'V02', 'S04', 'S05', 'S06', 'S07', 'S09', 'N178S', 'N178M', 'N259S', 'N259M', 'N319S', 'N319M', 'N353S', 'N353M', 'N399S', 'N399M', 'S10', 'S11', 'S13', 'S15']);
 }
 // 5. Delivery and next-use boundary, with no extra appendix slide.
 {
