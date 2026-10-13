@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n三、案例分析\n\n\n\n最终回答：\n\n\n### 三、案例分析\n\n基于前述 `ALM-20350 CSDB表定义丢失` 与 `ALM-20351 CSDB表访问超时` 的参数体系，以下提供现网典型故障分析框架，供实际工单排查参考：\n\n#### 📌 案例1：版本升级引发表结构不匹配（ALM-20350）\n| 分析维度 | 内容 |\n|:---|:---|\n| **故障现象** | 升级后用户策略下发失败，业务面注册成功率骤降 |\n| **告警参数** | `TableID: CFG_USER_POLICY` \\| `Reason: SchemaMismatch` \\| `ImpactLevel: 5` |\n| **根因推导** | 新版本的表结构字段与现网数据不兼容，CSDB加载配置失败 |\n| **处置步骤** | 1. 核对Release Notes的DB变更清单<br>2. 执行兼容层迁移脚本或回滚至升级前快照<br>3. 重启CSDB服务并验证策略加载 |\n| **指标关联** | 若伴随业务指标 **剧烈波动**（30分钟内波动幅度 > 15%），需触发紧急扩容与流量分流 |\n\n#### 📌 案例2：高并发查询缺失索引（ALM-20351）\n| 分析维度 | 内容 |\n|:---|:---|\n| **故障现象** | 业务高峰时段配置查询延迟飙升，部分请求超时失败 |\n| **告警参数** | `TableID: CFG_NETWORK_PROFILE` \\| `ResponseTime: 45s` \\| `RootCause: IndexMissing` |\n| **根因推导** | 并发查询量激增，缺失复合索引导致全表扫描，响应时间突破30秒阈值 |\n| **处置步骤** | 1. 导出慢查询日志，定位高频访问表<br>2. 离线构建复合索引，错开业务高峰窗口<br>3. 验证响应时间回落至阈值内，监控指标波动 |\n| **预防机制** | 将索引健康度纳入定期巡检，配置 **环比异常**（±20%）告警提前干预 |\n\n#### 💡 分析要点\n- **参数交叉验证**：结合 `ImpactLevel` 与 `RootCause` 快速定级，优先处理 `Level 4~5` 核心面故障。\n- **时间窗对齐**：通过 `LastAccessTime` / `StartTime` 比对变更台账，确认是否重合版本发布或配置热更。\n- **波动阈值联动**：若告警触发期间业务指标出现 **高位震荡**（持续2小时 > 80% 且波动 ±5% 以内），说明系统处于临界状态，需提前扩容。\n\n如需将上述案例归档至知识库、导出为标准化排查SOP，或补充具体现网工单数据，请随时提供指令。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何将上述案例分析内容归档至企业内部知识库？\n导出标准化排查SOP时需要包含哪些关键步骤和检查项？\n现网工单中若同时出现ALM-20350和ALM-20351告警，应如何优先处理？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 903,
+      "total_tokens": 962,
+      "completion_tokens": 59,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 903,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 59,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 962,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 58,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n三、案例分析\n\n\n\n最终回答：\n\n\n### 三、案例分析\n\n基于前述 `ALM-20350 CSDB表定义丢失` 与 `ALM-20351 CSDB表访问超时` 的参数体系，以下提供现网典型故障分析框架，供实际工单排查参考：\n\n#### 📌 案例1：版本升级引发表结构不匹配（ALM-20350）\n| 分析维度 | 内容 |\n|:---|:---|\n| **故障现象** | 升级后用户策略下发失败，业务面注册成功率骤降 |\n| **告警参数** | `TableID: CFG_USER_POLICY` \\| `Reason: SchemaMismatch` \\| `ImpactLevel: 5` |\n| **根因推导** | 新版本的表结构字段与现网数据不兼容，CSDB加载配置失败 |\n| **处置步骤** | 1. 核对Release Notes的DB变更清单<br>2. 执行兼容层迁移脚本或回滚至升级前快照<br>3. 重启CSDB服务并验证策略加载 |\n| **指标关联** | 若伴随业务指标 **剧烈波动**（30分钟内波动幅度 > 15%），需触发紧急扩容与流量分流 |\n\n#### 📌 案例2：高并发查询缺失索引（ALM-20351）\n| 分析维度 | 内容 |\n|:---|:---|\n| **故障现象** | 业务高峰时段配置查询延迟飙升，部分请求超时失败 |\n| **告警参数** | `TableID: CFG_NETWORK_PROFILE` \\| `ResponseTime: 45s` \\| `RootCause: IndexMissing` |\n| **根因推导** | 并发查询量激增，缺失复合索引导致全表扫描，响应时间突破30秒阈值 |\n| **处置步骤** | 1. 导出慢查询日志，定位高频访问表<br>2. 离线构建复合索引，错开业务高峰窗口<br>3. 验证响应时间回落至阈值内，监控指标波动 |\n| **预防机制** | 将索引健康度纳入定期巡检，配置 **环比异常**（±20%）告警提前干预 |\n\n#### 💡 分析要点\n- **参数交叉验证**：结合 `ImpactLevel` 与 `RootCause` 快速定级，优先处理 `Level 4~5` 核心面故障。\n- **时间窗对齐**：通过 `LastAccessTime` / `StartTime` 比对变更台账，确认是否重合版本发布或配置热更。\n- **波动阈值联动**：若告警触发期间业务指标出现 **高位震荡**（持续2小时 > 80% 且波动 ±5% 以内），说明系统处于临界状态，需提前扩容。\n\n如需将上述案例归档至知识库、导出为标准化排查SOP，或补充具体现网工单数据，请随时提供指令。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6f2e340e-f0d3-44b6-9f20-718d08cc2aca"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-979fc121-e2cd-457e-a684-907bd3c9d284"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-321f7e1c-c546-45b9-b9e2-c5aa7bbf6c6c"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3736"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 9166879,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 5150,
+      "byte_offset": 9167976,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9173126,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 9173331,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 5228,
+      "byte_offset": 9174156,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9179384,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 9194522,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 9194883,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 1415,
+      "byte_offset": 9195091,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9196506,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 9196711,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 9196924,
+      "path": "archive/2026-10-12/09/part-00013.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6f2e340e-f0d3-44b6-9f20-718d08cc2aca"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-979fc121-e2cd-457e-a684-907bd3c9d284"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-321f7e1c-c546-45b9-b9e2-c5aa7bbf6c6c"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3686"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:25:07.649874+00:00",
+    "arrival_seq": 4792,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

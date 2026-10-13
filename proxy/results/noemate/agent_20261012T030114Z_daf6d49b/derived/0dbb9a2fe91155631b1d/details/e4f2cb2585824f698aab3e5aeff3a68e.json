@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nALM-11889 二级中继电路占用告警的各个参数分别代表什么含义？\n\n\n\n最终回答：\n\n\n根据产品文档，`ALM-11889 二级中继电路占用告警` 携带的参数及其含义如下：\n\n| 参数名称 | 参数含义 |\n|:---|:---|\n| **局向信息** | 产生告警的局向名和局向号。如果局向名为NULL，局向号为无效值“65535”，则说明当前告警是针对SIP中继的告警，否则则是针对非SIP中继的告警。 |\n| **SIP中继群信息** | SIP中继群名和SIP中继群号，与局向信息互斥，同一时刻只允许一个是有效的。只有在针对SIP中继告警（局向名为NULL、局向号为65535）时，该值才有效。 |\n| **中继电路总数** | `SIP中继告警时`：指当前SIP中继的最大限呼数。<br>`非SIP中继告警时`：指空闲中继电路数、占用中继电路数和故障中继电路数的总和。 |\n| **可用的电路数** | `SIP中继告警时`：指当前SIP中继的最大限呼数与当前该SIP中继呼叫数的差值。<br>`非SIP中继告警时`：指空闲中继电路数。 |\n| **电路可用所占的比例（百分比）** | 可用电路数与中继电路总数的比值。 |\n| **电路故障级别** | 电路故障的级别（包括一级、二级、三级），其中一级为最低的告警级别。 |\n| **位置描述** | 产生此告警的位置描述信息。 |\n\n💡 **补充说明**：该告警在占用电路数占中继电路总数的百分比达到配置的二级阈值时上报，告警级别为**次要告警**，话务量回落至恢复阈值后会自动清除。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "一级和三级中继电路占用告警的触发阈值分别与二级告警有何不同？\n当局向名为NULL且局向号为65535时，如何确认该告警具体关联到哪个SIP中继群？\n话务量回落至恢复阈值后告警自动清除，如果话务量持续波动在阈值附近会导致告警频繁闪烁吗？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 688,
+      "total_tokens": 768,
+      "completion_tokens": 80,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 688,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 80,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 768,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 78,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nALM-11889 二级中继电路占用告警的各个参数分别代表什么含义？\n\n\n\n最终回答：\n\n\n根据产品文档，`ALM-11889 二级中继电路占用告警` 携带的参数及其含义如下：\n\n| 参数名称 | 参数含义 |\n|:---|:---|\n| **局向信息** | 产生告警的局向名和局向号。如果局向名为NULL，局向号为无效值“65535”，则说明当前告警是针对SIP中继的告警，否则则是针对非SIP中继的告警。 |\n| **SIP中继群信息** | SIP中继群名和SIP中继群号，与局向信息互斥，同一时刻只允许一个是有效的。只有在针对SIP中继告警（局向名为NULL、局向号为65535）时，该值才有效。 |\n| **中继电路总数** | `SIP中继告警时`：指当前SIP中继的最大限呼数。<br>`非SIP中继告警时`：指空闲中继电路数、占用中继电路数和故障中继电路数的总和。 |\n| **可用的电路数** | `SIP中继告警时`：指当前SIP中继的最大限呼数与当前该SIP中继呼叫数的差值。<br>`非SIP中继告警时`：指空闲中继电路数。 |\n| **电路可用所占的比例（百分比）** | 可用电路数与中继电路总数的比值。 |\n| **电路故障级别** | 电路故障的级别（包括一级、二级、三级），其中一级为最低的告警级别。 |\n| **位置描述** | 产生此告警的位置描述信息。 |\n\n💡 **补充说明**：该告警在占用电路数占中继电路总数的百分比达到配置的二级阈值时上报，告警级别为**次要告警**，话务量回落至恢复阈值后会自动清除。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b8aa3d52-f592-4874-a89b-7618101b567d"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-4450a1e3-1143-42d3-81a9-c3bfb4d24d7c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-600e25fc-4689-45b0-9e77-d82647c6ff5e"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3043"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5480646,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4226,
+      "byte_offset": 5481743,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5485969,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5486174,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4304,
+      "byte_offset": 5486999,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5491303,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6259725,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6260086,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1547,
+      "byte_offset": 6260294,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6261841,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 6262046,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 6262259,
+      "path": "archive/2026-10-12/13/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b8aa3d52-f592-4874-a89b-7618101b567d"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-4450a1e3-1143-42d3-81a9-c3bfb4d24d7c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-600e25fc-4689-45b0-9e77-d82647c6ff5e"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2993"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:16:04.785680+00:00",
+    "arrival_seq": 7597,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

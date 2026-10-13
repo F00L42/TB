@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nCPU/内存过载：\n\n\n\n最终回答：\n\n\n### CPU/内存过载日志示例\n\n| 时间戳 | 模块 | 关键日志/指标内容 | 波动标定 | 关联分析 | 排查建议 |\n|:---|:---|:---|:---|:---|:---|\n| `08:05:00` | `CPU_Monitor` | `CPU_Util=88% (↑28% vs 30minAvg)` | **剧烈波动** | 流量突增与重传风暴导致包处理线程CPU占用30分钟内环比>15%，触发调度延迟 | 启用CPU亲和性绑定，扩容处理线程池，平滑突发流量 |\n| `08:10:00~10:10:00` | `Mem_Manager` | `Mem_Usage=84%~87% (Watermark=80%)` | **高位震荡** | 会话表项与队列缓冲未及时释放，内存持续2小时维持在阈值上限80%以上且波动±5%以内 | 调整内存回收水印（如75%触发预清理），排查会话泄漏，启用惰性释放机制 |\n| `08:15:30` | `Session_CTRL` | `SessionCreateReject (Cause: ResourceExhaust)` | **大幅波动** | 内存/CPU双高压导致PFCP建链拒绝，1小时内会话成功率环比下降>20% | 上调 `session-max-threshold`，配置过载保护（GRACEFUL_REJECT），优先保障控制面 |\n| `08:20:00` | `GC_Thread` | `MemoryPressure: GC_Pause=120ms (Threshold=50ms)` | **剧烈波动** | 频繁GC停顿导致用户面处理中断，30分钟内丢包/时延波动幅度>15% | 调整堆内存分配策略，启用分代GC，隔离控制面与用户面内存池 |\n| `09:30:00` | `Auto_Scale` | `ScaleOutTriggered (CPU>85%持续5min)` | **小幅波动** | 弹性扩容生效后负载分摊，1小时内指标回落，波动幅度3%-5% | 验证新节点同步状态，核对负载均衡权重，确认无会话迁移丢包 |\n\n#### 📐 标定说明（严格对照您的定义）\n- **剧烈波动**：CPU占用与GC停顿在30分钟内波动幅度 > 15%，直接引发包处理延迟与丢包飙升。\n- **高位震荡**：内存利用率持续2小时卡在 84%~87%，符合“持续2小时维持在阈值上限80%以上且波动±5%以内”特征，根因为会话表项未释放与缓冲区回收滞后。\n- **大幅波动**：资源耗尽触发建链拒绝，1小时内会话成功率/流量环比变化 > 20%。\n- **小幅波动**：扩容生效后指标回归常态，1小时内波动幅度 3%-5%。\n\n#### 🛠 资源过载应急命令\n```bash\n# 1. 清理僵死会话与缓存\nclear session idle-timer 300\nfree mem-cache user-plane\n\n# 2. 调整内存回收与过载保护\nsystem resource memory-watermark 75%\noverload-protection mode graceful-reject\n\n# 3. 持续监控标定\nwatch -n 30 \"upf_perf show resource cpu mem session\"\n```\n提供实际资源监控输出或确认上述结构，我将输出精确的参数修正命令与热加载验证步骤。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "当前CPU/内存过载是突发流量引起还是存在会话内存泄漏？\n是否需要针对特定网元生成个性化的内存回收水印与过载保护配置命令？\n如何验证弹性扩容后的新节点会话迁移完整性与负载均衡权重？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1039,
+      "total_tokens": 1087,
+      "completion_tokens": 48,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1039,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 48,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1087,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 47,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nCPU/内存过载：\n\n\n\n最终回答：\n\n\n### CPU/内存过载日志示例\n\n| 时间戳 | 模块 | 关键日志/指标内容 | 波动标定 | 关联分析 | 排查建议 |\n|:---|:---|:---|:---|:---|:---|\n| `08:05:00` | `CPU_Monitor` | `CPU_Util=88% (↑28% vs 30minAvg)` | **剧烈波动** | 流量突增与重传风暴导致包处理线程CPU占用30分钟内环比>15%，触发调度延迟 | 启用CPU亲和性绑定，扩容处理线程池，平滑突发流量 |\n| `08:10:00~10:10:00` | `Mem_Manager` | `Mem_Usage=84%~87% (Watermark=80%)` | **高位震荡** | 会话表项与队列缓冲未及时释放，内存持续2小时维持在阈值上限80%以上且波动±5%以内 | 调整内存回收水印（如75%触发预清理），排查会话泄漏，启用惰性释放机制 |\n| `08:15:30` | `Session_CTRL` | `SessionCreateReject (Cause: ResourceExhaust)` | **大幅波动** | 内存/CPU双高压导致PFCP建链拒绝，1小时内会话成功率环比下降>20% | 上调 `session-max-threshold`，配置过载保护（GRACEFUL_REJECT），优先保障控制面 |\n| `08:20:00` | `GC_Thread` | `MemoryPressure: GC_Pause=120ms (Threshold=50ms)` | **剧烈波动** | 频繁GC停顿导致用户面处理中断，30分钟内丢包/时延波动幅度>15% | 调整堆内存分配策略，启用分代GC，隔离控制面与用户面内存池 |\n| `09:30:00` | `Auto_Scale` | `ScaleOutTriggered (CPU>85%持续5min)` | **小幅波动** | 弹性扩容生效后负载分摊，1小时内指标回落，波动幅度3%-5% | 验证新节点同步状态，核对负载均衡权重，确认无会话迁移丢包 |\n\n#### 📐 标定说明（严格对照您的定义）\n- **剧烈波动**：CPU占用与GC停顿在30分钟内波动幅度 > 15%，直接引发包处理延迟与丢包飙升。\n- **高位震荡**：内存利用率持续2小时卡在 84%~87%，符合“持续2小时维持在阈值上限80%以上且波动±5%以内”特征，根因为会话表项未释放与缓冲区回收滞后。\n- **大幅波动**：资源耗尽触发建链拒绝，1小时内会话成功率/流量环比变化 > 20%。\n- **小幅波动**：扩容生效后指标回归常态，1小时内波动幅度 3%-5%。\n\n#### 🛠 资源过载应急命令\n```bash\n# 1. 清理僵死会话与缓存\nclear session idle-timer 300\nfree mem-cache user-plane\n\n# 2. 调整内存回收与过载保护\nsystem resource memory-watermark 75%\noverload-protection mode graceful-reject\n\n# 3. 持续监控标定\nwatch -n 30 \"upf_perf show resource cpu mem session\"\n```\n提供实际资源监控输出或确认上述结构，我将输出精确的参数修正命令与热加载验证步骤。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5c17bb54-da91-448a-8924-276137327cfc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-18235e1f-9d84-4265-a61b-742945c0d324"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4102"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 735942,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 5638,
+      "byte_offset": 737039,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 742677,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 742882,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 5716,
+      "byte_offset": 743707,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 749423,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 763651,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 764012,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1463,
+      "byte_offset": 764220,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 765683,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 765888,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 766101,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5c17bb54-da91-448a-8924-276137327cfc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-18235e1f-9d84-4265-a61b-742945c0d324"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4052"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:20:20.353213+00:00",
+    "arrival_seq": 3743,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

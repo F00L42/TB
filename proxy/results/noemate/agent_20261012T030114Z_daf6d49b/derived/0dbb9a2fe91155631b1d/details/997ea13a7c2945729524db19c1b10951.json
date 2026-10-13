@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nPDU会话建立成功率怎么计算？请诊断网元unc1224在2026-01-21 07:00:00发生的PDU会话建立成功率低于一级门限性能告警\n\n\n\n最终回答：\n\n\n# PDU会话建立成功率计算及告警诊断结果\n\n## 一、PDU会话建立成功率计算公式\n\n根据产品性能指标定义，**PDU会话建立成功率**的计算公式如下：\n\n**PDU会话建立成功率 = PDU会话建立成功次数 / PDU会话建立请求次数 × 100%**\n\n相关性能测量指标：\n| 指标名称 | 指标ID | 说明 |\n|---------|--------|------|\n| SMF PDU会话建立请求次数 | 1929511385 | 分母：接收的PDU会话建立请求总数 |\n| SMF PDU会话建立成功次数 | 1929511386 | 分子：成功建立的PDU会话次数 |\n| 5GSA会话建立成功率 | 1929457392 | 最终计算得出的成功率KPI |\n\n---\n\n## 二、网元 unc1224 PDU会话建立成功率告警诊断\n\n**告警基本信息**\n- **网元**：unc1224\n- **告警名称**：PDU会话建立成功率低于一级门限\n- **告警级别**：严重\n- **发生时间**：2026-01-21 07:00:00\n\n### 故障根因分析\n\n#### 1. 会话建立流程异常\n- **控制面交互失败**：SMF向UPF发送的N4 Session Create Request未获响应，可能因UPF服务不可达、N4接口异常或会话上下文同步失败\n- **资源申请冲突**：UPF在创建会话时因内存不足、转发规则（URR）模板缺失、或UPF与数据面资源不匹配导致失败\n- **配置不一致**：UPF的N4接口地址或NSSF提供的UPF选择策略与SMF配置不匹配，导致会话锚点选择失败\n\n#### 2. 资源限制触发\n- **UPF资源过载**：当前UPF的处理能力已接近上限（如CPU、内存或GTPU连接数），导致新会话无法创建\n- **网络资源争用**：N6/N3接口带宽不足或链路拥塞，导致UPF无法完成PDU会话的数据面资源分配\n\n#### 3. 硬件或软件故障\n- **UPF服务模块异常**：GTPU功能或PFU实例宕机，导致无法处理N4信令请求\n- **硬件资源异常**：UPF所在服务器的网卡故障或存储I/O瓶颈，影响会话创建响应\n\n### 建议处理方向\n1. 检查N4接口连通性及SMF与UPF之间的信令交互日志\n2. 核查UPF资源使用情况（CPU、内存、GTPU连接数）\n3. 确认N3/N6接口带宽及链路状态\n4. 检查UPF服务模块运行状态及硬件健康状态"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "查询网元unc1224在2026-01-21 07:00:00的SMF PDU会话建立请求次数和成功次数具体数值\n检查unc1224网元关联UPF的N4接口连通性及信令交互日志\n获取unc1224网元在告警时刻的UPF资源使用情况包括CPU内存和GTPU连接数",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 946,
+      "total_tokens": 1038,
+      "completion_tokens": 92,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 946,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 92,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1038,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 91,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nPDU会话建立成功率怎么计算？请诊断网元unc1224在2026-01-21 07:00:00发生的PDU会话建立成功率低于一级门限性能告警\n\n\n\n最终回答：\n\n\n# PDU会话建立成功率计算及告警诊断结果\n\n## 一、PDU会话建立成功率计算公式\n\n根据产品性能指标定义，**PDU会话建立成功率**的计算公式如下：\n\n**PDU会话建立成功率 = PDU会话建立成功次数 / PDU会话建立请求次数 × 100%**\n\n相关性能测量指标：\n| 指标名称 | 指标ID | 说明 |\n|---------|--------|------|\n| SMF PDU会话建立请求次数 | 1929511385 | 分母：接收的PDU会话建立请求总数 |\n| SMF PDU会话建立成功次数 | 1929511386 | 分子：成功建立的PDU会话次数 |\n| 5GSA会话建立成功率 | 1929457392 | 最终计算得出的成功率KPI |\n\n---\n\n## 二、网元 unc1224 PDU会话建立成功率告警诊断\n\n**告警基本信息**\n- **网元**：unc1224\n- **告警名称**：PDU会话建立成功率低于一级门限\n- **告警级别**：严重\n- **发生时间**：2026-01-21 07:00:00\n\n### 故障根因分析\n\n#### 1. 会话建立流程异常\n- **控制面交互失败**：SMF向UPF发送的N4 Session Create Request未获响应，可能因UPF服务不可达、N4接口异常或会话上下文同步失败\n- **资源申请冲突**：UPF在创建会话时因内存不足、转发规则（URR）模板缺失、或UPF与数据面资源不匹配导致失败\n- **配置不一致**：UPF的N4接口地址或NSSF提供的UPF选择策略与SMF配置不匹配，导致会话锚点选择失败\n\n#### 2. 资源限制触发\n- **UPF资源过载**：当前UPF的处理能力已接近上限（如CPU、内存或GTPU连接数），导致新会话无法创建\n- **网络资源争用**：N6/N3接口带宽不足或链路拥塞，导致UPF无法完成PDU会话的数据面资源分配\n\n#### 3. 硬件或软件故障\n- **UPF服务模块异常**：GTPU功能或PFU实例宕机，导致无法处理N4信令请求\n- **硬件资源异常**：UPF所在服务器的网卡故障或存储I/O瓶颈，影响会话创建响应\n\n### 建议处理方向\n1. 检查N4接口连通性及SMF与UPF之间的信令交互日志\n2. 核查UPF资源使用情况（CPU、内存、GTPU连接数）\n3. 确认N3/N6接口带宽及链路状态\n4. 检查UPF服务模块运行状态及硬件健康状态"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e64dc4f1-853e-44fe-b8f6-1011ada9a1c1"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7240c855-9f82-457e-8e65-ffaf4c62f857"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-876f4fc7-c77e-4fdc-b49a-aa3abf169259"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3812"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 9097024,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 5250,
+      "byte_offset": 9098121,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9103371,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 9103576,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 5328,
+      "byte_offset": 9104401,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9109729,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 9109935,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 9110296,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 1467,
+      "byte_offset": 9110504,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9111971,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 9112176,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 9112389,
+      "path": "archive/2026-10-12/05/part-00002.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e64dc4f1-853e-44fe-b8f6-1011ada9a1c1"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7240c855-9f82-457e-8e65-ffaf4c62f857"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-876f4fc7-c77e-4fdc-b49a-aa3abf169259"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3762"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T05:14:59.960323+00:00",
+    "arrival_seq": 1076,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/05"
+  }
+}

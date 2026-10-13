@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n记住上面指标定义\n\n\n\n最终回答：\n\n\n已为您记录上述指标波动阈值与术语别名映射。后续涉及 KPI 查询、异常判定与报表分析时，将默认套用以下标准：\n\n**📊 波动幅度判定基准**\n| 等级 | 时间窗口 | 波动阈值 |\n|:---|:---|:---|\n| **小幅波动** | 1 小时内 | 3% ~ 5% |\n| **异常波动** | 1 小时内 | > 10% |\n| **大幅波动** | 1 小时内 | > 20% |\n| **剧烈波动** | 30 分钟内 | > 15% |\n\n**🏷️ 术语别名映射**\n- `SGSN` → GPRS 业务支撑节点\n- `T+1` → 隔天数据\n\n上述规则已纳入您的个人分析偏好。如需立即对特定网元或指标进行波动筛查，请直接提供查询对象。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "现在可以对我提供的网元数据进行波动筛查吗？\n如果某个指标在1小时内波动了8%，系统会如何判定其等级？\n这些波动阈值和术语别名可以导出为配置文件备用吗？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 472,
+      "total_tokens": 516,
+      "completion_tokens": 44,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 472,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 44,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 516,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 43,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n记住上面指标定义\n\n\n\n最终回答：\n\n\n已为您记录上述指标波动阈值与术语别名映射。后续涉及 KPI 查询、异常判定与报表分析时，将默认套用以下标准：\n\n**📊 波动幅度判定基准**\n| 等级 | 时间窗口 | 波动阈值 |\n|:---|:---|:---|\n| **小幅波动** | 1 小时内 | 3% ~ 5% |\n| **异常波动** | 1 小时内 | > 10% |\n| **大幅波动** | 1 小时内 | > 20% |\n| **剧烈波动** | 30 分钟内 | > 15% |\n\n**🏷️ 术语别名映射**\n- `SGSN` → GPRS 业务支撑节点\n- `T+1` → 隔天数据\n\n上述规则已纳入您的个人分析偏好。如需立即对特定网元或指标进行波动筛查，请直接提供查询对象。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-ea3361ed-30aa-4c80-80e3-5174145570ae"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-496c1c32-83ad-4c88-b592-56c6baf979f3"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-211186e2-290b-4f4a-ad8b-bbd0127e86fd"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2151"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 2389185,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 3038,
+      "byte_offset": 2390282,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2393320,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 2393525,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 3112,
+      "byte_offset": 2394350,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 2397462,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 2946976,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 2947337,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 1403,
+      "byte_offset": 2947545,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2948948,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 2949153,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 2949366,
+      "path": "archive/2026-10-12/07/part-00026.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-ea3361ed-30aa-4c80-80e3-5174145570ae"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-496c1c32-83ad-4c88-b592-56c6baf979f3"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-211186e2-290b-4f4a-ad8b-bbd0127e86fd"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2101"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:54:06.548675+00:00",
+    "arrival_seq": 3384,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

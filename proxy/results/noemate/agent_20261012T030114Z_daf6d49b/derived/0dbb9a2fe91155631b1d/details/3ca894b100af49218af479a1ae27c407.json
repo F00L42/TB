@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM混合组网迁移的checklist，SP和VSP的迁移前排查项是否一致？\n\n\n\n最终回答：\n\n\n根据检索到的知识库内容，**SP和vSP的迁移前排查项并不完全一致**。虽然混合组网迁移有一些通用的前置条件，但由于SP（ATCA/CloudDB平台）和vSP（PaaS DB平台）在架构、数据模型和配置要求上存在差异，部分排查项是针对性别的。\n\n### 主要差异分析\n\n| 排查类别 | SP (ATCA/CloudDB) | vSP (PaaS DB) | 是否一致 |\n|:---|:---|:---|:---|\n| **NFV平滑演进开关** | 需设置`NFV_EVOLUTION_SWITCH=1` | 同样需要配置 | ✅ 一致 |\n| **远端BE网元类型** | 无需特殊配置 | 需确认所有RPARTITION已配置\"远端BE网元类型\"，且`SET UDMSERV`命令的\"VSP分区的网元类型\"必须为`VSP_LIB` | ❌ 不一致 |\n| **全局数据校验** | 在SP上执行`STR GLBDATAVFY`向vRSP校验 | vSP（PaaS DB版本）不允许执行该命令 | ❌ 不一致 |\n| **5G LAN功能** | 支持 | 当UDM作为vSP时，混合组网**不支持**5G LAN功能 | ❌ 不一致 |\n| **下沉DSU全局数据** | 原设备（vRSP）需整合vSP多出的数据 | 新设备（vSP）需对比并整合数据 | ❌ 不一致 |\n| **用户迁移方向** | 仅支持从SP迁移到vSP/vRSP | 不支持从vSP/vRSP迁移回SP | ❌ 不一致 |\n| **营帐不停迁** | 支持通过`MOD USERPID`触发迁移 | 同样支持，但需确认分区配置 | ✅ 基本一致 |\n\n### 通用排查项（SP和vSP均需确认）\n\n1. **路由数据同步**：确认SP/vSP与vRSP之间的路由数据已完成同步和校验\n2. **信令链路配置**：确认FE间信令链路已配置，支持直连或STP/DRA转发\n3. **主用局优先级**：执行`LST RLOCATION`确认主用局BE优先级高于容灾局\n4. **网管版本**：确认网管同时支持HSS和UDM网元接入\n5. **业务发放接入**：确认业务发放系统已统一接入vRSP\n\n### 建议\n\n由于具体的checklist细节较多且涉及版本差异，建议参考以下官方指导书获取完整的迁移前排查清单：\n\n- **《UDM混合组网数据迁移操作指导书》**：适用于SP迁移场景\n- **《UDM混合组网VSP数据迁移操作指导书》**：适用于vSP迁移场景\n\n获取路径：登录华为运营商技术支持网站 → 技术支持 > 产品支持 > 云核心网 > Mobile Packet Core > 5G Convergent Data > UDM > UDM > 知识库\n\n如需针对特定版本或组网场景的详细checklist，请提供更多信息，我可以进一步帮您分析。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "SP迁移到vSP过程中，全局数据校验的具体替代方案是什么？\nvSP混合组网不支持5G LAN功能时，现有5G LAN用户该如何处理？\n营帐不停迁过程中，MOD USERPID命令在vSP分区配置上有无特殊注意事项？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 968,
+      "total_tokens": 1026,
+      "completion_tokens": 58,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 968,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 58,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1026,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 57,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM混合组网迁移的checklist，SP和VSP的迁移前排查项是否一致？\n\n\n\n最终回答：\n\n\n根据检索到的知识库内容，**SP和vSP的迁移前排查项并不完全一致**。虽然混合组网迁移有一些通用的前置条件，但由于SP（ATCA/CloudDB平台）和vSP（PaaS DB平台）在架构、数据模型和配置要求上存在差异，部分排查项是针对性别的。\n\n### 主要差异分析\n\n| 排查类别 | SP (ATCA/CloudDB) | vSP (PaaS DB) | 是否一致 |\n|:---|:---|:---|:---|\n| **NFV平滑演进开关** | 需设置`NFV_EVOLUTION_SWITCH=1` | 同样需要配置 | ✅ 一致 |\n| **远端BE网元类型** | 无需特殊配置 | 需确认所有RPARTITION已配置\"远端BE网元类型\"，且`SET UDMSERV`命令的\"VSP分区的网元类型\"必须为`VSP_LIB` | ❌ 不一致 |\n| **全局数据校验** | 在SP上执行`STR GLBDATAVFY`向vRSP校验 | vSP（PaaS DB版本）不允许执行该命令 | ❌ 不一致 |\n| **5G LAN功能** | 支持 | 当UDM作为vSP时，混合组网**不支持**5G LAN功能 | ❌ 不一致 |\n| **下沉DSU全局数据** | 原设备（vRSP）需整合vSP多出的数据 | 新设备（vSP）需对比并整合数据 | ❌ 不一致 |\n| **用户迁移方向** | 仅支持从SP迁移到vSP/vRSP | 不支持从vSP/vRSP迁移回SP | ❌ 不一致 |\n| **营帐不停迁** | 支持通过`MOD USERPID`触发迁移 | 同样支持，但需确认分区配置 | ✅ 基本一致 |\n\n### 通用排查项（SP和vSP均需确认）\n\n1. **路由数据同步**：确认SP/vSP与vRSP之间的路由数据已完成同步和校验\n2. **信令链路配置**：确认FE间信令链路已配置，支持直连或STP/DRA转发\n3. **主用局优先级**：执行`LST RLOCATION`确认主用局BE优先级高于容灾局\n4. **网管版本**：确认网管同时支持HSS和UDM网元接入\n5. **业务发放接入**：确认业务发放系统已统一接入vRSP\n\n### 建议\n\n由于具体的checklist细节较多且涉及版本差异，建议参考以下官方指导书获取完整的迁移前排查清单：\n\n- **《UDM混合组网数据迁移操作指导书》**：适用于SP迁移场景\n- **《UDM混合组网VSP数据迁移操作指导书》**：适用于vSP迁移场景\n\n获取路径：登录华为运营商技术支持网站 → 技术支持 > 产品支持 > 云核心网 > Mobile Packet Core > 5G Convergent Data > UDM > UDM > 知识库\n\n如需针对特定版本或组网场景的详细checklist，请提供更多信息，我可以进一步帮您分析。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6a7d96ea-5694-427e-842a-cd072eaa2b82"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-5e677ea3-210d-4aad-8b25-3e677e179b01"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-c96b3cb7-8508-497b-9c73-68f2b97ad2f8"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3975"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5120110,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 5470,
+      "byte_offset": 5121207,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5126677,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5126882,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 5544,
+      "byte_offset": 5127707,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5133251,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 5855650,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 5856011,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 1447,
+      "byte_offset": 5856219,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5857666,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 5857871,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 5858084,
+      "path": "archive/2026-10-12/14/part-00012.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6a7d96ea-5694-427e-842a-cd072eaa2b82"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-5e677ea3-210d-4aad-8b25-3e677e179b01"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-c96b3cb7-8508-497b-9c73-68f2b97ad2f8"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3925"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:24:15.038553+00:00",
+    "arrival_seq": 9279,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

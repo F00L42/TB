@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[当前会话] User：说的是数值达到近30天最高点\n\n\n\n最终回答：\n明白，您指的“达到峰值”是当前CPU利用率数值接近或达到**近30天最高点**。\n\n基于该明确条件重新查询AMF01网元，结果如下：\n\n### 📊 AMF01 CPU峰值查询结果\n**状态**：❌ 未获得匹配数据  \n**系统返回**：“没有获得匹配结果”\n\n**可能原因**：\n1. **网元名称不一致**：系统中实际名称可能包含后缀或大小写差异（如 `AMF01-01`、`amf01` 等）。\n2. **监控未启用/数据缺失**：该网元未配置CPU性能监控，或近30天历史数据尚未统计完成。\n3. **权限/数据源问题**：当前账号无权查看该网元性能数据，或数据源连接异常。\n\n---\n\n### 💡 下一步建议\n1. **核对网元名称**：请在 OM Portal > 监控 > 网元管理 中确认AMF01的准确名称。\n2. **手动核查峰值**：若急需确认，可导出该网元近30天CPU日报/周报进行对比。\n3. **提供正确名称后重试**：回复准确的网元名称，我将重新执行峰值比对查询。\n\n> 注：此前提供的**SMF服务实例资源不足告警**诊断方案依然有效。若AMF01确认达到30天CPU峰值，可参考其中的短期/长期优化建议（调整后台任务、扩容资源池、优化负载分配等）。\n\n请问是否需要协助核对网元列表，或提供其他网元的查询？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何在OM Portal中批量导出网元近30天的CPU利用率历史数据？\nAMF网元CPU持续处于高位时，除了调整后台任务还有哪些紧急降负载措施？\n如果确认网元名称无误但仍无监控数据，应如何检查并启用CPU性能监控配置？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 626,
+      "total_tokens": 687,
+      "completion_tokens": 61,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 626,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 61,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 687,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 60,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[当前会话] User：说的是数值达到近30天最高点\n\n\n\n最终回答：\n明白，您指的“达到峰值”是当前CPU利用率数值接近或达到**近30天最高点**。\n\n基于该明确条件重新查询AMF01网元，结果如下：\n\n### 📊 AMF01 CPU峰值查询结果\n**状态**：❌ 未获得匹配数据  \n**系统返回**：“没有获得匹配结果”\n\n**可能原因**：\n1. **网元名称不一致**：系统中实际名称可能包含后缀或大小写差异（如 `AMF01-01`、`amf01` 等）。\n2. **监控未启用/数据缺失**：该网元未配置CPU性能监控，或近30天历史数据尚未统计完成。\n3. **权限/数据源问题**：当前账号无权查看该网元性能数据，或数据源连接异常。\n\n---\n\n### 💡 下一步建议\n1. **核对网元名称**：请在 OM Portal > 监控 > 网元管理 中确认AMF01的准确名称。\n2. **手动核查峰值**：若急需确认，可导出该网元近30天CPU日报/周报进行对比。\n3. **提供正确名称后重试**：回复准确的网元名称，我将重新执行峰值比对查询。\n\n> 注：此前提供的**SMF服务实例资源不足告警**诊断方案依然有效。若AMF01确认达到30天CPU峰值，可参考其中的短期/长期优化建议（调整后台任务、扩容资源池、优化负载分配等）。\n\n请问是否需要协助核对网元列表，或提供其他网元的查询？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-06f26d34-6860-4c02-ad9e-058453dca57a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d5bd66d5-9016-4966-8c1b-8fbe9fef232b"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-16384dc1-8577-4e41-acea-716a82070226"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2871"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 8744801,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3998,
+      "byte_offset": 8745898,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8749896,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 8750101,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4072,
+      "byte_offset": 8750926,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 8754998,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 8908105,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 8908466,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1483,
+      "byte_offset": 8908674,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8910157,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 8910362,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 8910575,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-06f26d34-6860-4c02-ad9e-058453dca57a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d5bd66d5-9016-4966-8c1b-8fbe9fef232b"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-16384dc1-8577-4e41-acea-716a82070226"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2821"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T06:20:28.531811+00:00",
+    "arrival_seq": 1757,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/06"
+  }
+}

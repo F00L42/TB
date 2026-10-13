@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nStreaming 系统对外接口中的内容管理系统与MM接口的基本功能是什么？\n\n\n\n最终回答：\n\n\n根据知识库检索结果，为您梳理如下：\n\n### 1. 内容管理系统（CMS）\n* **定义**：Content Management System（内容管理系统）。\n* **基本功能**：作为内容提供商与用户价值链（或用户价值网络）之间的中间媒介，主要用于**媒体内容的发布与管理**。在Streaming系统对外接口中，CMS通常负责内容的上传、审核、分发策略配置、版权保护及内容生命周期管理，为下游业务提供标准化的内容源。\n\n### 2. MM接口\n* **知识库说明**：当前知识库中未收录 `Streaming 系统` 中 `MM接口` 的明确定义与详细功能说明。\n* **常规参考**：在流媒体/Streaming架构中，`MM` 通常指 **Media Management（媒体管理）** 或 **Membership Management（会员/权限管理）** 接口。其对外基本功能一般包括：\n  * **媒体资源控制**：对接第三方系统实现媒体文件的注册、状态同步、转码任务下发或缓存策略管理。\n  * **权限/订阅交互**：处理用户鉴权、订阅状态查询、播放权限校验等。\n  * **信令/控制交互**：与周边网元或业务支撑系统（BSS/OSS）进行控制面消息交互。\n\n💡 **建议**：由于不同产品版本对 `MM接口` 的命名和职责划分可能存在差异，如需获取精确的接口字段、报文格式及调用流程，请提供具体的产品型号/版本，或查阅对应版本的《Streaming 接口参考指南》或《外部接口说明》文档。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "CMS在Streaming系统中具体支持哪些内容分发策略和版权保护机制？\n当前产品版本中的MM接口是侧重于媒体管理还是会员权限管理？\n是否有具体的接口文档或示例说明MM接口的报文格式和调用流程？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 613,
+      "total_tokens": 662,
+      "completion_tokens": 49,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 613,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 49,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 662,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 48,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nStreaming 系统对外接口中的内容管理系统与MM接口的基本功能是什么？\n\n\n\n最终回答：\n\n\n根据知识库检索结果，为您梳理如下：\n\n### 1. 内容管理系统（CMS）\n* **定义**：Content Management System（内容管理系统）。\n* **基本功能**：作为内容提供商与用户价值链（或用户价值网络）之间的中间媒介，主要用于**媒体内容的发布与管理**。在Streaming系统对外接口中，CMS通常负责内容的上传、审核、分发策略配置、版权保护及内容生命周期管理，为下游业务提供标准化的内容源。\n\n### 2. MM接口\n* **知识库说明**：当前知识库中未收录 `Streaming 系统` 中 `MM接口` 的明确定义与详细功能说明。\n* **常规参考**：在流媒体/Streaming架构中，`MM` 通常指 **Media Management（媒体管理）** 或 **Membership Management（会员/权限管理）** 接口。其对外基本功能一般包括：\n  * **媒体资源控制**：对接第三方系统实现媒体文件的注册、状态同步、转码任务下发或缓存策略管理。\n  * **权限/订阅交互**：处理用户鉴权、订阅状态查询、播放权限校验等。\n  * **信令/控制交互**：与周边网元或业务支撑系统（BSS/OSS）进行控制面消息交互。\n\n💡 **建议**：由于不同产品版本对 `MM接口` 的命名和职责划分可能存在差异，如需获取精确的接口字段、报文格式及调用流程，请提供具体的产品型号/版本，或查阅对应版本的《Streaming 接口参考指南》或《外部接口说明》文档。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b4cda0ee-ae0f-4bb9-9f8d-40b88720e242"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-eabc7efa-e2c7-4fb2-9fa3-1e5536eefbb4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-bc9e008e-ac7e-4ed0-a1f3-69bc7424d8fd"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3069"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 16019262,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 4262,
+      "byte_offset": 16020359,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 16024621,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 16024826,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 4336,
+      "byte_offset": 16025651,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 16029987,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 16276456,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 16276817,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 1455,
+      "byte_offset": 16277025,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 16278480,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 16278685,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 16278898,
+      "path": "archive/2026-10-12/14/part-00005.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b4cda0ee-ae0f-4bb9-9f8d-40b88720e242"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-eabc7efa-e2c7-4fb2-9fa3-1e5536eefbb4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-bc9e008e-ac7e-4ed0-a1f3-69bc7424d8fd"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3019"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:11:17.226044+00:00",
+    "arrival_seq": 8937,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

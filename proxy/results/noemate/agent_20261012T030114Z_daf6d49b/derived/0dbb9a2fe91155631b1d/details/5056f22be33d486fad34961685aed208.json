@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：查询下6小时内清迈府UDM_001网元的用户鉴权请求失败数据，并分析是否存在异常波动情况，如果存在则进行诊断\n\n\n\n最终回答：\n\n\n根据查询结果，6小时内清迈府UDM_001网元（181udm30077342）的用户鉴权请求失败数据如下：\n\n**数据统计：**\n| 时间 | 网元名称 | 指标名称 | 数值 |\n|------|----------|----------|------|\n| 2026-07-23 09:12:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 92条 |\n| 2026-07-23 10:05:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 86条 |\n| 2026-07-23 11:18:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 97条 |\n| 2026-07-23 13:10:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 126条 |\n| 2026-07-23 13:22:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 141条 |\n| 2026-07-23 13:35:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 134条 |\n\n**异常分析：**\n- 今日全部采集点平均：96条\n- 最近一小时采集点平均：134条\n- **结论：** 近一小时缺少参数响应数量高于今日平均值，存在异常波动\n\n**诊断结果：**\n调用故障诊断服务时超时，暂时无法提供根因分析建议。建议：\n1. 检查该网元在最近1小时内的系统负载和资源配置\n2. 查看是否有相关告警信息\n3. 检查用户鉴权流程的上下游网元状态\n4. 如问题持续，请联系技术支持进行深度诊断"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "查看清迈府UDM_001网元最近1小时的系统负载和CPU、内存使用情况\n查询该网元在13:10至13:35期间是否产生过相关性能或故障告警\n检查与UDM_001交互的上下游网元（如AMF、SMSF）在同一时段的状态和错误日志",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 837,
+      "total_tokens": 915,
+      "completion_tokens": 78,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 837,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 78,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 915,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 77,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：查询下6小时内清迈府UDM_001网元的用户鉴权请求失败数据，并分析是否存在异常波动情况，如果存在则进行诊断\n\n\n\n最终回答：\n\n\n根据查询结果，6小时内清迈府UDM_001网元（181udm30077342）的用户鉴权请求失败数据如下：\n\n**数据统计：**\n| 时间 | 网元名称 | 指标名称 | 数值 |\n|------|----------|----------|------|\n| 2026-07-23 09:12:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 92条 |\n| 2026-07-23 10:05:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 86条 |\n| 2026-07-23 11:18:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 97条 |\n| 2026-07-23 13:10:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 126条 |\n| 2026-07-23 13:22:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 141条 |\n| 2026-07-23 13:35:00 | 181udm30077342 | 用户数据请求返回请求中缺少参数的响应消息总数 | 134条 |\n\n**异常分析：**\n- 今日全部采集点平均：96条\n- 最近一小时采集点平均：134条\n- **结论：** 近一小时缺少参数响应数量高于今日平均值，存在异常波动\n\n**诊断结果：**\n调用故障诊断服务时超时，暂时无法提供根因分析建议。建议：\n1. 检查该网元在最近1小时内的系统负载和资源配置\n2. 查看是否有相关告警信息\n3. 检查用户鉴权流程的上下游网元状态\n4. 如问题持续，请联系技术支持进行深度诊断"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-562ae3ac-3d49-4aea-8769-0c8b3bd2b4dd"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-880169c1-81a9-4a4c-93cb-0c4e06c9f724"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3a10c9f7-ab9d-44e6-8962-4ce137645aba"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3107"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 12535382,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4310,
+      "byte_offset": 12536479,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12540789,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 12540994,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4388,
+      "byte_offset": 12541819,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12546207,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 362,
+      "byte_offset": 13809610,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 209,
+      "byte_offset": 13809972,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1464,
+      "byte_offset": 13810181,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 13811645,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 214,
+      "byte_offset": 13811851,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    },
+    {
+      "byte_length": 411,
+      "byte_offset": 13812065,
+      "path": "archive/2026-10-12/06/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-562ae3ac-3d49-4aea-8769-0c8b3bd2b4dd"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-880169c1-81a9-4a4c-93cb-0c4e06c9f724"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3a10c9f7-ab9d-44e6-8962-4ce137645aba"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3057"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T06:22:34.747124+00:00",
+    "arrival_seq": 1769,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/06"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM混合组网VSP数据迁移操作是什么级别的操作？\n\n\n\n最终回答：\n根据产品文档，关于UDM混合组网VSP数据迁移操作的风险级别说明如下：\n\n1. **特性影响说明**：在《混合组网用户数据平滑迁移特性概述》中，明确标注该特性**对系统无影响**。\n2. **实际操作风险**：在混合组网场景下执行相关的数据迁移命令（如路由数据迁移命令 `STR ROUTETRANS`）被明确界定为**高危命令**。操作不当将导致数据无法访问、业务严重呼损。\n\n**操作建议与注意事项：**\n* **执行时机**：建议在**非话务量高峰期**（如凌晨2:00～4:00）执行。\n* **执行要求**：必须在**华为技术支持工程师指导下**使用，严禁私自执行。执行前需与华为技术支持确认。\n* **前置准备**：迁移前需关闭周期性校验开关、用户数据统计开关、定时备份开关等，并暂停业务发放系统下发涉及数据修改的指令。\n* **操作依据**：具体步骤请严格参考《UDM 混合组网VSP数据迁移操作指导书》。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "执行UDM混合组网VSP数据迁移前需要完成哪些具体的前置配置？\n如果迁移过程中出现异常，有哪些标准的回退或应急处理方案？\n除了STR ROUTETRANS命令外，还有哪些相关命令也被定义为高危操作？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 513,
+      "total_tokens": 565,
+      "completion_tokens": 52,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 513,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 52,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 565,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 51,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM混合组网VSP数据迁移操作是什么级别的操作？\n\n\n\n最终回答：\n根据产品文档，关于UDM混合组网VSP数据迁移操作的风险级别说明如下：\n\n1. **特性影响说明**：在《混合组网用户数据平滑迁移特性概述》中，明确标注该特性**对系统无影响**。\n2. **实际操作风险**：在混合组网场景下执行相关的数据迁移命令（如路由数据迁移命令 `STR ROUTETRANS`）被明确界定为**高危命令**。操作不当将导致数据无法访问、业务严重呼损。\n\n**操作建议与注意事项：**\n* **执行时机**：建议在**非话务量高峰期**（如凌晨2:00～4:00）执行。\n* **执行要求**：必须在**华为技术支持工程师指导下**使用，严禁私自执行。执行前需与华为技术支持确认。\n* **前置准备**：迁移前需关闭周期性校验开关、用户数据统计开关、定时备份开关等，并暂停业务发放系统下发涉及数据修改的指令。\n* **操作依据**：具体步骤请严格参考《UDM 混合组网VSP数据迁移操作指导书》。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-147d5a04-91dc-4760-ac71-8773cdf4b062"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-a325eb63-9e68-4382-a1ed-8824290308f4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4081acc3-fd1f-4213-8fca-cb4b089d87ba"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2550"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5854975,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 3570,
+      "byte_offset": 5856072,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5859642,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5859847,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 3644,
+      "byte_offset": 5860672,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5864316,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6781868,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6782229,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1451,
+      "byte_offset": 6782437,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6783888,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 6784093,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 6784306,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-147d5a04-91dc-4760-ac71-8773cdf4b062"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-a325eb63-9e68-4382-a1ed-8824290308f4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4081acc3-fd1f-4213-8fca-cb4b089d87ba"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2500"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:12:03.616769+00:00",
+    "arrival_seq": 8962,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

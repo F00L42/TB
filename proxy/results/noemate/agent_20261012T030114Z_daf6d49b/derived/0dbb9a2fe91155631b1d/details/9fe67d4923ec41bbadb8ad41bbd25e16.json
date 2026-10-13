@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请解释NF心跳异常告警\n\n\n\n最终回答：\n\n\n已为您整理总结出相关信息。\n\n## HUAWEI USC 融合信令控制器 25.1.0 网元的告警总结\n\n### 告警解释\n**适用NF**\nNRF\n\n* **告警触发机制**\n  当在NRF注册的NF与NRF间的心跳异常后，NRF将NF的状态设置为Suspended状态后，系统产生此告警。\n* **告警恢复机制**\n  * 当NF与NRF间的心跳恢复后，会自动恢复本告警。\n  * 当NF向NRF发起去注册请求且NRF处理成功后，会自动恢复本告警。\n  * 当NRF检测到NF处于Suspended状态的时间已经超过配置的NF老化时间，NRF将NF删除后，会自动恢复本告警。\n  * 当执行DEL REGNFINSTANCE命令删除NF实例成功后，会自动恢复本告警。\n\n### 告警属性\n\n| 告警ID | 告警级别 | 可自动清除 |\n|---:|:---|:---|\n| 100060 | 重要告警 | 是 |\n\n### 告警参数\n\n| 参数名称 | 参数含义 |\n|:---|:---|\n| NF实例标识 | 表示心跳异常NF的实例标识。 |\n| NF类型 | 表示心跳异常NF的类型。<br> • NRF<br> • UDM<br> • AMF<br> • SMF<br> • AUSF<br> • NEF<br> • PCF<br> • SMSF<br> • NSSF<br> • UDR<br> • LMF<br> • GMLC<br> • EIR_5G<br> • SEPP<br> • UPF<br> • N3IWF<br> • AF<br> • UDSF<br> • BSF<br> • CHF<br> • NWDAF<br> • CUSTOM_OCS<br> • SCP<br> |\n\n### 对系统的影响\n其他NF将不能通过NRF发现该NF，该NF提供服务对应的流程可能会受到影响。\n\n### 可能原因\n • NRF自身故障。\n • 传输网络故障。\n • 对端NF故障。\n\n### 处理步骤\n**检查NRF自身故障**\n\\t1. 执行DSP REGNFINSTANCE查看该NF的状态，是否为Suspended。\n\\t\\t • 是=> 步骤2。\n\\t\\t • 否=> 步骤4。\n**检查传输网络故障**\n\\t1. 在告警服务台上查看NRF是否有HTTP链路告警 。\n\\t\\t • 是 => 参考“ALM-100155 HTTP链路故障”的告警处理步骤 。\n\\t\\t • 否 => 步骤3。\n**检查对端NF故障**\n\\t1. 联系对端NF的维护工程师，排查对端NF是否有故障。\n\\t\\t • 是 =>  需要对端NF处理故障，处理结束。\n\\t\\t • 否 => 步骤4。\n\\t2. 请收集告警信息、日志信息和配置信息，并联系华为技术支持处理。\n\n### 参考信息\n无"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何执行DSP REGNFINSTANCE命令来查看特定NF的状态？\n如果NRF报告HTTP链路告警，应如何进一步排查ALM-100155告警？\n在什么情况下需要手动执行DEL REGNFINSTANCE命令来清除NF实例？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 955,
+      "total_tokens": 1014,
+      "completion_tokens": 59,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 955,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 59,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1014,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 58,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请解释NF心跳异常告警\n\n\n\n最终回答：\n\n\n已为您整理总结出相关信息。\n\n## HUAWEI USC 融合信令控制器 25.1.0 网元的告警总结\n\n### 告警解释\n**适用NF**\nNRF\n\n* **告警触发机制**\n  当在NRF注册的NF与NRF间的心跳异常后，NRF将NF的状态设置为Suspended状态后，系统产生此告警。\n* **告警恢复机制**\n  * 当NF与NRF间的心跳恢复后，会自动恢复本告警。\n  * 当NF向NRF发起去注册请求且NRF处理成功后，会自动恢复本告警。\n  * 当NRF检测到NF处于Suspended状态的时间已经超过配置的NF老化时间，NRF将NF删除后，会自动恢复本告警。\n  * 当执行DEL REGNFINSTANCE命令删除NF实例成功后，会自动恢复本告警。\n\n### 告警属性\n\n| 告警ID | 告警级别 | 可自动清除 |\n|---:|:---|:---|\n| 100060 | 重要告警 | 是 |\n\n### 告警参数\n\n| 参数名称 | 参数含义 |\n|:---|:---|\n| NF实例标识 | 表示心跳异常NF的实例标识。 |\n| NF类型 | 表示心跳异常NF的类型。<br> • NRF<br> • UDM<br> • AMF<br> • SMF<br> • AUSF<br> • NEF<br> • PCF<br> • SMSF<br> • NSSF<br> • UDR<br> • LMF<br> • GMLC<br> • EIR_5G<br> • SEPP<br> • UPF<br> • N3IWF<br> • AF<br> • UDSF<br> • BSF<br> • CHF<br> • NWDAF<br> • CUSTOM_OCS<br> • SCP<br> |\n\n### 对系统的影响\n其他NF将不能通过NRF发现该NF，该NF提供服务对应的流程可能会受到影响。\n\n### 可能原因\n • NRF自身故障。\n • 传输网络故障。\n • 对端NF故障。\n\n### 处理步骤\n**检查NRF自身故障**\n\\t1. 执行DSP REGNFINSTANCE查看该NF的状态，是否为Suspended。\n\\t\\t • 是=> 步骤2。\n\\t\\t • 否=> 步骤4。\n**检查传输网络故障**\n\\t1. 在告警服务台上查看NRF是否有HTTP链路告警 。\n\\t\\t • 是 => 参考“ALM-100155 HTTP链路故障”的告警处理步骤 。\n\\t\\t • 否 => 步骤3。\n**检查对端NF故障**\n\\t1. 联系对端NF的维护工程师，排查对端NF是否有故障。\n\\t\\t • 是 =>  需要对端NF处理故障，处理结束。\n\\t\\t • 否 => 步骤4。\n\\t2. 请收集告警信息、日志信息和配置信息，并联系华为技术支持处理。\n\n### 参考信息\n无"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-10507d50-299a-4e87-b2d4-9ddeeadc2c22"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-52fc5f03-36e7-4883-8801-12c35f11fa5d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-504e8c36-f179-4295-9758-ee4f1e5494b4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3730"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10969773,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 5142,
+      "byte_offset": 10970870,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10976012,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10976217,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 5220,
+      "byte_offset": 10977042,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10982262,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 11041200,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 11041561,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 1411,
+      "byte_offset": 11041769,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11043180,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 11043385,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 11043598,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-10507d50-299a-4e87-b2d4-9ddeeadc2c22"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-52fc5f03-36e7-4883-8801-12c35f11fa5d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-504e8c36-f179-4295-9758-ee4f1e5494b4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3680"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:32:53.330847+00:00",
+    "arrival_seq": 8038,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

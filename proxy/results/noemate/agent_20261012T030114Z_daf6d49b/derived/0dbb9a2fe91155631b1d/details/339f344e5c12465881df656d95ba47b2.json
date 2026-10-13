@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n被叫取路由流程在呼叫流程中起什么作用？\n\n\n\n最终回答：\n\n\n被叫取路由流程在呼叫流程中起着**实现移动用户动态定位与呼叫接续**的关键作用。其核心功能与意义如下：\n\n1. **获取被叫实时位置路由**：该流程由 GMSC（网关移动交换中心）向 HLR（归属位置寄存器）发起，用于查询被叫移动台（MS）当前的路由信息。HLR 会进一步向被叫当前驻留的 VLR（拜访位置寄存器）请求并获得动态路由信息（如漫游号码 TN），再返回给 GMSC。\n2. **保障移动性实现**：它是呼叫流程中不可或缺的一环。移动通信用户会不断切换驻留区域，若无此流程，网络仅凭固定的 MSISDN 无法得知被叫当前位置，MS 的移动性将无法实现，用户也无法随时随地接通电话。\n3. **完成准确呼叫转发**：GMSC 根据返回的路由信息，能够准确地将呼叫链路建立到被叫当前漫游或驻留的 MSC/VLR，从而完成后续的信令交互与语音接续。\n4. **适配不同业务类型**：从 HLR 处理角度，该流程支持**普通类型**（普通用户）和 **CAMEL 类型**（智能网业务用户），可根据用户签约业务灵活交互相应的控制信息（如 O_CSI/T_CSI），满足差异化呼叫控制需求。\n\n**总结**：被叫取路由流程是连接“被叫固定号码”与“被叫当前实际网络位置”的桥梁，为跨局、跨区、漫游场景下的呼叫提供精准路由指引，是移动通信网络实现无缝呼叫接续的基础保障。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "HLR 是如何根据用户类型区分普通流程和 CAMEL 流程的？\n如果被叫用户处于关机或不在服务区状态，该流程会如何响应？\nGMSC 获取到动态路由信息后，接下来会发起哪些信令交互？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 616,
+      "total_tokens": 670,
+      "completion_tokens": 54,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 616,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 54,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 670,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 53,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n被叫取路由流程在呼叫流程中起什么作用？\n\n\n\n最终回答：\n\n\n被叫取路由流程在呼叫流程中起着**实现移动用户动态定位与呼叫接续**的关键作用。其核心功能与意义如下：\n\n1. **获取被叫实时位置路由**：该流程由 GMSC（网关移动交换中心）向 HLR（归属位置寄存器）发起，用于查询被叫移动台（MS）当前的路由信息。HLR 会进一步向被叫当前驻留的 VLR（拜访位置寄存器）请求并获得动态路由信息（如漫游号码 TN），再返回给 GMSC。\n2. **保障移动性实现**：它是呼叫流程中不可或缺的一环。移动通信用户会不断切换驻留区域，若无此流程，网络仅凭固定的 MSISDN 无法得知被叫当前位置，MS 的移动性将无法实现，用户也无法随时随地接通电话。\n3. **完成准确呼叫转发**：GMSC 根据返回的路由信息，能够准确地将呼叫链路建立到被叫当前漫游或驻留的 MSC/VLR，从而完成后续的信令交互与语音接续。\n4. **适配不同业务类型**：从 HLR 处理角度，该流程支持**普通类型**（普通用户）和 **CAMEL 类型**（智能网业务用户），可根据用户签约业务灵活交互相应的控制信息（如 O_CSI/T_CSI），满足差异化呼叫控制需求。\n\n**总结**：被叫取路由流程是连接“被叫固定号码”与“被叫当前实际网络位置”的桥梁，为跨局、跨区、漫游场景下的呼叫提供精准路由指引，是移动通信网络实现无缝呼叫接续的基础保障。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-1e03c81e-1987-498b-a2da-465c98365eed"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-04860eed-c90d-49fb-95d0-dc61ac6f2efb"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-c5903dcc-eecf-4c0e-9999-dc210028a598"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3026"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 8235184,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 4202,
+      "byte_offset": 8236281,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8240483,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 8240688,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 4280,
+      "byte_offset": 8241513,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 8245793,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 8699594,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 8699955,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 1427,
+      "byte_offset": 8700163,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8701590,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 8701795,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 8702008,
+      "path": "archive/2026-10-12/13/part-00011.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-1e03c81e-1987-498b-a2da-465c98365eed"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-04860eed-c90d-49fb-95d0-dc61ac6f2efb"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-c5903dcc-eecf-4c0e-9999-dc210028a598"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2976"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:28:00.914667+00:00",
+    "arrival_seq": 7922,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

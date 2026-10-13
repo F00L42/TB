@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：告警现象分析：\n\n\n\n最终回答：\n\n\n### 告警现象分析\n\n- **性能指标骤降特征**\n  - S-CSCF网络接通率在 `18:00±15min` 窗口内由基线 `≥95%` 骤降至一级门限以下（现网记录约 `78%~82%`），跌破阈值持续时间约 `20~30分钟`。\n  - 指标恢复呈阶梯式反弹，伴随周期性波动，表明控制面存在重试叠加与链路间歇性恢复现象。\n\n- **关联告警与事件**\n  - 同期触发 `HTTP链路故障` 告警，AMF与IMS/AS上游控制面出现连接超时或对端不可达。\n  - 伴随 `路由分析失败`、`HSS开户数据查询超时` 或 `TLS证书校验异常` 等关联事件，信令交付成功率同步下滑。\n  - 若现网存在计划维护或配置变更，需核对变更时间窗与告警触发点的重合度。\n\n- **信令交互异常**\n  - SIP/HTTP2 层出现高频 `408 Request Timeout`、`480 Temporarily Unavailable` 或 `503 Service Unavailable` 响应。\n  - 关键流程（如 `INITIAL_REGISTRATION`、`CALL_SETUP`）等待对端响应超时，触发协议层重传；重传间隔固定且未启用退避，形成重试风暴。\n  - DNS解析延迟或失败码激增，导致S-CSCF地址发现阶段阻塞。\n\n- **资源负载特征**\n  - 拉取 `17:40-18:20` CPU/内存/队列监控曲线：若30分钟内波动幅度 `>15%`，判定为**剧烈波动**，表明突发话务或重试流量击穿调度能力；若持续2小时维持在阈值上限80%以上且波动 `±5%` 以内，判定为**高位震荡**，提示容量瓶颈或后台任务挤压。\n  - 连接池占用率触顶、消息队列积压，触发保护性限流或静默丢弃。\n\n- **影响范围评估**\n  - 故障精准命中依赖该AMF路由的IMS语音/视频业务，新呼叫建立失败率攀升，已建立会话不受影响。\n  - 若涉及特定切片或租户，需核对策略路由是否发生偏移或隔离失效。\n\n如需继续输出 `标准化排查步骤`、`根因收敛矩阵` 或 `修复与验证计划`，请回复对应序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "输出标准化排查步骤\n输出根因收敛矩阵\n输出修复与验证计划",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 825,
+      "total_tokens": 842,
+      "completion_tokens": 17,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 825,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 17,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 842,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 16,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：告警现象分析：\n\n\n\n最终回答：\n\n\n### 告警现象分析\n\n- **性能指标骤降特征**\n  - S-CSCF网络接通率在 `18:00±15min` 窗口内由基线 `≥95%` 骤降至一级门限以下（现网记录约 `78%~82%`），跌破阈值持续时间约 `20~30分钟`。\n  - 指标恢复呈阶梯式反弹，伴随周期性波动，表明控制面存在重试叠加与链路间歇性恢复现象。\n\n- **关联告警与事件**\n  - 同期触发 `HTTP链路故障` 告警，AMF与IMS/AS上游控制面出现连接超时或对端不可达。\n  - 伴随 `路由分析失败`、`HSS开户数据查询超时` 或 `TLS证书校验异常` 等关联事件，信令交付成功率同步下滑。\n  - 若现网存在计划维护或配置变更，需核对变更时间窗与告警触发点的重合度。\n\n- **信令交互异常**\n  - SIP/HTTP2 层出现高频 `408 Request Timeout`、`480 Temporarily Unavailable` 或 `503 Service Unavailable` 响应。\n  - 关键流程（如 `INITIAL_REGISTRATION`、`CALL_SETUP`）等待对端响应超时，触发协议层重传；重传间隔固定且未启用退避，形成重试风暴。\n  - DNS解析延迟或失败码激增，导致S-CSCF地址发现阶段阻塞。\n\n- **资源负载特征**\n  - 拉取 `17:40-18:20` CPU/内存/队列监控曲线：若30分钟内波动幅度 `>15%`，判定为**剧烈波动**，表明突发话务或重试流量击穿调度能力；若持续2小时维持在阈值上限80%以上且波动 `±5%` 以内，判定为**高位震荡**，提示容量瓶颈或后台任务挤压。\n  - 连接池占用率触顶、消息队列积压，触发保护性限流或静默丢弃。\n\n- **影响范围评估**\n  - 故障精准命中依赖该AMF路由的IMS语音/视频业务，新呼叫建立失败率攀升，已建立会话不受影响。\n  - 若涉及特定切片或租户，需核对策略路由是否发生偏移或隔离失效。\n\n如需继续输出 `标准化排查步骤`、`根因收敛矩阵` 或 `修复与验证计划`，请回复对应序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-996d3ef6-10b0-49dd-9e99-8e49b25815b1"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d88b8091-aa6c-4891-bc8b-427a38729491"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3505"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 2597265,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 4842,
+      "byte_offset": 2598362,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2603204,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 2603409,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 4920,
+      "byte_offset": 2604234,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 2609154,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 360,
+      "byte_offset": 2613884,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 207,
+      "byte_offset": 2614244,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 1222,
+      "byte_offset": 2614451,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 204,
+      "byte_offset": 2615673,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 2615877,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 409,
+      "byte_offset": 2616089,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-996d3ef6-10b0-49dd-9e99-8e49b25815b1"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d88b8091-aa6c-4891-bc8b-427a38729491"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3455"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:25:38.893298+00:00",
+    "arrival_seq": 3780,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

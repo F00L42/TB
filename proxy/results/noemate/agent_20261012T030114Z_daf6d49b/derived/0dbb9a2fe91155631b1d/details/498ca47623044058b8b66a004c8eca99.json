@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n定位信息包含POD的告警\n\n\n\n最终回答：\n\n\n根据知识库检索结果，定位信息或告警参数中包含 **POD** 信息的告警主要有以下两种：\n\n### 1. ALM-5521 服务中心和服务通信故障\n* **POD字段位置**：`定位信息` -> `pod名称`\n* **字段含义**：用于标识产生告警的服务实例 POD 名称。根据不同服务类型，取值规则如下：\n  1. K8s 管理的容器：取值为容器对应的 POD 名称。\n  2. 单 POD 多实例：取值为 `pod名称#进程编号`。\n  3. 非 K8s 管理或进程部署：多为 `服务名称-实例IP`。\n  4. 自定义规则（如扩容场景）：可能为 `服务名称_实例IP_SelfDeploy`。\n\n### 2. ALM-89007 NP学习本单板POD TB的出端口失败\n* **POD字段位置**：`告警参数` -> `POD TB` / `POD名称`\n* **字段含义**：\n  * `POD TB`：标识未学习到出端口的 Pod TB。\n  * `POD名称`：标识未学习到出端口的 Pod 名称。\n* **触发场景**：仅 NP 卡加速模式场景下，NP 学习本单板 POD TB 出端口失败或时间戳未刷新，且超过阈值时上报。\n\n---\n**说明**：上述告警中，`ALM-5521` 的 POD 信息直接归属于**定位信息**节点，用于微服务实例通信故障的精准定位；`ALM-89007` 的 POD 信息归属于**告警参数**节点，主要用于底层转发面 POD TB 路由学习失败的定位。如需查看特定网元上此类告警的实时数据，可提供具体网元名称和时间范围协助查询。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据ALM-5521告警中的POD名称定位具体的故障服务实例？\nALM-89007告警中POD TB出端口学习失败的常见原因及处理方法是什么？\n在K8s环境中，如何区分单POD多实例场景下的不同进程编号？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 686,
+      "total_tokens": 753,
+      "completion_tokens": 67,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 686,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 67,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 753,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 66,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n定位信息包含POD的告警\n\n\n\n最终回答：\n\n\n根据知识库检索结果，定位信息或告警参数中包含 **POD** 信息的告警主要有以下两种：\n\n### 1. ALM-5521 服务中心和服务通信故障\n* **POD字段位置**：`定位信息` -> `pod名称`\n* **字段含义**：用于标识产生告警的服务实例 POD 名称。根据不同服务类型，取值规则如下：\n  1. K8s 管理的容器：取值为容器对应的 POD 名称。\n  2. 单 POD 多实例：取值为 `pod名称#进程编号`。\n  3. 非 K8s 管理或进程部署：多为 `服务名称-实例IP`。\n  4. 自定义规则（如扩容场景）：可能为 `服务名称_实例IP_SelfDeploy`。\n\n### 2. ALM-89007 NP学习本单板POD TB的出端口失败\n* **POD字段位置**：`告警参数` -> `POD TB` / `POD名称`\n* **字段含义**：\n  * `POD TB`：标识未学习到出端口的 Pod TB。\n  * `POD名称`：标识未学习到出端口的 Pod 名称。\n* **触发场景**：仅 NP 卡加速模式场景下，NP 学习本单板 POD TB 出端口失败或时间戳未刷新，且超过阈值时上报。\n\n---\n**说明**：上述告警中，`ALM-5521` 的 POD 信息直接归属于**定位信息**节点，用于微服务实例通信故障的精准定位；`ALM-89007` 的 POD 信息归属于**告警参数**节点，主要用于底层转发面 POD TB 路由学习失败的定位。如需查看特定网元上此类告警的实时数据，可提供具体网元名称和时间范围协助查询。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-d0db331f-588a-44c1-98a0-ae54a15ffd51"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-c5cb003a-29d0-4e9f-8118-45d0520a58a8"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-f4cfefb2-c610-486e-9914-b40afc1faa9e"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2950"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1098,
+      "byte_offset": 11539763,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4102,
+      "byte_offset": 11540861,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11544963,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 11545168,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4180,
+      "byte_offset": 11545993,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 11550173,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 11779393,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 11779754,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1439,
+      "byte_offset": 11779962,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11781401,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 11781606,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 11781819,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-d0db331f-588a-44c1-98a0-ae54a15ffd51"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-c5cb003a-29d0-4e9f-8118-45d0520a58a8"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-f4cfefb2-c610-486e-9914-b40afc1faa9e"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2900"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T16:16:40.216454+00:00",
+    "arrival_seq": 11184,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/16"
+  }
+}

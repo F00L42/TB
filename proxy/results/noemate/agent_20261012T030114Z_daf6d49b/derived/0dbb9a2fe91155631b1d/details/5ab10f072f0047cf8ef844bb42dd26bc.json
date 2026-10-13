@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n- 根因：AUSF证书过期导致鉴权失败。\n\n\n\n最终回答：\n\n\n已更新根因。以下是补充完整后的结构化案例分析：\n\n### 📊 案例分析：ALM-2004 AMF与AUSF鉴权异常\n\n| 维度 | 详情 |\n|:---|:---|\n| **发生时间** | 2023-10-10 13:05:22 |\n| **关联网元** | AMF01-AUSF-03 |\n| **告警级别** | 严重（Critical） |\n| **确认根因** | AUSF服务TLS证书过期，导致AMF发起的鉴权请求握手失败，N7接口交互中断 |\n\n#### 🔍 根因分析\n- **直接原因**：AUSF节点配置的客户端/服务端证书超出有效期，TLS握手阶段报`certificate verify failed`。\n- **影响范围**：AMF无法完成用户鉴权，新注册与TAU流程失败，鉴权成功率出现**腰斩**（跌破基线50%），伴随N7接口时延**环比异常**（+210%）。\n- **降噪策略执行**：命中`严重级`规则，自动置顶、触发工单并通知值班工程师，未压缩/延迟。\n\n#### 🛠️ 处置建议\n1. **应急恢复**：重新签发AUSF证书并热加载，重启鉴权代理进程恢复N7链路。\n2. **状态确认**：验证鉴权成功率回升至99%以上，执行`ManualCleared`手动清除告警。\n3. **日志留存**：导出TLS握手失败日志与证书有效期快照，归档至故障知识库。\n\n#### 🛡️ 预防优化\n| 优化项 | 具体措施 |\n|:---|:---|\n| **监控前置** | 部署证书有效期探针，提前30天触发`Warning`、提前7天触发`Major`告警 |\n| **自动化轮换** | 接入CMK/Vault实现证书自动续期，杜绝人工维护遗漏 |\n| **规则收敛** | 配置拓扑抑制：N7证书故障期间自动屏蔽下游AMF鉴权超时衍生告警 |\n| **演练机制** | 每季度执行证书过期故障注入演练，验证自动工单与恢复SOP有效性 |\n\n如需输出完整故障时间线、指标波动快照或生成标准化复盘报告模板，请随时告知。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "生成标准化复盘报告模板\n输出完整故障时间线与指标波动快照\n配置证书有效期监控前置告警规则",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 797,
+      "total_tokens": 821,
+      "completion_tokens": 24,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 797,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 24,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 821,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 23,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n- 根因：AUSF证书过期导致鉴权失败。\n\n\n\n最终回答：\n\n\n已更新根因。以下是补充完整后的结构化案例分析：\n\n### 📊 案例分析：ALM-2004 AMF与AUSF鉴权异常\n\n| 维度 | 详情 |\n|:---|:---|\n| **发生时间** | 2023-10-10 13:05:22 |\n| **关联网元** | AMF01-AUSF-03 |\n| **告警级别** | 严重（Critical） |\n| **确认根因** | AUSF服务TLS证书过期，导致AMF发起的鉴权请求握手失败，N7接口交互中断 |\n\n#### 🔍 根因分析\n- **直接原因**：AUSF节点配置的客户端/服务端证书超出有效期，TLS握手阶段报`certificate verify failed`。\n- **影响范围**：AMF无法完成用户鉴权，新注册与TAU流程失败，鉴权成功率出现**腰斩**（跌破基线50%），伴随N7接口时延**环比异常**（+210%）。\n- **降噪策略执行**：命中`严重级`规则，自动置顶、触发工单并通知值班工程师，未压缩/延迟。\n\n#### 🛠️ 处置建议\n1. **应急恢复**：重新签发AUSF证书并热加载，重启鉴权代理进程恢复N7链路。\n2. **状态确认**：验证鉴权成功率回升至99%以上，执行`ManualCleared`手动清除告警。\n3. **日志留存**：导出TLS握手失败日志与证书有效期快照，归档至故障知识库。\n\n#### 🛡️ 预防优化\n| 优化项 | 具体措施 |\n|:---|:---|\n| **监控前置** | 部署证书有效期探针，提前30天触发`Warning`、提前7天触发`Major`告警 |\n| **自动化轮换** | 接入CMK/Vault实现证书自动续期，杜绝人工维护遗漏 |\n| **规则收敛** | 配置拓扑抑制：N7证书故障期间自动屏蔽下游AMF鉴权超时衍生告警 |\n| **演练机制** | 每季度执行证书过期故障注入演练，验证自动工单与恢复SOP有效性 |\n\n如需输出完整故障时间线、指标波动快照或生成标准化复盘报告模板，请随时告知。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5c7aac79-0d07-43cf-bf73-86b9430a0cea"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-95fa9099-bed5-42a0-a334-fed27d0fdaef"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-aa5cfb47-b837-475d-8f2d-274ba7943597"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3355"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10690487,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 4642,
+      "byte_offset": 10691584,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10696226,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10696431,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 4720,
+      "byte_offset": 10697256,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10701976,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10716699,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10717060,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 1287,
+      "byte_offset": 10717268,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10718555,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10718760,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10718973,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5c7aac79-0d07-43cf-bf73-86b9430a0cea"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-95fa9099-bed5-42a0-a334-fed27d0fdaef"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-aa5cfb47-b837-475d-8f2d-274ba7943597"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3305"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:49:03.818644+00:00",
+    "arrival_seq": 4086,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

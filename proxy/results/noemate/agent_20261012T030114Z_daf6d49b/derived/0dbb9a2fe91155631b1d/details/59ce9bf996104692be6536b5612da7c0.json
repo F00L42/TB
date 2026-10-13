@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n2. 检查是否本端E1线有问题。\n\n\n\n最终回答：\n\n\n确认。检查本端 E1 线缆及物理层连接的具体操作如下：\n\n### 🔧 本端 E1 线缆检查步骤\n1. **线缆通断与阻抗测试**\n   - 使用线缆测试仪或万用表测量 E1 双线对，确认无短路、断路或接触不良。\n   - 检查特性阻抗是否匹配标准值（通常 `120Ω` 不平衡或 `75Ω` 同轴，需与接口类型一致）。\n2. **终端电阻核对**\n   - 确认链路末端是否正确接入终端电阻。缺失或阻值偏差会导致信号反射，引发同步失败或滑码持续增长。\n3. **替换法验证（推荐）**\n   - 使用一根**已知良好**的 E1 线缆替换当前线缆，快速排除线缆隐性故障（如内部断芯、屏蔽层破损、阻抗漂移）。\n4. **设备侧物理层指标检查**\n   - 执行 `DSP E1PORT <端口号>` 查看端口状态。\n   - 执行 `DSP SLIP` 查看滑码计数：若滑码持续快速增长，说明时钟信号不稳定或线缆传输质量差。\n\n### 📌 结果处理\n- **若发现线缆故障/指标异常**：更换合格的 E1 线缆，重新插拔并确保屏蔽层可靠接地，随后执行 `DSP E1PORT` 确认状态恢复为 `Normal`。\n- **若本端线缆无误**：请继续执行下一步 → **3. 检查对端设备端口状态及配置一致性**。\n\n请告知测试结果或当前命令输出，我将为您给出后续定位建议。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "执行DSP E1PORT命令后端口状态显示是什么？\n当前E1接口使用的是120Ω不平衡还是75Ω同轴传输模式？\n替换线缆后滑码计数是否还在持续增长？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 624,
+      "total_tokens": 668,
+      "completion_tokens": 44,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 624,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 44,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 668,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 43,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n2. 检查是否本端E1线有问题。\n\n\n\n最终回答：\n\n\n确认。检查本端 E1 线缆及物理层连接的具体操作如下：\n\n### 🔧 本端 E1 线缆检查步骤\n1. **线缆通断与阻抗测试**\n   - 使用线缆测试仪或万用表测量 E1 双线对，确认无短路、断路或接触不良。\n   - 检查特性阻抗是否匹配标准值（通常 `120Ω` 不平衡或 `75Ω` 同轴，需与接口类型一致）。\n2. **终端电阻核对**\n   - 确认链路末端是否正确接入终端电阻。缺失或阻值偏差会导致信号反射，引发同步失败或滑码持续增长。\n3. **替换法验证（推荐）**\n   - 使用一根**已知良好**的 E1 线缆替换当前线缆，快速排除线缆隐性故障（如内部断芯、屏蔽层破损、阻抗漂移）。\n4. **设备侧物理层指标检查**\n   - 执行 `DSP E1PORT <端口号>` 查看端口状态。\n   - 执行 `DSP SLIP` 查看滑码计数：若滑码持续快速增长，说明时钟信号不稳定或线缆传输质量差。\n\n### 📌 结果处理\n- **若发现线缆故障/指标异常**：更换合格的 E1 线缆，重新插拔并确保屏蔽层可靠接地，随后执行 `DSP E1PORT` 确认状态恢复为 `Normal`。\n- **若本端线缆无误**：请继续执行下一步 → **3. 检查对端设备端口状态及配置一致性**。\n\n请告知测试结果或当前命令输出，我将为您给出后续定位建议。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-9dfd3927-8d5a-4a84-8679-78067ff364ec"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-5745876b-bc73-417a-9b9d-512afa0d82ff"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3ec6b3c7-d690-406a-a9cd-316edceb98c5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2879"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5996725,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 4006,
+      "byte_offset": 5997822,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6001828,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 6002033,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 4084,
+      "byte_offset": 6002858,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6006942,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6973284,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6973645,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 1359,
+      "byte_offset": 6973853,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6975212,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 6975417,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 6975630,
+      "path": "archive/2026-10-12/09/part-00002.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-9dfd3927-8d5a-4a84-8679-78067ff364ec"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-5745876b-bc73-417a-9b9d-512afa0d82ff"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3ec6b3c7-d690-406a-a9cd-316edceb98c5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2829"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:02:57.061566+00:00",
+    "arrival_seq": 4348,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

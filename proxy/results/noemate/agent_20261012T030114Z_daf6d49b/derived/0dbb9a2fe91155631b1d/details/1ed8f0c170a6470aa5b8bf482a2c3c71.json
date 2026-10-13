@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请帮我解释端口故障告警\n\n\n\n最终回答：\n\n\n端口故障告警是指当网络设备的主机端口、单板端口或虚拟机端口出现连接状态异常、配置错误或性能指标超标时系统上报的告警。此类告警通常意味着端口已不可用或存在业务损伤风险。\n\n以下是关于端口故障告警的核心说明：\n\n### 🔍 常见告警类型\n| 告警名称 | 告警ID | 适用对象 |\n|:---|:---:|:---|\n| **端口故障** | ALM-9521 | 主机物理端口 |\n| **单板端口故障** | ALM-1023 | 业务单板/交换板端口 |\n| **虚拟机端口故障** | ALM-9610 | 虚拟化网络端口 |\n| **ATM端口故障** | ALM-2037 | ATM业务端口 |\n\n### ⚠️ 对系统的影响\n- 端口直接不可用，导致该端口承载的业务中断。\n- 可能触发通信故障、链路断开或主备模块倒换。\n- 若为虚拟端口或检测异常告警，可能导致持续丢包、错包，造成业务性能下降。\n\n### 🛠️ 常见原因\n1. **物理层问题**：网线/光纤未插入、松脱、损坏，或对端设备端口故障。\n2. **硬件故障**：端口芯片异常、单板逻辑加载失败、多功能交换板故障。\n3. **配置不匹配**：本端与对端工作模式（速率、双工、OAM等）配置不一致。\n4. **性能阈值超标**：业务过载、网络泛洪攻击导致流量占用率、丢包率或错包率超过系统阈值。\n5. **虚拟化层异常**：虚拟机端口绑定的物理端口异常或虚拟机运行状态异常。\n\n### 📋 通用处理步骤\n1. **确认告警参数**：查看告警中的“端口名称”、“位置描述”和“告警原因”。\n2. **检查物理连接**：根据位置信息检查网线/光纤是否插紧，必要时更换线缆。\n3. **核对对端状态**：确认对端设备端口是否正常工作，是否存在关联告警。\n4. **检查配置与模式**：通过MML命令（如 `DSP PORT`、`LST VNET`）确认端口工作模式、OAM配置是否与对端匹配。\n5. **处理关联故障**：若伴随模块故障（如ALM-1037）或泛洪攻击告警，优先处理根因告警。\n6. **重启/倒换恢复**：对于虚拟端口故障，可在业务低峰期停止并重启虚拟机；或执行模块倒换操作。\n7. **收集信息并求助**：若上述步骤无效，收集主机日志、事件日志及配置信息，联系技术支持进一步排查。\n\n如需针对某个具体告警ID（如 `ALM-9521`）或特定网元端口进行定位，可提供详细告警信息，我将为您输出精准的排查路径。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据告警ID快速定位具体的故障端口？\n物理连接正常但仍报端口故障时该如何排查配置问题？\n虚拟机端口故障是否会影响同一主机上的其他业务？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 926,
+      "total_tokens": 964,
+      "completion_tokens": 38,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 926,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 38,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 964,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 37,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请帮我解释端口故障告警\n\n\n\n最终回答：\n\n\n端口故障告警是指当网络设备的主机端口、单板端口或虚拟机端口出现连接状态异常、配置错误或性能指标超标时系统上报的告警。此类告警通常意味着端口已不可用或存在业务损伤风险。\n\n以下是关于端口故障告警的核心说明：\n\n### 🔍 常见告警类型\n| 告警名称 | 告警ID | 适用对象 |\n|:---|:---:|:---|\n| **端口故障** | ALM-9521 | 主机物理端口 |\n| **单板端口故障** | ALM-1023 | 业务单板/交换板端口 |\n| **虚拟机端口故障** | ALM-9610 | 虚拟化网络端口 |\n| **ATM端口故障** | ALM-2037 | ATM业务端口 |\n\n### ⚠️ 对系统的影响\n- 端口直接不可用，导致该端口承载的业务中断。\n- 可能触发通信故障、链路断开或主备模块倒换。\n- 若为虚拟端口或检测异常告警，可能导致持续丢包、错包，造成业务性能下降。\n\n### 🛠️ 常见原因\n1. **物理层问题**：网线/光纤未插入、松脱、损坏，或对端设备端口故障。\n2. **硬件故障**：端口芯片异常、单板逻辑加载失败、多功能交换板故障。\n3. **配置不匹配**：本端与对端工作模式（速率、双工、OAM等）配置不一致。\n4. **性能阈值超标**：业务过载、网络泛洪攻击导致流量占用率、丢包率或错包率超过系统阈值。\n5. **虚拟化层异常**：虚拟机端口绑定的物理端口异常或虚拟机运行状态异常。\n\n### 📋 通用处理步骤\n1. **确认告警参数**：查看告警中的“端口名称”、“位置描述”和“告警原因”。\n2. **检查物理连接**：根据位置信息检查网线/光纤是否插紧，必要时更换线缆。\n3. **核对对端状态**：确认对端设备端口是否正常工作，是否存在关联告警。\n4. **检查配置与模式**：通过MML命令（如 `DSP PORT`、`LST VNET`）确认端口工作模式、OAM配置是否与对端匹配。\n5. **处理关联故障**：若伴随模块故障（如ALM-1037）或泛洪攻击告警，优先处理根因告警。\n6. **重启/倒换恢复**：对于虚拟端口故障，可在业务低峰期停止并重启虚拟机；或执行模块倒换操作。\n7. **收集信息并求助**：若上述步骤无效，收集主机日志、事件日志及配置信息，联系技术支持进一步排查。\n\n如需针对某个具体告警ID（如 `ALM-9521`）或特定网元端口进行定位，可提供详细告警信息，我将为您输出精准的排查路径。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-1f6c8485-6589-4070-8164-482f7e42cf7a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-9026ff5f-253c-44b4-8110-a548535f9d35"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-721bb18e-6d03-420e-8666-e5f036311646"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4030"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 14975369,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 5542,
+      "byte_offset": 14976466,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14982008,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14982213,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 5620,
+      "byte_offset": 14983038,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14988658,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 15037595,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 15037956,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 1379,
+      "byte_offset": 15038164,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15039543,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 15039748,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 15039961,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-1f6c8485-6589-4070-8164-482f7e42cf7a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-9026ff5f-253c-44b4-8110-a548535f9d35"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-721bb18e-6d03-420e-8666-e5f036311646"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3980"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:46:21.422713+00:00",
+    "arrival_seq": 8350,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

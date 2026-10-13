@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n找出所有“健康状态为正常的虚拟机所在的”的主机组，并同时显示这些主机组的称号和所属资源池的健康状态\n\n\n\n最终回答：\n\n\n查询请求超时，未能获取到数据。\n\n**原因分析：**\n智能问数接口响应超时，可能的原因包括：\n1. 查询条件复杂，涉及多表关联（虚拟机、主机组、资源池），处理时间较长\n2. 数据量大，查询和聚合操作耗时超出接口超时限制\n3. 后端服务负载较高，响应缓慢\n\n**建议：**\n1. 简化查询条件，分步查询（先查健康状态正常的虚拟机，再查对应主机组信息）\n2. 增加时间范围限制，减少数据扫描量\n3. 联系系统管理员检查智能问数服务状态和性能\n4. 稍后重试查询"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "是否可以先查询健康状态为正常的虚拟机列表，再根据结果查询对应的主机组信息？\n当前查询涉及的数据量大概有多大，是否可以通过增加时间范围来缩小查询范围？\n智能问数服务目前是否处于高负载状态，是否有预计的恢复时间？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 432,
+      "total_tokens": 489,
+      "completion_tokens": 57,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 432,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 57,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 489,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 56,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n找出所有“健康状态为正常的虚拟机所在的”的主机组，并同时显示这些主机组的称号和所属资源池的健康状态\n\n\n\n最终回答：\n\n\n查询请求超时，未能获取到数据。\n\n**原因分析：**\n智能问数接口响应超时，可能的原因包括：\n1. 查询条件复杂，涉及多表关联（虚拟机、主机组、资源池），处理时间较长\n2. 数据量大，查询和聚合操作耗时超出接口超时限制\n3. 后端服务负载较高，响应缓慢\n\n**建议：**\n1. 简化查询条件，分步查询（先查健康状态正常的虚拟机，再查对应主机组信息）\n2. 增加时间范围限制，减少数据扫描量\n3. 联系系统管理员检查智能问数服务状态和性能\n4. 稍后重试查询"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-810b9879-c2d7-45f6-a2be-b3f22211c9ac"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-6fce8cb6-7653-47c3-afc8-f4e0b1528fb4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9381f372-fa9b-4444-b93e-314ad1ec3568"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2223"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1096,
+      "byte_offset": 14822801,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3134,
+      "byte_offset": 14823897,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14827031,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14827236,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3208,
+      "byte_offset": 14828061,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14831269,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 15026853,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 15027214,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1527,
+      "byte_offset": 15027422,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15028949,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 15029154,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 15029367,
+      "path": "archive/2026-10-12/04/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-810b9879-c2d7-45f6-a2be-b3f22211c9ac"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-6fce8cb6-7653-47c3-afc8-f4e0b1528fb4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9381f372-fa9b-4444-b93e-314ad1ec3568"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2173"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T04:35:31.577555+00:00",
+    "arrival_seq": 741,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/04"
+  }
+}

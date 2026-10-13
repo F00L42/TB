@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n中继群故障可能是什么原因造成的\n\n\n\n最终回答：\n\n\n根据产品文档，中继群故障（如 `ALM-20187 SIP中继群故障` 和 `ALM-27005 中继群故障`）通常由以下几类原因导致：\n\n### 1. 链路或心跳检测失败（对端不可达）\n* **心跳超时**：系统向对端设备发送心跳请求（如持续探测或启发式探测），连续多次（默认3次）未收到响应。\n* **业务请求无响应**：发送初始对话外请求时连续多次未收到对端响应。\n* **链路建立失败**：中继群下的所有SIP链路建立失败或发生物理/逻辑故障。\n\n### 2. 人工操作干预\n* **人工去激活链路**：运维人员手动执行命令去激活了正常链路。\n* **人工闭塞**：通过 `BLK` 类命令将中继群状态设置为“人工闭塞”。\n\n### 3. QoS 指标超过阈值\n当中继群的网络质量指标超出系统配置的门限时会触发故障，包括：\n* 网络丢包率大于重要/紧急阈值\n* 网络环路时延大于重要/紧急阈值\n* 网络抖动大于重要/紧急阈值\n* 网络 MOS 值（语音质量）小于重要/紧急阈值\n\n### 4. 路由异常\n* 动态生成的路由发生路由故障，导致 TG（中继网关）状态变为故障。\n\n### 5. 注册超时（特定协议）\n* 对于 GB28181 等类型中继，若对端设备未注册或注册刷新超时（配置的“用户老化时间”大于对端要求的注册刷新时间），也会触发中继群故障。\n\n---\n**💡 排查建议**：\n1. 查看告警参数中的**“原因”**字段，快速定位是探测故障、人工闭塞还是QoS超标。\n2. 执行 `DSP` 命令（如 `DSP SIPTG` / `DSP ASIPTG` / `DSP ISIPTG`）查询当前中继群状态及下属链路状态。\n3. 若为心跳/探测失败，可结合 `PING` 或 `ALM-27026 特定IP不可达` 的排查步骤检查网络连通性。\n4. 若为QoS超标，需联系传输/网络团队排查底层链路质量。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据告警中的“原因”字段具体区分是心跳超时还是QoS指标超标？\n执行DSP SIPTG命令后，哪些关键字段可以确认中继群当前处于人工闭塞状态？\n当中继群因注册超时发生故障时，应如何调整用户老化时间以对端设备的注册刷新要求？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 779,
+      "total_tokens": 845,
+      "completion_tokens": 66,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 779,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 66,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 845,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 65,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n中继群故障可能是什么原因造成的\n\n\n\n最终回答：\n\n\n根据产品文档，中继群故障（如 `ALM-20187 SIP中继群故障` 和 `ALM-27005 中继群故障`）通常由以下几类原因导致：\n\n### 1. 链路或心跳检测失败（对端不可达）\n* **心跳超时**：系统向对端设备发送心跳请求（如持续探测或启发式探测），连续多次（默认3次）未收到响应。\n* **业务请求无响应**：发送初始对话外请求时连续多次未收到对端响应。\n* **链路建立失败**：中继群下的所有SIP链路建立失败或发生物理/逻辑故障。\n\n### 2. 人工操作干预\n* **人工去激活链路**：运维人员手动执行命令去激活了正常链路。\n* **人工闭塞**：通过 `BLK` 类命令将中继群状态设置为“人工闭塞”。\n\n### 3. QoS 指标超过阈值\n当中继群的网络质量指标超出系统配置的门限时会触发故障，包括：\n* 网络丢包率大于重要/紧急阈值\n* 网络环路时延大于重要/紧急阈值\n* 网络抖动大于重要/紧急阈值\n* 网络 MOS 值（语音质量）小于重要/紧急阈值\n\n### 4. 路由异常\n* 动态生成的路由发生路由故障，导致 TG（中继网关）状态变为故障。\n\n### 5. 注册超时（特定协议）\n* 对于 GB28181 等类型中继，若对端设备未注册或注册刷新超时（配置的“用户老化时间”大于对端要求的注册刷新时间），也会触发中继群故障。\n\n---\n**💡 排查建议**：\n1. 查看告警参数中的**“原因”**字段，快速定位是探测故障、人工闭塞还是QoS超标。\n2. 执行 `DSP` 命令（如 `DSP SIPTG` / `DSP ASIPTG` / `DSP ISIPTG`）查询当前中继群状态及下属链路状态。\n3. 若为心跳/探测失败，可结合 `PING` 或 `ALM-27026 特定IP不可达` 的排查步骤检查网络连通性。\n4. 若为QoS超标，需联系传输/网络团队排查底层链路质量。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-74578561-97fa-4bba-a27f-1370d1cc32eb"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f9ab52d5-1a8c-4244-bb22-96308db0ebe6"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-f5637c57-2b5c-4284-aa15-c485fce619e1"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3414"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 7305334,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 4722,
+      "byte_offset": 7306431,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7311153,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 7311358,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 4796,
+      "byte_offset": 7312183,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 7316979,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 7362917,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 7363278,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 1531,
+      "byte_offset": 7363486,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7365017,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 7365222,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 7365435,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-74578561-97fa-4bba-a27f-1370d1cc32eb"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f9ab52d5-1a8c-4244-bb22-96308db0ebe6"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-f5637c57-2b5c-4284-aa15-c485fce619e1"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3364"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:51:27.730753+00:00",
+    "arrival_seq": 8464,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

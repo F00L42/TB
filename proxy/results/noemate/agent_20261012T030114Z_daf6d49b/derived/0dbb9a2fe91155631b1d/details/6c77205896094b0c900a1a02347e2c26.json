@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n- 发生时段：2025-09-04 21:58:32（日终业务高峰后，用户数下降但服务请求激增）；  \n\n\n\n最终回答：\n\n\n#### （1）告警触发时间与上下文\n- **发生时段**：`2025-09-04 21:58:32`（日终业务高峰后，用户数下降但服务请求激增）\n- **负载特征初判**：该时段瞬时请求激增易导致控制面资源曲线出现**剧烈波动**（30分钟内波动幅度 > 15%）或**大幅波动**（一小时内波动幅度 > 20%），需重点核查AMF消息队列是否因突发流量冲击产生积压，进而引发N2交互响应延迟。\n- **业务背景关联**：日终时段常伴随批量会话更新、计费结算、策略刷新或后台定时任务。若此时对端gNB/UPF处理 capacity 未同步扩容，或T3560等定时器未适配突发延迟，极易触发误判型超时。\n- **排查聚焦**：\n  1. 拉取21:40-22:10资源监控曲线，确认是否命中**剧烈波动**或**大幅波动**阈值；\n  2. 核对同期是否执行日终批量作业或策略分发，评估请求激增的业务来源；\n  3. 检查告警前后N2信令Trace，确认超时集中于特定消息类型（如会话更新、策略刷新）还是全量交互。\n\n如需继续输出 `#### （2）协议层交互排查` 或调取具体MML/监控命令，请回复序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "拉取21:40-22:10资源监控曲线后，如何判断波动幅度是否超过15%或20%的阈值？\n如果N2信令Trace显示超时集中在会话更新消息，应如何调整T3560定时器参数？\n日终批量作业期间，如何通过MML命令检查AMF消息队列的积压情况？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 628,
+      "total_tokens": 708,
+      "completion_tokens": 80,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 628,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 80,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 708,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 79,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n- 发生时段：2025-09-04 21:58:32（日终业务高峰后，用户数下降但服务请求激增）；  \n\n\n\n最终回答：\n\n\n#### （1）告警触发时间与上下文\n- **发生时段**：`2025-09-04 21:58:32`（日终业务高峰后，用户数下降但服务请求激增）\n- **负载特征初判**：该时段瞬时请求激增易导致控制面资源曲线出现**剧烈波动**（30分钟内波动幅度 > 15%）或**大幅波动**（一小时内波动幅度 > 20%），需重点核查AMF消息队列是否因突发流量冲击产生积压，进而引发N2交互响应延迟。\n- **业务背景关联**：日终时段常伴随批量会话更新、计费结算、策略刷新或后台定时任务。若此时对端gNB/UPF处理 capacity 未同步扩容，或T3560等定时器未适配突发延迟，极易触发误判型超时。\n- **排查聚焦**：\n  1. 拉取21:40-22:10资源监控曲线，确认是否命中**剧烈波动**或**大幅波动**阈值；\n  2. 核对同期是否执行日终批量作业或策略分发，评估请求激增的业务来源；\n  3. 检查告警前后N2信令Trace，确认超时集中于特定消息类型（如会话更新、策略刷新）还是全量交互。\n\n如需继续输出 `#### （2）协议层交互排查` 或调取具体MML/监控命令，请回复序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-3a9603c8-0e60-4bbe-846f-de4cf16d8b5d"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-43101bef-60bb-4876-886f-410b04e02802"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2762"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 380007,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 3850,
+      "byte_offset": 381104,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 384954,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 385159,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 3928,
+      "byte_offset": 385984,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 389912,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 528241,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 528602,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1495,
+      "byte_offset": 528810,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 530305,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 530510,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 530723,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-3a9603c8-0e60-4bbe-846f-de4cf16d8b5d"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-43101bef-60bb-4876-886f-410b04e02802"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2712"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:07:01.964277+00:00",
+    "arrival_seq": 3613,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

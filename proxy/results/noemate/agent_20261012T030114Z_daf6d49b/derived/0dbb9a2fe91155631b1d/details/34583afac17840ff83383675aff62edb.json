@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n经综合研判，定位本次告警的根本原因为：**UDM 数据库索引失效导致的高并发处理延迟。**\n\n\n\n最终回答：\n\n\n### 2. 根因定位\n- **根本原因**：**UDM 数据库索引失效导致的高并发处理延迟。**\n- **故障机理**：早高峰时段 TAU 请求突增，UDM 面临海量签约数据查询。因数据库索引失效，查询操作退化为全表扫描，导致 CPU 利用率飙升（>85%）及磁盘 IOWait 异常升高，单条鉴权向量获取延迟从 50ms 恶化至 2.5~3 秒，接口响应呈现**剧烈波动**。\n- **级联影响路径**：UDM 响应延迟超出 AMF 侧 T3540 定时器阈值（2秒），引发批量 `Message Timeout`；超时重传与信令堆积进一步加剧 N2 接口拥塞与 AMF CPU **高位震荡**，最终导致鉴权成功率出现**大幅波动**并跌破一级门限。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何验证UDM数据库索引是否已失效？\n早高峰TAU请求突增的具体时间点及持续时间是什么？\n当前UDM数据库的索引重建方案及预计完成时间是什么？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 483,
+      "total_tokens": 523,
+      "completion_tokens": 40,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 483,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 40,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 523,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 39,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n经综合研判，定位本次告警的根本原因为：**UDM 数据库索引失效导致的高并发处理延迟。**\n\n\n\n最终回答：\n\n\n### 2. 根因定位\n- **根本原因**：**UDM 数据库索引失效导致的高并发处理延迟。**\n- **故障机理**：早高峰时段 TAU 请求突增，UDM 面临海量签约数据查询。因数据库索引失效，查询操作退化为全表扫描，导致 CPU 利用率飙升（>85%）及磁盘 IOWait 异常升高，单条鉴权向量获取延迟从 50ms 恶化至 2.5~3 秒，接口响应呈现**剧烈波动**。\n- **级联影响路径**：UDM 响应延迟超出 AMF 侧 T3540 定时器阈值（2秒），引发批量 `Message Timeout`；超时重传与信令堆积进一步加剧 N2 接口拥塞与 AMF CPU **高位震荡**，最终导致鉴权成功率出现**大幅波动**并跌破一级门限。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6f1bc902-1017-4cb8-8aff-ef84043bbf4e"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-c2669e12-eb7a-4657-beab-81ee17cf892d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-648080ff-518e-4f59-9852-f6ff562f812f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2298"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 15897296,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 3234,
+      "byte_offset": 15898393,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15901627,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 15901832,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 3308,
+      "byte_offset": 15902657,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 15905965,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 15932007,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 15932368,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1371,
+      "byte_offset": 15932576,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15933947,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 15934152,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 15934365,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6f1bc902-1017-4cb8-8aff-ef84043bbf4e"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-c2669e12-eb7a-4657-beab-81ee17cf892d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-648080ff-518e-4f59-9852-f6ff562f812f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2248"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:03:05.871353+00:00",
+    "arrival_seq": 3553,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

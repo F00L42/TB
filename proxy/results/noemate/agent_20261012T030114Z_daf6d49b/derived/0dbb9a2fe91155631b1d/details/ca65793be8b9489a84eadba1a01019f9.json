@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n这个方案中，主备CHF未生效，当主用CHF故障时，SMF并未将计费消息发送到备用CHF。这种情况的处理流程是怎样的？\n\n\n\n最终回答：\n\n\n针对主备CHF未生效导致主用CHF故障时SMF未将计费消息发送至备用CHF的场景，处理流程如下：\n\n### 🔍 现象描述\n主备CHF未生效，当主用CHF故障时，SMF并未将计费消息发送到备用CHF。\n\n### 📌 可能原因\n1. 未配置备用CHF。\n2. CHF下发的响应消息中明确不支持failover功能。\n3. CHF未下发failover且SMF本地配置未使能failover功能。\n4. 备用CHF链路故障。\n\n### 🛠️ 处理步骤\n\n**1. 检查是否配置备用CHF**\n* 若通过本地配置基于CC选择CHF，执行以下命令查看SMF本地是否配置备CHF组，且备用CHF配置了IP地址等信息：\n  `LST SELECTCHFGBYCC`、`LST TNFBINDGRP`、`LST TNFGRP`、`LST TNFINSIP`、`LST TNFINS`\n* **未配置**：执行 `ADD TNFINSIP`、`MOD TNFINS`、`ADD TNFGRP`、`MOD TNFBINDGRP`、`MOD SELECTCHFGBYCC` 命令，根据规划配置基于CC绑定主备CHF组。\n* **已配置**：进入步骤 2。\n\n**2. 检查CHF是否下发不支持failover功能**\n* 查看用户跟踪消息，打开CHF给SMF发送的 `Charging Data Response [initial]` / `Charging Data Response [update]` 消息。\n* 检查是否携带 `sessionFailover` 信元，且该信元为 `FAILOVER_NOT_SUPPORTED`（即主用CHF故障时不支持向备用CHF发送计费消息）。\n* **是**：此时SMF未向备用CHF发送计费消息属于正常行为。如需修改，需联系CHF端技术支持修改相关配置。\n* **否**：进入步骤 3。\n\n**3. 检查SMF本地配置是否使能failover功能**\n* 执行 `LST CCT` 命令，查询与当前用户所使用的融合计费模板对应的“支持failover使能开关”是否配置为“使能”。\n* **未使能**：执行与当前用户所使用的融合计费模板对应的 `SET FAILHANDLING` 命令，将 `FAILOVERSUP` 参数配置为 `ENABLE`（即SMF支持在主用CHF故障时向备用CHF发送计费消息）。\n* **已使能**：进入步骤 4。\n\n**4. 检查备CHF链路是否故障**\n* 在告警服务台上检查UNC是否产生 `ALM-100072 目的NF服务不可达告警`，查询N40接口的通信是否存在故障。\n* **存在告警**：根据告警信息进行处理，观察告警是否恢复。恢复则结束流程；未恢复则进入步骤 5。\n* **不存在告警**：进入步骤 5。\n\n**5. 收集信息并寻求技术支持**\n* 若上述步骤均未解决问题，请收集告警信息、用户跟踪日志和当前配置数据，并联系华为技术支持进一步处理。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何判断CHF下发的响应消息中是否明确不支持failover功能？\n如果SMF本地配置未使能failover功能，具体如何修改配置以启用该功能？\n当备CHF链路故障时，除了查看告警信息外，还有哪些方法可以验证链路状态？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 985,
+      "total_tokens": 1044,
+      "completion_tokens": 59,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 985,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 59,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1044,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 58,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n这个方案中，主备CHF未生效，当主用CHF故障时，SMF并未将计费消息发送到备用CHF。这种情况的处理流程是怎样的？\n\n\n\n最终回答：\n\n\n针对主备CHF未生效导致主用CHF故障时SMF未将计费消息发送至备用CHF的场景，处理流程如下：\n\n### 🔍 现象描述\n主备CHF未生效，当主用CHF故障时，SMF并未将计费消息发送到备用CHF。\n\n### 📌 可能原因\n1. 未配置备用CHF。\n2. CHF下发的响应消息中明确不支持failover功能。\n3. CHF未下发failover且SMF本地配置未使能failover功能。\n4. 备用CHF链路故障。\n\n### 🛠️ 处理步骤\n\n**1. 检查是否配置备用CHF**\n* 若通过本地配置基于CC选择CHF，执行以下命令查看SMF本地是否配置备CHF组，且备用CHF配置了IP地址等信息：\n  `LST SELECTCHFGBYCC`、`LST TNFBINDGRP`、`LST TNFGRP`、`LST TNFINSIP`、`LST TNFINS`\n* **未配置**：执行 `ADD TNFINSIP`、`MOD TNFINS`、`ADD TNFGRP`、`MOD TNFBINDGRP`、`MOD SELECTCHFGBYCC` 命令，根据规划配置基于CC绑定主备CHF组。\n* **已配置**：进入步骤 2。\n\n**2. 检查CHF是否下发不支持failover功能**\n* 查看用户跟踪消息，打开CHF给SMF发送的 `Charging Data Response [initial]` / `Charging Data Response [update]` 消息。\n* 检查是否携带 `sessionFailover` 信元，且该信元为 `FAILOVER_NOT_SUPPORTED`（即主用CHF故障时不支持向备用CHF发送计费消息）。\n* **是**：此时SMF未向备用CHF发送计费消息属于正常行为。如需修改，需联系CHF端技术支持修改相关配置。\n* **否**：进入步骤 3。\n\n**3. 检查SMF本地配置是否使能failover功能**\n* 执行 `LST CCT` 命令，查询与当前用户所使用的融合计费模板对应的“支持failover使能开关”是否配置为“使能”。\n* **未使能**：执行与当前用户所使用的融合计费模板对应的 `SET FAILHANDLING` 命令，将 `FAILOVERSUP` 参数配置为 `ENABLE`（即SMF支持在主用CHF故障时向备用CHF发送计费消息）。\n* **已使能**：进入步骤 4。\n\n**4. 检查备CHF链路是否故障**\n* 在告警服务台上检查UNC是否产生 `ALM-100072 目的NF服务不可达告警`，查询N40接口的通信是否存在故障。\n* **存在告警**：根据告警信息进行处理，观察告警是否恢复。恢复则结束流程；未恢复则进入步骤 5。\n* **不存在告警**：进入步骤 5。\n\n**5. 收集信息并寻求技术支持**\n* 若上述步骤均未解决问题，请收集告警信息、用户跟踪日志和当前配置数据，并联系华为技术支持进一步处理。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a3ccd37c-0d0f-4617-83c9-dc8bbbe4ea68"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-bac0f90e-bec4-45c2-99db-3e83d2a752d1"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a43cdb87-9365-42d1-89cf-2311572a2ada"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4111"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 821280,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 5650,
+      "byte_offset": 822377,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 828027,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 828232,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 5728,
+      "byte_offset": 829057,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 834785,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 1050839,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 1051200,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 1479,
+      "byte_offset": 1051408,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1052887,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 1053092,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 1053305,
+      "path": "archive/2026-10-12/11/part-00007.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a3ccd37c-0d0f-4617-83c9-dc8bbbe4ea68"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-bac0f90e-bec4-45c2-99db-3e83d2a752d1"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a43cdb87-9365-42d1-89cf-2311572a2ada"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4061"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T11:46:08.138000+00:00",
+    "arrival_seq": 6636,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/11"
+  }
+}

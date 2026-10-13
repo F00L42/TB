@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：UPF01网元近期有网口故障告警，请进行诊断，然后再查询链路异常告警的告警含义\n\n\n\n最终回答：\n\n\n---\n\n## 一、UPF01网元网口故障告警诊断\n\n⚠️ **诊断请求处理超时**\n\n调用故障诊断接口时响应超时，未能完成UPF01网元网口故障告警的自动诊断。建议：\n- 稍后重试诊断请求\n- 或提供具体的告警ID/告警名称，以便进行针对性诊断\n\n---\n\n## 二、链路异常告警含义说明\n\n根据知识库检索结果，\"链路异常告警\"主要对应以下告警：\n\n### ALM-82039 Ga链路异常告警\n\n#### 告警解释\n- **告警触发机制**：Ga链路连续5个周期（周期间隔60s）收到不符合版本（SET SRVSTH配置支持版本）的GTP'报文时，上报告警。\n- **告警恢复机制**：\n  - Ga链路连续5个周期（周期间隔60s）未收到不符合版本的GTP'报文时，恢复告警。\n  - 链路释放时恢复告警（包括链路失效老化、链路迁移等场景）。\n\n#### 告警属性\n\n| 告警ID | 告警级别 | 可自动清除 |\n|:---|:---|:---|\n| 82039 | 重要告警 | 是 |\n\n#### 对系统的影响\n如果由于上下游使用GTP'协议版本协商不一致时，会234G话单业务无法接入，可能导致计费延迟。\n\n#### 可能原因\n- SET SRVSTH命令中配置了错误的GTP'协议版本。\n- SMF、AMF网元上，使用了NCG禁用的GTP'协议版本。\n\n#### 处理步骤\n1. 在\"MML命令行 - UNC\"窗口中，执行 `LST SRVSTH:`; 查询\"Ga口GTP'协议支持版本开关\"。若GTP'版本正确执行步骤3，否则执行步骤2。\n2. 执行 `SET SRVSTH` 命令，将GTP'版本设置为正确的版本。\n3. 检查上游SMF、AMF网元上，是否使用了NCG禁用的GTP'协议版本。上游SMF、AMF仅支持V2协议，不支持配置。若使用了则执行步骤5，否则执行步骤4。\n4. 发送话单，等待5~10分钟，若告警恢复，则处理完毕。否则执行步骤5。\n5. 收集告警信息、日志信息和配置信息，联系华为技术支持。\n\n---\n\n### 其他相关告警\n\n**ALM-0111 链路检测异常**\n- 告警级别：次要\n- 说明：此告警为系统预留告警，目前未使用。\n\n---\n\n如需进一步了解其他类型的链路异常告警或需要重新诊断UPF01网元，请提供更多信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "UPF01网元的网口故障告警是否有具体的告警ID或告警名称？\nGa链路异常告警中的GTP'协议版本不一致问题是否可能导致UPF01网元的网口故障？\n是否需要重新尝试对UPF01网元进行网口故障诊断？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 929,
+      "total_tokens": 994,
+      "completion_tokens": 65,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 929,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 65,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 994,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 64,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：UPF01网元近期有网口故障告警，请进行诊断，然后再查询链路异常告警的告警含义\n\n\n\n最终回答：\n\n\n---\n\n## 一、UPF01网元网口故障告警诊断\n\n⚠️ **诊断请求处理超时**\n\n调用故障诊断接口时响应超时，未能完成UPF01网元网口故障告警的自动诊断。建议：\n- 稍后重试诊断请求\n- 或提供具体的告警ID/告警名称，以便进行针对性诊断\n\n---\n\n## 二、链路异常告警含义说明\n\n根据知识库检索结果，\"链路异常告警\"主要对应以下告警：\n\n### ALM-82039 Ga链路异常告警\n\n#### 告警解释\n- **告警触发机制**：Ga链路连续5个周期（周期间隔60s）收到不符合版本（SET SRVSTH配置支持版本）的GTP'报文时，上报告警。\n- **告警恢复机制**：\n  - Ga链路连续5个周期（周期间隔60s）未收到不符合版本的GTP'报文时，恢复告警。\n  - 链路释放时恢复告警（包括链路失效老化、链路迁移等场景）。\n\n#### 告警属性\n\n| 告警ID | 告警级别 | 可自动清除 |\n|:---|:---|:---|\n| 82039 | 重要告警 | 是 |\n\n#### 对系统的影响\n如果由于上下游使用GTP'协议版本协商不一致时，会234G话单业务无法接入，可能导致计费延迟。\n\n#### 可能原因\n- SET SRVSTH命令中配置了错误的GTP'协议版本。\n- SMF、AMF网元上，使用了NCG禁用的GTP'协议版本。\n\n#### 处理步骤\n1. 在\"MML命令行 - UNC\"窗口中，执行 `LST SRVSTH:`; 查询\"Ga口GTP'协议支持版本开关\"。若GTP'版本正确执行步骤3，否则执行步骤2。\n2. 执行 `SET SRVSTH` 命令，将GTP'版本设置为正确的版本。\n3. 检查上游SMF、AMF网元上，是否使用了NCG禁用的GTP'协议版本。上游SMF、AMF仅支持V2协议，不支持配置。若使用了则执行步骤5，否则执行步骤4。\n4. 发送话单，等待5~10分钟，若告警恢复，则处理完毕。否则执行步骤5。\n5. 收集告警信息、日志信息和配置信息，联系华为技术支持。\n\n---\n\n### 其他相关告警\n\n**ALM-0111 链路检测异常**\n- 告警级别：次要\n- 说明：此告警为系统预留告警，目前未使用。\n\n---\n\n如需进一步了解其他类型的链路异常告警或需要重新诊断UPF01网元，请提供更多信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5436bb34-4758-45ac-88e7-9cc46fbf6154"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fabc1618-f479-4e6d-92cf-e4fac110757d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a05ff9fa-24c8-406f-9a03-c77ff096730f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3812"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 13511685,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 5250,
+      "byte_offset": 13512782,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13518032,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 13518237,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 5328,
+      "byte_offset": 13519062,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 13524390,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 13539988,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 13540349,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1443,
+      "byte_offset": 13540557,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13542000,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 13542205,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 13542418,
+      "path": "archive/2026-10-12/06/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5436bb34-4758-45ac-88e7-9cc46fbf6154"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fabc1618-f479-4e6d-92cf-e4fac110757d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a05ff9fa-24c8-406f-9a03-c77ff096730f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3762"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T06:08:27.322115+00:00",
+    "arrival_seq": 1659,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/06"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请问5065 DIAMETER_REQUESTED_IPCAN_SESSION_NOT_AVAILABLE错误码产生原理?\n\n\n\n最终回答：\n5065 DIAMETER_REQUESTED_IPCAN_SESSION_NOT_AVAILABLE 错误码的产生原理主要与**Rx会话与Gx/N7会话绑定失败**有关。以下是详细的错误码描述、可能原因及排查方法：\n\n### 🔍 错误码描述\n当AF发起Rx会话请求（如AAR消息）时，策略控制节点（UPCF/UPCC）会尝试根据用户IP地址将其与已有的Gx/N7会话进行绑定。如果**找不到可以绑定的Gx/N7会话**，则会返回 `5065 DIAMETER_REQUESTED_IPCAN_SESSION_NOT_AVAILABLE` 错误码。\n\n---\n\n### 🧩 可能原因与排查方法\n\n| 可能原因 | 场景说明 | 排查与处理方法 |\n|:---|:---|:---|\n| **AAR消息缺失IP地址** | AAR-I消息未携带可用于会话绑定的IP地址（如Framed-IP-Address或Framed-IPv6-Prefix AVP）。 | 1. 检查消息跟踪报文，确认AAR-I是否携带IP地址AVP。<br>2. 若未携带，请联系对端AF设备维护人员处理。 |\n| **PCEF配置了PPCEFGROUP** | Gx链路对端PCEF配置了参数`PPCEFGROUP`，导致Rx会话通过用户IP无法找到对应的Gx会话承载。 | 1. 执行 `LST PPCEF` 查询`PPCEFGROUP`是否为`Null`。<br>2. 若非Null，执行 `MOD PPCEF: PPCEFGROUP=Null;` 修改配置。 |\n| **主备容灾会话恢复失败** | 容灾倒换后，因License/内存不足或DSU故障，Gx/N7会话恢复失败，UPCF本地无对应会话。 | 1. 检查CCA-U是否携带`5002 DIAMETER_UNKNOWN_SESSION_ID`。<br>2. 参考5002错误码的“会话恢复失败”方案处理。 |\n| **UPCF返回3004 TOO_BUSY** | UPCF模块启动流控丢弃CCR-I/U，返回`3004 DIAMETER_TOO_BUSY`，导致Gx会话未建立。 | 1. 检查CCA-I/U是否携带3004错误码。<br>2. 参考3004错误码的“启动流控”方案处理。 |\n| **DRA/SMF转发路径错误** | 对端将AAR/Npcf_PolicyAuthorization_Create消息转发至非用户IMS承载注册的UPCF上。 | 1. 导出该用户会话数据，确认当前UPCF是否存在该用户的默认承载Gx会话。<br>2. 若不存在，请联系对端DRA/SMF维护人员处理路由。 |\n| **单用户Rx会话超限** | 单用户Rx接口会话超过20个，第21个会话上线时超出最大数量限制，绑定失败。 | 1. 执行 `SET SERDBG` 导出用户全量会话数据。<br>2. 收集PcfPolicyEngineService日志，联系华为技术支持分析。 |\n| **P-CSCF故障恢复功能时序问题** | Gx会话上线后才开启基于PCRF的P-CSCF故障恢复功能，或CCR-I未携带IMSI和VoLTE-APN。 | 1. 检查CCR-I是否同时携带IMSI和VoLTE-APN。<br>2. 让用户释放Gx会话并重新上线，观察是否复现。 |\n| **5063错误码强制转换** | 通过`ADD VOICETORXRCMAP`配置了语音错误码映射，将N7/Gx接口的5063强制转换为Rx接口的5065。 | 1. 执行 `LST VOICETORXRCMAP` 查询是否存在映射记录。<br>2. 若存在，请按5063错误码的处理指导进行排查。 |\n\n---\n\n### 💡 处理建议\n1. **优先检查消息报文**：确认AAR/CCR消息是否携带完整的用户标识（IP、IMSI、APN等）。\n2. **检查对端配置**：确认PCEF的`PPCEFGROUP`配置及DRA/SMF的路由转发规则。\n3. **容灾与流控场景**：若发生在倒换或高负载期间，重点检查会话恢复状态及系统流控日志。\n4. **日志收集**：对于会话超限或复杂绑定失败，建议导出全量会话数据及相关服务日志，交由技术支持深度分析。\n\n如需针对某一具体原因进行深入排查或提供命令执行结果，可进一步补充信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "AAR消息中具体需要携带哪些IP地址相关的AVP属性才能成功绑定Gx会话？\n执行LST PPCEF命令后，如果PPCEFGROUP参数不是Null，除了设置为Null还有其他可选值吗？\n在容灾倒换场景下，如何快速判断Gx会话恢复失败是由于License不足还是DSU故障引起的？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1303,
+      "total_tokens": 1377,
+      "completion_tokens": 74,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1303,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 74,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1377,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 73,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请问5065 DIAMETER_REQUESTED_IPCAN_SESSION_NOT_AVAILABLE错误码产生原理?\n\n\n\n最终回答：\n5065 DIAMETER_REQUESTED_IPCAN_SESSION_NOT_AVAILABLE 错误码的产生原理主要与**Rx会话与Gx/N7会话绑定失败**有关。以下是详细的错误码描述、可能原因及排查方法：\n\n### 🔍 错误码描述\n当AF发起Rx会话请求（如AAR消息）时，策略控制节点（UPCF/UPCC）会尝试根据用户IP地址将其与已有的Gx/N7会话进行绑定。如果**找不到可以绑定的Gx/N7会话**，则会返回 `5065 DIAMETER_REQUESTED_IPCAN_SESSION_NOT_AVAILABLE` 错误码。\n\n---\n\n### 🧩 可能原因与排查方法\n\n| 可能原因 | 场景说明 | 排查与处理方法 |\n|:---|:---|:---|\n| **AAR消息缺失IP地址** | AAR-I消息未携带可用于会话绑定的IP地址（如Framed-IP-Address或Framed-IPv6-Prefix AVP）。 | 1. 检查消息跟踪报文，确认AAR-I是否携带IP地址AVP。<br>2. 若未携带，请联系对端AF设备维护人员处理。 |\n| **PCEF配置了PPCEFGROUP** | Gx链路对端PCEF配置了参数`PPCEFGROUP`，导致Rx会话通过用户IP无法找到对应的Gx会话承载。 | 1. 执行 `LST PPCEF` 查询`PPCEFGROUP`是否为`Null`。<br>2. 若非Null，执行 `MOD PPCEF: PPCEFGROUP=Null;` 修改配置。 |\n| **主备容灾会话恢复失败** | 容灾倒换后，因License/内存不足或DSU故障，Gx/N7会话恢复失败，UPCF本地无对应会话。 | 1. 检查CCA-U是否携带`5002 DIAMETER_UNKNOWN_SESSION_ID`。<br>2. 参考5002错误码的“会话恢复失败”方案处理。 |\n| **UPCF返回3004 TOO_BUSY** | UPCF模块启动流控丢弃CCR-I/U，返回`3004 DIAMETER_TOO_BUSY`，导致Gx会话未建立。 | 1. 检查CCA-I/U是否携带3004错误码。<br>2. 参考3004错误码的“启动流控”方案处理。 |\n| **DRA/SMF转发路径错误** | 对端将AAR/Npcf_PolicyAuthorization_Create消息转发至非用户IMS承载注册的UPCF上。 | 1. 导出该用户会话数据，确认当前UPCF是否存在该用户的默认承载Gx会话。<br>2. 若不存在，请联系对端DRA/SMF维护人员处理路由。 |\n| **单用户Rx会话超限** | 单用户Rx接口会话超过20个，第21个会话上线时超出最大数量限制，绑定失败。 | 1. 执行 `SET SERDBG` 导出用户全量会话数据。<br>2. 收集PcfPolicyEngineService日志，联系华为技术支持分析。 |\n| **P-CSCF故障恢复功能时序问题** | Gx会话上线后才开启基于PCRF的P-CSCF故障恢复功能，或CCR-I未携带IMSI和VoLTE-APN。 | 1. 检查CCR-I是否同时携带IMSI和VoLTE-APN。<br>2. 让用户释放Gx会话并重新上线，观察是否复现。 |\n| **5063错误码强制转换** | 通过`ADD VOICETORXRCMAP`配置了语音错误码映射，将N7/Gx接口的5063强制转换为Rx接口的5065。 | 1. 执行 `LST VOICETORXRCMAP` 查询是否存在映射记录。<br>2. 若存在，请按5063错误码的处理指导进行排查。 |\n\n---\n\n### 💡 处理建议\n1. **优先检查消息报文**：确认AAR/CCR消息是否携带完整的用户标识（IP、IMSI、APN等）。\n2. **检查对端配置**：确认PCEF的`PPCEFGROUP`配置及DRA/SMF的路由转发规则。\n3. **容灾与流控场景**：若发生在倒换或高负载期间，重点检查会话恢复状态及系统流控日志。\n4. **日志收集**：对于会话超限或复杂绑定失败，建议导出全量会话数据及相关服务日志，交由技术支持深度分析。\n\n如需针对某一具体原因进行深入排查或提供命令执行结果，可进一步补充信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c5109443-5790-4dbd-bbfc-502c9534f303"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-be36a750-0600-4110-9d09-91bb0a535305"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3f2280da-c887-4387-9905-5194b7da202c"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "5029"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 14364690,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 6874,
+      "byte_offset": 14365787,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14372661,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14372866,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 6952,
+      "byte_offset": 14373691,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14380643,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 14672179,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 14672540,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 1539,
+      "byte_offset": 14672748,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14674287,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 14674492,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 14674705,
+      "path": "archive/2026-10-12/13/part-00024.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c5109443-5790-4dbd-bbfc-502c9534f303"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-be36a750-0600-4110-9d09-91bb0a535305"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3f2280da-c887-4387-9905-5194b7da202c"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4979"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:57:27.050292+00:00",
+    "arrival_seq": 8607,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

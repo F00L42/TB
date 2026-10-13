@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：Delete Subscriber Data详细流程如下：\n\n\n\n最终回答：\n\n\n根据协议文档，**Delete Subscriber Data（删除用户签约数据）** 流程主要用于 HSS 与 MME（S6a接口）或 HSS/HLR 与 SGSN（S6d/Gr接口）之间。该流程由 **HSS/HLR 发起**，用于删除 MME 或 SGSN 中保存的部分或全部用户签约数据（HSS user profile）。\n\n以下是该流程的详细说明：\n\n### 一、 核心业务流程\n\n#### 场景1：HSS 与 MME 之间（S6a接口）\n1. **发起删除请求**：HSS 向 MME 发送 `Delete Subscriber Data Request` 消息，请求删除 MME 上存储的用户签约数据。\n2. **执行删除与后续处理**：\n   * MME 根据请求删除对应的签约数据。\n   * **承载去激活**：如果被删除的签约数据是用于创建 PDN 连接的，MME 必须随后发起**承载去激活流程（Bearer [REDACTED_TOKEN]）**。\n3. **返回确认响应**：MME 完成删除后，向 HSS 回复 `Delete Subscriber Data Answer` 消息，指示操作成功或失败。\n\n#### 场景2：HLR/HSS 与 SGSN 之间（Gr/S6d接口）\n1. **发起删除请求**：HLR 向 SGSN 发送 `Delete Subscriber Data` 消息，携带 IMSI 和需要删除的 PDP Context Identifiers List。\n2. **执行删除与状态检查**：SGSN 对列表中的每个 PDP Context Identifier 进行检查：\n   * **非激活状态（Inactive）**：直接删除该 PDP Context，无需其他操作。\n   * **激活状态（Active）**：SGSN 必须先发起 **SGSN发起的PDP Context去激活流程**，然后再删除该上下文。\n3. **返回确认响应**：SGSN 完成操作后，向 HLR 回复 `Delete Subscriber Data Ack` 消息。\n\n---\n\n### 二、 可删除的数据范围\n该流程支持删除以下一种或多种数据：\n* **EPS/GPRS 签约数据**：MME或SGSN中用户所有或部分 APN Configuration Profile。\n* **区域签约数据**：用户签约的移动区域范围（TAI/RAI）。\n* **签约计费属性**。\n* **SRVCC 会话传输码**（Session Transfer Number）。\n* **跟踪数据**（Trace Data）。\n\n---\n\n### 三、 关键消息信元（IE）说明\n\n| 信元名称 | 必填性 | 简要说明 |\n|:---|:---|:---|\n| **IMSI** | Mandatory | 国际移动用户标识，唯一标识一个用户。 |\n| **DSR Flags** | Mandatory | 删除标记位（Bitmask），用于指示具体需要删除的数据类型（如 PDN subscription contexts Withdrawal、Trace Data Withdrawal 等）。 |\n| **Context Identifier** | Conditional | 上下文标识。当需要删除特定的 PDN 或 PDP 上下文时携带。 |\n| **Trace Reference** | Conditional | 跟踪参考。当撤回跟踪数据（Trace Data Withdrawal）时携带。 |\n| **Result** | Mandatory | 操作结果。包含 Result-Code AVP 或 Experimental-Result AVP 指示成功/错误。 |\n\n该流程符合 3GPP TS 29.272 (S6a/S6d) 及 TS 29.002 (MAP) 协议中关于签约数据管理的规定。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "DSR Flags信元中不同Bit位具体对应哪些可删除的数据类型？\n承载去激活流程在Delete Subscriber Data之后的触发条件和详细步骤是什么？\n如果MME或SGSN在执行删除过程中发生故障，协议规定的错误处理和重试机制是什么？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1050,
+      "total_tokens": 1104,
+      "completion_tokens": 54,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1050,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 54,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1104,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 53,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：Delete Subscriber Data详细流程如下：\n\n\n\n最终回答：\n\n\n根据协议文档，**Delete Subscriber Data（删除用户签约数据）** 流程主要用于 HSS 与 MME（S6a接口）或 HSS/HLR 与 SGSN（S6d/Gr接口）之间。该流程由 **HSS/HLR 发起**，用于删除 MME 或 SGSN 中保存的部分或全部用户签约数据（HSS user profile）。\n\n以下是该流程的详细说明：\n\n### 一、 核心业务流程\n\n#### 场景1：HSS 与 MME 之间（S6a接口）\n1. **发起删除请求**：HSS 向 MME 发送 `Delete Subscriber Data Request` 消息，请求删除 MME 上存储的用户签约数据。\n2. **执行删除与后续处理**：\n   * MME 根据请求删除对应的签约数据。\n   * **承载去激活**：如果被删除的签约数据是用于创建 PDN 连接的，MME 必须随后发起**承载去激活流程（Bearer [REDACTED_TOKEN]）**。\n3. **返回确认响应**：MME 完成删除后，向 HSS 回复 `Delete Subscriber Data Answer` 消息，指示操作成功或失败。\n\n#### 场景2：HLR/HSS 与 SGSN 之间（Gr/S6d接口）\n1. **发起删除请求**：HLR 向 SGSN 发送 `Delete Subscriber Data` 消息，携带 IMSI 和需要删除的 PDP Context Identifiers List。\n2. **执行删除与状态检查**：SGSN 对列表中的每个 PDP Context Identifier 进行检查：\n   * **非激活状态（Inactive）**：直接删除该 PDP Context，无需其他操作。\n   * **激活状态（Active）**：SGSN 必须先发起 **SGSN发起的PDP Context去激活流程**，然后再删除该上下文。\n3. **返回确认响应**：SGSN 完成操作后，向 HLR 回复 `Delete Subscriber Data Ack` 消息。\n\n---\n\n### 二、 可删除的数据范围\n该流程支持删除以下一种或多种数据：\n* **EPS/GPRS 签约数据**：MME或SGSN中用户所有或部分 APN Configuration Profile。\n* **区域签约数据**：用户签约的移动区域范围（TAI/RAI）。\n* **签约计费属性**。\n* **SRVCC 会话传输码**（Session Transfer Number）。\n* **跟踪数据**（Trace Data）。\n\n---\n\n### 三、 关键消息信元（IE）说明\n\n| 信元名称 | 必填性 | 简要说明 |\n|:---|:---|:---|\n| **IMSI** | Mandatory | 国际移动用户标识，唯一标识一个用户。 |\n| **DSR Flags** | Mandatory | 删除标记位（Bitmask），用于指示具体需要删除的数据类型（如 PDN subscription contexts Withdrawal、Trace Data Withdrawal 等）。 |\n| **Context Identifier** | Conditional | 上下文标识。当需要删除特定的 PDN 或 PDP 上下文时携带。 |\n| **Trace Reference** | Conditional | 跟踪参考。当撤回跟踪数据（Trace Data Withdrawal）时携带。 |\n| **Result** | Mandatory | 操作结果。包含 Result-Code AVP 或 Experimental-Result AVP 指示成功/错误。 |\n\n该流程符合 3GPP TS 29.272 (S6a/S6d) 及 TS 29.002 (MAP) 协议中关于签约数据管理的规定。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-97f8abc0-fe69-4eeb-8790-15482956b1b6"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d4ac3a98-0d4c-4f4a-9b55-f472c065e601"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ba2f4bf9-a772-4e29-9c57-1905b9f01304"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4400"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 3516586,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 6034,
+      "byte_offset": 3517683,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 3523717,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 3523922,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 6112,
+      "byte_offset": 3524747,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 3530859,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4247062,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4247423,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 1491,
+      "byte_offset": 4247631,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4249122,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4249327,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4249540,
+      "path": "archive/2026-10-12/07/part-00002.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-97f8abc0-fe69-4eeb-8790-15482956b1b6"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d4ac3a98-0d4c-4f4a-9b55-f472c065e601"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ba2f4bf9-a772-4e29-9c57-1905b9f01304"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4350"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:04:25.093365+00:00",
+    "arrival_seq": 2272,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n这些告警状态都是什么\n\n\n\n最终回答：\n从您提供的截图来看，这些告警的“状态”主要可以从三个维度来理解：**确认状态**、**严重级别**和**具体告警类型**。以下是详细解释：\n\n### 1. 确认状态（Acknowledgement State）\n* **显示内容**：均为 `未确认`\n* **含义**：表示这些告警触发后，尚未有运维人员进行过查看、确认或处理操作。通常告警产生后默认处于此状态，点击确认后会变为“已确认”。\n\n### 2. 严重级别（Severity）\n* **`Critical`（红色图标）**：紧急/致命级。通常表示核心业务中断或主链路故障，需要立即处理。\n* **`Major`（橙色图标）**：主要/严重级。表示重要业务受影响或存在较严重的隐患，需尽快排查。\n\n### 3. 具体告警类型（Name）\n截图中主要包含三种网络类告警，均发生在 `10.192.190.130/131/132` 等网元上：\n* **`LinkDown`**：**物理或逻辑链路断开**。表示设备某个接口失去连接，可能是网线/光纤松动、对端设备关机、接口配置错误等导致。\n* **`TunnelLinkDown`**：**隧道链路断开**。通常指 GRE、VXLAN 或 IPsec 等隧道通信中断，一般由底层链路不通或隧道配置不一致引起。\n* **`NeighborDown`**：**路由邻居关系断开**。常见于 OSPF、BGP 或 IS-IS 等路由协议，表示设备与相邻路由器的会话丢失，会导致路由不可达。\n\n### 💡 简要排查建议\n这三类告警通常具有**关联性**：底层 `LinkDown` 会导致上层 `TunnelLinkDown` 和 `NeighborDown` 连锁上报。建议优先排查 `10.192.190.130` 的物理链路和接口状态，恢复底层连通性后，隧道和邻居告警通常会随之自动清除。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何批量确认这些未确认的告警？\nLinkDown、TunnelLinkDown 和 NeighborDown 的排查命令分别是什么？\n如果底层链路恢复后上层告警未自动清除，应该如何手动处理？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 715,
+      "total_tokens": 762,
+      "completion_tokens": 47,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 715,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 47,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 762,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 46,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n这些告警状态都是什么\n\n\n\n最终回答：\n从您提供的截图来看，这些告警的“状态”主要可以从三个维度来理解：**确认状态**、**严重级别**和**具体告警类型**。以下是详细解释：\n\n### 1. 确认状态（Acknowledgement State）\n* **显示内容**：均为 `未确认`\n* **含义**：表示这些告警触发后，尚未有运维人员进行过查看、确认或处理操作。通常告警产生后默认处于此状态，点击确认后会变为“已确认”。\n\n### 2. 严重级别（Severity）\n* **`Critical`（红色图标）**：紧急/致命级。通常表示核心业务中断或主链路故障，需要立即处理。\n* **`Major`（橙色图标）**：主要/严重级。表示重要业务受影响或存在较严重的隐患，需尽快排查。\n\n### 3. 具体告警类型（Name）\n截图中主要包含三种网络类告警，均发生在 `10.192.190.130/131/132` 等网元上：\n* **`LinkDown`**：**物理或逻辑链路断开**。表示设备某个接口失去连接，可能是网线/光纤松动、对端设备关机、接口配置错误等导致。\n* **`TunnelLinkDown`**：**隧道链路断开**。通常指 GRE、VXLAN 或 IPsec 等隧道通信中断，一般由底层链路不通或隧道配置不一致引起。\n* **`NeighborDown`**：**路由邻居关系断开**。常见于 OSPF、BGP 或 IS-IS 等路由协议，表示设备与相邻路由器的会话丢失，会导致路由不可达。\n\n### 💡 简要排查建议\n这三类告警通常具有**关联性**：底层 `LinkDown` 会导致上层 `TunnelLinkDown` 和 `NeighborDown` 连锁上报。建议优先排查 `10.192.190.130` 的物理链路和接口状态，恢复底层连通性后，隧道和邻居告警通常会随之自动清除。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-eaa8c397-a8eb-4289-ab23-d189eb54b7dc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1e10507a-4e51-482f-bf77-d5602e15aea7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-8f34ae50-ea61-4fa9-bcd3-bf50f2fd62aa"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3227"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1098,
+      "byte_offset": 11047045,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4470,
+      "byte_offset": 11048143,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11052613,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 11052818,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4548,
+      "byte_offset": 11053643,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 11058191,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 11472261,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 11472622,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1391,
+      "byte_offset": 11472830,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11474221,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 11474426,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 11474639,
+      "path": "archive/2026-10-12/16/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-eaa8c397-a8eb-4289-ab23-d189eb54b7dc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1e10507a-4e51-482f-bf77-d5602e15aea7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-8f34ae50-ea61-4fa9-bcd3-bf50f2fd62aa"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3177"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T16:16:35.800622+00:00",
+    "arrival_seq": 11181,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/16"
+  }
+}

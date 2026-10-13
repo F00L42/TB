@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nN3接口\n\n\n\n最终回答：\n\n\n根据产品文档，**N3接口**的相关信息如下：\n\n### 1. 定义\nN3接口是5G核心网中 **NG-RAN（下一代无线接入网）** 与 **UPF（用户面功能）** 之间的接口。\n\n### 2. 主要功能\n主要用于在 NG-RAN 与 UPF 之间传递**上下行用户面数据**。当网络中部署了 UPF 与 (R)AN 时，需配置对应的 N3 接口以传输用户面信息。\n\n### 3. 接口协议\n* **协议类型**：GTP-U（GPRS Tunnelling Protocol for the User Plane，具体为 GTPv1-U）。\n* **遵循标准**：3GPP TS 29.281。\n* **工作机制**：利用隧道协议在骨干网节点间传输用户数据，屏蔽上层协议影响，同时提供会话级的双向快速传输通道。除数据包外，还支持数据传输出错指示、Echo消息、支持的扩展头列表等用户面传输辅助信令。\n\n### 4. 特性规格与应用限制\n| 项目 | 说明 |\n|:---|:---|\n| **最大接口数** | UDG/UEG 设备最大支持 **32** 个 N3 接口 |\n| **IP地址要求** | 配置 N3 接口类型的逻辑接口地址时，IP 地址类型必须相同 |\n| **扩展头限制** | 传输 GTP-U 报文时携带的扩展头总长度最多支持 **100 字节**，超出此长度报文会被丢弃 |\n| **IPv6承载依赖** | 若 N3 接口需要 IPv6 承载，需启用“逻辑接口支持 IPv6”特性 |\n\n### 5. 客户价值\nUPF 的 N3 接口基于 3GPP 标准实现，运营商可借此实现与**不同厂家的 (R)AN 设备**对接，用户侧无感知。\n\n如需了解 N3 接口的具体配置命令、故障排查或特定版本下的部署细节，可提供具体场景继续提问。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "N3接口的具体配置命令是什么？\nN3接口故障排查的常见方法有哪些？\n在特定版本下部署N3接口有哪些细节需要注意？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 719,
+      "total_tokens": 753,
+      "completion_tokens": 34,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 719,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 34,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 753,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 33,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nN3接口\n\n\n\n最终回答：\n\n\n根据产品文档，**N3接口**的相关信息如下：\n\n### 1. 定义\nN3接口是5G核心网中 **NG-RAN（下一代无线接入网）** 与 **UPF（用户面功能）** 之间的接口。\n\n### 2. 主要功能\n主要用于在 NG-RAN 与 UPF 之间传递**上下行用户面数据**。当网络中部署了 UPF 与 (R)AN 时，需配置对应的 N3 接口以传输用户面信息。\n\n### 3. 接口协议\n* **协议类型**：GTP-U（GPRS Tunnelling Protocol for the User Plane，具体为 GTPv1-U）。\n* **遵循标准**：3GPP TS 29.281。\n* **工作机制**：利用隧道协议在骨干网节点间传输用户数据，屏蔽上层协议影响，同时提供会话级的双向快速传输通道。除数据包外，还支持数据传输出错指示、Echo消息、支持的扩展头列表等用户面传输辅助信令。\n\n### 4. 特性规格与应用限制\n| 项目 | 说明 |\n|:---|:---|\n| **最大接口数** | UDG/UEG 设备最大支持 **32** 个 N3 接口 |\n| **IP地址要求** | 配置 N3 接口类型的逻辑接口地址时，IP 地址类型必须相同 |\n| **扩展头限制** | 传输 GTP-U 报文时携带的扩展头总长度最多支持 **100 字节**，超出此长度报文会被丢弃 |\n| **IPv6承载依赖** | 若 N3 接口需要 IPv6 承载，需启用“逻辑接口支持 IPv6”特性 |\n\n### 5. 客户价值\nUPF 的 N3 接口基于 3GPP 标准实现，运营商可借此实现与**不同厂家的 (R)AN 设备**对接，用户侧无感知。\n\n如需了解 N3 接口的具体配置命令、故障排查或特定版本下的部署细节，可提供具体场景继续提问。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-61ee3606-dec0-459a-a5ff-6430a7252fba"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-2bf101d7-b579-46b4-b98e-307733036cbe"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9718bce1-6eab-4ffb-b37f-df93349b23bf"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3097"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 14688599,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 4298,
+      "byte_offset": 14689696,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14693994,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14694199,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 4376,
+      "byte_offset": 14695024,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14699400,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 14726303,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 14726664,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 1319,
+      "byte_offset": 14726872,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14728191,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 14728396,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 14728609,
+      "path": "archive/2026-10-12/13/part-00022.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-61ee3606-dec0-459a-a5ff-6430a7252fba"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-2bf101d7-b579-46b4-b98e-307733036cbe"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9718bce1-6eab-4ffb-b37f-df93349b23bf"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3047"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:52:30.038078+00:00",
+    "arrival_seq": 8492,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

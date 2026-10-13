@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM混合组网VSP数据迁移操作过程中，UDM混合组网VSP数据迁移操作有哪几种迁移方式？\n\n\n\n最终回答：\n\n\n在UDM混合组网VSP数据迁移操作中，支持以下4种用户数据平滑迁移方式：\n\n1. **基于用户号段的平滑迁移**\n   通过PGW Web LMT的文件管理器上传待迁移的号段文件，执行 `STR MIGRATION` 命令将号段内的用户迁移至UDM。\n\n2. **基于用户列表的平滑迁移**\n   通过PGW Web LMT的文件管理器上传待迁移的用户列表文件，执行 `STR MIGRATION` 命令将列表内的指定用户迁移至UDM。\n\n3. **基于用户数的平滑迁移**\n   直接执行 `STR MIGRATION` 命令并指定需要迁出的用户数量，系统按指定数量将用户迁移至UDM。\n\n4. **基于条件的平滑迁移**\n   执行 `LOD ADPPKG` 命令加载迁移适配包，然后执行 `STR MIGRATION` 命令。该方式可依据适配包内的不同模板（普通导出、用户列表导出、SQL导出、号段列表导出）实现基于特定条件属性的用户筛选与迁移。\n\n实际操作时，可根据现网割接计划、用户分布特征及营帐系统对接情况选择合适的迁移方式。详细步骤可参考《UDM 混合组网VSP数据迁移操作指导书》。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "各种迁移方式分别适用于什么样的现网场景？\n执行STR MIGRATION命令前需要准备哪些前置条件？\n迁移过程中如何验证用户数据是否已完整同步至UDM？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 565,
+      "total_tokens": 603,
+      "completion_tokens": 38,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 565,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 38,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 603,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 37,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM混合组网VSP数据迁移操作过程中，UDM混合组网VSP数据迁移操作有哪几种迁移方式？\n\n\n\n最终回答：\n\n\n在UDM混合组网VSP数据迁移操作中，支持以下4种用户数据平滑迁移方式：\n\n1. **基于用户号段的平滑迁移**\n   通过PGW Web LMT的文件管理器上传待迁移的号段文件，执行 `STR MIGRATION` 命令将号段内的用户迁移至UDM。\n\n2. **基于用户列表的平滑迁移**\n   通过PGW Web LMT的文件管理器上传待迁移的用户列表文件，执行 `STR MIGRATION` 命令将列表内的指定用户迁移至UDM。\n\n3. **基于用户数的平滑迁移**\n   直接执行 `STR MIGRATION` 命令并指定需要迁出的用户数量，系统按指定数量将用户迁移至UDM。\n\n4. **基于条件的平滑迁移**\n   执行 `LOD ADPPKG` 命令加载迁移适配包，然后执行 `STR MIGRATION` 命令。该方式可依据适配包内的不同模板（普通导出、用户列表导出、SQL导出、号段列表导出）实现基于特定条件属性的用户筛选与迁移。\n\n实际操作时，可根据现网割接计划、用户分布特征及营帐系统对接情况选择合适的迁移方式。详细步骤可参考《UDM 混合组网VSP数据迁移操作指导书》。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-bdb9a0e4-04d6-4753-84b3-5a3c8b6ae4a1"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-10a99cd6-f12a-4139-9a78-4affeb953a46"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4aca4a97-132d-4648-b150-303eaa679b36"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2716"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 4601199,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 3790,
+      "byte_offset": 4602296,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4606086,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 4606291,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 3868,
+      "byte_offset": 4607116,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4610984,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4656140,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4656501,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1371,
+      "byte_offset": 4656709,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4658080,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4658285,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4658498,
+      "path": "archive/2026-10-12/14/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-bdb9a0e4-04d6-4753-84b3-5a3c8b6ae4a1"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-10a99cd6-f12a-4139-9a78-4affeb953a46"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4aca4a97-132d-4648-b150-303eaa679b36"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2666"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:11:52.030845+00:00",
+    "arrival_seq": 8958,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

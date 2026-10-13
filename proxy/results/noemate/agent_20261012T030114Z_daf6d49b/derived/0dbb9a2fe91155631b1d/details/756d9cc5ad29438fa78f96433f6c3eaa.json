@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n刚装好CDMA HLR9820设备后，想通过TDM或ATM-2M方式检查E1物理连接情况，如果发现某个接口状态不对劲，这种情况的处理经验应该是怎么样的呀？\n\n\n\n最终回答：\n\n\n根据知识库中的相关信息，针对CDMA HLR9820设备通过TDM或ATM-2M方式检查E1物理连接情况及接口状态异常的处理，经验如下：\n\n## 一、E1物理连接检查要点\n\n### 1. 硬件配置确认\n- **接口板类型**：确认使用ETIA0或ETIA2后插板作为E1接口\n  - ETIA0：提供32个E1/T1端口（2×16）\n  - ETIA2：提供16个E1/T1端口，同时支持GE接口\n- **阻抗匹配**：E1接口阻抗需设置为75Ω（`E1IMPED=E1_75ohm`）\n- **编码方式**：配置E1帧格式为DF，编码为HDB3\n\n### 2. 配置验证命令\n```bash\n# 配置ETIA板\nSET ETICFG: SRN=0, SN=1, CFGTDMTYPE=E1, E1IMPED=E1_75ohm, CFGAPPMODE=ATM;\n\n# 配置E1端口\nSET ET1PORT: SRN=0, SN=1, PORTTYPE=E1_T1, STRPORTID=0, CFGTDMTYPE=E1, CFGE1FRM=DF, CFGE1ENC=HDB3;\n```\n\n### 3. 链路状态验证\n- 使用`DSP N7LNK`命令查看ATM 2M链路状态是否为\"已激活\"\n- 检查UNI链路、PVC链路、MTP3链路层层级配置是否正确绑定\n\n## 二、接口状态异常处理流程\n\n当发现E1接口状态异常（如帧失步、信号降级、通道远端缺陷等）时，按以下步骤排查：\n\n### 步骤1：检查对端设备\n- 确认对端设备对应端口是否有告警/事件\n- 如对端有异常，优先处理对端故障\n\n### 步骤2：物理连接检查\n1. **线缆插接**：确认E1线缆两端已插紧\n2. **线缆类型**：确认使用正确的同轴电缆或双绞线（根据阻抗匹配）\n3. **线缆质量**：更换新线缆排除线缆故障\n\n### 步骤3：本端自环测试\n- 使用BNC接头将本端E1口自环\n- 观察自环后接口状态是否恢复\n  - 恢复 → 问题在对端或传输线路\n  - 未恢复 → 问题在本端设备\n\n### 步骤4：单板更换\n- 在防静电措施下拔出疑似故障的ETIA板\n- 更换同型号备件单板重新测试\n\n### 步骤5：时钟同步检查\n- 确认窄带中心框配置在0框\n- 检查BASE平面网线连接（从框需使用LAN0网口）\n- 验证时钟源配置是否合理（优先使用0框最小槽位ETIA板的E1作为时钟源）\n\n## 三、常见异常原因及对策\n\n| 异常现象 | 可能原因 | 处理建议 |\n|:---|:---|:---|\n| 帧失步 | 线缆故障、对端发送故障、本端接收故障 | 按上述流程逐步排查物理连接 |\n| 信号降级 | 传输质量差、阻抗不匹配 | 检查线缆质量、确认75Ω阻抗配置 |\n| 段跟踪字不匹配 | 对端配置错误 | 核对两端E1参数配置一致性 |\n| 通道远端缺陷指示 | 对端网板时钟故障、PFI板物理故障 | 检查对端时钟配置及硬件状态 |\n\n## 四、注意事项\n\n1. **负荷分担配置**：同一局向的E1链路应均匀分布在至少两块ETIA板上，避免单点故障\n2. **时钟布线**：时钟线缆尽量缩短，减少信号干扰\n3. **端口分布**：同一块ETIA板上的链路建议均匀配置在各个E1端口上\n4. **互助槽位**：互助槽位的前后插板类型必须一致\n\n如上述步骤处理后问题仍未解决，建议收集配置数据和日志信息，联系华为技术支持进一步处理。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "自环测试后接口状态仍未恢复，如何进一步区分是ETIA单板硬件故障还是背板/机框问题？\n配置E1端口时CFGE1FRM和CFGE1ENC参数除了DF/HDB3组合，还有哪些常见配置需要根据对端设备调整？\n使用DSP N7LNK查看ATM 2M链路状态时，如果显示未激活但物理层无告警，应优先检查哪层配置绑定？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1225,
+      "total_tokens": 1321,
+      "completion_tokens": 96,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1225,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 96,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1321,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 95,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n刚装好CDMA HLR9820设备后，想通过TDM或ATM-2M方式检查E1物理连接情况，如果发现某个接口状态不对劲，这种情况的处理经验应该是怎么样的呀？\n\n\n\n最终回答：\n\n\n根据知识库中的相关信息，针对CDMA HLR9820设备通过TDM或ATM-2M方式检查E1物理连接情况及接口状态异常的处理，经验如下：\n\n## 一、E1物理连接检查要点\n\n### 1. 硬件配置确认\n- **接口板类型**：确认使用ETIA0或ETIA2后插板作为E1接口\n  - ETIA0：提供32个E1/T1端口（2×16）\n  - ETIA2：提供16个E1/T1端口，同时支持GE接口\n- **阻抗匹配**：E1接口阻抗需设置为75Ω（`E1IMPED=E1_75ohm`）\n- **编码方式**：配置E1帧格式为DF，编码为HDB3\n\n### 2. 配置验证命令\n```bash\n# 配置ETIA板\nSET ETICFG: SRN=0, SN=1, CFGTDMTYPE=E1, E1IMPED=E1_75ohm, CFGAPPMODE=ATM;\n\n# 配置E1端口\nSET ET1PORT: SRN=0, SN=1, PORTTYPE=E1_T1, STRPORTID=0, CFGTDMTYPE=E1, CFGE1FRM=DF, CFGE1ENC=HDB3;\n```\n\n### 3. 链路状态验证\n- 使用`DSP N7LNK`命令查看ATM 2M链路状态是否为\"已激活\"\n- 检查UNI链路、PVC链路、MTP3链路层层级配置是否正确绑定\n\n## 二、接口状态异常处理流程\n\n当发现E1接口状态异常（如帧失步、信号降级、通道远端缺陷等）时，按以下步骤排查：\n\n### 步骤1：检查对端设备\n- 确认对端设备对应端口是否有告警/事件\n- 如对端有异常，优先处理对端故障\n\n### 步骤2：物理连接检查\n1. **线缆插接**：确认E1线缆两端已插紧\n2. **线缆类型**：确认使用正确的同轴电缆或双绞线（根据阻抗匹配）\n3. **线缆质量**：更换新线缆排除线缆故障\n\n### 步骤3：本端自环测试\n- 使用BNC接头将本端E1口自环\n- 观察自环后接口状态是否恢复\n  - 恢复 → 问题在对端或传输线路\n  - 未恢复 → 问题在本端设备\n\n### 步骤4：单板更换\n- 在防静电措施下拔出疑似故障的ETIA板\n- 更换同型号备件单板重新测试\n\n### 步骤5：时钟同步检查\n- 确认窄带中心框配置在0框\n- 检查BASE平面网线连接（从框需使用LAN0网口）\n- 验证时钟源配置是否合理（优先使用0框最小槽位ETIA板的E1作为时钟源）\n\n## 三、常见异常原因及对策\n\n| 异常现象 | 可能原因 | 处理建议 |\n|:---|:---|:---|\n| 帧失步 | 线缆故障、对端发送故障、本端接收故障 | 按上述流程逐步排查物理连接 |\n| 信号降级 | 传输质量差、阻抗不匹配 | 检查线缆质量、确认75Ω阻抗配置 |\n| 段跟踪字不匹配 | 对端配置错误 | 核对两端E1参数配置一致性 |\n| 通道远端缺陷指示 | 对端网板时钟故障、PFI板物理故障 | 检查对端时钟配置及硬件状态 |\n\n## 四、注意事项\n\n1. **负荷分担配置**：同一局向的E1链路应均匀分布在至少两块ETIA板上，避免单点故障\n2. **时钟布线**：时钟线缆尽量缩短，减少信号干扰\n3. **端口分布**：同一块ETIA板上的链路建议均匀配置在各个E1端口上\n4. **互助槽位**：互助槽位的前后插板类型必须一致\n\n如上述步骤处理后问题仍未解决，建议收集配置数据和日志信息，联系华为技术支持进一步处理。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7183557c-96e6-48fe-8262-06464bbd0d3f"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d05b2269-82bd-4cea-bf00-1b1a21a092c7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-2777fa58-5f66-4f46-b2d0-fb0d548af4a5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4764"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5108007,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 6522,
+      "byte_offset": 5109104,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5115626,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5115831,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 6596,
+      "byte_offset": 5116656,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5123252,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 362,
+      "byte_offset": 5562889,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 5563251,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1603,
+      "byte_offset": 5563459,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5565062,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 5565267,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 411,
+      "byte_offset": 5565480,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7183557c-96e6-48fe-8262-06464bbd0d3f"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d05b2269-82bd-4cea-bf00-1b1a21a092c7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-2777fa58-5f66-4f46-b2d0-fb0d548af4a5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4714"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T11:42:46.151022+00:00",
+    "arrival_seq": 6594,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/11"
+  }
+}

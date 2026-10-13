@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n2️⃣ 故障诊断与工单（参考【故障诊断】功能）：查询该指标异常是否触发了性能工单，查看故障原因分析及恢复操作记录。\n\n\n\n最终回答：\n\n\n已完成故障诊断与工单查询，结果如下：\n\n### 📋 性能工单查询结果\n当前系统中 **未查询到** 网元SMF004初始成功注册平均时长异常相关的性能投诉工单。\n\n---\n\n### 🔍 关联告警诊断结果\n该指标异常期间，网元SMF004共触发 **3 条活跃告警**，根因诊断如下：\n\n#### 1. ALM-580031 SMF PDU 会话上下文缺失告警\n- 15点用户集中发起PDU会话重建，AMF下发创建请求时携带的UE上下文标识失效\n- SMF会话上下文老化定时器设置过短，空闲会话提前清理，二次请求查询不到上下文\n- AMF与SMF时钟不同步，上下文创建/删除时间戳校验异常，匹配失败\n- 批量终端异常去注册，SMF同步清理上下文，但终端快速重发起会话请求\n- N11接口报文丢包，AMF上下文同步消息未送达SMF，本地无对应上下文记录\n- 同池SMF负载均衡切换，UE上下文未同步至当前网元\n\n#### 2. ALM-580107 N11 接口信令交互时延过高告警\n- 15点小区大量用户并发会话请求，N11接口信令流量突增，传输链路拥塞\n- 中间安全网关开启深度报文检测，N11 HTTP/2信令逐包解析转发耗时增加\n- SMF业务处理CPU占用饱和，N11请求处理排队，报文回复延迟\n- AMF与SMF之间路由转发跳数多，端到端传输基础时延抬升\n- 防火墙会话表容量不足，大量新建N11连接触发老化淘汰，反复重建连接\n- 网络带宽临时割降，N11接口带宽不足以承载峰值信令流量\n\n#### 3. ALM-580089 SMF 会话表资源占用过高告警\n- 通勤高峰海量终端同时建立PDU会话，SMF会话表条目快速打满上限\n- 部分物联网设备长期保活不释放会话，持续占用会话表条目不回收\n- 会话释放流程异常，N4接口UPF会话删除消息丢失，SMF会话残留无法清理\n- 批量终端频繁切换TA，重复新建会话，产生大量冗余会话条目\n- 会话表扩容配置未生效，硬件内存分配不足，峰值下资源耗尽\n- PCF策略下发延迟，部分会话无法完成正常释放流程，长期驻留会话表\n\n---\n\n如需进一步查看某条告警的详细处理步骤、恢复操作记录或导出诊断报告，请告诉我具体告警ID。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "查看ALM-580031告警的详细处理步骤和恢复操作记录\n导出当前故障诊断报告并包含所有关联告警分析\n检查AMF与SMF之间的时钟同步配置及N11接口链路状态",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 893,
+      "total_tokens": 944,
+      "completion_tokens": 51,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 893,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 51,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 944,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 50,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n2️⃣ 故障诊断与工单（参考【故障诊断】功能）：查询该指标异常是否触发了性能工单，查看故障原因分析及恢复操作记录。\n\n\n\n最终回答：\n\n\n已完成故障诊断与工单查询，结果如下：\n\n### 📋 性能工单查询结果\n当前系统中 **未查询到** 网元SMF004初始成功注册平均时长异常相关的性能投诉工单。\n\n---\n\n### 🔍 关联告警诊断结果\n该指标异常期间，网元SMF004共触发 **3 条活跃告警**，根因诊断如下：\n\n#### 1. ALM-580031 SMF PDU 会话上下文缺失告警\n- 15点用户集中发起PDU会话重建，AMF下发创建请求时携带的UE上下文标识失效\n- SMF会话上下文老化定时器设置过短，空闲会话提前清理，二次请求查询不到上下文\n- AMF与SMF时钟不同步，上下文创建/删除时间戳校验异常，匹配失败\n- 批量终端异常去注册，SMF同步清理上下文，但终端快速重发起会话请求\n- N11接口报文丢包，AMF上下文同步消息未送达SMF，本地无对应上下文记录\n- 同池SMF负载均衡切换，UE上下文未同步至当前网元\n\n#### 2. ALM-580107 N11 接口信令交互时延过高告警\n- 15点小区大量用户并发会话请求，N11接口信令流量突增，传输链路拥塞\n- 中间安全网关开启深度报文检测，N11 HTTP/2信令逐包解析转发耗时增加\n- SMF业务处理CPU占用饱和，N11请求处理排队，报文回复延迟\n- AMF与SMF之间路由转发跳数多，端到端传输基础时延抬升\n- 防火墙会话表容量不足，大量新建N11连接触发老化淘汰，反复重建连接\n- 网络带宽临时割降，N11接口带宽不足以承载峰值信令流量\n\n#### 3. ALM-580089 SMF 会话表资源占用过高告警\n- 通勤高峰海量终端同时建立PDU会话，SMF会话表条目快速打满上限\n- 部分物联网设备长期保活不释放会话，持续占用会话表条目不回收\n- 会话释放流程异常，N4接口UPF会话删除消息丢失，SMF会话残留无法清理\n- 批量终端频繁切换TA，重复新建会话，产生大量冗余会话条目\n- 会话表扩容配置未生效，硬件内存分配不足，峰值下资源耗尽\n- PCF策略下发延迟，部分会话无法完成正常释放流程，长期驻留会话表\n\n---\n\n如需进一步查看某条告警的详细处理步骤、恢复操作记录或导出诊断报告，请告诉我具体告警ID。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-ef56a9a1-c825-4003-8b06-2e8a62bf4ba5"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-4418ace4-f469-43f9-9a51-995383377835"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-211186e2-290b-4f4a-ad8b-bbd0127e86fd"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3915"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 13209646,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 5390,
+      "byte_offset": 13210743,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13216133,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 13216338,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 5464,
+      "byte_offset": 13217163,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 13222627,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 362,
+      "byte_offset": 14617130,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 209,
+      "byte_offset": 14617492,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 1376,
+      "byte_offset": 14617701,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14619077,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 214,
+      "byte_offset": 14619283,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 411,
+      "byte_offset": 14619497,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-ef56a9a1-c825-4003-8b06-2e8a62bf4ba5"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-4418ace4-f469-43f9-9a51-995383377835"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-211186e2-290b-4f4a-ad8b-bbd0127e86fd"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3865"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:51:29.203631+00:00",
+    "arrival_seq": 3317,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

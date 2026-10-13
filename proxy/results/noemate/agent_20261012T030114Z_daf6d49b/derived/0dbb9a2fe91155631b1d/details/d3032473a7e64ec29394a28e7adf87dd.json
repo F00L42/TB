@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nEVP的系统级推荐中，业务流程是怎样的？\n\n\n\n最终回答：\n\n\n当前知识库中未找到关于\"EVP系统级推荐业务流程\"的相关文档，无法提供足够信息回答此问题。\n\n如果您能补充以下信息，我将有助于进一步检索：\n- EVP的具体全称或所属产品/项目名称\n- 相关的业务场景或应用场景描述\n- 是否有具体的文档来源或版本信息"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "EVP的全称是什么？它属于哪个产品或项目？\nEVP系统级推荐主要应用于哪些业务场景？\n是否有相关的文档来源或版本信息可以提供？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 339,
+      "total_tokens": 375,
+      "completion_tokens": 36,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 339,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 36,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 375,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 35,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nEVP的系统级推荐中，业务流程是怎样的？\n\n\n\n最终回答：\n\n\n当前知识库中未找到关于\"EVP系统级推荐业务流程\"的相关文档，无法提供足够信息回答此问题。\n\n如果您能补充以下信息，我将有助于进一步检索：\n- EVP的具体全称或所属产品/项目名称\n- 相关的业务场景或应用场景描述\n- 是否有具体的文档来源或版本信息"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-8b8da8b4-6023-4797-a4f7-5ae095f76fd8"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-48ce2608-2e6d-4038-acbc-2a22adfa5c93"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5c02dcd7-d7d4-46a4-a096-27028b45edf0"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "1858"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 9228529,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 2646,
+      "byte_offset": 9229626,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9232272,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 9232477,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 2724,
+      "byte_offset": 9233302,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9236026,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 9824480,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 9824841,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 1347,
+      "byte_offset": 9825049,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9826396,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 9826601,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 9826814,
+      "path": "archive/2026-10-12/14/part-00011.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-8b8da8b4-6023-4797-a4f7-5ae095f76fd8"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-48ce2608-2e6d-4038-acbc-2a22adfa5c93"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5c02dcd7-d7d4-46a4-a096-27028b45edf0"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "1808"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:22:39.620028+00:00",
+    "arrival_seq": 9240,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

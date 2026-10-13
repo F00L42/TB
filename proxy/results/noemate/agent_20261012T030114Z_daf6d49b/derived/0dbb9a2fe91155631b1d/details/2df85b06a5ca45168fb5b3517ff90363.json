@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDG节点故障告警处理步骤是什么\n\n\n\n最终回答：\nUDG中的“节点故障告警”通常指 **ALM-135630 节点故障**（虚拟机故障）。该告警仅在Full-stack虚机场景下支持，表示虚拟机发生故障，其承载的业务不可用。\n\n### 处理步骤\n\n1. **查看告警详情**\n   - 登录运维门户，选择“监控分析 > 告警管理 > 活动告警”。\n   - 单击该告警前的展开详情，查看其“定位信息”（节点名称、虚拟机名称、应用ID）和“附加信息”（节点IP、告警原因、主机名称等）。\n\n2. **等待自动恢复**\n   - 若告警原因为“运行状态异常”或“管理状态异常”，等待 **1小时**，观察告警是否自动清除。\n     - **是** → 处理完毕。\n     - **否** → 执行步骤3。\n\n3. **手动恢复虚拟机**\n   - 针对故障虚拟机依次执行 **手动重启、重建、重装** 操作。\n   - 操作完成后检查告警是否自动清除。\n     - **是** → 处理完毕。\n     - **否** → 执行步骤4。\n\n4. **收集信息并联系技术支持**\n   - **收集告警信息**：在活动告警页面按告警ID搜索本告警，单击“导出”获取告警详情。\n   - **收集日志信息**：选择“监控分析 > 运行日志 > 服务日志收集”，收集告警上报前15天的 `NRSMaster` 日志（单次最长收集7天，需分多次收集）。\n   - 将收集的告警和日志信息提交给华为技术支持进一步排查。\n\n### 常见可能原因\n- 虚拟机异常重启或人为重启\n- 虚拟机重建或重装过程\n- GuestOS 停止响应\n- 系统损坏或底层存储异常导致虚拟机反复重启\n- 底层网络异常、NFVI异常导致虚拟机不可用\n- 节点纳管失败\n\n> 注：部分上层组件告警（如 `ALM-100221 vHA ETCD集群节点故障`、`ALM-100033 集群选举节点异常`）会将 `ALM-135630` 列为根源告警。处理时请优先按照上述步骤消除节点故障根源，上层告警通常会随之自动恢复。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如果手动重启、重建、重装虚拟机后告警仍未清除，应如何进一步排查？\n收集NRSMaster日志时若告警发生在15天前，应如何分段收集以确保数据完整？\n当ALM-135630作为根源告警触发上层组件告警时，如何确认上层告警已随节点恢复自动清除？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 794,
+      "total_tokens": 871,
+      "completion_tokens": 77,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 794,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 77,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 871,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 76,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDG节点故障告警处理步骤是什么\n\n\n\n最终回答：\nUDG中的“节点故障告警”通常指 **ALM-135630 节点故障**（虚拟机故障）。该告警仅在Full-stack虚机场景下支持，表示虚拟机发生故障，其承载的业务不可用。\n\n### 处理步骤\n\n1. **查看告警详情**\n   - 登录运维门户，选择“监控分析 > 告警管理 > 活动告警”。\n   - 单击该告警前的展开详情，查看其“定位信息”（节点名称、虚拟机名称、应用ID）和“附加信息”（节点IP、告警原因、主机名称等）。\n\n2. **等待自动恢复**\n   - 若告警原因为“运行状态异常”或“管理状态异常”，等待 **1小时**，观察告警是否自动清除。\n     - **是** → 处理完毕。\n     - **否** → 执行步骤3。\n\n3. **手动恢复虚拟机**\n   - 针对故障虚拟机依次执行 **手动重启、重建、重装** 操作。\n   - 操作完成后检查告警是否自动清除。\n     - **是** → 处理完毕。\n     - **否** → 执行步骤4。\n\n4. **收集信息并联系技术支持**\n   - **收集告警信息**：在活动告警页面按告警ID搜索本告警，单击“导出”获取告警详情。\n   - **收集日志信息**：选择“监控分析 > 运行日志 > 服务日志收集”，收集告警上报前15天的 `NRSMaster` 日志（单次最长收集7天，需分多次收集）。\n   - 将收集的告警和日志信息提交给华为技术支持进一步排查。\n\n### 常见可能原因\n- 虚拟机异常重启或人为重启\n- 虚拟机重建或重装过程\n- GuestOS 停止响应\n- 系统损坏或底层存储异常导致虚拟机反复重启\n- 底层网络异常、NFVI异常导致虚拟机不可用\n- 节点纳管失败\n\n> 注：部分上层组件告警（如 `ALM-100221 vHA ETCD集群节点故障`、`ALM-100033 集群选举节点异常`）会将 `ALM-135630` 列为根源告警。处理时请优先按照上述步骤消除节点故障根源，上层告警通常会随之自动恢复。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-13913a3d-f9a5-47bd-a9af-c4185fb92341"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d6266a5c-f7de-4303-a533-837ca1875ff6"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-93229fb0-7e56-4165-be72-bf44fa4c7949"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3490"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 14198860,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 4822,
+      "byte_offset": 14199957,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14204779,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14204984,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 4900,
+      "byte_offset": 14205809,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14210709,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 15341348,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 15341709,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 1535,
+      "byte_offset": 15341917,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15343452,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 15343657,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 15343870,
+      "path": "archive/2026-10-12/13/part-00013.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-13913a3d-f9a5-47bd-a9af-c4185fb92341"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d6266a5c-f7de-4303-a533-837ca1875ff6"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-93229fb0-7e56-4165-be72-bf44fa4c7949"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3440"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:33:25.247380+00:00",
+    "arrival_seq": 8046,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

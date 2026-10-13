@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：1. 确认告警内容与影响范围\n\n\n\n最终回答：\n\n\n请提供具体的告警ID、发生时间、关联网元及当前业务影响情况，以便精准定位。常规处理步骤如下：\n\n### 1. 确认告警内容与影响范围\n- **提取告警详情**：记录告警ID、名称、级别、首次/最近发生时间、源网元及目标网元。\n- **评估业务影响**：确认是否出现呼叫建立失败、短信下发延迟、用户面流量中断或控制面信令拥塞。\n- **关联告警排查**：检查是否伴随底层链路中断、后端服务宕机、资源过载或证书过期等关联告警。\n\n### 2. 检查 LbService 配置与后端状态\n- **验证后端池状态**：登录负载均衡管理界面，确认后端服务节点（Real Server）健康检查是否通过，是否存在节点下线或权重异常。\n- **检查服务发现配置**：确认 LbService 的监听端口、转发规则、SSL证书及域名解析是否正常。\n- **资源阈值核对**：检查当前连接数、带宽利用率是否触及系统阈值导致转发拒绝。\n\n### 3. 系统资源与链路诊断\n- **控制面/用户面链路**：使用 `ping`、`traceroute` 或内部诊断命令测试 LbService 到后端网元的网络可达性。\n- **系统负载检查**：查看 CPU、内存、文件描述符及网络队列使用情况，排除资源瓶颈。\n- **防火墙/安全组**：确认近期是否有策略变更拦截了特定端口或协议。\n\n### 4. 日志收集与根因定位\n- **抓取转发日志**：收集 LbService 访问日志、错误日志及后端健康检查记录。\n- **信令跟踪**：如有条件，抓取异常时段的控制面信令，定位丢包或超时环节。\n- **根因分析**：结合日志与配置变更时间线，判断是配置错误、资源不足、链路故障还是软件缺陷。\n\n### 5. 恢复操作与验证\n- **临时恢复**：重启异常服务进程、恢复后端节点上线、调整负载均衡权重或回滚近期配置变更。\n- **业务验证**：模拟业务流量或执行端到端测试，确认转发恢复且无新增告警。\n- **长期优化**：完善监控阈值、优化健康检查策略、扩容资源池或提交缺陷修复请求。\n\n提供具体告警参数后，可进一步输出针对性诊断命令与修复方案。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "具体的告警ID、发生时间、关联网元及当前业务影响情况是什么？\n目前LbService的后端节点健康检查状态如何，是否存在节点下线或权重异常？\n近期是否有进行过配置变更、防火墙策略调整或证书更新操作？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 805,
+      "total_tokens": 859,
+      "completion_tokens": 54,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 805,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 54,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 859,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 53,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：1. 确认告警内容与影响范围\n\n\n\n最终回答：\n\n\n请提供具体的告警ID、发生时间、关联网元及当前业务影响情况，以便精准定位。常规处理步骤如下：\n\n### 1. 确认告警内容与影响范围\n- **提取告警详情**：记录告警ID、名称、级别、首次/最近发生时间、源网元及目标网元。\n- **评估业务影响**：确认是否出现呼叫建立失败、短信下发延迟、用户面流量中断或控制面信令拥塞。\n- **关联告警排查**：检查是否伴随底层链路中断、后端服务宕机、资源过载或证书过期等关联告警。\n\n### 2. 检查 LbService 配置与后端状态\n- **验证后端池状态**：登录负载均衡管理界面，确认后端服务节点（Real Server）健康检查是否通过，是否存在节点下线或权重异常。\n- **检查服务发现配置**：确认 LbService 的监听端口、转发规则、SSL证书及域名解析是否正常。\n- **资源阈值核对**：检查当前连接数、带宽利用率是否触及系统阈值导致转发拒绝。\n\n### 3. 系统资源与链路诊断\n- **控制面/用户面链路**：使用 `ping`、`traceroute` 或内部诊断命令测试 LbService 到后端网元的网络可达性。\n- **系统负载检查**：查看 CPU、内存、文件描述符及网络队列使用情况，排除资源瓶颈。\n- **防火墙/安全组**：确认近期是否有策略变更拦截了特定端口或协议。\n\n### 4. 日志收集与根因定位\n- **抓取转发日志**：收集 LbService 访问日志、错误日志及后端健康检查记录。\n- **信令跟踪**：如有条件，抓取异常时段的控制面信令，定位丢包或超时环节。\n- **根因分析**：结合日志与配置变更时间线，判断是配置错误、资源不足、链路故障还是软件缺陷。\n\n### 5. 恢复操作与验证\n- **临时恢复**：重启异常服务进程、恢复后端节点上线、调整负载均衡权重或回滚近期配置变更。\n- **业务验证**：模拟业务流量或执行端到端测试，确认转发恢复且无新增告警。\n- **长期优化**：完善监控阈值、优化健康检查策略、扩容资源池或提交缺陷修复请求。\n\n提供具体告警参数后，可进一步输出针对性诊断命令与修复方案。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-4b0c2707-a144-45e7-83c3-5faad54bb674"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-a08a7ab9-4150-45a2-969b-da52e39599f4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ba2f4bf9-a772-4e29-9c57-1905b9f01304"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3803"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 955616,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 5238,
+      "byte_offset": 956713,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 961951,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 962156,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 5316,
+      "byte_offset": 962981,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 968297,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 994672,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 995033,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1475,
+      "byte_offset": 995241,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 996716,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 996921,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 997134,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-4b0c2707-a144-45e7-83c3-5faad54bb674"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-a08a7ab9-4150-45a2-969b-da52e39599f4"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ba2f4bf9-a772-4e29-9c57-1905b9f01304"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3753"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:06:34.686399+00:00",
+    "arrival_seq": 2307,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nXUDT/XUDTS消息如何进行重路由\n\n\n\n最终回答：\nXUDT/XUDTS消息的重路由主要依赖STP的**SCCP增强选路**或**扩展SCCP增强选路**功能实现。由于XUDT消息通常为分段传输，重路由前需进行**组包处理**，具体机制如下：\n\n### 1. 核心处理流程\n1. **组包配置**：执行 `SET SS7PP` 命令，将“SCCP组包开关”设置为 `BIT3(REROUTEXUDT)`，开启XUDT组包功能。\n2. **消息缓存与组包**：STP收到源端发来的XUDT分段消息后进行缓存等待组包（默认最大等待8秒，最多支持16段，最大组包长度1500字节）。\n   - **组包成功**：使用完整消息继续后续重路由判断。\n   - **组包失败**（如乱序或超时）：按非组包流程直接放通转发。\n3. **重路由匹配**：STP基于组包后的完整消息匹配SCCP增强选路条件（如OPC、DPC、SI、SSN、GT、操作码等）。符合条件则根据配置的处理规则重定向至第三方平台；不符合则发往原始目的端。\n4. **拆包与转发**：重路由决策完成后，STP根据 `SET SS7PP` 中配置的“SCCP XUDT分段长度”进行拆包处理，并将拆包后的XUDT/XUDTS消息发送至目的网元或重路由目标服务器。\n\n### 2. 重要应用限制\n- **MTP/M3UA重路由不支持分段XUDT**：基于操作码、ACN、主叫/被叫号码的MTP层重路由不支持XUDT组包，因此无法对分段XUDT消息进行此类重路由。\n- **仅支持SCCP 1类消息**：SCCP增强选路中的XUDT组包仅支持SCCP Class 1消息。\n- **跟踪解析限制**：XUDT消息在重路由过程中可能存在跟踪解析结果不完整的情况。\n\n### 3. 相关统计控制\n- 软参 `P442（路由重定向返回UDTS/XUDTS消息统计控制开关）` 用于控制是否对重路由结果为消息屏蔽/丢弃且目的信令点不可达时触发的UDTS/XUDTS消息进行测量统计。默认关闭（0），按需可设置为1开启。\n\n如需配置具体重路由规则或调整组包定时器/分段长度，可提供现网设备型号与版本，以便给出对应命令示例。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据现网设备型号配置XUDT重路由的具体命令示例？\n当XUDT组包失败时，STP是按原始路径转发还是丢弃消息？\n软参P442开启后，对系统性能或统计精度有何影响？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 836,
+      "total_tokens": 892,
+      "completion_tokens": 56,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 836,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 56,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 892,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 55,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nXUDT/XUDTS消息如何进行重路由\n\n\n\n最终回答：\nXUDT/XUDTS消息的重路由主要依赖STP的**SCCP增强选路**或**扩展SCCP增强选路**功能实现。由于XUDT消息通常为分段传输，重路由前需进行**组包处理**，具体机制如下：\n\n### 1. 核心处理流程\n1. **组包配置**：执行 `SET SS7PP` 命令，将“SCCP组包开关”设置为 `BIT3(REROUTEXUDT)`，开启XUDT组包功能。\n2. **消息缓存与组包**：STP收到源端发来的XUDT分段消息后进行缓存等待组包（默认最大等待8秒，最多支持16段，最大组包长度1500字节）。\n   - **组包成功**：使用完整消息继续后续重路由判断。\n   - **组包失败**（如乱序或超时）：按非组包流程直接放通转发。\n3. **重路由匹配**：STP基于组包后的完整消息匹配SCCP增强选路条件（如OPC、DPC、SI、SSN、GT、操作码等）。符合条件则根据配置的处理规则重定向至第三方平台；不符合则发往原始目的端。\n4. **拆包与转发**：重路由决策完成后，STP根据 `SET SS7PP` 中配置的“SCCP XUDT分段长度”进行拆包处理，并将拆包后的XUDT/XUDTS消息发送至目的网元或重路由目标服务器。\n\n### 2. 重要应用限制\n- **MTP/M3UA重路由不支持分段XUDT**：基于操作码、ACN、主叫/被叫号码的MTP层重路由不支持XUDT组包，因此无法对分段XUDT消息进行此类重路由。\n- **仅支持SCCP 1类消息**：SCCP增强选路中的XUDT组包仅支持SCCP Class 1消息。\n- **跟踪解析限制**：XUDT消息在重路由过程中可能存在跟踪解析结果不完整的情况。\n\n### 3. 相关统计控制\n- 软参 `P442（路由重定向返回UDTS/XUDTS消息统计控制开关）` 用于控制是否对重路由结果为消息屏蔽/丢弃且目的信令点不可达时触发的UDTS/XUDTS消息进行测量统计。默认关闭（0），按需可设置为1开启。\n\n如需配置具体重路由规则或调整组包定时器/分段长度，可提供现网设备型号与版本，以便给出对应命令示例。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5e78b2cc-1106-4e85-ac29-c25c4143856e"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ec984052-efab-4727-9434-acf84200f328"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-882ccff0-986a-4543-aef8-689b88d2707b"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3546"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 1135624,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4898,
+      "byte_offset": 1136721,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1141619,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 1141824,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4972,
+      "byte_offset": 1142649,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 1147621,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 1652250,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 1652611,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1403,
+      "byte_offset": 1652819,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1654222,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 1654427,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 1654640,
+      "path": "archive/2026-10-12/05/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5e78b2cc-1106-4e85-ac29-c25c4143856e"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ec984052-efab-4727-9434-acf84200f328"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-882ccff0-986a-4543-aef8-689b88d2707b"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3496"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T05:29:41.909662+00:00",
+    "arrival_seq": 1247,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/05"
+  }
+}

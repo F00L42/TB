@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n   - 使用 Wireshark 抓包分析 N1/N2/N3 接口消息：  \n\n\n\n最终回答：\n\n\n### 3. 消息流与协议分析（Wireshark 抓包维度）\n\n结合当前 `NrfDiscTimeout` 激增与附着成功率暴跌至 `58.3%` 的故障背景，针对 `N1/N2/N3` 接口抓包数据，请按以下维度提取关键特征：\n\n#### （1）N1 接口（AMF ↔ UE，NAS 信令）\n| 关注消息 | 正常表现 | 故障时段异常特征 | 定位指向 |\n|:---|:---|:---|:---|\n| `Registration Request` | UE 发起附着请求 | 请求量正常，但 AMF 无响应或延迟响应 | AMF 控制面处理阻塞 |\n| `Registration Reject` | 极少出现 | 频繁下发，Cause: `#11`, `#15`, `#39` | 网络侧主动拒绝，关联 SBI 超时或资源保护 |\n| `Authentication Failure` | 用户侧原因 | 已排除用户原因，该消息应占比极低 | 若突增需复核 IMSI/KI 同步状态 |\n\n#### （2）N2 接口（AMF ↔ RAN，NGAP 信令）\n| 关注消息 | 正常表现 | 故障时段异常特征 | 定位指向 |\n|:---|:---|:---|:---|\n| `Initial UE Message` | RAN 转发 UE NAS 请求 | RAN 侧重试发送，AMF 未 acknowledgment | AMF 队列拥塞或 SBI 等待超时 |\n| `Downlink NAS Transport` | AMF 下发 NAS 响应 | 携带 `Registration Reject` 或空载超时 | 控制面决策失败传导至 RAN |\n| `NGAP Release Resource` | 正常释放 | 异常频繁释放，Cause: `Radio Network Layer` | RAN 侧因无响应触发链路超时 teardown |\n\n#### （3）N3 接口（UPF ↔ RAN，GTP-U 用户面）\n- 附着阶段 N3 通常未完全建立，若抓包显示 `GTP-U Echo Response` 超时或 `Sequence Number` 断号，表明 UPF 与 RAN 传输路径存在隐性丢包，可能间接触发控制面保护性拒绝。\n- 若 PDU 会话建立阶段伴随 N3 数据流中断，需检查 UPF 侧 DN 路由及 N3 隧道地址映射。\n\n#### （4）跨接口时序关联分析（关键）\n1. **SBI 超时传导链**：`N1 Registration Request` → AMF 查询 NRF/SMF → `SBI Timeout` → AMF 延迟下发 `N1 Registration Reject` → N2 下发 `NGAP Release`。\n2. **时间戳对齐**：提取 `N1 Request` 到 `N1 Reject` 的端到端时延。若时延 > SBI 超时阈值（通常 3~5s），直接证实故障由 AMF-SMF 交互阻塞引发。\n3. **重试风暴识别**：检查 N1/N2 是否存在指数级重传（UE Paging/RAN Retransmission），可能放大控制面负载，形成雪崩。\n\n#### （5）下一步数据需求\n请提供以下抓包统计结果，以便输出最终根因与恢复指令：\n- `N1 Registration Reject` 的 Cause Code 分布及占比\n- `N1 Request` 到 `N1 Response/Reject` 的平均时延与 P95 时延\n- `N2 Initial UE Message` 的重传率\n- 抓包时间窗口内 HTTP/2 SBI 流量（若可抓取）的 `RST_STREAM` / `GOAWAY` 频率\n\n提供数据后将立即完成根因定性并给出恢复操作指引。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "N1 Registration Reject 的 Cause Code 分布及占比是多少？\nN1 Request 到 N1 Response/Reject 的平均时延与 P95 时延数据如何？\nN2 Initial UE Message 的重传率及 HTTP/2 SBI 流量的 RST_STREAM/GOAWAY 频率是多少？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1123,
+      "total_tokens": 1192,
+      "completion_tokens": 69,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1123,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 69,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1192,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 68,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n   - 使用 Wireshark 抓包分析 N1/N2/N3 接口消息：  \n\n\n\n最终回答：\n\n\n### 3. 消息流与协议分析（Wireshark 抓包维度）\n\n结合当前 `NrfDiscTimeout` 激增与附着成功率暴跌至 `58.3%` 的故障背景，针对 `N1/N2/N3` 接口抓包数据，请按以下维度提取关键特征：\n\n#### （1）N1 接口（AMF ↔ UE，NAS 信令）\n| 关注消息 | 正常表现 | 故障时段异常特征 | 定位指向 |\n|:---|:---|:---|:---|\n| `Registration Request` | UE 发起附着请求 | 请求量正常，但 AMF 无响应或延迟响应 | AMF 控制面处理阻塞 |\n| `Registration Reject` | 极少出现 | 频繁下发，Cause: `#11`, `#15`, `#39` | 网络侧主动拒绝，关联 SBI 超时或资源保护 |\n| `Authentication Failure` | 用户侧原因 | 已排除用户原因，该消息应占比极低 | 若突增需复核 IMSI/KI 同步状态 |\n\n#### （2）N2 接口（AMF ↔ RAN，NGAP 信令）\n| 关注消息 | 正常表现 | 故障时段异常特征 | 定位指向 |\n|:---|:---|:---|:---|\n| `Initial UE Message` | RAN 转发 UE NAS 请求 | RAN 侧重试发送，AMF 未 acknowledgment | AMF 队列拥塞或 SBI 等待超时 |\n| `Downlink NAS Transport` | AMF 下发 NAS 响应 | 携带 `Registration Reject` 或空载超时 | 控制面决策失败传导至 RAN |\n| `NGAP Release Resource` | 正常释放 | 异常频繁释放，Cause: `Radio Network Layer` | RAN 侧因无响应触发链路超时 teardown |\n\n#### （3）N3 接口（UPF ↔ RAN，GTP-U 用户面）\n- 附着阶段 N3 通常未完全建立，若抓包显示 `GTP-U Echo Response` 超时或 `Sequence Number` 断号，表明 UPF 与 RAN 传输路径存在隐性丢包，可能间接触发控制面保护性拒绝。\n- 若 PDU 会话建立阶段伴随 N3 数据流中断，需检查 UPF 侧 DN 路由及 N3 隧道地址映射。\n\n#### （4）跨接口时序关联分析（关键）\n1. **SBI 超时传导链**：`N1 Registration Request` → AMF 查询 NRF/SMF → `SBI Timeout` → AMF 延迟下发 `N1 Registration Reject` → N2 下发 `NGAP Release`。\n2. **时间戳对齐**：提取 `N1 Request` 到 `N1 Reject` 的端到端时延。若时延 > SBI 超时阈值（通常 3~5s），直接证实故障由 AMF-SMF 交互阻塞引发。\n3. **重试风暴识别**：检查 N1/N2 是否存在指数级重传（UE Paging/RAN Retransmission），可能放大控制面负载，形成雪崩。\n\n#### （5）下一步数据需求\n请提供以下抓包统计结果，以便输出最终根因与恢复指令：\n- `N1 Registration Reject` 的 Cause Code 分布及占比\n- `N1 Request` 到 `N1 Response/Reject` 的平均时延与 P95 时延\n- `N2 Initial UE Message` 的重传率\n- 抓包时间窗口内 HTTP/2 SBI 流量（若可抓取）的 `RST_STREAM` / `GOAWAY` 频率\n\n提供数据后将立即完成根因定性并给出恢复操作指引。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-92c0e798-26ad-4f24-82c9-312b40e89b2a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f954db50-e086-450a-afda-d9c455fbaa99"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-fd9e6f45-728c-4002-9991-206982324c06"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4313"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 6142163,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 5918,
+      "byte_offset": 6143260,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6149178,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 6149383,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 5996,
+      "byte_offset": 6150208,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6156204,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6576563,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6576924,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1439,
+      "byte_offset": 6577132,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6578571,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 6578776,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 6578989,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-92c0e798-26ad-4f24-82c9-312b40e89b2a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f954db50-e086-450a-afda-d9c455fbaa99"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-fd9e6f45-728c-4002-9991-206982324c06"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4263"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:01:12.566358+00:00",
+    "arrival_seq": 3523,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n- 深层原因：New Calling场景未在UPF部署阶段完成切片策略适配（PFCP规则未同步）。  \n\n\n\n最终回答：\n\n\n#### （3）深层原因分析（流程与机制层面）\n- **部署流程缺陷**：New Calling解决方案上线期间，UPF侧切片策略适配未完成闭环验证，`PFCP Rule 2025-NC` 缺失与 N6 带宽配置错误未被部署检查清单捕获。\n- **策略同步机制缺失**：SMF与UPF间缺乏配置一致性探针与原子生效机制，导致控制面规则下发后用户侧未同步，形成策略断层。\n- **现网基线适配不足**：定时器阈值（`T3560=5s`）与算力规划（`2 vCPU`）沿用默认模板，未针对New Calling场景的P95延迟（`~6.4s`）与日终突发流量进行现网调优。\n- **容灾与背压设计空白**：未配置指数退避、动态流控与HPA弹性扩容，链路异常时缺乏早期拦截机制，导致重试风暴直接击穿控制面调度能力。\n\n---\n\n#### （4）修复方案与验证计划\n\n| 阶段 | 操作项 | 执行动作/命令 | 预期效果 |\n|:---|:---|:---|:---|\n| **即时恢复** | 加载PFCP规则 | `ADD PFCPRULE: RULEID=2025-NC, ACTION=LOAD;` | 恢复UPF对New Calling会话的识别能力 |\n|  | 调整N6带宽 | `SET IFBWLIMIT: IFNAME=N6, BWLIMIT=300Mbps, QOS=HQoS;` | 消除用户面拥塞，降低PFCP确认延迟 |\n|  | 上调N2定时器 | `MOD TIMER: TIMERID=T3560, VALUE=8000;` | 适配P95延迟，停止误判型超时与重传 |\n|  | 强制清理缓存 | `CLR CACHE: TYPE=PFCP_SES_FAIL, FORCE=Y;` | 释放N4连接池，缓解SMF熔断压力 |\n| **长期加固** | 算力弹性扩容 | 基础vCPU `2→4~8`，配置HPA（CPU>75%自动扩容） | 消除算力硬瓶颈，平滑吸收突发流量 |\n|  | 重试退避机制 | 启用指数退避 `BACKOFF_FACTOR=1.5`，最大重试 `3次` | 抑制固定间隔重传引发的**剧烈波动** |\n|  | 动态背压流控 | 队列 `>8000` 或 CPU `>85%` 触发SBI/N2流控 | 早期拦截溢出请求，防止级联雪崩 |\n|  | 策略同步校验 | 部署SMF-UPF配置一致性探针，变更需原子生效 | 杜绝规则缺失/不同步导致的会话交付失败 |\n\n**验证观察期指标**\n- **窗口**：修复后 `2小时`（覆盖日终尾部流量与夜间基线）\n- **核心指标**：CPU/队列曲线回落至基线（波动幅度 <5%）；`SID=100072` 语音建立失败率 `≤1%`；N2/N4超时计数归零；PFCP会话成功率 `≥99.5%`\n- **回滚预案**：若指标未达标或出现新告警，立即恢复原定时器/带宽配置，切换至备用UPF实例，并收集完整SBI/N2 Trace升级技术支持。\n\n如需生成可执行的MML/CLI脚本包、输出《故障诊断与修复报告》PDF模板，或继续排查其他关联网元，请回复对应需求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "生成可执行的MML/CLI脚本包以自动化实施上述修复命令。\n输出本次故障诊断与修复报告的PDF文档模板。\n检查其他UPF实例是否存在相同的PFCP规则缺失或N6带宽配置错误。",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1094,
+      "total_tokens": 1143,
+      "completion_tokens": 49,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1094,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 49,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1143,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 48,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n- 深层原因：New Calling场景未在UPF部署阶段完成切片策略适配（PFCP规则未同步）。  \n\n\n\n最终回答：\n\n\n#### （3）深层原因分析（流程与机制层面）\n- **部署流程缺陷**：New Calling解决方案上线期间，UPF侧切片策略适配未完成闭环验证，`PFCP Rule 2025-NC` 缺失与 N6 带宽配置错误未被部署检查清单捕获。\n- **策略同步机制缺失**：SMF与UPF间缺乏配置一致性探针与原子生效机制，导致控制面规则下发后用户侧未同步，形成策略断层。\n- **现网基线适配不足**：定时器阈值（`T3560=5s`）与算力规划（`2 vCPU`）沿用默认模板，未针对New Calling场景的P95延迟（`~6.4s`）与日终突发流量进行现网调优。\n- **容灾与背压设计空白**：未配置指数退避、动态流控与HPA弹性扩容，链路异常时缺乏早期拦截机制，导致重试风暴直接击穿控制面调度能力。\n\n---\n\n#### （4）修复方案与验证计划\n\n| 阶段 | 操作项 | 执行动作/命令 | 预期效果 |\n|:---|:---|:---|:---|\n| **即时恢复** | 加载PFCP规则 | `ADD PFCPRULE: RULEID=2025-NC, ACTION=LOAD;` | 恢复UPF对New Calling会话的识别能力 |\n|  | 调整N6带宽 | `SET IFBWLIMIT: IFNAME=N6, BWLIMIT=300Mbps, QOS=HQoS;` | 消除用户面拥塞，降低PFCP确认延迟 |\n|  | 上调N2定时器 | `MOD TIMER: TIMERID=T3560, VALUE=8000;` | 适配P95延迟，停止误判型超时与重传 |\n|  | 强制清理缓存 | `CLR CACHE: TYPE=PFCP_SES_FAIL, FORCE=Y;` | 释放N4连接池，缓解SMF熔断压力 |\n| **长期加固** | 算力弹性扩容 | 基础vCPU `2→4~8`，配置HPA（CPU>75%自动扩容） | 消除算力硬瓶颈，平滑吸收突发流量 |\n|  | 重试退避机制 | 启用指数退避 `BACKOFF_FACTOR=1.5`，最大重试 `3次` | 抑制固定间隔重传引发的**剧烈波动** |\n|  | 动态背压流控 | 队列 `>8000` 或 CPU `>85%` 触发SBI/N2流控 | 早期拦截溢出请求，防止级联雪崩 |\n|  | 策略同步校验 | 部署SMF-UPF配置一致性探针，变更需原子生效 | 杜绝规则缺失/不同步导致的会话交付失败 |\n\n**验证观察期指标**\n- **窗口**：修复后 `2小时`（覆盖日终尾部流量与夜间基线）\n- **核心指标**：CPU/队列曲线回落至基线（波动幅度 <5%）；`SID=100072` 语音建立失败率 `≤1%`；N2/N4超时计数归零；PFCP会话成功率 `≥99.5%`\n- **回滚预案**：若指标未达标或出现新告警，立即恢复原定时器/带宽配置，切换至备用UPF实例，并收集完整SBI/N2 Trace升级技术支持。\n\n如需生成可执行的MML/CLI脚本包、输出《故障诊断与修复报告》PDF模板，或继续排查其他关联网元，请回复对应需求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5e6192a1-5735-43eb-b8d8-e6be46262f60"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7b12b4fc-4eb7-42a9-a275-142510764ab9"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4225"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 6734267,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 5802,
+      "byte_offset": 6735364,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6741166,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 6741371,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 5880,
+      "byte_offset": 6742196,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6748076,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6762499,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6762860,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 1411,
+      "byte_offset": 6763068,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6764479,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 6764684,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 6764897,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5e6192a1-5735-43eb-b8d8-e6be46262f60"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7b12b4fc-4eb7-42a9-a275-142510764ab9"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4175"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:17:55.173178+00:00",
+    "arrival_seq": 3717,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

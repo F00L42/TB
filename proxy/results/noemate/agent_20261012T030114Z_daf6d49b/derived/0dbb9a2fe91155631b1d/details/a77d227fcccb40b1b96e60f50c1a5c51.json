@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n1. 预处理阶段：\n\n\n\n最终回答：\n\n\n基于您提供的用户偏好与特征，**预处理阶段**主要完成以下核心任务的标准化与映射，以确保后续 Skill 调用的准确性：\n\n### 1. 时间实体解析与标准化\n将用户输入中的相对时间或习惯用语转换为系统可识别的具体时间范围：\n*   **D-1**：自动映射为**昨天**（即当前系统时间往前推24小时或日历日的前一天）。\n*   **早忙时**：自动映射为 **07:00 - 09:00**。\n*   **晚忙时**：自动映射为 **17:00 - 19:00**。\n*   **其他相对时间**：如“最近”、“上周”等，结合上下文或默认规则（如最近3天）进行换算。\n\n### 2. 地域/网元范围映射\n将用户使用的区域别名展开为具体的网元列表或区域ID，支持精准查询：\n*   **华中北区**：映射为 `TAS-North region-01/02`, `AMF-North region-01/02`, `UDM-North region`, `UPF-North region-01/02/03`。\n*   **华中南区**：映射为对应的 South 区域网元集合。\n*   **关中平原**：映射为西安市、咸阳市、宝鸡市、渭南市。\n*   **三江平原**：映射为佳木斯市、双鸭山市、七台河市、鸡西市。\n*   **川渝**：映射为四川全省和重庆市。\n\n### 3. 异常判定阈值加载\n根据用户定义的标准，预处理阶段会加载相应的判断逻辑，用于后续的数据分析或诊断：\n*   **暴涨/异常波动**：默认判定标准为**一小时内上涨超过 30%**。\n*   如果在查询或诊断任务中涉及趋势判断，将自动应用此阈值。\n\n### 4. 意图识别与路由准备\n*   结合上述标准化后的参数，判断用户意图属于**查询类**、**诊断类**、**知识类**还是**投诉类**。\n*   构造最终的结构化请求参数（Query Payload），准备调用对应的 Skill（如 `cn-query-ops-monitoring-data` 或 `cn-fault-spirit`）。\n\n---\n**示例演示：**\n若用户输入：“查一下**华中北区**在**D-1早忙时**是否有**暴涨**告警。”\n**预处理后的内部请求将变为：**\n*   **目标对象**：`[TAS-North region-01, ..., UPF-North region-03]`\n*   **时间范围**：`昨天 07:00:00 - 昨天 09:00:00`\n*   **筛选条件**：`涨幅 > 30%`\n*   **动作**：查询告警/指标异常\n\n请继续提供后续阶段或具体指令。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "预处理阶段是否支持用户自定义新的时间别名或区域映射规则？\n如果用户输入的时间或地域实体无法匹配现有规则，系统如何处理？\n预处理阶段输出的结构化请求参数是否包含用户身份或权限信息以支持技能路由？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 914,
+      "total_tokens": 964,
+      "completion_tokens": 50,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 914,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 50,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 964,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 49,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n1. 预处理阶段：\n\n\n\n最终回答：\n\n\n基于您提供的用户偏好与特征，**预处理阶段**主要完成以下核心任务的标准化与映射，以确保后续 Skill 调用的准确性：\n\n### 1. 时间实体解析与标准化\n将用户输入中的相对时间或习惯用语转换为系统可识别的具体时间范围：\n*   **D-1**：自动映射为**昨天**（即当前系统时间往前推24小时或日历日的前一天）。\n*   **早忙时**：自动映射为 **07:00 - 09:00**。\n*   **晚忙时**：自动映射为 **17:00 - 19:00**。\n*   **其他相对时间**：如“最近”、“上周”等，结合上下文或默认规则（如最近3天）进行换算。\n\n### 2. 地域/网元范围映射\n将用户使用的区域别名展开为具体的网元列表或区域ID，支持精准查询：\n*   **华中北区**：映射为 `TAS-North region-01/02`, `AMF-North region-01/02`, `UDM-North region`, `UPF-North region-01/02/03`。\n*   **华中南区**：映射为对应的 South 区域网元集合。\n*   **关中平原**：映射为西安市、咸阳市、宝鸡市、渭南市。\n*   **三江平原**：映射为佳木斯市、双鸭山市、七台河市、鸡西市。\n*   **川渝**：映射为四川全省和重庆市。\n\n### 3. 异常判定阈值加载\n根据用户定义的标准，预处理阶段会加载相应的判断逻辑，用于后续的数据分析或诊断：\n*   **暴涨/异常波动**：默认判定标准为**一小时内上涨超过 30%**。\n*   如果在查询或诊断任务中涉及趋势判断，将自动应用此阈值。\n\n### 4. 意图识别与路由准备\n*   结合上述标准化后的参数，判断用户意图属于**查询类**、**诊断类**、**知识类**还是**投诉类**。\n*   构造最终的结构化请求参数（Query Payload），准备调用对应的 Skill（如 `cn-query-ops-monitoring-data` 或 `cn-fault-spirit`）。\n\n---\n**示例演示：**\n若用户输入：“查一下**华中北区**在**D-1早忙时**是否有**暴涨**告警。”\n**预处理后的内部请求将变为：**\n*   **目标对象**：`[TAS-North region-01, ..., UPF-North region-03]`\n*   **时间范围**：`昨天 07:00:00 - 昨天 09:00:00`\n*   **筛选条件**：`涨幅 > 30%`\n*   **动作**：查询告警/指标异常\n\n请继续提供后续阶段或具体指令。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f13aec69-7d90-4bfe-b136-5298a6ab14b4"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-235a2b46-3930-4d94-b56e-16de0b410738"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-8172e7cf-6a26-4c91-b695-21b533c93c5a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3801"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 3358305,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 5238,
+      "byte_offset": 3359402,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 3364640,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 3364845,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 5312,
+      "byte_offset": 3365670,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 3370982,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4266554,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4266915,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1495,
+      "byte_offset": 4267123,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4268618,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4268823,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4269036,
+      "path": "archive/2026-10-12/07/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f13aec69-7d90-4bfe-b136-5298a6ab14b4"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-235a2b46-3930-4d94-b56e-16de0b410738"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-8172e7cf-6a26-4c91-b695-21b533c93c5a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3751"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:07:03.073739+00:00",
+    "arrival_seq": 2315,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n100223 DDN流控的原因有哪些\n\n\n\n最终回答：\n\n\n根据产品文档，触发 `ALM-100223 DDN流控` 告警的可能原因主要有以下两项：\n\n1. **网络侧异常导致DDN消息突发** \n   如网络侧受到外部攻击、应用服务器集中推送业务、话务模型突发冲击等，导致短时间内系统收到并需转发的DDN（Downlink Data Notification）消息量急剧增加。\n2. **流控阈值（WAL值）配置不恰当** \n   通过 `SET DDNFLOWCTRL` 命令配置的WAL值未结合现网实际部署规划及下游网元（如AMF/MME）的接收处理能力进行合理设置，阈值过低易引发流控。\n\n当系统发送的DDN消息速率超出配置的WAL值时，SMF/SGW-C会丢弃超出的DDN消息并上报该告警。建议优先排查是否存在外部攻击或异常话务冲击，随后通过 `LST DDNFLOWCTRL` 检查当前WAL值是否合理，必要时使用 `SET DDNFLOWCTRL` 进行调整。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何判断当前现网是否正遭受外部攻击或异常话务冲击？\n执行 LST DDNFLOWCTRL 命令后，如何根据输出结果评估WAL值是否配置合理？\n在调整WAL值之前，是否需要先通知下游网元（AMF/MME）确认其最大处理能力？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 505,
+      "total_tokens": 571,
+      "completion_tokens": 66,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 505,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 66,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 571,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 65,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n100223 DDN流控的原因有哪些\n\n\n\n最终回答：\n\n\n根据产品文档，触发 `ALM-100223 DDN流控` 告警的可能原因主要有以下两项：\n\n1. **网络侧异常导致DDN消息突发** \n   如网络侧受到外部攻击、应用服务器集中推送业务、话务模型突发冲击等，导致短时间内系统收到并需转发的DDN（Downlink Data Notification）消息量急剧增加。\n2. **流控阈值（WAL值）配置不恰当** \n   通过 `SET DDNFLOWCTRL` 命令配置的WAL值未结合现网实际部署规划及下游网元（如AMF/MME）的接收处理能力进行合理设置，阈值过低易引发流控。\n\n当系统发送的DDN消息速率超出配置的WAL值时，SMF/SGW-C会丢弃超出的DDN消息并上报该告警。建议优先排查是否存在外部攻击或异常话务冲击，随后通过 `LST DDNFLOWCTRL` 检查当前WAL值是否合理，必要时使用 `SET DDNFLOWCTRL` 进行调整。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-2269e4cb-359c-47d0-bdcb-264840d2178a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1dc7017e-3c2f-44fa-b611-6127b4874e9b"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3aaaf1fe-7da0-43b1-9e4c-5576a7b93db8"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2384"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 12415816,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 3346,
+      "byte_offset": 12416913,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12420259,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 12420464,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 3424,
+      "byte_offset": 12421289,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12424713,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 12472871,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 12473232,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 1475,
+      "byte_offset": 12473440,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12474915,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 12475120,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 12475333,
+      "path": "archive/2026-10-12/13/part-00018.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-2269e4cb-359c-47d0-bdcb-264840d2178a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1dc7017e-3c2f-44fa-b611-6127b4874e9b"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3aaaf1fe-7da0-43b1-9e4c-5576a7b93db8"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2334"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:43:44.702740+00:00",
+    "arrival_seq": 8288,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

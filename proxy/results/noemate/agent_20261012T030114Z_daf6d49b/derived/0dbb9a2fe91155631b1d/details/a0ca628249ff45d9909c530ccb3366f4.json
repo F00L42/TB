@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n哪种VMs应该设计在DMZ域\n\n\n\n最终回答：\n\n\n根据安全域隔离原则，以下类型的VM应该设计在DMZ域：\n\n### 核心判定标准\n**与CMNET有连接、且面向公网提供服务的网元**应部署在DMZ域。\n\n### 具体包括的网元类型\n- **彩信中心**（含彩信网关）\n- **统一Centrex**\n- **通信能力开放平台**\n- **VIM** 和 **NFVO+** 中需要与公网通信的模块\n- 其他需要被互联网或第三方网络访问的公共服务主机\n\n### DMZ域的定位\n- **安全级别**：低于受信任区域（Trusted Zone），高于不信任网络（Untrusted Zone）\n- **访问控制**：不信任区域的设备要访问DMZ域服务器必须经过许可，否则不能访问内部服务器\n- **典型部署**：公网可访问的网元部署在DMZ域，管理网元部署在信任域，不同安全域之间通过防火墙隔离\n\n### 设计原则\n- 存在交互的两个网元通常划分到一个安全域中，尽量减少安全域之间的交互\n- DMZ域和不信任区域之间必须部署防火墙\n- DMZ域可进一步划分不同的子区域，通过防火墙实现 finer-grained 的隔离"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "DMZ域与受信任区域之间应如何配置防火墙策略？\n哪些具体业务场景需要VIM和NFVO+模块与公网通信？\n如果某个网元同时服务公网和内部网络，应该如何划分其VM部署？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 539,
+      "total_tokens": 589,
+      "completion_tokens": 50,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 539,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 50,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 589,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 49,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n哪种VMs应该设计在DMZ域\n\n\n\n最终回答：\n\n\n根据安全域隔离原则，以下类型的VM应该设计在DMZ域：\n\n### 核心判定标准\n**与CMNET有连接、且面向公网提供服务的网元**应部署在DMZ域。\n\n### 具体包括的网元类型\n- **彩信中心**（含彩信网关）\n- **统一Centrex**\n- **通信能力开放平台**\n- **VIM** 和 **NFVO+** 中需要与公网通信的模块\n- 其他需要被互联网或第三方网络访问的公共服务主机\n\n### DMZ域的定位\n- **安全级别**：低于受信任区域（Trusted Zone），高于不信任网络（Untrusted Zone）\n- **访问控制**：不信任区域的设备要访问DMZ域服务器必须经过许可，否则不能访问内部服务器\n- **典型部署**：公网可访问的网元部署在DMZ域，管理网元部署在信任域，不同安全域之间通过防火墙隔离\n\n### 设计原则\n- 存在交互的两个网元通常划分到一个安全域中，尽量减少安全域之间的交互\n- DMZ域和不信任区域之间必须部署防火墙\n- DMZ域可进一步划分不同的子区域，通过防火墙实现 finer-grained 的隔离"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-62ef8b92-171c-49de-8efd-24c68d95bd89"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-bd35eb83-2d35-42d8-9574-0e77033d19ac"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-92f509ae-0747-45b5-905d-f36e37c06d3d"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2599"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5137822,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 3634,
+      "byte_offset": 5138919,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5142553,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5142758,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 3712,
+      "byte_offset": 5143583,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5147295,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 5569225,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 5569586,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 1403,
+      "byte_offset": 5569794,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5571197,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 5571402,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 5571615,
+      "path": "archive/2026-10-12/14/part-00002.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-62ef8b92-171c-49de-8efd-24c68d95bd89"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-bd35eb83-2d35-42d8-9574-0e77033d19ac"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-92f509ae-0747-45b5-905d-f36e37c06d3d"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2549"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:03:04.070079+00:00",
+    "arrival_seq": 8745,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

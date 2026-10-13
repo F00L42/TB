@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请列出几种可能导致被叫响应的原因，并对每个原因进行简单的描述解释\n\n\n\n最终回答：\n根据云核心网及交换系统（如UGC）的呼叫处理机制，被叫侧的响应结果（应答、拒绝、无响应或拆线）通常由以下几类原因导致：\n\n1. **被叫用户忙**\n被叫用户正在通话中或主动挂机。系统在寻呼或接续过程中检测到被叫处于忙状态（例如收到局间忙信号），从而提示用户忙并拆除呼叫。\n\n2. **久不应答/无应答**\n在系统定时器规定的时间段内，被叫终端一直未接听呼叫。振铃时间超时后，系统自动判定为无应答并拆除呼叫。\n\n3. **被叫不可及/不在服务区**\n网络向被叫发起寻呼请求后未收到响应。通常是因为被叫终端处于信号盲区、开启飞行模式、SIM卡异常或网络覆盖不佳。\n\n4. **被叫终端关机**\n被叫移动设备处于关机状态，VLR中的用户注册记录被清空或标记为脱网，导致路由无法送达被叫终端。\n\n5. **被叫禁止呼入（BAIC等限呼业务）**\n被叫用户签约并启用了呼入限制补充业务（如BAIC），或运营商侧配置了闭锁呼入策略。此时所有呼入请求会被系统直接拒绝并拆线。\n\n6. **被叫号码不存在/格式无效**\n被叫号码未在HLR中配置、已被注销、号码格式错误或地址不全。系统在查询用户数据时收到“未知用户”或“未分配号码”响应，导致呼叫失败。\n\n7. **网络拥塞或资源不足**\n交换设备、中继电路或无线资源出现拥塞，系统无法为呼叫分配必要的控制块（CCB）、电路或信道，导致被叫侧无法正常响应振铃。\n\n8. **路由不可达/选路失败**\n系统无法获取到达被叫所在网络或终端的有效路由，例如查询位置区/小区信息失败、对端网元无响应或路由跳数超限，导致呼叫无法送达被叫。\n\n9. **信令交互超时或故障**\n在呼叫建立过程中，主叫侧与被叫侧网元之间的信令消息（如Alerting、Connect、RCH响应等）传输超时或丢失，导致系统判定被叫无响应而拆线。\n\n以上原因涵盖了终端状态、用户业务配置、号码数据、网络资源及信令交互等维度。实际运维中可结合具体失败原因码（如CV84用户忙、CV101无应答、CV104不可及等）进行精准定位。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请详细解释原因码CV84、CV101和CV104分别对应哪些具体的信令交互失败场景？\n在云核心网架构中，如何配置BAIC业务以实现被叫禁止呼入的功能？\n当出现网络拥塞导致被叫无响应时，运维人员应优先检查哪些关键性能指标？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 828,
+      "total_tokens": 901,
+      "completion_tokens": 73,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 828,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 73,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 901,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 72,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请列出几种可能导致被叫响应的原因，并对每个原因进行简单的描述解释\n\n\n\n最终回答：\n根据云核心网及交换系统（如UGC）的呼叫处理机制，被叫侧的响应结果（应答、拒绝、无响应或拆线）通常由以下几类原因导致：\n\n1. **被叫用户忙**\n被叫用户正在通话中或主动挂机。系统在寻呼或接续过程中检测到被叫处于忙状态（例如收到局间忙信号），从而提示用户忙并拆除呼叫。\n\n2. **久不应答/无应答**\n在系统定时器规定的时间段内，被叫终端一直未接听呼叫。振铃时间超时后，系统自动判定为无应答并拆除呼叫。\n\n3. **被叫不可及/不在服务区**\n网络向被叫发起寻呼请求后未收到响应。通常是因为被叫终端处于信号盲区、开启飞行模式、SIM卡异常或网络覆盖不佳。\n\n4. **被叫终端关机**\n被叫移动设备处于关机状态，VLR中的用户注册记录被清空或标记为脱网，导致路由无法送达被叫终端。\n\n5. **被叫禁止呼入（BAIC等限呼业务）**\n被叫用户签约并启用了呼入限制补充业务（如BAIC），或运营商侧配置了闭锁呼入策略。此时所有呼入请求会被系统直接拒绝并拆线。\n\n6. **被叫号码不存在/格式无效**\n被叫号码未在HLR中配置、已被注销、号码格式错误或地址不全。系统在查询用户数据时收到“未知用户”或“未分配号码”响应，导致呼叫失败。\n\n7. **网络拥塞或资源不足**\n交换设备、中继电路或无线资源出现拥塞，系统无法为呼叫分配必要的控制块（CCB）、电路或信道，导致被叫侧无法正常响应振铃。\n\n8. **路由不可达/选路失败**\n系统无法获取到达被叫所在网络或终端的有效路由，例如查询位置区/小区信息失败、对端网元无响应或路由跳数超限，导致呼叫无法送达被叫。\n\n9. **信令交互超时或故障**\n在呼叫建立过程中，主叫侧与被叫侧网元之间的信令消息（如Alerting、Connect、RCH响应等）传输超时或丢失，导致系统判定被叫无响应而拆线。\n\n以上原因涵盖了终端状态、用户业务配置、号码数据、网络资源及信令交互等维度。实际运维中可结合具体失败原因码（如CV84用户忙、CV101无应答、CV104不可及等）进行精准定位。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-dd68c3f2-9ad4-466a-b447-67a05edecb01"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-83179250-4e73-4973-95ef-0217bc546c17"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a7b15cdb-10c4-4824-9dff-e9e7b1c55620"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3871"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5262395,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 5330,
+      "byte_offset": 5263492,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5268822,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5269027,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 5408,
+      "byte_offset": 5269852,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5275260,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 5336569,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 5336930,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 1503,
+      "byte_offset": 5337138,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5338641,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 5338846,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 5339059,
+      "path": "archive/2026-10-12/14/part-00018.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-dd68c3f2-9ad4-466a-b447-67a05edecb01"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-83179250-4e73-4973-95ef-0217bc546c17"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a7b15cdb-10c4-4824-9dff-e9e7b1c55620"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3821"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:37:10.117522+00:00",
+    "arrival_seq": 9572,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

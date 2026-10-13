@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n硬件资源不足 - 检查CPU/内存是否成为瓶颈，避免因硬件限制导致资源利用率虚高。\n\n\n\n最终回答：\n\n\n已记录并更新表格。编译如下：\n\n| 场景 | 处理措施 |\n|:---|:---|\n| **资源使用量接近阈值（85%~90%）** | 执行 `DSP LICENSERES` 核实实际用量，提前启动容量评估与扩容申请流程 |\n| **资源使用量突破License上限** | 立即联系工程师申请扩容，加载并激活新License文件后观察告警清除 |\n| **告警频繁误报（阈值配置过低）** | 执行 `LST LICCTRLALM` 检查配置，通过 `SET LICCTRLALM` 将阈值调整为 `80%~85%` |\n| **LicenseCtrl主节点复位后告警重报** | 复核资源真实水位，若仍超阈值则按扩容流程处理；若为统计异常则清除告警并监控 |\n| **扩容后告警仍未清除** | 执行 `DSP LICENSERES` 确认新License已生效，收集配置快照与运行日志提交技术支持 |\n| **License配置错误** | 检查License文件是否过期或配置错误（如文件路径错误、权限不足） |\n| **资源规划不足** | 预估业务增长趋势，提前扩容License（如从10000会话升级至15000会话） |\n| **突发业务高峰** | 启用弹性License（如按需扩容），或临时调整阈值（如将90%调整为95%） |\n| **硬件资源不足** | 检查CPU/内存是否成为瓶颈，避免因硬件限制导致资源利用率虚高 |\n\n请继续补充其他场景行，或输入下一章节标题（如 `2. 容量规划建议`、`三、根因分析`、`四、案例示例`）。我将按标准格式持续编译。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何具体检查CPU和内存是否成为瓶颈？\n有哪些命令或工具可以查看当前的CPU和内存使用情况？\n如果确认是硬件资源不足，应采取哪些扩容或优化措施？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 679,
+      "total_tokens": 718,
+      "completion_tokens": 39,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 679,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 39,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 718,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 38,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n硬件资源不足 - 检查CPU/内存是否成为瓶颈，避免因硬件限制导致资源利用率虚高。\n\n\n\n最终回答：\n\n\n已记录并更新表格。编译如下：\n\n| 场景 | 处理措施 |\n|:---|:---|\n| **资源使用量接近阈值（85%~90%）** | 执行 `DSP LICENSERES` 核实实际用量，提前启动容量评估与扩容申请流程 |\n| **资源使用量突破License上限** | 立即联系工程师申请扩容，加载并激活新License文件后观察告警清除 |\n| **告警频繁误报（阈值配置过低）** | 执行 `LST LICCTRLALM` 检查配置，通过 `SET LICCTRLALM` 将阈值调整为 `80%~85%` |\n| **LicenseCtrl主节点复位后告警重报** | 复核资源真实水位，若仍超阈值则按扩容流程处理；若为统计异常则清除告警并监控 |\n| **扩容后告警仍未清除** | 执行 `DSP LICENSERES` 确认新License已生效，收集配置快照与运行日志提交技术支持 |\n| **License配置错误** | 检查License文件是否过期或配置错误（如文件路径错误、权限不足） |\n| **资源规划不足** | 预估业务增长趋势，提前扩容License（如从10000会话升级至15000会话） |\n| **突发业务高峰** | 启用弹性License（如按需扩容），或临时调整阈值（如将90%调整为95%） |\n| **硬件资源不足** | 检查CPU/内存是否成为瓶颈，避免因硬件限制导致资源利用率虚高 |\n\n请继续补充其他场景行，或输入下一章节标题（如 `2. 容量规划建议`、`三、根因分析`、`四、案例示例`）。我将按标准格式持续编译。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-61ef0243-c55c-4ce9-b088-ee04ee8a7ffd"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e60b7b34-ec3a-40e3-a4d6-94860333a907"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3047"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 1701848,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 4230,
+      "byte_offset": 1702945,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1707175,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 1707380,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 4308,
+      "byte_offset": 1708205,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 1712513,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 2228058,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 2228419,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 1383,
+      "byte_offset": 2228627,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2230010,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 2230215,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 2230428,
+      "path": "archive/2026-10-12/09/part-00021.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-61ef0243-c55c-4ce9-b088-ee04ee8a7ffd"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e60b7b34-ec3a-40e3-a4d6-94860333a907"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2997"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:48:24.481459+00:00",
+    "arrival_seq": 5153,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

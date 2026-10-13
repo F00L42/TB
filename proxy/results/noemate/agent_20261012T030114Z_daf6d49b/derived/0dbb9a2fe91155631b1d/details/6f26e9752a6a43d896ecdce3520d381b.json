@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n使用RS221G1 机架服务器,2x4网口网卡部署与TaiShan 200服务器部署该产品时，哪种部署方式需要在在机柜后面提供交流电源接入？\n\n\n\n最终回答：\n\n\n根据检索到的硬件安装文档，**两种部署方式都需要在机柜后面提供交流电源接入**：\n\n### RS221G1 机架服务器（2x4网口网卡）\n- 电源模块位于服务器**后部**\n- 安装步骤明确要求：\"将电源模块线缆的一端插入服务器电源模块的线缆接口，另一端插入**机柜后方的交流插线排**\"\n\n### TaiShan 200 服务器（型号2280）\n- 电源模块同样位于服务器**后部**\n- 安装步骤要求：\"将电源线缆的一端插入服务器交流电源模块的线缆接口，另一端插入**机柜后方的交流插线排**\"\n\n### 结论\n两种服务器均为标准机架式设备，电源接口设计在机箱后部，部署时均需：\n1. 电源线从服务器后部电源模块引出\n2. 连接至机柜后方的PDU（交流插线排）\n3. 建议使用主备方式连接到不同的PDU以保证可靠性\n\n这是机架服务器的标准布线规范，便于机柜后方的统一理线和电源管理。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "RS221G1与TaiShan 200服务器的电源模块额定输入电压范围是否相同？\n两种服务器在连接机柜PDU时是否都需要配置主备双路电源以提高供电可靠性？\nRS221G1的2x4网口网卡部署方案对机柜后方的网络布线空间是否有特殊要求？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 538,
+      "total_tokens": 611,
+      "completion_tokens": 73,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 538,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 73,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 611,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 72,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n使用RS221G1 机架服务器,2x4网口网卡部署与TaiShan 200服务器部署该产品时，哪种部署方式需要在在机柜后面提供交流电源接入？\n\n\n\n最终回答：\n\n\n根据检索到的硬件安装文档，**两种部署方式都需要在机柜后面提供交流电源接入**：\n\n### RS221G1 机架服务器（2x4网口网卡）\n- 电源模块位于服务器**后部**\n- 安装步骤明确要求：\"将电源模块线缆的一端插入服务器电源模块的线缆接口，另一端插入**机柜后方的交流插线排**\"\n\n### TaiShan 200 服务器（型号2280）\n- 电源模块同样位于服务器**后部**\n- 安装步骤要求：\"将电源线缆的一端插入服务器交流电源模块的线缆接口，另一端插入**机柜后方的交流插线排**\"\n\n### 结论\n两种服务器均为标准机架式设备，电源接口设计在机箱后部，部署时均需：\n1. 电源线从服务器后部电源模块引出\n2. 连接至机柜后方的PDU（交流插线排）\n3. 建议使用主备方式连接到不同的PDU以保证可靠性\n\n这是机架服务器的标准布线规范，便于机柜后方的统一理线和电源管理。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e7ccfa58-3f97-48ce-aa1b-70c7241a9a48"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f437591a-3b3b-48f3-ad1b-42a842f94626"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-466b4383-959f-4e67-943b-15cb040d9009"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2621"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 15804306,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3662,
+      "byte_offset": 15805403,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15809065,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 15809270,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3740,
+      "byte_offset": 15810095,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 15813835,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 16056857,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 16057218,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1495,
+      "byte_offset": 16057426,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 16058921,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 16059126,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 16059339,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e7ccfa58-3f97-48ce-aa1b-70c7241a9a48"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f437591a-3b3b-48f3-ad1b-42a842f94626"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-466b4383-959f-4e67-943b-15cb040d9009"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2571"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T12:40:03.994822+00:00",
+    "arrival_seq": 7047,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/12"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nNSSF的主要功能是什么？\n\n\n\n最终回答：\n\n\nNSSF（Network Slice Selection Function，网络切片选择功能）是5G核心网中专门负责网络切片管理的关键网元。根据其产品文档，主要功能可归纳为以下几点：\n\n### 1. 网络切片选择\n在业务流程中，NSSF会根据NF消费者（如AMF）发送的切片选择请求中携带的 `NSSAI`、`PLMN ID`、`TAI` 等信息，计算并返回允许使用的切片信息，辅助网络为终端用户选择合适的网络切片实例。\n\n### 2. 切片可用性服务管理\n支持对NF消费者的切片状态、属性等进行统一管理，并提供订阅与通知服务。通过该能力，NSSF可以实时掌握5G网络中各NF的切片支持情况，实现切片信息的自治理与动态更新。\n\n### 3. 关键接口交互\n* **N22接口（对接AMF）**：支持AMF与NSSF交互，获取切片管理策略，从而控制用户接入合适的网络切片。\n* **Nnssf接口（对接NRF等）**：在NSSF生命周期管理过程以及业务流程中选择NF时，与NRF进行交互以获取必要的服务发现与注册信息。\n\n### 4. 架构与可靠性支撑\n* **服务化架构（SBA）**：完全遵循5G服务化架构设计，提供基于 `HTTP/2` 协议的标准SBI接口（Nnssf），支撑业务灵活上线与解耦部署。\n* **IPv6与容灾支持**：逻辑接口全面支持IPv6组网，并内置高可靠性与容灾机制，确保切片选择服务在复杂网络环境下的连续性与稳定性。\n\n**总结**：NSSF 核心承载了5G网络的切片选择与切片可用性管理功能，通过灵活可靠的切片决策能力，助力运营商实现端到端网络切片的敏捷构建与高效运维。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "NSSF与AMF之间的N22接口具体交互流程是什么？\n切片可用性服务中的订阅与通知机制如何工作？\nNSSF在高可靠性与容灾方面有哪些具体设计？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 659,
+      "total_tokens": 700,
+      "completion_tokens": 41,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 659,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 41,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 700,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 40,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nNSSF的主要功能是什么？\n\n\n\n最终回答：\n\n\nNSSF（Network Slice Selection Function，网络切片选择功能）是5G核心网中专门负责网络切片管理的关键网元。根据其产品文档，主要功能可归纳为以下几点：\n\n### 1. 网络切片选择\n在业务流程中，NSSF会根据NF消费者（如AMF）发送的切片选择请求中携带的 `NSSAI`、`PLMN ID`、`TAI` 等信息，计算并返回允许使用的切片信息，辅助网络为终端用户选择合适的网络切片实例。\n\n### 2. 切片可用性服务管理\n支持对NF消费者的切片状态、属性等进行统一管理，并提供订阅与通知服务。通过该能力，NSSF可以实时掌握5G网络中各NF的切片支持情况，实现切片信息的自治理与动态更新。\n\n### 3. 关键接口交互\n* **N22接口（对接AMF）**：支持AMF与NSSF交互，获取切片管理策略，从而控制用户接入合适的网络切片。\n* **Nnssf接口（对接NRF等）**：在NSSF生命周期管理过程以及业务流程中选择NF时，与NRF进行交互以获取必要的服务发现与注册信息。\n\n### 4. 架构与可靠性支撑\n* **服务化架构（SBA）**：完全遵循5G服务化架构设计，提供基于 `HTTP/2` 协议的标准SBI接口（Nnssf），支撑业务灵活上线与解耦部署。\n* **IPv6与容灾支持**：逻辑接口全面支持IPv6组网，并内置高可靠性与容灾机制，确保切片选择服务在复杂网络环境下的连续性与稳定性。\n\n**总结**：NSSF 核心承载了5G网络的切片选择与切片可用性管理功能，通过灵活可靠的切片决策能力，助力运营商实现端到端网络切片的敏捷构建与高效运维。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f63cba1d-9711-476b-b8bd-32f933ec1dac"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-06305663-3e20-45f4-8bc9-b36d581f04c5"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-70db3a9c-4df0-4d1c-9bbf-797e7420172a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3172"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 4518908,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 4398,
+      "byte_offset": 4520005,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4524403,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 4524608,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 4476,
+      "byte_offset": 4525433,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4529909,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4771071,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4771432,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1355,
+      "byte_offset": 4771640,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4772995,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4773200,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4773413,
+      "path": "archive/2026-10-12/14/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f63cba1d-9711-476b-b8bd-32f933ec1dac"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-06305663-3e20-45f4-8bc9-b36d581f04c5"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-70db3a9c-4df0-4d1c-9bbf-797e7420172a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3122"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:00:39.616358+00:00",
+    "arrival_seq": 8677,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

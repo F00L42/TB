@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n4.  **网元状态排查**：\n\n\n\n最终回答：\n4.  **网元状态排查**：\n    - **AMF 资源与负载**：`unc1224` CPU 利用率呈现**高位震荡**（持续2小时维持在阈值上限80%以上且波动±5%以内），移动性处理线程队列持续积压；内存正常，磁盘 IO 因全量操作日志记录与频繁 UDM 交互处于高负载状态。\n    - **AUSF/UDM 状态**：AUSF 处理线程无阻塞，但 UDM 签约数据查询响应延迟出现**剧烈波动**（30分钟内波动幅度 > 15%），本地缓存命中率下降，导致鉴权向量（5G AV）获取耗时显著攀升。\n    - **接口与传输链路**：N2/N8 接口 SCTP 关联正常，但发送队列长度持续超标；未配置信令专属 QoS，普通业务抢占传输资源，叠加防火墙深度包检测引入额外转发延迟。\n    - **配置与定时器核查**：AMF 侧 T3540 定时器配置为 2 秒，低于当前 AUSF/UDM 实际处理耗时（2.5~3 秒），直接引发批量 `Message Timeout`；未开启请求批量处理机制，单条报文独立执行完整流程加重计算负担。\n    - **排查结论**：网元硬件与基础服务无故障，核心瓶颈在于 UDM 查询延迟、N2 传输拥塞与 T3540 定时器配置不匹配；需协同优化 UDM 缓存策略、N2 QoS 分级及定时器阈值。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何优化UDM缓存策略以降低签约数据查询延迟波动？\nN2接口信令专属QoS应如何配置以避免普通业务抢占传输资源？\nT3540定时器调整至何值可匹配当前AUSF/UDM处理耗时并消除Message Timeout？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 618,
+      "total_tokens": 678,
+      "completion_tokens": 60,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 618,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 60,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 678,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 59,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n4.  **网元状态排查**：\n\n\n\n最终回答：\n4.  **网元状态排查**：\n    - **AMF 资源与负载**：`unc1224` CPU 利用率呈现**高位震荡**（持续2小时维持在阈值上限80%以上且波动±5%以内），移动性处理线程队列持续积压；内存正常，磁盘 IO 因全量操作日志记录与频繁 UDM 交互处于高负载状态。\n    - **AUSF/UDM 状态**：AUSF 处理线程无阻塞，但 UDM 签约数据查询响应延迟出现**剧烈波动**（30分钟内波动幅度 > 15%），本地缓存命中率下降，导致鉴权向量（5G AV）获取耗时显著攀升。\n    - **接口与传输链路**：N2/N8 接口 SCTP 关联正常，但发送队列长度持续超标；未配置信令专属 QoS，普通业务抢占传输资源，叠加防火墙深度包检测引入额外转发延迟。\n    - **配置与定时器核查**：AMF 侧 T3540 定时器配置为 2 秒，低于当前 AUSF/UDM 实际处理耗时（2.5~3 秒），直接引发批量 `Message Timeout`；未开启请求批量处理机制，单条报文独立执行完整流程加重计算负担。\n    - **排查结论**：网元硬件与基础服务无故障，核心瓶颈在于 UDM 查询延迟、N2 传输拥塞与 T3540 定时器配置不匹配；需协同优化 UDM 缓存策略、N2 QoS 分级及定时器阈值。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5c503ea6-cfc5-4a4e-877f-97e570a48298"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e94293fa-8b0f-45e4-91e6-11333338602d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-648080ff-518e-4f59-9852-f6ff562f812f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2765"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 7816077,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 3854,
+      "byte_offset": 7817174,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7821028,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 7821233,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 3932,
+      "byte_offset": 7822058,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 7825990,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 7857950,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 7858311,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1439,
+      "byte_offset": 7858519,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7859958,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 7860163,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 7860786,
+      "path": "archive/2026-10-12/08/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5c503ea6-cfc5-4a4e-877f-97e570a48298"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e94293fa-8b0f-45e4-91e6-11333338602d"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-648080ff-518e-4f59-9852-f6ff562f812f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2715"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:01:31.260249+00:00",
+    "arrival_seq": 3529,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

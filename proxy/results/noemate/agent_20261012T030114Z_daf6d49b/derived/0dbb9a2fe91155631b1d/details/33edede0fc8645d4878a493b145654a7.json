@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n给出EVP中Forward Error Correction的原理\n\n\n\n最终回答：\n根据检索到的技术规范，**前向纠错（Forward Error Correction, FEC）** 是一种在不请求重传的前提下，通过发送冗余数据来恢复丢包的技术。其在音视频传输（如RTP/MBMS/MTSI等场景）中的核心原理如下：\n\n### 1. 基本工作机制\n* **发送端（编码）**：发送端将原始的音视频RTP数据包作为源数据包，根据特定的算法（如系统性灵活校验码 Flexible Parity FEC）计算出额外的**冗余修复包（Repair Packets）**。\n* **传输过程**：原始数据包和修复包通常通过**独立的流（如不同的SSRC）**复用发送。修复包与源包携带关联信息，以便接收端识别。\n* **接收端（解码）**：接收端监听从流。如果部分原始数据包在传输中丢失，接收端可利用收到的修复包和未丢失的原始包，通过数学运算（如异或或矩阵运算）反向推导并重建丢失的数据包，从而实现无缝播放。\n\n### 2. 关键处理流程（以3GPP标准为例）\n* **加密与FEC的顺序**：FEC编码在**媒体面加密之后**进行，而FEC解码在**媒体面解密之前**完成。这确保了冗余数据同样具备安全性，且解密模块无需感知丢包恢复过程。\n* **流映射机制**：接收端通过RTP头中的`SSRC`字段对流入流进行解复用，并利用`ssrc-group`机制将修复流映射回对应的原始媒体流。\n* **协议协商**：FEC的使用需在通信建立前通过信令协商。双方确认支持FEC后，才会启用独立的修复流。\n\n### 3. 优势与适用场景\n* **无需往返交互**：不同于NACK重传机制，FEC不需要接收端反馈丢失信息，因此**无重传延迟**。\n* **适合高延迟或广播场景**：在RTT较大、丢包率适中，或一对多的广播/组播场景（如MBMS）中，FEC能显著降低端到端延迟并提升抗丢包能力。\n* **资源权衡**：FEC会占用额外的带宽发送冗余包。网络状况良好时可关闭以节省带宽，在丢包加剧时启用以保障媒体连续性。\n\n> 注：若您提到的 `EVP` 指代特定设备或私有协议栈，其FEC底层数学原理与上述标准一致，具体配置命令或调优参数可提供更多上下文以便进一步说明。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "FEC的冗余开销具体如何计算，在实际部署中应如何根据网络丢包率动态调整保护强度？\n在实时音视频通话中，FEC与前向重传（NACK）机制应如何配合使用以兼顾延迟与可靠性？\n3GPP标准中提到的系统性灵活校验码（Flexible Parity FEC）相比传统异或FEC有哪些具体优势及实现复杂度差异？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 803,
+      "total_tokens": 887,
+      "completion_tokens": 84,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 803,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 84,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 887,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 83,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n给出EVP中Forward Error Correction的原理\n\n\n\n最终回答：\n根据检索到的技术规范，**前向纠错（Forward Error Correction, FEC）** 是一种在不请求重传的前提下，通过发送冗余数据来恢复丢包的技术。其在音视频传输（如RTP/MBMS/MTSI等场景）中的核心原理如下：\n\n### 1. 基本工作机制\n* **发送端（编码）**：发送端将原始的音视频RTP数据包作为源数据包，根据特定的算法（如系统性灵活校验码 Flexible Parity FEC）计算出额外的**冗余修复包（Repair Packets）**。\n* **传输过程**：原始数据包和修复包通常通过**独立的流（如不同的SSRC）**复用发送。修复包与源包携带关联信息，以便接收端识别。\n* **接收端（解码）**：接收端监听从流。如果部分原始数据包在传输中丢失，接收端可利用收到的修复包和未丢失的原始包，通过数学运算（如异或或矩阵运算）反向推导并重建丢失的数据包，从而实现无缝播放。\n\n### 2. 关键处理流程（以3GPP标准为例）\n* **加密与FEC的顺序**：FEC编码在**媒体面加密之后**进行，而FEC解码在**媒体面解密之前**完成。这确保了冗余数据同样具备安全性，且解密模块无需感知丢包恢复过程。\n* **流映射机制**：接收端通过RTP头中的`SSRC`字段对流入流进行解复用，并利用`ssrc-group`机制将修复流映射回对应的原始媒体流。\n* **协议协商**：FEC的使用需在通信建立前通过信令协商。双方确认支持FEC后，才会启用独立的修复流。\n\n### 3. 优势与适用场景\n* **无需往返交互**：不同于NACK重传机制，FEC不需要接收端反馈丢失信息，因此**无重传延迟**。\n* **适合高延迟或广播场景**：在RTT较大、丢包率适中，或一对多的广播/组播场景（如MBMS）中，FEC能显著降低端到端延迟并提升抗丢包能力。\n* **资源权衡**：FEC会占用额外的带宽发送冗余包。网络状况良好时可关闭以节省带宽，在丢包加剧时启用以保障媒体连续性。\n\n> 注：若您提到的 `EVP` 指代特定设备或私有协议栈，其FEC底层数学原理与上述标准一致，具体配置命令或调优参数可提供更多上下文以便进一步说明。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-16c8d077-52b1-431f-a342-75cb06bae850"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-af50256e-ba7b-4250-b96a-da78ce6c3002"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7553b145-efe5-4249-8e14-fc0e55d8ea3a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3779"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 14305062,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 5206,
+      "byte_offset": 14306159,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14311365,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14311570,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 5284,
+      "byte_offset": 14312395,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14317679,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 362,
+      "byte_offset": 14400038,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 14400400,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1611,
+      "byte_offset": 14400608,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14402219,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 14402424,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 411,
+      "byte_offset": 14402637,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-16c8d077-52b1-431f-a342-75cb06bae850"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-af50256e-ba7b-4250-b96a-da78ce6c3002"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7553b145-efe5-4249-8e14-fc0e55d8ea3a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3729"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:18:58.370483+00:00",
+    "arrival_seq": 9144,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

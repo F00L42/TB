@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n查下资源达到License扩容门限告警的维护经验\n\n\n\n最终回答：\n\n\n根据知识库检索结果，为您整理**资源达到License扩容门限告警**（通常告警ID为 `ALM-100046` 或 `ALM-10181`）的维护经验与处理指南如下：\n\n### 📊 告警基本信息\n* **告警名称**：资源达到LICENSE扩容门限\n* **告警级别**：重要告警\n* **可自动清除**：是\n\n### ⚙️ 触发与恢复机制\n* **触发条件**：\n  1. 统计持续时间内（可通过 `SET LICCTRLALM` 设置）的控制项资源数（如用户数）平均值超过扩容告警阈值。\n  2. 资源使用数单次超过License实际购买的资源数时，会立即产生此告警。\n* **恢复条件**：\n  1. 统计持续时间内的控制项资源数平均值低于扩容告警门限。\n  2. 部分产品（如UDG/CloudUDN）若连续5分钟检测到当前告警的控制项资源数没有上报，告警也会恢复。\n\n### ⚠️ 对系统的影响\n提示需要扩容。如果不及时购买更大容量的License，可能会因为License的限制而导致部分授权资源得不到服务。\n\n### 🔍 可能原因\n1. License扩容告警阈值设置过低。\n2. 申请的License的受限资源项数量较少，无法满足现网业务需求。\n\n### 🛠️ 处理步骤（维护经验）\n\n#### 1. 检查并调整License容量告警阈值\n首先确认是否因阈值设置过低导致频繁告警。\n* 执行命令 `LST LICCTRLALM` 查看License容量告警配置表。\n* 检查查询结果中“容量告警百分比(%)”是否低于 **80%**。\n  * **是**：执行 `SET LICCTRLALM` 将“容量告警百分比(%)”调整为 **80%**，随后观察告警是否恢复。\n  * **否**：进入下一步。\n\n#### 2. 申请License扩容\n若阈值设置合理仍告警，说明资源确实接近或已达上限，需申请扩容。\n* 执行命令 `DSP LICENSERES` 确认是否还有其他资源项也接近License容量，建议一并申请扩容。\n* 联系华为技术工程师或参考《License操作指导书》申请更大容量的License。\n* 获取新License后，执行相应命令（如 `ACT LICENSE`）加载并激活。\n* 在告警台查看告警是否恢复。\n\n#### 3. 联系技术支持\n若上述操作后告警仍未恢复：\n* 收集告警信息、日志信息和配置信息。\n* 联系华为技术支持进一步处理。\n\n### 📝 常用命令参考\n| 命令 | 说明 |\n|:---|:---|\n| `LST LICCTRLALM` | 查看License容量告警配置（阈值、统计时长等） |\n| `SET LICCTRLALM` | 设置License容量告警阈值及统计时长 |\n| `DSP LICENSERES` | 查询当前License资源使用情况，辅助判断需扩容的资源项 |\n\n> **注**：不同产品（如UPG、UNC、CloudUSN、UDG等）命令略有差异（例如CloudUSN使用 `LST LICALM` / `SET LICALM`），请以对应产品的MML命令手册为准。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "不同产品的License告警配置命令具体有哪些差异？\n如果调整告警阈值后告警仍未恢复，应如何进一步排查？\n申请License扩容时需要准备哪些现网信息？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1027,
+      "total_tokens": 1067,
+      "completion_tokens": 40,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1027,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 40,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1067,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 39,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n查下资源达到License扩容门限告警的维护经验\n\n\n\n最终回答：\n\n\n根据知识库检索结果，为您整理**资源达到License扩容门限告警**（通常告警ID为 `ALM-100046` 或 `ALM-10181`）的维护经验与处理指南如下：\n\n### 📊 告警基本信息\n* **告警名称**：资源达到LICENSE扩容门限\n* **告警级别**：重要告警\n* **可自动清除**：是\n\n### ⚙️ 触发与恢复机制\n* **触发条件**：\n  1. 统计持续时间内（可通过 `SET LICCTRLALM` 设置）的控制项资源数（如用户数）平均值超过扩容告警阈值。\n  2. 资源使用数单次超过License实际购买的资源数时，会立即产生此告警。\n* **恢复条件**：\n  1. 统计持续时间内的控制项资源数平均值低于扩容告警门限。\n  2. 部分产品（如UDG/CloudUDN）若连续5分钟检测到当前告警的控制项资源数没有上报，告警也会恢复。\n\n### ⚠️ 对系统的影响\n提示需要扩容。如果不及时购买更大容量的License，可能会因为License的限制而导致部分授权资源得不到服务。\n\n### 🔍 可能原因\n1. License扩容告警阈值设置过低。\n2. 申请的License的受限资源项数量较少，无法满足现网业务需求。\n\n### 🛠️ 处理步骤（维护经验）\n\n#### 1. 检查并调整License容量告警阈值\n首先确认是否因阈值设置过低导致频繁告警。\n* 执行命令 `LST LICCTRLALM` 查看License容量告警配置表。\n* 检查查询结果中“容量告警百分比(%)”是否低于 **80%**。\n  * **是**：执行 `SET LICCTRLALM` 将“容量告警百分比(%)”调整为 **80%**，随后观察告警是否恢复。\n  * **否**：进入下一步。\n\n#### 2. 申请License扩容\n若阈值设置合理仍告警，说明资源确实接近或已达上限，需申请扩容。\n* 执行命令 `DSP LICENSERES` 确认是否还有其他资源项也接近License容量，建议一并申请扩容。\n* 联系华为技术工程师或参考《License操作指导书》申请更大容量的License。\n* 获取新License后，执行相应命令（如 `ACT LICENSE`）加载并激活。\n* 在告警台查看告警是否恢复。\n\n#### 3. 联系技术支持\n若上述操作后告警仍未恢复：\n* 收集告警信息、日志信息和配置信息。\n* 联系华为技术支持进一步处理。\n\n### 📝 常用命令参考\n| 命令 | 说明 |\n|:---|:---|\n| `LST LICCTRLALM` | 查看License容量告警配置（阈值、统计时长等） |\n| `SET LICCTRLALM` | 设置License容量告警阈值及统计时长 |\n| `DSP LICENSERES` | 查询当前License资源使用情况，辅助判断需扩容的资源项 |\n\n> **注**：不同产品（如UPG、UNC、CloudUSN、UDG等）命令略有差异（例如CloudUSN使用 `LST LICALM` / `SET LICALM`），请以对应产品的MML命令手册为准。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-3509a0b9-f940-4463-8ad4-5c97af6782c8"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f36783d1-c864-4b9c-abb5-62fa4f84e701"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a017946e-2fc9-4408-8cc0-d143dcf9d98e"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4338"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 2640599,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 5954,
+      "byte_offset": 2641696,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2647650,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 2647855,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 6028,
+      "byte_offset": 2648680,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 2654708,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 2918798,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 2919159,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1379,
+      "byte_offset": 2919367,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2920746,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 2920951,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 2921164,
+      "path": "archive/2026-10-12/11/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-3509a0b9-f940-4463-8ad4-5c97af6782c8"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f36783d1-c864-4b9c-abb5-62fa4f84e701"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-a017946e-2fc9-4408-8cc0-d143dcf9d98e"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4288"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T11:08:13.934913+00:00",
+    "arrival_seq": 6406,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/11"
+  }
+}

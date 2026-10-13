@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n#### （2）根因定位步骤  \n\n\n\n最终回答：\n#### （2）根因定位步骤\n\n**步骤1：资源负载与队列积压验证**\n- 拉取 `21:40-22:10` AMF控制面资源监控曲线，核对CPU/内存利用率是否命中**剧烈波动**（30分钟内>15%）或**大幅波动**（1小时内>20%）阈值。\n- 查询AMF消息队列长度、丢弃计数及PFCP异常会话缓存记录，确认是否因瞬时请求激增导致队列积压与无效连接占用。\n\n**步骤2：协议层重传与信令Trace分析**\n- 导出N2接口HTTP2/NG-AP信令跟踪（过滤`SID=100072`），统计 `Initial UE Message`、`N2 Setup Response` 等关键消息的丢失、乱序与重复率。\n- 关联 `ALM-238690120` 重传告警，定位重传触发源；验证对端gNB/UPF是否因New Calling扩展IE解析失败或安全校验异常导致静默丢弃。\n\n**步骤3：定时器与阈值匹配度校验**\n- 执行配置查询，提取 `T3560`（N2异常检测定时器）、HTTP2 STREAM超时及重传退避参数。\n- 对比告警时段现网RTT分布与业务处理耗时，判断是否因定时器配置过短引发误判，进而触发重试风暴与级联超时。\n\n**步骤4：切片策略与对端状态核对**\n- 比对 `SID=100072` 网络切片策略与UPF放行规则，确认UPF侧是否未放行New Calling特定QCI/业务流。\n- 同步核查对端gNB/UPF在 `21:58` 前后的链路状态、证书有效期及版本兼容性，排除对端处理瓶颈或策略拦截。\n\n**步骤5：根因收敛与结论输出**\n- 综合资源曲线、信令Trace、定时器配置与策略核对结果，收敛主因（如：突发流量引发剧烈波动+T3560过短触发重试风暴/切片策略不一致导致信令拦截/协议扩展字段不兼容）。\n- 输出根因结论，制定修复方案（阈值调优/策略同步/版本对齐/缓存清理），并设定验证观察期。\n\n如需输出 `#### （3）修复方案与验证计划` 或提供具体MML/CLI排查命令，请回复序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "生成修复方案与验证计划\n提供本场景对应的MML/CLI排查命令\n输出各步骤的关键监控指标正常阈值参考表",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 816,
+      "total_tokens": 845,
+      "completion_tokens": 29,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 816,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 29,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 845,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 28,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n#### （2）根因定位步骤  \n\n\n\n最终回答：\n#### （2）根因定位步骤\n\n**步骤1：资源负载与队列积压验证**\n- 拉取 `21:40-22:10` AMF控制面资源监控曲线，核对CPU/内存利用率是否命中**剧烈波动**（30分钟内>15%）或**大幅波动**（1小时内>20%）阈值。\n- 查询AMF消息队列长度、丢弃计数及PFCP异常会话缓存记录，确认是否因瞬时请求激增导致队列积压与无效连接占用。\n\n**步骤2：协议层重传与信令Trace分析**\n- 导出N2接口HTTP2/NG-AP信令跟踪（过滤`SID=100072`），统计 `Initial UE Message`、`N2 Setup Response` 等关键消息的丢失、乱序与重复率。\n- 关联 `ALM-238690120` 重传告警，定位重传触发源；验证对端gNB/UPF是否因New Calling扩展IE解析失败或安全校验异常导致静默丢弃。\n\n**步骤3：定时器与阈值匹配度校验**\n- 执行配置查询，提取 `T3560`（N2异常检测定时器）、HTTP2 STREAM超时及重传退避参数。\n- 对比告警时段现网RTT分布与业务处理耗时，判断是否因定时器配置过短引发误判，进而触发重试风暴与级联超时。\n\n**步骤4：切片策略与对端状态核对**\n- 比对 `SID=100072` 网络切片策略与UPF放行规则，确认UPF侧是否未放行New Calling特定QCI/业务流。\n- 同步核查对端gNB/UPF在 `21:58` 前后的链路状态、证书有效期及版本兼容性，排除对端处理瓶颈或策略拦截。\n\n**步骤5：根因收敛与结论输出**\n- 综合资源曲线、信令Trace、定时器配置与策略核对结果，收敛主因（如：突发流量引发剧烈波动+T3560过短触发重试风暴/切片策略不一致导致信令拦截/协议扩展字段不兼容）。\n- 输出根因结论，制定修复方案（阈值调优/策略同步/版本对齐/缓存清理），并设定验证观察期。\n\n如需输出 `#### （3）修复方案与验证计划` 或提供具体MML/CLI排查命令，请回复序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e5e9ab06-bf17-4bad-8201-5299dcc1417d"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-69fcf872-c120-4410-8216-0941c1bbbb0a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3449"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 4582211,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 4766,
+      "byte_offset": 4583308,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4588074,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 4588279,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 4844,
+      "byte_offset": 4589104,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4593948,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4602598,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4602959,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1295,
+      "byte_offset": 4603167,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4604462,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4604667,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4604880,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e5e9ab06-bf17-4bad-8201-5299dcc1417d"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-69fcf872-c120-4410-8216-0941c1bbbb0a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3399"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:08:15.860023+00:00",
+    "arrival_seq": 3625,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

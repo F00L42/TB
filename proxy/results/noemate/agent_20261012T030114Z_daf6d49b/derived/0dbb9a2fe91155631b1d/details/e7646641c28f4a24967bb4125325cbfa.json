@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n   - 查询时段内 `unc1224` 的告警历史，未发现直接关联的硬告警（如 CPUSW、CPURSW、OMS 等）。  \n\n\n\n最终回答：\n\n\n### 2. 告警关联分析结论\n\n#### （1）硬告警排查结果\n- `12:00~12:30` 时段 `unc1224` 无 `CPUSW`、`CPURSW`、`OMS` 等硬告警，**排除硬件故障、进程崩溃、主板级异常**等严重故障。\n\n#### （2）隐性故障导向\n无硬告警但附着成功率暴跌至 `58.3%`（排除用户原因后），表明故障源于 **软性性能瓶颈或交互异常**，需聚焦以下维度：\n| 排查方向 | 典型特征 | 验证手段 |\n|:---|:---|:---|\n| **接口质量劣化** | S1-MME/Gs接口丢包、时延抖动、隐性拥塞，未触发断链告警 | 接口抓包、QoS监控、对端链路健康度检查 |\n| **控制面软拥塞** | 瞬时信令突增导致队列堆积、处理超时，未达资源告警阈值 | 检查消息队列深度、处理时延分布、License配额使用率 |\n| **签约/路由数据异常** | 部分TAI/IMSI段路由错误或签约同步延迟，引发批量拒绝 | 核对HSS/UDM同步日志、路由表生效时间、Cause Code分布 |\n| **对端节点软故障** | SGSN（GPRS业务支撑节点）或MME处理能力瓶颈、策略拦截 | 查询对端KPI、告警历史、接口拒绝统计 |\n\n#### （3）下一步排查动作\n1. **信令Cause Code统计**：导出 `12:00~12:30` 附着拒绝原因值，若集中出现 `#11（RAU rejected）`、`#15（NAS signaling failure）` 或 `#39（MAC failure）`，可精准定位故障环节。\n2. **接口质量核查**：抓取 S1-MME/Gs 接口流量，计算丢包率与时延百分位（P95/P99），确认是否存在隐性传输劣化。\n3. **对端状态同步**：核查对接的 SGSN（GPRS业务支撑节点）与 MME 在相同时段是否有性能下滑或策略调整记录。\n4. **配置变更审计**：确认 `11:00~12:30` 是否有路由更新、TAI映射调整、License扩容或版本热补丁操作。\n\n提供信令统计或接口质量数据后，将立即输出根因结论与恢复指引。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "导出12:00~12:30附着拒绝信令的Cause Code分布统计\n抓取S1-MME/Gs接口流量并计算丢包率与时延百分位\n核查对接SGSN与MME在相同时段的性能指标及策略变更",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 872,
+      "total_tokens": 930,
+      "completion_tokens": 58,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 872,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 58,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 930,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 57,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n   - 查询时段内 `unc1224` 的告警历史，未发现直接关联的硬告警（如 CPUSW、CPURSW、OMS 等）。  \n\n\n\n最终回答：\n\n\n### 2. 告警关联分析结论\n\n#### （1）硬告警排查结果\n- `12:00~12:30` 时段 `unc1224` 无 `CPUSW`、`CPURSW`、`OMS` 等硬告警，**排除硬件故障、进程崩溃、主板级异常**等严重故障。\n\n#### （2）隐性故障导向\n无硬告警但附着成功率暴跌至 `58.3%`（排除用户原因后），表明故障源于 **软性性能瓶颈或交互异常**，需聚焦以下维度：\n| 排查方向 | 典型特征 | 验证手段 |\n|:---|:---|:---|\n| **接口质量劣化** | S1-MME/Gs接口丢包、时延抖动、隐性拥塞，未触发断链告警 | 接口抓包、QoS监控、对端链路健康度检查 |\n| **控制面软拥塞** | 瞬时信令突增导致队列堆积、处理超时，未达资源告警阈值 | 检查消息队列深度、处理时延分布、License配额使用率 |\n| **签约/路由数据异常** | 部分TAI/IMSI段路由错误或签约同步延迟，引发批量拒绝 | 核对HSS/UDM同步日志、路由表生效时间、Cause Code分布 |\n| **对端节点软故障** | SGSN（GPRS业务支撑节点）或MME处理能力瓶颈、策略拦截 | 查询对端KPI、告警历史、接口拒绝统计 |\n\n#### （3）下一步排查动作\n1. **信令Cause Code统计**：导出 `12:00~12:30` 附着拒绝原因值，若集中出现 `#11（RAU rejected）`、`#15（NAS signaling failure）` 或 `#39（MAC failure）`，可精准定位故障环节。\n2. **接口质量核查**：抓取 S1-MME/Gs 接口流量，计算丢包率与时延百分位（P95/P99），确认是否存在隐性传输劣化。\n3. **对端状态同步**：核查对接的 SGSN（GPRS业务支撑节点）与 MME 在相同时段是否有性能下滑或策略调整记录。\n4. **配置变更审计**：确认 `11:00~12:30` 是否有路由更新、TAI映射调整、License扩容或版本热补丁操作。\n\n提供信令统计或接口质量数据后，将立即输出根因结论与恢复指引。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-63256240-f8ca-44cd-8f07-58dc545669e5"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-889a4d87-65fe-4e89-86d3-d40e42c66591"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-fd9e6f45-728c-4002-9991-206982324c06"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3524"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 13961800,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 4866,
+      "byte_offset": 13962897,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13967763,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 13967968,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 4944,
+      "byte_offset": 13968793,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 13973737,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 14013426,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 14013787,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 1371,
+      "byte_offset": 14013995,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14015366,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 14015571,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 14015784,
+      "path": "archive/2026-10-12/07/part-00027.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-63256240-f8ca-44cd-8f07-58dc545669e5"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-889a4d87-65fe-4e89-86d3-d40e42c66591"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-fd9e6f45-728c-4002-9991-206982324c06"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3474"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:59:14.765088+00:00",
+    "arrival_seq": 3487,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

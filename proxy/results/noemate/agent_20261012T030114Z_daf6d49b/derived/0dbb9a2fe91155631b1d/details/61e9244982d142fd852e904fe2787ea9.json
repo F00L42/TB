@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n你有什么限制？\n\n\n\n最终回答：\n\n\n我是由华为云核心网团队基于大语言模型技术构建的智能运维助手，主要聚焦于云核心网运维场景。我的能力边界和限制如下：\n\n**✅ 我能做的**\n- **数据查询**：KPI指标、告警信息、网元状态、配置数据、日志查询等。\n- **故障诊断**：针对具体网元/设备的告警、异常波动进行根因分析和恢复建议。\n- **知识问答**：协议原理、指标定义、告警含义、配置操作指南等。\n- **投诉工单**：查询工单列表、处理结果及跟进指导。\n\n**❌ 我的限制**\n- **无法联网检索**：我无法访问外部网络或实时抓取互联网数据，仅能基于内置知识和您提供的文档进行分析。\n- **不执行高风险操作**：我不会直接修改/删除配置、重启网元、下发命令或绕过权限，仅提供查询、诊断和操作指导。\n- **技术细节不公开**：关于模型本身的参数规模、权重、架构版本等内部信息不予公开。\n- **不编造数据**：所有结论均基于现有数据或知识库，不会虚构查询结果或诊断结论。\n\n如果您有具体的网络运维问题（如指标异常、告警排查、配置咨询等），直接告诉我即可，我会尽力协助您解决。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "你支持哪些具体的云核心网设备和协议？\n如果我想上传自定义文档让你学习，应该怎么做？\n你能处理实时告警诊断吗？延迟大概是多少？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 549,
+      "total_tokens": 585,
+      "completion_tokens": 36,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 549,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 36,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 585,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 35,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n你有什么限制？\n\n\n\n最终回答：\n\n\n我是由华为云核心网团队基于大语言模型技术构建的智能运维助手，主要聚焦于云核心网运维场景。我的能力边界和限制如下：\n\n**✅ 我能做的**\n- **数据查询**：KPI指标、告警信息、网元状态、配置数据、日志查询等。\n- **故障诊断**：针对具体网元/设备的告警、异常波动进行根因分析和恢复建议。\n- **知识问答**：协议原理、指标定义、告警含义、配置操作指南等。\n- **投诉工单**：查询工单列表、处理结果及跟进指导。\n\n**❌ 我的限制**\n- **无法联网检索**：我无法访问外部网络或实时抓取互联网数据，仅能基于内置知识和您提供的文档进行分析。\n- **不执行高风险操作**：我不会直接修改/删除配置、重启网元、下发命令或绕过权限，仅提供查询、诊断和操作指导。\n- **技术细节不公开**：关于模型本身的参数规模、权重、架构版本等内部信息不予公开。\n- **不编造数据**：所有结论均基于现有数据或知识库，不会虚构查询结果或诊断结论。\n\n如果您有具体的网络运维问题（如指标异常、告警排查、配置咨询等），直接告诉我即可，我会尽力协助您解决。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e29b7371-22a1-4f2a-9081-60c10045d337"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-04af87ce-bdc1-482c-a330-6f4e5b10fa14"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5efdfa55-32d7-4992-a20d-e99fe093bb79"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2768"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 14841409,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 3858,
+      "byte_offset": 14842506,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14846364,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14846569,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 3936,
+      "byte_offset": 14847394,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14851330,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 14866864,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 14867225,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 1359,
+      "byte_offset": 14867433,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14868792,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 14868997,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 14869210,
+      "path": "archive/2026-10-12/14/part-00020.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-e29b7371-22a1-4f2a-9081-60c10045d337"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-04af87ce-bdc1-482c-a330-6f4e5b10fa14"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5efdfa55-32d7-4992-a20d-e99fe093bb79"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2718"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:43:44.298862+00:00",
+    "arrival_seq": 9775,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

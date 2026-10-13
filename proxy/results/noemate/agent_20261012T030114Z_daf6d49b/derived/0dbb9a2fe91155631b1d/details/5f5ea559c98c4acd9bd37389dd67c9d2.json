@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nNF退出服务告警如何处理\n\n\n\n最终回答：\n根据知识库信息，您询问的“NF退出服务告警”通常对应 **ALM-20226 网元退出服务**（在不同产品中可能略有差异，如USC、SPS、UPG、ATS等）。该告警为**紧急告警**，表示网元已被去激活，对应业务不可用。\n\n### 🔍 告警说明\n- **触发原因**：维护人员在客户端执行了 `MOD SYSRM` 命令将网元设置为“非激活”状态，或网元因亚健康故障被主动退服。\n- **对系统影响**：网元对应的业务全部不可用（正在进行的呼叫通常不会中断，但新接入的业务会失败）。\n\n---\n\n### 🛠️ 处理步骤\n\n#### 1. 确认退服是否为预期操作\n- 如果是例行维护、割接或亚健康保护导致的主动退服，请跳过至步骤 2。\n- 如果是意外退服，请检查是否有相关操作记录或亚健康告警。\n\n#### 2. 重新激活网元\n根据告警信息中的**业务类型**，在对应的 MML 命令行窗口执行激活命令：\n```bash\nMOD SYSRM\n```\n- 将“运行模式”设置为 **激活（Active）**。\n- 执行后，网元会重新上线并恢复对外提供服务。\n\n#### 3. 验证告警是否恢复\n- 执行激活命令后，观察告警台。该告警支持**自动清除**，网元激活成功后应自动恢复。\n- ✅ **已恢复** → 处理完毕。\n- ❌ **未恢复** → 执行步骤 4。\n\n#### 4. 进一步排查\n如果激活后告警仍未清除，或网元无法激活：\n1. 检查网元是否存在底层资源故障、链路中断或亚健康状态未恢复。\n2. 检查系统日志，确认是否有其他关联告警（如链路故障、资源过载等）。\n3. 收集告警信息、运行日志和配置数据，**联系华为技术支持**处理。\n\n---\n\n### 📌 注意事项\n- 不同网元类型（如 STP、DRA、SCP、NRF 等）激活后，相关链路（MTP、Diameter、HTTP 等）会自动恢复，客户端会重新发起建链。\n- 若激活前存在被去激活的链路，激活后需根据原规划手动处理链路状态。\n- 操作 `MOD SYSRM` 涉及业务中断，请在维护窗口期执行，并提前做好业务影响评估。\n\n如需针对具体网元（如 AMF、UDM、SCP 等）的详细命令参数，可提供具体产品类型，我将为您补充对应操作指南。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何判断网元退服是主动维护操作还是意外故障触发？\n执行MOD SYSRM激活命令后告警未自动清除该如何进一步排查？\n不同网元类型激活后链路恢复机制有何差异及手动干预要点？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 855,
+      "total_tokens": 905,
+      "completion_tokens": 50,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 855,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 50,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 905,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 49,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nNF退出服务告警如何处理\n\n\n\n最终回答：\n根据知识库信息，您询问的“NF退出服务告警”通常对应 **ALM-20226 网元退出服务**（在不同产品中可能略有差异，如USC、SPS、UPG、ATS等）。该告警为**紧急告警**，表示网元已被去激活，对应业务不可用。\n\n### 🔍 告警说明\n- **触发原因**：维护人员在客户端执行了 `MOD SYSRM` 命令将网元设置为“非激活”状态，或网元因亚健康故障被主动退服。\n- **对系统影响**：网元对应的业务全部不可用（正在进行的呼叫通常不会中断，但新接入的业务会失败）。\n\n---\n\n### 🛠️ 处理步骤\n\n#### 1. 确认退服是否为预期操作\n- 如果是例行维护、割接或亚健康保护导致的主动退服，请跳过至步骤 2。\n- 如果是意外退服，请检查是否有相关操作记录或亚健康告警。\n\n#### 2. 重新激活网元\n根据告警信息中的**业务类型**，在对应的 MML 命令行窗口执行激活命令：\n```bash\nMOD SYSRM\n```\n- 将“运行模式”设置为 **激活（Active）**。\n- 执行后，网元会重新上线并恢复对外提供服务。\n\n#### 3. 验证告警是否恢复\n- 执行激活命令后，观察告警台。该告警支持**自动清除**，网元激活成功后应自动恢复。\n- ✅ **已恢复** → 处理完毕。\n- ❌ **未恢复** → 执行步骤 4。\n\n#### 4. 进一步排查\n如果激活后告警仍未清除，或网元无法激活：\n1. 检查网元是否存在底层资源故障、链路中断或亚健康状态未恢复。\n2. 检查系统日志，确认是否有其他关联告警（如链路故障、资源过载等）。\n3. 收集告警信息、运行日志和配置数据，**联系华为技术支持**处理。\n\n---\n\n### 📌 注意事项\n- 不同网元类型（如 STP、DRA、SCP、NRF 等）激活后，相关链路（MTP、Diameter、HTTP 等）会自动恢复，客户端会重新发起建链。\n- 若激活前存在被去激活的链路，激活后需根据原规划手动处理链路状态。\n- 操作 `MOD SYSRM` 涉及业务中断，请在维护窗口期执行，并提前做好业务影响评估。\n\n如需针对具体网元（如 AMF、UDM、SCP 等）的详细命令参数，可提供具体产品类型，我将为您补充对应操作指南。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-79444a87-bc24-4d80-b620-44e70edc4fab"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-961da4c3-28d9-40d9-acb6-1b42b5fabbf2"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-700ec749-aa0a-430c-92f3-828d2ec961ed"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3800"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 15719037,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 5234,
+      "byte_offset": 15720134,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15725368,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 15725573,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 5312,
+      "byte_offset": 15726398,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 15731710,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 16279623,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 16279984,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 1427,
+      "byte_offset": 16280192,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 16281619,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 16281824,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 16282037,
+      "path": "archive/2026-10-12/13/part-00015.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-79444a87-bc24-4d80-b620-44e70edc4fab"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-961da4c3-28d9-40d9-acb6-1b42b5fabbf2"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-700ec749-aa0a-430c-92f3-828d2ec961ed"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3750"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:37:39.010498+00:00",
+    "arrival_seq": 8142,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

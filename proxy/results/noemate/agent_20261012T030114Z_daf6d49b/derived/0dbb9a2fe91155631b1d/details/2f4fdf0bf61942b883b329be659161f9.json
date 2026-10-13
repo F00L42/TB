@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n关联告警与根因分析\n\n\n\n最终回答：\n\n\n以下是 **关联告警与根因分析** 的结构化框架，已对齐您的术语映射与运维场景。请补充具体告警ID或确认现有内容，以便归档：\n\n### 🔗 关联告警矩阵\n| 告警编号 | 告警名称 | 关联类型 | 触发逻辑 |\n|:---|:---|:---|:---|\n| `ALM-CPU-High` / `ALM-Mem-High` | CPU/内存使用率超标 | **直接触发** | 资源使用率突破预设阈值（CPU>85%、内存>90%） |\n| `ALM-Session-Fail` | 会话建立失败率超标 | **业务衍生** | SMF资源耗尽导致新PDU会话拒绝，失败率>1% |\n| `ALM-Envoy-PoolFull` | 代理服务器连接池耗尽 | **组件级联** | Envoy线程/连接数打满，转发RTT劣化引发信令积压 |\n| `ALM-UPF-ResFail` | UPF资源分配失败 | **下游级联** | SMF无法下发会话策略，UPF拒绝分配隧道资源 |\n| `ALM-AMF-RouteErr` | AMF路由/注册异常 | **上游级联** | SMF实例不可达，AMF切换路由或触发保护倒换 |\n\n### 🔍 根因分析树\n| 根因类别 | 典型场景 | 验证方法 |\n|:---|:---|:---|\n| **1. 业务负载激增** | 节假日/赛事直播突发话务，会话请求超设计容量30%+ | 核对话务监控曲线，确认是否匹配**剧烈波动**（30min>15%）或**环比异常**（±20%） |\n| **2. 资源规划不足** | 实例规格未随现网增长动态调整，单实例会话上限偏低 | 对比容量评估报告与现网峰值，检查弹性扩容策略是否生效 |\n| **3. 配置错误** | 会话上限误配、告警阈值过敏、负载均衡权重偏差 | 导出SMF配置快照，核对阈值参数与路由策略 |\n| **4. 硬件/性能瓶颈** | CPU/内存物理规格触顶，或未启用负载均衡分流 | 检查硬件健康状态、RAID磁盘组I/O、网卡带宽利用率 |\n| **5. 软件/算法缺陷** | 会话上下文泄漏、冗余QoS策略计算、代理服务器调优不足 | 分析核心转储日志、会话生命周期追踪、Envoy性能快照 |\n\n---\n💡 **下一步建议**：\n- 补充现网具体的关联告警ID（如 `ALM-4012`、`ALM-5007` 等）\n- 确认根因类别中需重点排查的项（如配置校验/容量评估/算法优化）\n- 回复 `生成完整档案` 输出标准化案例文档（含SOP、指标表格、降噪策略）\n\n请提供补充信息或直接指令。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何基于现有告警ID自动匹配关联告警矩阵中的触发逻辑？\n根因分析树中各类别验证方法所需的数据源和采集频率是什么？\n生成完整档案时需要包含哪些具体的SOP步骤和指标表格模板？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 944,
+      "total_tokens": 995,
+      "completion_tokens": 51,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 944,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 51,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 995,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 50,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n关联告警与根因分析\n\n\n\n最终回答：\n\n\n以下是 **关联告警与根因分析** 的结构化框架，已对齐您的术语映射与运维场景。请补充具体告警ID或确认现有内容，以便归档：\n\n### 🔗 关联告警矩阵\n| 告警编号 | 告警名称 | 关联类型 | 触发逻辑 |\n|:---|:---|:---|:---|\n| `ALM-CPU-High` / `ALM-Mem-High` | CPU/内存使用率超标 | **直接触发** | 资源使用率突破预设阈值（CPU>85%、内存>90%） |\n| `ALM-Session-Fail` | 会话建立失败率超标 | **业务衍生** | SMF资源耗尽导致新PDU会话拒绝，失败率>1% |\n| `ALM-Envoy-PoolFull` | 代理服务器连接池耗尽 | **组件级联** | Envoy线程/连接数打满，转发RTT劣化引发信令积压 |\n| `ALM-UPF-ResFail` | UPF资源分配失败 | **下游级联** | SMF无法下发会话策略，UPF拒绝分配隧道资源 |\n| `ALM-AMF-RouteErr` | AMF路由/注册异常 | **上游级联** | SMF实例不可达，AMF切换路由或触发保护倒换 |\n\n### 🔍 根因分析树\n| 根因类别 | 典型场景 | 验证方法 |\n|:---|:---|:---|\n| **1. 业务负载激增** | 节假日/赛事直播突发话务，会话请求超设计容量30%+ | 核对话务监控曲线，确认是否匹配**剧烈波动**（30min>15%）或**环比异常**（±20%） |\n| **2. 资源规划不足** | 实例规格未随现网增长动态调整，单实例会话上限偏低 | 对比容量评估报告与现网峰值，检查弹性扩容策略是否生效 |\n| **3. 配置错误** | 会话上限误配、告警阈值过敏、负载均衡权重偏差 | 导出SMF配置快照，核对阈值参数与路由策略 |\n| **4. 硬件/性能瓶颈** | CPU/内存物理规格触顶，或未启用负载均衡分流 | 检查硬件健康状态、RAID磁盘组I/O、网卡带宽利用率 |\n| **5. 软件/算法缺陷** | 会话上下文泄漏、冗余QoS策略计算、代理服务器调优不足 | 分析核心转储日志、会话生命周期追踪、Envoy性能快照 |\n\n---\n💡 **下一步建议**：\n- 补充现网具体的关联告警ID（如 `ALM-4012`、`ALM-5007` 等）\n- 确认根因类别中需重点排查的项（如配置校验/容量评估/算法优化）\n- 回复 `生成完整档案` 输出标准化案例文档（含SOP、指标表格、降噪策略）\n\n请提供补充信息或直接指令。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a4fe44b7-fe06-4a15-b2d4-eba6d7e48703"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-b192c2e0-2cf7-4450-adb9-02564ae8d4b7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-aa5cfb47-b837-475d-8f2d-274ba7943597"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3795"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10900479,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 5230,
+      "byte_offset": 10901576,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10906806,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10907011,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 5304,
+      "byte_offset": 10907836,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10913140,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10960648,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10961009,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 1439,
+      "byte_offset": 10961217,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10962656,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10962861,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10963074,
+      "path": "archive/2026-10-12/09/part-00007.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a4fe44b7-fe06-4a15-b2d4-eba6d7e48703"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-b192c2e0-2cf7-4450-adb9-02564ae8d4b7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-aa5cfb47-b837-475d-8f2d-274ba7943597"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3745"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:10:40.853093+00:00",
+    "arrival_seq": 4590,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

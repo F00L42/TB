@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n用户面平均吞吐量\n\n\n\n最终回答：\n\n\n在5GC及核心网用户面性能指标中，“用户面平均吞吐量”主要分为**指定POD级别**和**整机级别**两个核心指标。具体定义如下：\n\n### 1. 用户平面指定POD的平均吞吐量 (指标ID: 1914318400)\n该指标用于统计在一个测量周期结束时，当前指定POD的平均吞吐量，主要用于判断License资源使用状况，为业务调整和扩容提供依据。\n* **适用形态**：SGW-U、PGW-U、UPF、CloudEPSN-U等。\n* **单位**：千字节/秒 (KB/s)\n* **计算公式**：\n  `用户平面指定POD平均吞吐量 = (RecvUpKB + SendDnKB) / t`\n  * `RecvUpKB`：用户平面指定POD接收的上行用户面报文千字节数。\n  * `SendDnKB`：用户平面指定POD发送的下行用户面报文千字节数。\n  * `t`：统计周期。\n\n### 2. 用户平面整机平均吞吐量 (指标ID: 1914307560)\n该指标用于统计在一个测量周期结束时，当前整机的平均吞吐量。除了基础上下行报文外，整机指标通常还包含间接转发、MBS会话、宽带集群群组等报文统计。\n* **适用形态**：SGW-U、PGW-U、UPF、CloudEPSN-U等。\n* **单位**：千字节/秒 (KB/s)\n* **计算公式**：\n  `用户平面整机平均吞吐量 = (RecvUpKB + SendDnKB + SendDnBtruncKB + SendDnMbsKB + RecvS1UInKB + SendS1UInKB + RecvN3InKB + SendN3InKB) / t`\n  * 基础变量同上，额外变量包括发送宽带集群群组下行报文、发送MBS会话下行报文、S1-U/N3接口接收和发送的间接转发报文千字节数等。\n\n### 💡 现网运维相关说明\n* **波动阈值**：现网中连续两天同一个周期的指标测量值波动范围通常**不大于10%**。若超过该范围，需要进行重点关注和排查。\n* **异常排查建议**：\n  1. 检查激活成功率，与上一周同时期相比是否有突变。\n  2. 逐个APN进行排查，确认该指标对应的Session数是否有突变。\n  3. 若上述排查未发现异常，建议联系技术支持进一步分析。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "用户面平均吞吐量的统计周期t具体是多长时间？\n如果现网中用户面平均吞吐量波动超过10%，应如何具体排查？\n间接转发报文在用户面平均吞吐量中的占比通常是多少？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 825,
+      "total_tokens": 871,
+      "completion_tokens": 46,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 825,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 46,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 871,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 45,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n用户面平均吞吐量\n\n\n\n最终回答：\n\n\n在5GC及核心网用户面性能指标中，“用户面平均吞吐量”主要分为**指定POD级别**和**整机级别**两个核心指标。具体定义如下：\n\n### 1. 用户平面指定POD的平均吞吐量 (指标ID: 1914318400)\n该指标用于统计在一个测量周期结束时，当前指定POD的平均吞吐量，主要用于判断License资源使用状况，为业务调整和扩容提供依据。\n* **适用形态**：SGW-U、PGW-U、UPF、CloudEPSN-U等。\n* **单位**：千字节/秒 (KB/s)\n* **计算公式**：\n  `用户平面指定POD平均吞吐量 = (RecvUpKB + SendDnKB) / t`\n  * `RecvUpKB`：用户平面指定POD接收的上行用户面报文千字节数。\n  * `SendDnKB`：用户平面指定POD发送的下行用户面报文千字节数。\n  * `t`：统计周期。\n\n### 2. 用户平面整机平均吞吐量 (指标ID: 1914307560)\n该指标用于统计在一个测量周期结束时，当前整机的平均吞吐量。除了基础上下行报文外，整机指标通常还包含间接转发、MBS会话、宽带集群群组等报文统计。\n* **适用形态**：SGW-U、PGW-U、UPF、CloudEPSN-U等。\n* **单位**：千字节/秒 (KB/s)\n* **计算公式**：\n  `用户平面整机平均吞吐量 = (RecvUpKB + SendDnKB + SendDnBtruncKB + SendDnMbsKB + RecvS1UInKB + SendS1UInKB + RecvN3InKB + SendN3InKB) / t`\n  * 基础变量同上，额外变量包括发送宽带集群群组下行报文、发送MBS会话下行报文、S1-U/N3接口接收和发送的间接转发报文千字节数等。\n\n### 💡 现网运维相关说明\n* **波动阈值**：现网中连续两天同一个周期的指标测量值波动范围通常**不大于10%**。若超过该范围，需要进行重点关注和排查。\n* **异常排查建议**：\n  1. 检查激活成功率，与上一周同时期相比是否有突变。\n  2. 逐个APN进行排查，确认该指标对应的Session数是否有突变。\n  3. 若上述排查未发现异常，建议联系技术支持进一步分析。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-110e59c9-4942-4170-bb8f-604ae40c89ba"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-4af5f905-f7b4-4ea7-aff6-5ab894ee29b1"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-09802079-506c-420c-a723-c9f97c7b05f6"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3504"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1095,
+      "byte_offset": 5857670,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 4842,
+      "byte_offset": 5858765,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5863607,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5863812,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 4916,
+      "byte_offset": 5864637,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5869553,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 5894471,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 5894832,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1411,
+      "byte_offset": 5895040,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5896451,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 5896656,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 5896869,
+      "path": "archive/2026-10-12/03/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-110e59c9-4942-4170-bb8f-604ae40c89ba"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-4af5f905-f7b4-4ea7-aff6-5ab894ee29b1"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-09802079-506c-420c-a723-c9f97c7b05f6"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3454"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T03:16:23.200061+00:00",
+    "arrival_seq": 22,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/03"
+  }
+}

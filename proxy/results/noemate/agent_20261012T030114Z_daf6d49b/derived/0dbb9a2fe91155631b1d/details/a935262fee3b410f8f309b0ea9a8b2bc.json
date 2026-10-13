@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n解释下Video Service Platform\n\n\n\n最终回答：\n\n\n基于华为网络安全产品文档，**Video Service Platform（视频安全管理平台）** 是摄像头安全管理解决方案中的核心管控组件，主要用于实现摄像头的集中管理与安全接入管控。\n\n以下是其核心能力与工作机制的详细说明：\n\n### 1. 核心定位与功能\n* **集中化管理**：对网络中的摄像头设备进行统一注册、资产管理和状态监控。\n* **安全接入管控**：防止非法设备私接或伪装的摄像头接入内网，保障视频传输链路的安全。\n* **策略统一下发**：作为解决方案的控制面，接管业务配置并自动向底层网络设备（如防火墙 FW）下发安全策略。\n\n### 2. 与防火墙（FW）的协同机制\n在典型架构中，视频安全管理平台通过 **RESTCONF 接口** 与防火墙（如 Eudemon 系列）对接，主要协同流程如下：\n* **开启视频网关模式**：平台配置 FW 对接参数后，会自动下发 `video service enable` 命令，将 FW 切换至视频网关模式。\n* **安全策略接管**：FW 切换模式后，原有安全策略会被清除，并由平台自动下发预置的 6 条解决方案安全策略。后续所有策略匹配条件的填充与更新均由平台统一管控，禁止在 FW 端手工配置。\n* **认证模式配置**：平台可下发 `device authentication-mode` 命令，配置摄像头接入认证模式（IP认证、MAC认证或 IP-MAC 绑定认证），确保只有准入资产范围内的摄像头才能上线。\n\n### 3. 配置影响与注意事项\n* **策略匹配逻辑变更**：开启视频网关模式后，安全策略的“应用”匹配条件会变更为“排除应用”（即匹配配置应用的流量无法匹配该策略，仅放行非配置应用范围内的流量）。\n* **配置备份机制**：FW 在切换模式前会自动备份原配置文件（`before_video_device_gw.cfg`），若误操作可通过该文件回退。\n* **运维建议**：该场景下的业务配置应以视频安全管理平台为准，常规情况下无需登录 FW 命令行手动执行相关 `iot` 视图命令。\n\n如需了解具体的接口对接参数、策略填充规则或故障排查方法，可提供具体场景进一步说明。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "视频安全管理平台支持哪些具体的摄像头接入认证模式？\n开启视频网关模式后，防火墙的安全策略匹配逻辑发生了哪些具体变化？\n如果误操作开启了视频网关模式，如何通过备份文件回退配置？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 741,
+      "total_tokens": 786,
+      "completion_tokens": 45,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 741,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 45,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 786,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 44,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n解释下Video Service Platform\n\n\n\n最终回答：\n\n\n基于华为网络安全产品文档，**Video Service Platform（视频安全管理平台）** 是摄像头安全管理解决方案中的核心管控组件，主要用于实现摄像头的集中管理与安全接入管控。\n\n以下是其核心能力与工作机制的详细说明：\n\n### 1. 核心定位与功能\n* **集中化管理**：对网络中的摄像头设备进行统一注册、资产管理和状态监控。\n* **安全接入管控**：防止非法设备私接或伪装的摄像头接入内网，保障视频传输链路的安全。\n* **策略统一下发**：作为解决方案的控制面，接管业务配置并自动向底层网络设备（如防火墙 FW）下发安全策略。\n\n### 2. 与防火墙（FW）的协同机制\n在典型架构中，视频安全管理平台通过 **RESTCONF 接口** 与防火墙（如 Eudemon 系列）对接，主要协同流程如下：\n* **开启视频网关模式**：平台配置 FW 对接参数后，会自动下发 `video service enable` 命令，将 FW 切换至视频网关模式。\n* **安全策略接管**：FW 切换模式后，原有安全策略会被清除，并由平台自动下发预置的 6 条解决方案安全策略。后续所有策略匹配条件的填充与更新均由平台统一管控，禁止在 FW 端手工配置。\n* **认证模式配置**：平台可下发 `device authentication-mode` 命令，配置摄像头接入认证模式（IP认证、MAC认证或 IP-MAC 绑定认证），确保只有准入资产范围内的摄像头才能上线。\n\n### 3. 配置影响与注意事项\n* **策略匹配逻辑变更**：开启视频网关模式后，安全策略的“应用”匹配条件会变更为“排除应用”（即匹配配置应用的流量无法匹配该策略，仅放行非配置应用范围内的流量）。\n* **配置备份机制**：FW 在切换模式前会自动备份原配置文件（`before_video_device_gw.cfg`），若误操作可通过该文件回退。\n* **运维建议**：该场景下的业务配置应以视频安全管理平台为准，常规情况下无需登录 FW 命令行手动执行相关 `iot` 视图命令。\n\n如需了解具体的接口对接参数、策略填充规则或故障排查方法，可提供具体场景进一步说明。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-fe709651-e20f-4562-8f5a-77f87df94d5e"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-605c6187-53b8-45bf-8751-02aeb7460317"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-e93398bd-0660-4655-bb08-22051372bd42"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3753"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 1863511,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 5174,
+      "byte_offset": 1864608,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1869782,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 1869987,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 5248,
+      "byte_offset": 1870812,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 1876060,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 2106922,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 2107283,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1459,
+      "byte_offset": 2107491,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2108950,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 2109155,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 2109368,
+      "path": "archive/2026-10-12/14/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-fe709651-e20f-4562-8f5a-77f87df94d5e"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-605c6187-53b8-45bf-8751-02aeb7460317"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-e93398bd-0660-4655-bb08-22051372bd42"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3703"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:17:32.320552+00:00",
+    "arrival_seq": 9107,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

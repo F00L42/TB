@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nCpU占用了高告警如何处理？\n\n\n\n最终回答：\n\n\nCPU占用率过高告警（如 `ALM-201` / `ALM-100` 等）的标准化处理流程如下：\n\n### 🔍 可能原因\n- 临时性系统繁忙或正在执行消耗资源的操作（如批量配置、升级、备份等）。\n- CPU占用率告警阈值设置不合理。\n- 存在异常进程持续占用CPU，或硬件存在故障风险。\n- 服务器硬件性能较低，无法支撑当前系统管理规模。\n\n---\n\n### 🛠️ 处理步骤\n\n**1. 检查是否有后台任务正在执行**\n- 登录管理面（或OSMU），进入 `系统 > 任务列表`。\n- 若有多个任务正在运行，等待所有任务执行完毕后观察告警是否自动清除。\n- ✅ 已清除 → 处理结束。❌ 未清除 → 继续下一步。\n\n**2. 检查告警阈值设置是否合理**\n- 进入 `维护 > 运维管理 > 规则设置/阈值规则设置 > 指标阈值`。\n- 选择对应产品，检查“CPU占用率过高”的产生门限和清除门限。\n- ❌ 阈值过低或不合理 → 重新设置合理阈值，等待1分钟观察。\n- ✅ 阈值合理 → 继续下一步。\n\n**3. 通过监控界面检查高CPU进程**\n- 进入 `维护 > 运维管理 > 全景监控 > 节点监控`。\n- 选择告警对应的产品并点击故障节点，在“进程”页签按 `CPU使用率` 降序排序。\n- 若发现某业务进程CPU持续偏高，收集信息联系华为技术支持；观察告警是否清除。\n\n**4. 通过SSH命令行排查异常进程**\n- 使用PuTTY等工具以 `sopuser` 登录告警提示的故障节点。\n- 执行命令：`top -o %CPU`\n- 查看是否有非业务进程或异常进程长期占用高CPU。\n- ✅ 发现异常进程 → 收集日志与截图，联系技术支持处理。\n- ❌ 无异常进程 → 继续下一步。\n\n**5. 核对硬件配置与管理规模**\n- 确认当前服务器硬件配置是否满足产品文档中对应管理规模的最低要求。\n- 若硬件性能瓶颈导致频繁告警，需联系技术支持评估扩容或升级硬件。\n\n**6. 最终验证**\n- 完成上述检查调整后，等待约1分钟查看告警状态。\n- 若告警仍未清除，请收集以下信息并联系华为技术支持：\n  - 告警详细信息（主机、IP、产品别名、CPU占用率数值）\n  - `top` 命令输出截图\n  - 近期执行的任务列表及系统日志\n\n---\n\n### 📌 补充说明\n- **自动清除机制**：该告警通常在CPU占用率回落至清除门限后自动清除，无需手动操作。\n- **需手动清除的场景**：若故障节点名称、站点名称、操作系统版本发生变更，或该服务器已停止监控，需登录管理面在异常事件列表中手动清除历史告警。\n- 阈值调整建议：默认产生阈值一般为 `90%`，清除阈值一般为 `75%`，检测周期 `8分钟`。不建议随意调高产生阈值，以免掩盖性能风险。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "当前服务器是否正在执行批量配置、升级或备份等后台任务？\nCPU占用率告警的产生门限和清除门限当前设置是多少？\n通过top命令查看CPU占用率最高的进程是什么？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 998,
+      "total_tokens": 1043,
+      "completion_tokens": 45,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 998,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 45,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1043,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 44,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nCpU占用了高告警如何处理？\n\n\n\n最终回答：\n\n\nCPU占用率过高告警（如 `ALM-201` / `ALM-100` 等）的标准化处理流程如下：\n\n### 🔍 可能原因\n- 临时性系统繁忙或正在执行消耗资源的操作（如批量配置、升级、备份等）。\n- CPU占用率告警阈值设置不合理。\n- 存在异常进程持续占用CPU，或硬件存在故障风险。\n- 服务器硬件性能较低，无法支撑当前系统管理规模。\n\n---\n\n### 🛠️ 处理步骤\n\n**1. 检查是否有后台任务正在执行**\n- 登录管理面（或OSMU），进入 `系统 > 任务列表`。\n- 若有多个任务正在运行，等待所有任务执行完毕后观察告警是否自动清除。\n- ✅ 已清除 → 处理结束。❌ 未清除 → 继续下一步。\n\n**2. 检查告警阈值设置是否合理**\n- 进入 `维护 > 运维管理 > 规则设置/阈值规则设置 > 指标阈值`。\n- 选择对应产品，检查“CPU占用率过高”的产生门限和清除门限。\n- ❌ 阈值过低或不合理 → 重新设置合理阈值，等待1分钟观察。\n- ✅ 阈值合理 → 继续下一步。\n\n**3. 通过监控界面检查高CPU进程**\n- 进入 `维护 > 运维管理 > 全景监控 > 节点监控`。\n- 选择告警对应的产品并点击故障节点，在“进程”页签按 `CPU使用率` 降序排序。\n- 若发现某业务进程CPU持续偏高，收集信息联系华为技术支持；观察告警是否清除。\n\n**4. 通过SSH命令行排查异常进程**\n- 使用PuTTY等工具以 `sopuser` 登录告警提示的故障节点。\n- 执行命令：`top -o %CPU`\n- 查看是否有非业务进程或异常进程长期占用高CPU。\n- ✅ 发现异常进程 → 收集日志与截图，联系技术支持处理。\n- ❌ 无异常进程 → 继续下一步。\n\n**5. 核对硬件配置与管理规模**\n- 确认当前服务器硬件配置是否满足产品文档中对应管理规模的最低要求。\n- 若硬件性能瓶颈导致频繁告警，需联系技术支持评估扩容或升级硬件。\n\n**6. 最终验证**\n- 完成上述检查调整后，等待约1分钟查看告警状态。\n- 若告警仍未清除，请收集以下信息并联系华为技术支持：\n  - 告警详细信息（主机、IP、产品别名、CPU占用率数值）\n  - `top` 命令输出截图\n  - 近期执行的任务列表及系统日志\n\n---\n\n### 📌 补充说明\n- **自动清除机制**：该告警通常在CPU占用率回落至清除门限后自动清除，无需手动操作。\n- **需手动清除的场景**：若故障节点名称、站点名称、操作系统版本发生变更，或该服务器已停止监控，需登录管理面在异常事件列表中手动清除历史告警。\n- 阈值调整建议：默认产生阈值一般为 `90%`，清除阈值一般为 `75%`，检测周期 `8分钟`。不建议随意调高产生阈值，以免掩盖性能风险。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f52ffe18-e1cb-4404-9cf2-037bbbaf4ec6"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-60ceb6a6-6d03-45fc-bfff-7e550707125a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-22dbc6f1-0c03-4555-815c-0679bb265404"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4384"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 14198016,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 6014,
+      "byte_offset": 14199113,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14205127,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14205332,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 6092,
+      "byte_offset": 14206157,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14212249,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 15040769,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 15041130,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 1403,
+      "byte_offset": 15041338,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15042741,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 15042946,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 15043159,
+      "path": "archive/2026-10-12/13/part-00017.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f52ffe18-e1cb-4404-9cf2-037bbbaf4ec6"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-60ceb6a6-6d03-45fc-bfff-7e550707125a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-22dbc6f1-0c03-4555-815c-0679bb265404"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4334"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:41:49.918750+00:00",
+    "arrival_seq": 8239,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

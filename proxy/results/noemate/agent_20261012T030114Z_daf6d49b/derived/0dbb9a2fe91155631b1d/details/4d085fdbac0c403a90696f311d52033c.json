@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n计费系统阻塞\n\n\n\n最终回答：\n### 计费系统阻塞影响分析\n\n#### 🔍 故障映射与影响路径\n计费系统（OCS/CHF/BSS）阻塞会直接导致会话建立流程在**鉴权/计费授权阶段挂起**。S-CSCF/P-CSCF等待计费响应超时，触发协议层重传或静默丢弃，现网表现为S-CSCF接通率骤降、注册失败率攀升，并伴随控制面队列积压。\n`UE请求 → P-CSCF/S-CSCF → 计费接口(Rx/Dx/Cx) → OCS阻塞 → 授权超时 → 会话建立失败/503 → 接通率跌破门限`\n\n---\n\n#### 📉 核心现象与判定标准\n| 监控维度 | 异常特征 | 负载特征映射（结合偏好） |\n|:---|:---|:---|\n| **计费接口延迟** | CCR/CCA或Charging Request响应 >3s，超时率 >5% | 延迟累积导致控制面调度阻塞 |\n| **队列与连接池** | 计费等待队列积压，HTTP2/Diameter连接池占用 >90% | 若30分钟内波动幅度 >15% → **剧烈波动**（重试风暴/突发话务）<br>若持续2小时 ≥80% 且波动 ±5% → **高位震荡**（容量瓶颈/资源泄漏） |\n| **信令失败码** | `403 Forbidden`、`408 Timeout`、`503 Service Unavailable` 高频返回 | 计费授权失败直接映射为接通率下滑 |\n\n---\n\n#### 🛠️ 标准化排查步骤\n1. **计费接口日志提取**\n   - 导出夜间告警时段 P-CSCF/S-CSCF 至 OCS/CHF 的计费交互日志，过滤 `Credit-Control`、`Session-Failure`、`Timeout` 记录。\n   - 统计计费请求平均响应延迟、超时比例与重试频率。\n\n2. **控制面负载与队列核查**\n   - 拉取 CPU、内存、计费等待队列曲线，对照偏好定义判定波动类型。\n   - 若命中**剧烈波动**，重点排查固定间隔重试未退避；若命中**高位震荡**，重点核查基础容量与License上限。\n\n3. **跨系统路由与策略验证**\n   - 检查计费接口路由配置、DNS解析效率、防火墙/ACL策略，确认无路由死循环或策略拦截。\n   - 验证计费降级策略（如离线计费缓存、异步授权）是否生效。\n\n4. **信令Trace与失败码关联**\n   - 抓取SIP/Diameter信令，关联计费超时与S-CSCF接通率拐点，确认故障传播路径。\n\n---\n\n#### 📝 修复与优化建议\n| 阶段 | 操作项 | 预期效果 |\n|:---|:---|:---|\n| **即时恢复** | 启用计费异步授权模式，清除超时会话缓存；重启阻塞的计费客户端进程 | 快速释放控制面队列，接通率回升至基线 |\n| **短期调优** | 配置重试指数退避（`BACKOFF≥1.5`），上调计费超时阈值；启用离线计费缓存策略 | 降低误判型超时，消除重试风暴叠加负载 |\n| **长期加固** | 部署计费接口质量探针，配置OCS弹性扩容与多活路由；建立计费降级与熔断机制 | 预防跨系统阻塞级联，提升会话建立健壮性 |\n\n**验证观察期**：修复后持续监控 `2小时`，确认计费响应延迟 `<1s`，队列长度回落，负载曲线脱离**剧烈波动/高位震荡**区间，S-CSCF接通率稳定 `≥95%`。\n\n如需输出具体MML/CLI计费接口核查命令、信令过滤脚本或生成完整跨系统诊断报告，请回复对应需求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何获取并执行具体的MML/CLI计费接口核查命令？\n信令过滤脚本的具体内容和用法是什么？\n如何生成完整的跨系统诊断报告？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1123,
+      "total_tokens": 1157,
+      "completion_tokens": 34,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1123,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 34,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1157,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 33,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n计费系统阻塞\n\n\n\n最终回答：\n### 计费系统阻塞影响分析\n\n#### 🔍 故障映射与影响路径\n计费系统（OCS/CHF/BSS）阻塞会直接导致会话建立流程在**鉴权/计费授权阶段挂起**。S-CSCF/P-CSCF等待计费响应超时，触发协议层重传或静默丢弃，现网表现为S-CSCF接通率骤降、注册失败率攀升，并伴随控制面队列积压。\n`UE请求 → P-CSCF/S-CSCF → 计费接口(Rx/Dx/Cx) → OCS阻塞 → 授权超时 → 会话建立失败/503 → 接通率跌破门限`\n\n---\n\n#### 📉 核心现象与判定标准\n| 监控维度 | 异常特征 | 负载特征映射（结合偏好） |\n|:---|:---|:---|\n| **计费接口延迟** | CCR/CCA或Charging Request响应 >3s，超时率 >5% | 延迟累积导致控制面调度阻塞 |\n| **队列与连接池** | 计费等待队列积压，HTTP2/Diameter连接池占用 >90% | 若30分钟内波动幅度 >15% → **剧烈波动**（重试风暴/突发话务）<br>若持续2小时 ≥80% 且波动 ±5% → **高位震荡**（容量瓶颈/资源泄漏） |\n| **信令失败码** | `403 Forbidden`、`408 Timeout`、`503 Service Unavailable` 高频返回 | 计费授权失败直接映射为接通率下滑 |\n\n---\n\n#### 🛠️ 标准化排查步骤\n1. **计费接口日志提取**\n   - 导出夜间告警时段 P-CSCF/S-CSCF 至 OCS/CHF 的计费交互日志，过滤 `Credit-Control`、`Session-Failure`、`Timeout` 记录。\n   - 统计计费请求平均响应延迟、超时比例与重试频率。\n\n2. **控制面负载与队列核查**\n   - 拉取 CPU、内存、计费等待队列曲线，对照偏好定义判定波动类型。\n   - 若命中**剧烈波动**，重点排查固定间隔重试未退避；若命中**高位震荡**，重点核查基础容量与License上限。\n\n3. **跨系统路由与策略验证**\n   - 检查计费接口路由配置、DNS解析效率、防火墙/ACL策略，确认无路由死循环或策略拦截。\n   - 验证计费降级策略（如离线计费缓存、异步授权）是否生效。\n\n4. **信令Trace与失败码关联**\n   - 抓取SIP/Diameter信令，关联计费超时与S-CSCF接通率拐点，确认故障传播路径。\n\n---\n\n#### 📝 修复与优化建议\n| 阶段 | 操作项 | 预期效果 |\n|:---|:---|:---|\n| **即时恢复** | 启用计费异步授权模式，清除超时会话缓存；重启阻塞的计费客户端进程 | 快速释放控制面队列，接通率回升至基线 |\n| **短期调优** | 配置重试指数退避（`BACKOFF≥1.5`），上调计费超时阈值；启用离线计费缓存策略 | 降低误判型超时，消除重试风暴叠加负载 |\n| **长期加固** | 部署计费接口质量探针，配置OCS弹性扩容与多活路由；建立计费降级与熔断机制 | 预防跨系统阻塞级联，提升会话建立健壮性 |\n\n**验证观察期**：修复后持续监控 `2小时`，确认计费响应延迟 `<1s`，队列长度回落，负载曲线脱离**剧烈波动/高位震荡**区间，S-CSCF接通率稳定 `≥95%`。\n\n如需输出具体MML/CLI计费接口核查命令、信令过滤脚本或生成完整跨系统诊断报告，请回复对应需求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-4b82f3bc-c746-4b65-81d0-2614b9221ad0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7b32cb4f-f9a9-4814-ae84-e8b5a663c72a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4640"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 4447561,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 6354,
+      "byte_offset": 4448658,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4455012,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 4455217,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 6432,
+      "byte_offset": 4456042,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4462474,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4471736,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4472097,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 1339,
+      "byte_offset": 4472305,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4473644,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4473849,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4474062,
+      "path": "archive/2026-10-12/08/part-00008.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-4b82f3bc-c746-4b65-81d0-2614b9221ad0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7b32cb4f-f9a9-4814-ae84-e8b5a663c72a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4590"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:29:25.414351+00:00",
+    "arrival_seq": 3815,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

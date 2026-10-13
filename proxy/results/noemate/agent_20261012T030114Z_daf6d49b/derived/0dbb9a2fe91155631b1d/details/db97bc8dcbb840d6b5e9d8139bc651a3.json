@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n服务可用性确认：\n\n\n\n最终回答：\n\n\n以下是后端**服务可用性确认**的标准核查清单与操作指引，用于在基础设施与负载均衡层恢复后，验证业务是否真正可用：\n\n### 1. 端到端业务链路验证\n| 验证项 | 操作命令/方法 | 预期结果 | 异常处置 |\n|:---|:---|:---|:---|\n| **核心接口模拟** | `curl -v -w \"\\nTotal:%\\{time_total\\}s\\n\" http://<后端IP>:<端口>/<业务路径>` | 返回 `200`，延迟 `<业务阈值`，无超时/重试 | 检查应用日志、依赖组件连通性、线程池/连接池状态 |\n| **真实业务流测试** | 使用现网测试工具或自动化脚本发起完整流程（如呼叫建立、签约查询、短信下发） | 全流程成功，无中间环节丢弃或回退 | 按链路分段抓包/查日志，定位断点网元或微服务 |\n| **跨区/多活验证** | 从不同区域客户端发起请求，验证路由与会话一致性 | 各区域响应正常，会话不丢失，负载按权重分发 | 检查 DNS/GTM 策略、会话同步机制、跨区链路质量 |\n\n### 2. 核心依赖组件状态核查\n- **数据库/缓存**：`mysqladmin status` / `redis-cli ping` / 连接池使用率（应 `<80%`）\n- **消息队列**：Kafka/RabbitMQ 队列深度、消费延迟、消费者组状态\n- **配置/注册中心**：Nacos/Consul/ETCD 节点健康状态、配置版本一致性\n- **依赖验证命令**：\n  ```bash\n  # 检查应用内依赖连通性（以常见中间件为例）\n  nc -zv <DB_IP> 3306 && nc -zv <Redis_IP> 6379 && echo \"Dependencies OK\"\n  ```\n\n### 3. 性能指标与阈值核对\n| 指标 | 正常基线 | 异常判定 | 调整建议 |\n|:---|:---|:---|:---|\n| **P95/P99 延迟** | `< 业务SLA阈值` | 持续超标或波动 `>30%` | 优化慢查询、扩容实例、调整连接池/线程池 |\n| **错误率** | `< 0.5%` | `>1%` 或突发 `5xx` | 检查依赖超时、熔断策略、代码异常堆栈 |\n| **吞吐/QPS** | 接近容量规划值 | 明显低于基线或触发限流 | 验证负载均衡权重、清理阻塞进程、调整限流阈值 |\n| **资源水位** | CPU `<80%`、内存 `<85%`、磁盘IO `<70%` | 触及保护阈值或 OOM | 触发弹性伸缩、清理日志/缓存、优化GC/内存参数 |\n\n### 4. 监控与告警交叉验证\n- **APM/链路追踪**：确认 Trace 无红色慢链路或断点，Span 耗时分布正常。\n- **业务监控面板**：核对早忙时（07:00-09:00）与晚忙时（17:00-19:00）指标曲线是否回归基线。\n- **告警状态**：确认原始 `LbService转发异常` 告警已清除，无新增关联告警（如后端过载、依赖超时、证书异常）。\n\n### 5. 确认通过标准与后续动作\n✅ **可通过标准**：\n- 连续 3 次端到端业务测试成功\n- 核心指标（延迟、错误率、吞吐）恢复至基线范围\n- 依赖组件全绿，无资源瓶颈或连接泄漏\n- 监控面板无异常波动，告警已清除\n\n🔧 **后续动作**：\n- 逐步恢复流量权重（`10% → 50% → 100%`），观察指标稳定性\n- 输出故障根因报告，完善健康检查阈值、弹性伸缩策略与变更审批流\n- 若为周期性/忙时触发，制定容量扩容或架构优化计划\n\n提供具体业务路径、依赖组件类型或监控指标截图，可进一步输出精准验证脚本与调优参数。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何针对特定业务路径编写自动化端到端验证脚本？\n当核心依赖组件如数据库或缓存出现连接池耗尽时应如何快速排查？\n在逐步恢复流量权重期间应重点关注哪些监控指标以确保持续稳定？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1223,
+      "total_tokens": 1272,
+      "completion_tokens": 49,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1223,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 49,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1272,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 48,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n服务可用性确认：\n\n\n\n最终回答：\n\n\n以下是后端**服务可用性确认**的标准核查清单与操作指引，用于在基础设施与负载均衡层恢复后，验证业务是否真正可用：\n\n### 1. 端到端业务链路验证\n| 验证项 | 操作命令/方法 | 预期结果 | 异常处置 |\n|:---|:---|:---|:---|\n| **核心接口模拟** | `curl -v -w \"\\nTotal:%\\{time_total\\}s\\n\" http://<后端IP>:<端口>/<业务路径>` | 返回 `200`，延迟 `<业务阈值`，无超时/重试 | 检查应用日志、依赖组件连通性、线程池/连接池状态 |\n| **真实业务流测试** | 使用现网测试工具或自动化脚本发起完整流程（如呼叫建立、签约查询、短信下发） | 全流程成功，无中间环节丢弃或回退 | 按链路分段抓包/查日志，定位断点网元或微服务 |\n| **跨区/多活验证** | 从不同区域客户端发起请求，验证路由与会话一致性 | 各区域响应正常，会话不丢失，负载按权重分发 | 检查 DNS/GTM 策略、会话同步机制、跨区链路质量 |\n\n### 2. 核心依赖组件状态核查\n- **数据库/缓存**：`mysqladmin status` / `redis-cli ping` / 连接池使用率（应 `<80%`）\n- **消息队列**：Kafka/RabbitMQ 队列深度、消费延迟、消费者组状态\n- **配置/注册中心**：Nacos/Consul/ETCD 节点健康状态、配置版本一致性\n- **依赖验证命令**：\n  ```bash\n  # 检查应用内依赖连通性（以常见中间件为例）\n  nc -zv <DB_IP> 3306 && nc -zv <Redis_IP> 6379 && echo \"Dependencies OK\"\n  ```\n\n### 3. 性能指标与阈值核对\n| 指标 | 正常基线 | 异常判定 | 调整建议 |\n|:---|:---|:---|:---|\n| **P95/P99 延迟** | `< 业务SLA阈值` | 持续超标或波动 `>30%` | 优化慢查询、扩容实例、调整连接池/线程池 |\n| **错误率** | `< 0.5%` | `>1%` 或突发 `5xx` | 检查依赖超时、熔断策略、代码异常堆栈 |\n| **吞吐/QPS** | 接近容量规划值 | 明显低于基线或触发限流 | 验证负载均衡权重、清理阻塞进程、调整限流阈值 |\n| **资源水位** | CPU `<80%`、内存 `<85%`、磁盘IO `<70%` | 触及保护阈值或 OOM | 触发弹性伸缩、清理日志/缓存、优化GC/内存参数 |\n\n### 4. 监控与告警交叉验证\n- **APM/链路追踪**：确认 Trace 无红色慢链路或断点，Span 耗时分布正常。\n- **业务监控面板**：核对早忙时（07:00-09:00）与晚忙时（17:00-19:00）指标曲线是否回归基线。\n- **告警状态**：确认原始 `LbService转发异常` 告警已清除，无新增关联告警（如后端过载、依赖超时、证书异常）。\n\n### 5. 确认通过标准与后续动作\n✅ **可通过标准**：\n- 连续 3 次端到端业务测试成功\n- 核心指标（延迟、错误率、吞吐）恢复至基线范围\n- 依赖组件全绿，无资源瓶颈或连接泄漏\n- 监控面板无异常波动，告警已清除\n\n🔧 **后续动作**：\n- 逐步恢复流量权重（`10% → 50% → 100%`），观察指标稳定性\n- 输出故障根因报告，完善健康检查阈值、弹性伸缩策略与变更审批流\n- 若为周期性/忙时触发，制定容量扩容或架构优化计划\n\n提供具体业务路径、依赖组件类型或监控指标截图，可进一步输出精准验证脚本与调优参数。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-8c66b5a5-0e8a-4e91-ac73-0feccad76d4c"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ea26dc9e-08b6-49c1-8f6a-db0edc2fae3f"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ba2f4bf9-a772-4e29-9c57-1905b9f01304"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4816"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 8841684,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 6590,
+      "byte_offset": 8842781,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8849371,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 8849576,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 6668,
+      "byte_offset": 8850401,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 8857069,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 8896025,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 8896386,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 1451,
+      "byte_offset": 8896594,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8898045,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 8898250,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 8898463,
+      "path": "archive/2026-10-12/07/part-00008.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-8c66b5a5-0e8a-4e91-ac73-0feccad76d4c"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ea26dc9e-08b6-49c1-8f6a-db0edc2fae3f"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ba2f4bf9-a772-4e29-9c57-1905b9f01304"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4766"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:19:57.473932+00:00",
+    "arrival_seq": 2560,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

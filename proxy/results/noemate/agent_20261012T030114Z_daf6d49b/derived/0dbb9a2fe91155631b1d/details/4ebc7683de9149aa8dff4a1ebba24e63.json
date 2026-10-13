@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n4. 检查是否WEPI单板有问题。\n\n\n\n最终回答：\n软件异常。\n3. **尝试单板复位（视业务窗口）**\n   - 在维护窗口期执行 `RST BOARD` 命令复位WEPI单板，等待3~5分钟观察状态是否恢复。\n4. **替换单板测试**\n   - 若复位无效或状态仍异常，在防静电措施下拔出疑似故障的WEPI单板。\n   - 插入同型号备用单板，等待业务加载完成后执行 `DSP PORT` 验证E1端口状态及误码计数。\n\n### 🔀 结果判断与后续分支\n- ✅ **复位/更换后恢复** → 故障原因为WEPI单板硬件故障或底层软件卡死。记录工单，下线故障单板送修。\n- ❌ **仍未恢复** → 排除单板问题，故障点可能位于 **机框背板**、**电源模块** 或 **时钟同步系统**。\n  → **下一步**：检查机框电源电压、背板插槽接触情况，核对系统时钟源配置，或联系华为技术支持进一步诊断。\n\n### ⚠️ 注意事项\n- 复位或更换WEPI单板会中断该槽位下所有E1端口业务，务必提前评估影响范围并在维护窗口操作。\n- 更换单板后需确认新单板的软件版本与现网一致，必要时执行版本加载或配置同步。\n- 操作全程佩戴防静电手环，避免静电损坏背板或其他相邻单板。\n\n需要我提供 `DSP BOARD` 命令详解、单板更换防静电规范或时钟源核对清单吗？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "提供DSP BOARD命令详解\n提供单板更换防静电规范\n提供时钟源核对清单",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 602,
+      "total_tokens": 620,
+      "completion_tokens": 18,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 602,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 18,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 620,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 17,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n4. 检查是否WEPI单板有问题。\n\n\n\n最终回答：\n软件异常。\n3. **尝试单板复位（视业务窗口）**\n   - 在维护窗口期执行 `RST BOARD` 命令复位WEPI单板，等待3~5分钟观察状态是否恢复。\n4. **替换单板测试**\n   - 若复位无效或状态仍异常，在防静电措施下拔出疑似故障的WEPI单板。\n   - 插入同型号备用单板，等待业务加载完成后执行 `DSP PORT` 验证E1端口状态及误码计数。\n\n### 🔀 结果判断与后续分支\n- ✅ **复位/更换后恢复** → 故障原因为WEPI单板硬件故障或底层软件卡死。记录工单，下线故障单板送修。\n- ❌ **仍未恢复** → 排除单板问题，故障点可能位于 **机框背板**、**电源模块** 或 **时钟同步系统**。\n  → **下一步**：检查机框电源电压、背板插槽接触情况，核对系统时钟源配置，或联系华为技术支持进一步诊断。\n\n### ⚠️ 注意事项\n- 复位或更换WEPI单板会中断该槽位下所有E1端口业务，务必提前评估影响范围并在维护窗口操作。\n- 更换单板后需确认新单板的软件版本与现网一致，必要时执行版本加载或配置同步。\n- 操作全程佩戴防静电手环，避免静电损坏背板或其他相邻单板。\n\n需要我提供 `DSP BOARD` 命令详解、单板更换防静电规范或时钟源核对清单吗？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-376f25e5-7437-4a81-af93-e7de4cfa1ba7"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1d90cc61-c35a-4c0c-be09-98ae8225235c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-59835324-1178-4c0c-aff7-bc117936d860"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2850"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 12426921,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 3970,
+      "byte_offset": 12428018,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12431988,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 12432193,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 4044,
+      "byte_offset": 12433018,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12437062,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 360,
+      "byte_offset": 12442315,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 207,
+      "byte_offset": 12442675,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1234,
+      "byte_offset": 12442882,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 204,
+      "byte_offset": 12444116,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 212,
+      "byte_offset": 12444320,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    },
+    {
+      "byte_length": 409,
+      "byte_offset": 12444532,
+      "path": "archive/2026-10-12/10/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-376f25e5-7437-4a81-af93-e7de4cfa1ba7"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1d90cc61-c35a-4c0c-be09-98ae8225235c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-59835324-1178-4c0c-aff7-bc117936d860"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2800"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T10:02:19.046717+00:00",
+    "arrival_seq": 5380,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/10"
+  }
+}

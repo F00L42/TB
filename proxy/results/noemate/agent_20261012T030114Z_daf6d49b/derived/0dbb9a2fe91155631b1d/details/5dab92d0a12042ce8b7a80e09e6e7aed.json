@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：帮我看下主机host23实时的内存占用率是否有超出预期呢，超出预期的处理流程是什么呢\n\n\n\n最终回答：\n\n\n关于您的请求，处理结果如下：\n\n### 一、 主机host23实时内存占用率查询结果\n智能问数接口返回：**没有获得匹配结果**。\n当前未能获取到主机host23的实时内存占用率数据，可能是该主机暂无监控数据上报、主机名称不准确或超出当前查询范围。建议您确认主机名称或检查监控数据上报状态。\n\n---\n\n### 二、 主机内存占用率超出预期的处理流程\n根据运维知识库，主机内存使用率超过阈值的标准处理流程如下：\n\n#### 1. 可能原因\n- 主机业务繁忙，负载过重\n- 系统存在内存泄漏或流量异常冲高\n- 资源隔离配置不合理（如内存预留过小）\n- 特定进程异常或人为启动额外进程\n\n#### 2. 通用处理步骤\n| 步骤 | 操作内容 |\n|:---|:---|\n| **步骤一：定位高内存进程** | 登录主机，执行 `top -M` 或 `vsw-mntctl show memory-detail` 查看内存占用最高的进程PID，并通过 `ps -ef \\| grep <PID>` 确认进程所属服务。 |\n| **步骤二：检查资源隔离配置** | 登录管理控制台（如FusionSphere OpenStack），进入“资源隔离”配置，核对内存预留值是否符合《NFV LLD文档》标准。若配置过低，适当增加取值并等待3~5分钟观察告警是否恢复。 |\n| **步骤三：业务迁移（如适用）** | 若为非控制节点且内存持续过高，可尝试将部分虚拟机热迁移至其他负载较低的主机，缓解当前主机压力。 |\n| **步骤四：日志收集与上报** | 若上述步骤未恢复，执行日志收集命令（如 `vsw-logctl collect log --type=normal` 或 `collect_log.sh`），打包告警信息、运行日志和配置信息，联系技术支持工程师进一步分析。 |\n\n#### 3. 恢复机制\n- 多数内存阈值告警为**自动清除**类型。当内存使用率回落至正常阈值（通常低于90%）并持续一段时间后，系统会自动清除告警，无需手动干预。\n- 若告警持续不恢复，通常需结合步骤四的日志由后端定位是否存在内存泄漏或硬件异常。\n\n如需针对特定告警ID（如 `ALM-6045`、`hwMEMUtilizationRisingAlarm` 等）获取精确到命令行的排障SOP，可提供完整告警名称或ID，我将为您调取对应产品的专属处理文档。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请提供主机host23的完整告警ID或准确名称，以便重新查询实时内存占用率数据。\n当前主机内存占用率过高时，如何判断是业务负载过重还是存在内存泄漏问题？\n执行内存排查命令top -M和vsw-mntctl show memory-detail时，需要关注哪些关键指标参数？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 849,
+      "total_tokens": 921,
+      "completion_tokens": 72,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 849,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 72,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 921,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 71,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：帮我看下主机host23实时的内存占用率是否有超出预期呢，超出预期的处理流程是什么呢\n\n\n\n最终回答：\n\n\n关于您的请求，处理结果如下：\n\n### 一、 主机host23实时内存占用率查询结果\n智能问数接口返回：**没有获得匹配结果**。\n当前未能获取到主机host23的实时内存占用率数据，可能是该主机暂无监控数据上报、主机名称不准确或超出当前查询范围。建议您确认主机名称或检查监控数据上报状态。\n\n---\n\n### 二、 主机内存占用率超出预期的处理流程\n根据运维知识库，主机内存使用率超过阈值的标准处理流程如下：\n\n#### 1. 可能原因\n- 主机业务繁忙，负载过重\n- 系统存在内存泄漏或流量异常冲高\n- 资源隔离配置不合理（如内存预留过小）\n- 特定进程异常或人为启动额外进程\n\n#### 2. 通用处理步骤\n| 步骤 | 操作内容 |\n|:---|:---|\n| **步骤一：定位高内存进程** | 登录主机，执行 `top -M` 或 `vsw-mntctl show memory-detail` 查看内存占用最高的进程PID，并通过 `ps -ef \\| grep <PID>` 确认进程所属服务。 |\n| **步骤二：检查资源隔离配置** | 登录管理控制台（如FusionSphere OpenStack），进入“资源隔离”配置，核对内存预留值是否符合《NFV LLD文档》标准。若配置过低，适当增加取值并等待3~5分钟观察告警是否恢复。 |\n| **步骤三：业务迁移（如适用）** | 若为非控制节点且内存持续过高，可尝试将部分虚拟机热迁移至其他负载较低的主机，缓解当前主机压力。 |\n| **步骤四：日志收集与上报** | 若上述步骤未恢复，执行日志收集命令（如 `vsw-logctl collect log --type=normal` 或 `collect_log.sh`），打包告警信息、运行日志和配置信息，联系技术支持工程师进一步分析。 |\n\n#### 3. 恢复机制\n- 多数内存阈值告警为**自动清除**类型。当内存使用率回落至正常阈值（通常低于90%）并持续一段时间后，系统会自动清除告警，无需手动干预。\n- 若告警持续不恢复，通常需结合步骤四的日志由后端定位是否存在内存泄漏或硬件异常。\n\n如需针对特定告警ID（如 `ALM-6045`、`hwMEMUtilizationRisingAlarm` 等）获取精确到命令行的排障SOP，可提供完整告警名称或ID，我将为您调取对应产品的专属处理文档。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-bfe4ee41-adcd-40cd-b203-d4754ac9d1ba"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-8299ed72-46cc-4397-bd69-bbd7035f20b5"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-2395dfe2-a437-4be4-b578-f6446ae4dd52"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3936"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10959733,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 5418,
+      "byte_offset": 10960830,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10966248,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10966453,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 5492,
+      "byte_offset": 10967278,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10972770,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 11636611,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 11636972,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1539,
+      "byte_offset": 11637180,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11638719,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 11638924,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 11639137,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-bfe4ee41-adcd-40cd-b203-d4754ac9d1ba"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-8299ed72-46cc-4397-bd69-bbd7035f20b5"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-2395dfe2-a437-4be4-b578-f6446ae4dd52"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3886"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T06:47:51.733312+00:00",
+    "arrival_seq": 2081,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/06"
+  }
+}

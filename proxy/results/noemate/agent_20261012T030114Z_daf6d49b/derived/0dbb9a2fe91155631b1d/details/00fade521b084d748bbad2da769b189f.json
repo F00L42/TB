@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n场景：\n\n\n\n最终回答：\n\n\n已记录。结合前置诊断与优化数据，编译场景结构如下：\n\n- **时间**：`2023-12-12 10:30`（告警触发） / `2023-12-15 10:00`（优化执行）\n- **网元/对象**：`SMF02`、`AMF01`\n- **业务背景**：`待补充`（如节假日流量高峰、新业务上线、容量规划周期、大型活动等）\n- **触发条件**：License使用率触阈（92%）、根目录空间超标（89%）、CPU负载偏高（85%）\n- **影响范围**：`待补充`（如特定区域/网络切片/用户群体/业务类型）\n\n请继续补充具体背景与影响范围，或输入下一项（如 `- 现象：`、`- 处理过程：`）。我将按标准格式持续编译。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请补充本次告警发生的具体业务背景，例如是否处于节假日流量高峰、新业务上线期或容量规划周期。\n请说明异常指标影响的具体范围，例如涉及哪些区域、网络切片、用户群体或业务类型。\n请提供告警触发后的具体现象描述，包括用户感知、业务中断情况或系统日志中的关键错误信息。",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 479,
+      "total_tokens": 555,
+      "completion_tokens": 76,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 479,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 76,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 555,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 75,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n场景：\n\n\n\n最终回答：\n\n\n已记录。结合前置诊断与优化数据，编译场景结构如下：\n\n- **时间**：`2023-12-12 10:30`（告警触发） / `2023-12-15 10:00`（优化执行）\n- **网元/对象**：`SMF02`、`AMF01`\n- **业务背景**：`待补充`（如节假日流量高峰、新业务上线、容量规划周期、大型活动等）\n- **触发条件**：License使用率触阈（92%）、根目录空间超标（89%）、CPU负载偏高（85%）\n- **影响范围**：`待补充`（如特定区域/网络切片/用户群体/业务类型）\n\n请继续补充具体背景与影响范围，或输入下一项（如 `- 现象：`、`- 处理过程：`）。我将按标准格式持续编译。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-23deb47e-1515-4707-8ed3-6bc89cd37bd0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fafcfcd6-d5aa-4054-a299-2b2db6587994"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2161"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 9026201,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 3050,
+      "byte_offset": 9027298,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9030348,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 9030553,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 3128,
+      "byte_offset": 9031378,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 9034506,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 362,
+      "byte_offset": 9587152,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 9587514,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1627,
+      "byte_offset": 9587722,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 9589349,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 9589554,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    },
+    {
+      "byte_length": 411,
+      "byte_offset": 9589767,
+      "path": "archive/2026-10-12/10/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-23deb47e-1515-4707-8ed3-6bc89cd37bd0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fafcfcd6-d5aa-4054-a299-2b2db6587994"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2111"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T10:19:53.344779+00:00",
+    "arrival_seq": 5870,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/10"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请问有恢复链路状态的办法吗？\n\n\n\n最终回答：\n\n\n根据知识库中的信息，恢复链路状态的方法取决于具体的异常场景：\n\n### 1. 链路端口管理状态异常\n- 从链路列表中获取异常网元名称\n- 进入设备详情界面的“设备配置 > 接口管理”\n- 将接口“管理状态”修改为 **up**\n\n### 2. 链路端口运行状态异常\n- 通过设备配置端口内部环回\n- 或直接检查物理连接（插上网线等）\n\n### 3. 设备离线导致链路异常\n- **设备下电**：重新上电\n- **设备IP地址变更**：删除原设备后重新添加到管理系统\n\n### 4. Diameter链路故障（如策略服务器链路）\n1. 执行 `display diameter configuration` 查看链路状态\n2. 对比本端和对端的IP、端口配置是否一致\n3. 使用 `diameter-local` 和 `diameter-peer` 命令修正不一致的配置\n4. 再次检查链路状态是否恢复为 Up\n\n### 5. 主机链路状态未知\n- 在“主机接入链路”中检查未知链路是否仍存在于设备上\n- 若存在：重新发现链路\n- 若已不存在且无业务使用：直接删除该链路记录\n\n### 通用处理建议\n- 排除设备故障后检查链路状态\n- 如仍异常，可尝试删除链路后重新创建\n- 若以上方法无效，请收集告警信息、日志和配置，联系华为技术支持工程师\n\n请问您遇到的是哪种链路异常场景？我可以提供更具体的指导。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "我的链路端口管理状态显示异常，如何将其修改为up？\n设备离线导致链路异常，重新上电后仍需哪些操作？\nDiameter链路故障时，如何修正本端和对端不一致的配置？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 605,
+      "total_tokens": 651,
+      "completion_tokens": 46,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 605,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 46,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 651,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 45,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请问有恢复链路状态的办法吗？\n\n\n\n最终回答：\n\n\n根据知识库中的信息，恢复链路状态的方法取决于具体的异常场景：\n\n### 1. 链路端口管理状态异常\n- 从链路列表中获取异常网元名称\n- 进入设备详情界面的“设备配置 > 接口管理”\n- 将接口“管理状态”修改为 **up**\n\n### 2. 链路端口运行状态异常\n- 通过设备配置端口内部环回\n- 或直接检查物理连接（插上网线等）\n\n### 3. 设备离线导致链路异常\n- **设备下电**：重新上电\n- **设备IP地址变更**：删除原设备后重新添加到管理系统\n\n### 4. Diameter链路故障（如策略服务器链路）\n1. 执行 `display diameter configuration` 查看链路状态\n2. 对比本端和对端的IP、端口配置是否一致\n3. 使用 `diameter-local` 和 `diameter-peer` 命令修正不一致的配置\n4. 再次检查链路状态是否恢复为 Up\n\n### 5. 主机链路状态未知\n- 在“主机接入链路”中检查未知链路是否仍存在于设备上\n- 若存在：重新发现链路\n- 若已不存在且无业务使用：直接删除该链路记录\n\n### 通用处理建议\n- 排除设备故障后检查链路状态\n- 如仍异常，可尝试删除链路后重新创建\n- 若以上方法无效，请收集告警信息、日志和配置，联系华为技术支持工程师\n\n请问您遇到的是哪种链路异常场景？我可以提供更具体的指导。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-15a25cc8-497a-468e-a393-0f1c260b7b24"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-0d9b3464-d9ed-49e7-9f13-3ef9752092b8"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cf3a130c-5da9-4772-b5b4-dd446cb01af7"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2915"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 836599,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 4054,
+      "byte_offset": 837696,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 841750,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 841955,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 4132,
+      "byte_offset": 842780,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 846912,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 847118,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 847479,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 1403,
+      "byte_offset": 847687,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 849090,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 849295,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 849508,
+      "path": "archive/2026-10-12/13/part-00001.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-15a25cc8-497a-468e-a393-0f1c260b7b24"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-0d9b3464-d9ed-49e7-9f13-3ef9752092b8"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cf3a130c-5da9-4772-b5b4-dd446cb01af7"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2865"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:00:20.457572+00:00",
+    "arrival_seq": 7245,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

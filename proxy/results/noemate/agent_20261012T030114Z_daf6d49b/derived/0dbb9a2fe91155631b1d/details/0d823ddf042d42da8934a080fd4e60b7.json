@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUGC3200收到CS侧404消息的可能原因是什么？\n\n\n\n最终回答：\n\n\n根据产品文档，呼叫过程中UGC3200向CS侧发送INVITE消息后收到404响应，可能的原因及定位处理思路如下：\n\n### 可能原因\n1. **号码变换配置错误**\n2. **对局号码分析配置错误**\n\n### 定位与处理步骤\n**1. 检查号码变换配置**\n* 检查出局INVITE消息中的主叫和被叫号码格式（是否携带`+`、国际/国内号码前缀、国家码及地区码等），确认是否符合实际网络规划。\n* **说明**：例如在国内呼叫场景中，若IMS送至UGC3200的号码为全局格式（如`+86`），需在UGC3200上配置删除国家码前缀并转换为国内号码。若未正确变换，号码携带`+`号会导致对局NGN接续失败。\n* 若配置不符，请结合实际规划修改号码变换配置（参考配置号码预处理数据），随后检查故障是否排除。\n\n**2. 检查对局号码分析数据**\n* 若号码变换配置无误但仍收到404，需检查对局设备的号码分析数据。\n* 如果对局设备为非华为产品，请联系对局设备技术支持人员协同定位。\n* 如对局为华为设备且无法自行定位，请联系华为技术支持处理。\n\n通过上述两步通常可定位因号码格式或分析规则不匹配导致的404接续失败问题。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何配置UGC3200的号码预处理数据以删除国家码前缀？\n在对局设备为非华为产品时，应提供哪些信息给对局技术支持人员以协同定位404问题？\n如果号码变换和对局号码分析配置均正确但仍收到404，还需检查哪些潜在原因？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 588,
+      "total_tokens": 656,
+      "completion_tokens": 68,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 588,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 68,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 656,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 67,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUGC3200收到CS侧404消息的可能原因是什么？\n\n\n\n最终回答：\n\n\n根据产品文档，呼叫过程中UGC3200向CS侧发送INVITE消息后收到404响应，可能的原因及定位处理思路如下：\n\n### 可能原因\n1. **号码变换配置错误**\n2. **对局号码分析配置错误**\n\n### 定位与处理步骤\n**1. 检查号码变换配置**\n* 检查出局INVITE消息中的主叫和被叫号码格式（是否携带`+`、国际/国内号码前缀、国家码及地区码等），确认是否符合实际网络规划。\n* **说明**：例如在国内呼叫场景中，若IMS送至UGC3200的号码为全局格式（如`+86`），需在UGC3200上配置删除国家码前缀并转换为国内号码。若未正确变换，号码携带`+`号会导致对局NGN接续失败。\n* 若配置不符，请结合实际规划修改号码变换配置（参考配置号码预处理数据），随后检查故障是否排除。\n\n**2. 检查对局号码分析数据**\n* 若号码变换配置无误但仍收到404，需检查对局设备的号码分析数据。\n* 如果对局设备为非华为产品，请联系对局设备技术支持人员协同定位。\n* 如对局为华为设备且无法自行定位，请联系华为技术支持处理。\n\n通过上述两步通常可定位因号码格式或分析规则不匹配导致的404接续失败问题。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-596ec36b-66f1-4cb8-84be-1a356e4f6c58"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7c1d3c9a-9d9c-455c-9e71-34c30aec6aa5"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-1a02d0d6-5945-418a-8408-928d352c2e13"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2807"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 15456178,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 3910,
+      "byte_offset": 15457275,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15461185,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 15461390,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 3988,
+      "byte_offset": 15462215,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 15466203,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 15908832,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 15909193,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1503,
+      "byte_offset": 15909401,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15910904,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 15911109,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 15911322,
+      "path": "archive/2026-10-12/13/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-596ec36b-66f1-4cb8-84be-1a356e4f6c58"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7c1d3c9a-9d9c-455c-9e71-34c30aec6aa5"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-1a02d0d6-5945-418a-8408-928d352c2e13"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2757"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:24:26.633720+00:00",
+    "arrival_seq": 7823,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

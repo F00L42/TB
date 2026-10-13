@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：AMF中哪个参数是控制4、5G互操作开关的？并查询下AMF01和AMF02的最近的AMF排除用户原因的ABCF重注册成功率是否有变化？若存在劣化，请对其进行诊断\n\n\n\n最终回答：\n\n\n### 一、AMF控制4/5G互操作开关参数\n根据产品文档，AMF中控制4/5G互操作的相关核心参数如下：\n- **DWORD55 BIT2（控制AMF是否支持4/5G互操作时的N26接口）**：当AMF支持4/5G互操作时，需将该软参设置为`0`。\n- **AMFRESEL（互操作流程的AMF重选开关）**：位于`SET NGMMFUNC`命令中，控制在4G到5G多切片切换流程中AMF是否进行重选。部署多切片和N26互操作特性时需配置为`ON`。\n\n---\n\n### 二、AMF01/AMF02 指标查询结果\n查询近五天数据返回如下：\n- **AMF02（q30044120amf02）**：`S1模式MME内SGW不变更TAU失败率`指标出现明显波动与劣化。失败率从11.6%持续攀升至峰值`26.8%`（7月27日），随后逐步回落至10.4%，存在阶段性劣化。\n- **AMF01**：当前查询结果中未返回相关数据，建议检查网元命名或数据上报配置。\n\n---\n\n### 三、AMF02 指标劣化诊断分析\n针对AMF02的TAU失败率劣化，诊断根因如下：\n1. **S1接口链路丢包**：S1-U/S1-MME接口SCTP链路存在短时丢包，导致TAU请求报文往返时延超出AMF内置超时阈值，直接判定失败。\n2. **信令队列堆积**：通勤高峰时段大量NSA终端同步发起SGW不变更TAU，S1接口信令队列堆积，消息处理延迟超限。\n3. **N26通道带宽不足**：AMF与对接MME之间N26通道带宽不足，跨网元TAU上下文同步报文挤占S1信令资源。\n4. **基站缓冲参数配置过小**：部分老旧LTE基站S1链路缓冲参数配置过小，批量TAU报文触发端口拥塞丢弃。\n\n**建议处理方向**：检查S1/N26接口链路质量与带宽配置，优化基站缓冲参数，并结合话务高峰时段调整信令处理阈值或扩容相关通道容量。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请提供AMF01的正确网元标识或检查其数据上报配置以获取ABCF重注册成功率指标。\n请确认AMF02的S1接口链路丢包率具体数值及N26通道当前带宽配置情况。\n请提供AMF02在通勤高峰时段的信令队列长度监控数据及基站S1链路缓冲参数配置详情。",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 847,
+      "total_tokens": 928,
+      "completion_tokens": 81,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 847,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 81,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 928,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 80,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：AMF中哪个参数是控制4、5G互操作开关的？并查询下AMF01和AMF02的最近的AMF排除用户原因的ABCF重注册成功率是否有变化？若存在劣化，请对其进行诊断\n\n\n\n最终回答：\n\n\n### 一、AMF控制4/5G互操作开关参数\n根据产品文档，AMF中控制4/5G互操作的相关核心参数如下：\n- **DWORD55 BIT2（控制AMF是否支持4/5G互操作时的N26接口）**：当AMF支持4/5G互操作时，需将该软参设置为`0`。\n- **AMFRESEL（互操作流程的AMF重选开关）**：位于`SET NGMMFUNC`命令中，控制在4G到5G多切片切换流程中AMF是否进行重选。部署多切片和N26互操作特性时需配置为`ON`。\n\n---\n\n### 二、AMF01/AMF02 指标查询结果\n查询近五天数据返回如下：\n- **AMF02（q30044120amf02）**：`S1模式MME内SGW不变更TAU失败率`指标出现明显波动与劣化。失败率从11.6%持续攀升至峰值`26.8%`（7月27日），随后逐步回落至10.4%，存在阶段性劣化。\n- **AMF01**：当前查询结果中未返回相关数据，建议检查网元命名或数据上报配置。\n\n---\n\n### 三、AMF02 指标劣化诊断分析\n针对AMF02的TAU失败率劣化，诊断根因如下：\n1. **S1接口链路丢包**：S1-U/S1-MME接口SCTP链路存在短时丢包，导致TAU请求报文往返时延超出AMF内置超时阈值，直接判定失败。\n2. **信令队列堆积**：通勤高峰时段大量NSA终端同步发起SGW不变更TAU，S1接口信令队列堆积，消息处理延迟超限。\n3. **N26通道带宽不足**：AMF与对接MME之间N26通道带宽不足，跨网元TAU上下文同步报文挤占S1信令资源。\n4. **基站缓冲参数配置过小**：部分老旧LTE基站S1链路缓冲参数配置过小，批量TAU报文触发端口拥塞丢弃。\n\n**建议处理方向**：检查S1/N26接口链路质量与带宽配置，优化基站缓冲参数，并结合话务高峰时段调整信令处理阈值或扩容相关通道容量。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-85fda7d0-2678-4bba-a16f-3c0e27312e28"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-167ea7f5-ea7c-414b-a1d1-e1328315d92e"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-297f8864-137e-41fe-81da-dbd7f44c401d"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3458"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 6753278,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4778,
+      "byte_offset": 6754375,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6759153,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 6759358,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4856,
+      "byte_offset": 6760183,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6765039,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 7186685,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 7187046,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1527,
+      "byte_offset": 7187254,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7188781,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 7188986,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 7189199,
+      "path": "archive/2026-10-12/06/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-85fda7d0-2678-4bba-a16f-3c0e27312e28"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-167ea7f5-ea7c-414b-a1d1-e1328315d92e"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-297f8864-137e-41fe-81da-dbd7f44c401d"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3408"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T06:27:38.878316+00:00",
+    "arrival_seq": 1852,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/06"
+  }
+}

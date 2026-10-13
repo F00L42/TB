@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n3. 当前状态：  \n\n\n\n最终回答：\n\n\n#### 3. 当前状态\n\n- **指标恢复情况**：\n  - AMF/UPF CPU利用率已回落至 `65%/70%` 基线水平，队列长度稳定在 `~1500`，负载特征已脱离**剧烈波动**（30分钟内波动幅度 > 15%），未出现**高位震荡**（持续2小时维持在阈值上限80%以上且波动±5%以内）。\n  - `SID=100072` 语音建立失败率由峰值 `23%` 降至 `1.8%` 并持续收敛；N2/N4接口超时计数归零，SMF `503` 响应清零。\n  - PFCP会话建立成功率恢复至 `≥99.3%`，N6吞吐量稳定在 `280~295Mbps`。\n\n- **配置与措施生效状态**：\n  - **临时措施**：已全部生效并验证有效（PFCP规则加载、N6带宽调整、T3560上调至8s、缓存强制清理、告警阈值临时上调至90%）。\n  - **长期修复**：UPF固件升级（v2.3.14）与AMF算力扩容进入变更窗口审批；定时器优化（T3560→10s+指数退避）、动态背压与策略同步探针已完成测试环境验证，排期至明日灰度下发。\n\n- **后续验证与监控计划**：\n  - 维持 `2小时` 观察期，重点监控日终尾部流量与夜间基线切换阶段的队列水位与重试频率。\n  - 若失败率反弹或CPU再次触发**剧烈波动**，立即执行回滚预案（恢复原定时器/带宽配置，切换备用UPF实例）。\n  - 长期修复项按变更窗口逐项落地，每项生效后同步更新配置基线并触发回归验证。\n\n如需输出《故障诊断与修复报告》归档模板或调整监控阈值策略，请回复具体需求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "是否需要输出《故障诊断与修复报告》归档模板？\n长期修复项的灰度下发具体安排在明日的什么时间窗口？\n如果观察期内失败率反弹，回滚预案的执行步骤和责任人是谁？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 715,
+      "total_tokens": 761,
+      "completion_tokens": 46,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 715,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 46,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 761,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 45,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n3. 当前状态：  \n\n\n\n最终回答：\n\n\n#### 3. 当前状态\n\n- **指标恢复情况**：\n  - AMF/UPF CPU利用率已回落至 `65%/70%` 基线水平，队列长度稳定在 `~1500`，负载特征已脱离**剧烈波动**（30分钟内波动幅度 > 15%），未出现**高位震荡**（持续2小时维持在阈值上限80%以上且波动±5%以内）。\n  - `SID=100072` 语音建立失败率由峰值 `23%` 降至 `1.8%` 并持续收敛；N2/N4接口超时计数归零，SMF `503` 响应清零。\n  - PFCP会话建立成功率恢复至 `≥99.3%`，N6吞吐量稳定在 `280~295Mbps`。\n\n- **配置与措施生效状态**：\n  - **临时措施**：已全部生效并验证有效（PFCP规则加载、N6带宽调整、T3560上调至8s、缓存强制清理、告警阈值临时上调至90%）。\n  - **长期修复**：UPF固件升级（v2.3.14）与AMF算力扩容进入变更窗口审批；定时器优化（T3560→10s+指数退避）、动态背压与策略同步探针已完成测试环境验证，排期至明日灰度下发。\n\n- **后续验证与监控计划**：\n  - 维持 `2小时` 观察期，重点监控日终尾部流量与夜间基线切换阶段的队列水位与重试频率。\n  - 若失败率反弹或CPU再次触发**剧烈波动**，立即执行回滚预案（恢复原定时器/带宽配置，切换备用UPF实例）。\n  - 长期修复项按变更窗口逐项落地，每项生效后同步更新配置基线并触发回归验证。\n\n如需输出《故障诊断与修复报告》归档模板或调整监控阈值策略，请回复具体需求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6d82acc3-c228-4dd4-965f-4847e5cd9f24"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fc5cd3d9-e0f3-4242-85cb-e12c55c3a090"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3028"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 1464379,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4206,
+      "byte_offset": 1465476,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1469682,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 1469887,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4284,
+      "byte_offset": 1470712,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 1474996,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 1489818,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 1490179,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1419,
+      "byte_offset": 1490387,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1491806,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 1492011,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 1492224,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6d82acc3-c228-4dd4-965f-4847e5cd9f24"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fc5cd3d9-e0f3-4242-85cb-e12c55c3a090"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2978"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:20:26.892729+00:00",
+    "arrival_seq": 3745,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

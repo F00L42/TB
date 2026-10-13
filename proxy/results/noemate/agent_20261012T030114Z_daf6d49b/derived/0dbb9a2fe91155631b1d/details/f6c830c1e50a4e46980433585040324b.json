@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：在 UNC 产品中，当出现“100314”告警时，可能的原因有两个:APN 下的 PDP 上下文数过多；SET APNACCESSCTRL 配置的“最大 PDP 数目”不恰当。\n\n\n\n最终回答：\n\n\n在UNC产品中，`100314` 对应的是告警 **ALM-100314 APN最大PDP数流控**。该告警主要用于提示特定APN下的会话数量已达到系统配置的流控阈值。\n\n### 🔍 常见触发原因\n1. **实际业务量过大**：该APN下的终端接入或专载创建请求激增，导致激活的PDP上下文数量超过系统阈值。\n2. **配置阈值不合理**：通过 `SET APNACCESSCTRL` 命令配置的“最大PDP数目”偏低，未结合现网实际部署规划进行合理设置。\n\n### 🛠️ 处理建议\n- **核对配置与现网情况**：执行 `LST APNACCESSCTRL` 查看当前配置的最大PDP数目，并结合 `DSP SMSESSIONNUM` 查询实际会话数，判断是否确实超阈。\n- **调整流控阈值**：若配置值偏低，执行 `SET APNACCESSCTRL` 适当调大最大PDP数目，使其匹配现网业务规模。\n- **持续观察**：调整后观察告警是否恢复。若阈值合理且会话数无异常但仍持续上报，建议联系技术支持进一步排查。\n\n> 💡 **业务影响**：告警触发期间，该APN下的新会话创建或专载创建请求会被拒绝，可能导致用户接入失败。建议结合现网业务峰值提前评估容量。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何执行 LST APNACCESSCTRL 命令查看当前APN的最大PDP数目配置？\n如果调整最大PDP数目后告警仍未恢复，可能需要检查哪些相关参数？\n在业务高峰期来临前，如何合理评估和设置APN的容量阈值？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 626,
+      "total_tokens": 684,
+      "completion_tokens": 58,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 626,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 58,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 684,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 57,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：在 UNC 产品中，当出现“100314”告警时，可能的原因有两个:APN 下的 PDP 上下文数过多；SET APNACCESSCTRL 配置的“最大 PDP 数目”不恰当。\n\n\n\n最终回答：\n\n\n在UNC产品中，`100314` 对应的是告警 **ALM-100314 APN最大PDP数流控**。该告警主要用于提示特定APN下的会话数量已达到系统配置的流控阈值。\n\n### 🔍 常见触发原因\n1. **实际业务量过大**：该APN下的终端接入或专载创建请求激增，导致激活的PDP上下文数量超过系统阈值。\n2. **配置阈值不合理**：通过 `SET APNACCESSCTRL` 命令配置的“最大PDP数目”偏低，未结合现网实际部署规划进行合理设置。\n\n### 🛠️ 处理建议\n- **核对配置与现网情况**：执行 `LST APNACCESSCTRL` 查看当前配置的最大PDP数目，并结合 `DSP SMSESSIONNUM` 查询实际会话数，判断是否确实超阈。\n- **调整流控阈值**：若配置值偏低，执行 `SET APNACCESSCTRL` 适当调大最大PDP数目，使其匹配现网业务规模。\n- **持续观察**：调整后观察告警是否恢复。若阈值合理且会话数无异常但仍持续上报，建议联系技术支持进一步排查。\n\n> 💡 **业务影响**：告警触发期间，该APN下的新会话创建或专载创建请求会被拒绝，可能导致用户接入失败。建议结合现网业务峰值提前评估容量。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f703e6dc-f676-48e5-8eac-7351bb9cf0ab"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ab0fe1aa-6a5d-4e91-893b-6ce4f03e760f"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9cfc04b4-54fb-4131-a90b-1bbb233fad80"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2882"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10294462,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 4010,
+      "byte_offset": 10295559,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10299569,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10299774,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 4088,
+      "byte_offset": 10300599,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10304687,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10639943,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10640304,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 1447,
+      "byte_offset": 10640512,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10641959,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10642164,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10642377,
+      "path": "archive/2026-10-12/09/part-00016.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f703e6dc-f676-48e5-8eac-7351bb9cf0ab"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ab0fe1aa-6a5d-4e91-893b-6ce4f03e760f"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9cfc04b4-54fb-4131-a90b-1bbb233fad80"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2832"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:33:46.192716+00:00",
+    "arrival_seq": 4918,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

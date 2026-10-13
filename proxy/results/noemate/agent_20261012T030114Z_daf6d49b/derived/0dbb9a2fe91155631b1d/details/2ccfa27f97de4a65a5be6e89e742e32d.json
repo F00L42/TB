@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nALM-36磁盘占用率过高告警的属性包括哪些参数，对应的告警ID、告警级别和告警类型分别是什么？\n\n\n\n最终回答：\n根据产品文档，**ALM-36 磁盘占用率过高告警**的属性及参数如下：\n\n### 🔔 告警基本属性\n| 属性项 | 具体内容 |\n| :--- | :--- |\n| **告警ID** | `36` |\n| **告警级别** | **重要** |\n| **告警类型** | **越限**（部分产品/版本中定义为“网管内部”） |\n\n### 📦 告警参数说明\n该告警携带的参数主要用于定位故障节点和查看磁盘使用情况，分为定位信息与附加信息两类：\n\n| 类别 | 参数名称 | 参数含义 |\n| :--- | :--- | :--- |\n| **定位信息** | **主机** | 产生告警时，故障节点的名称。 |\n| | **操作系统** | 服务器的操作系统。 |\n| | **磁盘** | 产生告警的服务器磁盘名称。 |\n| | **站点名称** | 产生告警的站点名称。 |\n| **附加信息** | **产生门限** | 告警产生的占用率门限值。 |\n| | **清除门限** | 告警清除的占用率门限值。 |\n| | **剩余空间产生门限** | 告警产生的剩余空间门限值。 |\n| | **剩余空间清除门限** | 告警清除的剩余空间门限值。 |\n| | **容量** | 磁盘总容量。 |\n| | **占用率** | 产生告警时，磁盘空间的使用率。 |\n| | **IP地址** | 产生告警时，故障节点的IP地址。 |\n| | **产品别名** | 产生告警的产品别名。 |\n| | **接入IP / 站点** | 管理面的接入IP地址，或站点名称及虚拟IP地址（依具体产品而定）。 |\n\n> 💡 **补充说明**：\n> 1. 不同产品线（如 eSight、iMaster MAE、NCE-Fabric 等）或不同版本中，部分附加参数的命名或检测阈值规则可能略有差异，但核心参数保持一致。\n> 2. 该告警在磁盘占用率回落至清除门限以下时，系统通常会**自动清除**。若因节点名称变更、磁盘挂载点变化等原因导致无法自动清除，需手动操作清除。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "磁盘占用率过高告警的默认产生门限和清除门限分别是多少？\n当ALM-36告警无法自动清除时，具体的手动清除操作步骤是什么？\n不同产品线（如eSight、iMaster MAE）中该告警的参数命名有哪些具体差异？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 811,
+      "total_tokens": 874,
+      "completion_tokens": 63,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 811,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 63,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 874,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 62,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nALM-36磁盘占用率过高告警的属性包括哪些参数，对应的告警ID、告警级别和告警类型分别是什么？\n\n\n\n最终回答：\n根据产品文档，**ALM-36 磁盘占用率过高告警**的属性及参数如下：\n\n### 🔔 告警基本属性\n| 属性项 | 具体内容 |\n| :--- | :--- |\n| **告警ID** | `36` |\n| **告警级别** | **重要** |\n| **告警类型** | **越限**（部分产品/版本中定义为“网管内部”） |\n\n### 📦 告警参数说明\n该告警携带的参数主要用于定位故障节点和查看磁盘使用情况，分为定位信息与附加信息两类：\n\n| 类别 | 参数名称 | 参数含义 |\n| :--- | :--- | :--- |\n| **定位信息** | **主机** | 产生告警时，故障节点的名称。 |\n| | **操作系统** | 服务器的操作系统。 |\n| | **磁盘** | 产生告警的服务器磁盘名称。 |\n| | **站点名称** | 产生告警的站点名称。 |\n| **附加信息** | **产生门限** | 告警产生的占用率门限值。 |\n| | **清除门限** | 告警清除的占用率门限值。 |\n| | **剩余空间产生门限** | 告警产生的剩余空间门限值。 |\n| | **剩余空间清除门限** | 告警清除的剩余空间门限值。 |\n| | **容量** | 磁盘总容量。 |\n| | **占用率** | 产生告警时，磁盘空间的使用率。 |\n| | **IP地址** | 产生告警时，故障节点的IP地址。 |\n| | **产品别名** | 产生告警的产品别名。 |\n| | **接入IP / 站点** | 管理面的接入IP地址，或站点名称及虚拟IP地址（依具体产品而定）。 |\n\n> 💡 **补充说明**：\n> 1. 不同产品线（如 eSight、iMaster MAE、NCE-Fabric 等）或不同版本中，部分附加参数的命名或检测阈值规则可能略有差异，但核心参数保持一致。\n> 2. 该告警在磁盘占用率回落至清除门限以下时，系统通常会**自动清除**。若因节点名称变更、磁盘挂载点变化等原因导致无法自动清除，需手动操作清除。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-06fcc9a5-19de-42fa-9ac9-faa200d79782"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e18d64df-9bee-4397-a743-ddd1ae66d4f1"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-065ed928-b05e-4eb9-bfd9-7e858daf2f87"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3460"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 16767903,
+      "path": "archive/2026-10-12/13/part-00002.jsonl"
+    },
+    {
+      "byte_length": 4782,
+      "byte_offset": 16769000,
+      "path": "archive/2026-10-12/13/part-00002.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 16773782,
+      "path": "archive/2026-10-12/13/part-00002.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 16773987,
+      "path": "archive/2026-10-12/13/part-00002.jsonl"
+    },
+    {
+      "byte_length": 4860,
+      "byte_offset": 0,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4860,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 1119184,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 1119545,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1463,
+      "byte_offset": 1119753,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1121216,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 1121421,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 1121634,
+      "path": "archive/2026-10-12/13/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-06fcc9a5-19de-42fa-9ac9-faa200d79782"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e18d64df-9bee-4397-a743-ddd1ae66d4f1"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-065ed928-b05e-4eb9-bfd9-7e858daf2f87"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3410"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:08:46.330166+00:00",
+    "arrival_seq": 7381,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

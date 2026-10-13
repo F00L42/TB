@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nNRF网元的NF心跳异常告警发生原因是什么\n\n\n\n最终回答：\n\n\n根据知识库信息，NRF网元的**ALM-100060 NF心跳异常告警**的发生原因如下：\n\n## 可能原因\n\n1. **NRF自身故障** - NRF网元本身出现异常\n2. **传输网络故障** - NRF与NF之间的传输网络出现问题\n3. **对端NF故障** - 注册到NRF的对端NF网元发生故障\n\n## 告警触发机制\n\n当在NRF注册的NF与NRF之间的心跳异常后，NRF将该NF的状态设置为**Suspended**状态，系统产生此告警。\n\n## 对系统的影响\n\n其他NF将不能通过NRF发现该NF，该NF提供服务对应的流程可能会受到影响。\n\n## 处理建议\n\n1. **检查NRF自身故障**：执行`DSP REGNFINSTANCE`查看该NF的状态是否为Suspended\n2. **检查传输网络故障**：在告警服务台上查看NRF是否有HTTP链路告警，如有参考\"ALM-100155 HTTP链路故障\"处理\n3. **检查对端NF故障**：联系对端NF维护工程师排查对端NF是否有故障\n\n该告警为**重要告警**，支持自动清除。当NF与NRF间心跳恢复、NF去注册成功、或NRF删除老化的NF实例后，告警会自动恢复。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何执行DSP REGNFINSTANCE命令来查看NF的状态？\n如果检查发现是传输网络故障，具体的处理步骤是什么？\n在对端NF故障的情况下，如何确认故障已经排除并恢复心跳？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 568,
+      "total_tokens": 612,
+      "completion_tokens": 44,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 568,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 44,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 612,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 43,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nNRF网元的NF心跳异常告警发生原因是什么\n\n\n\n最终回答：\n\n\n根据知识库信息，NRF网元的**ALM-100060 NF心跳异常告警**的发生原因如下：\n\n## 可能原因\n\n1. **NRF自身故障** - NRF网元本身出现异常\n2. **传输网络故障** - NRF与NF之间的传输网络出现问题\n3. **对端NF故障** - 注册到NRF的对端NF网元发生故障\n\n## 告警触发机制\n\n当在NRF注册的NF与NRF之间的心跳异常后，NRF将该NF的状态设置为**Suspended**状态，系统产生此告警。\n\n## 对系统的影响\n\n其他NF将不能通过NRF发现该NF，该NF提供服务对应的流程可能会受到影响。\n\n## 处理建议\n\n1. **检查NRF自身故障**：执行`DSP REGNFINSTANCE`查看该NF的状态是否为Suspended\n2. **检查传输网络故障**：在告警服务台上查看NRF是否有HTTP链路告警，如有参考\"ALM-100155 HTTP链路故障\"处理\n3. **检查对端NF故障**：联系对端NF维护工程师排查对端NF是否有故障\n\n该告警为**重要告警**，支持自动清除。当NF与NRF间心跳恢复、NF去注册成功、或NRF删除老化的NF实例后，告警会自动恢复。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-be109b39-755b-4327-ac12-46f51aacd1a5"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-32b9f32a-88ea-4ba9-815d-ef8633bd7114"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7a5a55fe-6820-42d5-9572-a39fb4db5afb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2619"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 8935267,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 3662,
+      "byte_offset": 8936364,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8940026,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 8940231,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 3736,
+      "byte_offset": 8941056,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 8944792,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 8989398,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 8989759,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 1403,
+      "byte_offset": 8989967,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8991370,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 8991575,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 8991788,
+      "path": "archive/2026-10-12/13/part-00012.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-be109b39-755b-4327-ac12-46f51aacd1a5"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-32b9f32a-88ea-4ba9-815d-ef8633bd7114"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7a5a55fe-6820-42d5-9572-a39fb4db5afb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2569"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:30:26.736212+00:00",
+    "arrival_seq": 7978,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

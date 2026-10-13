@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n命令SET AUTOCON。诊断主机host108的内存温度过高告警，并给出其告警含义\n\n\n\n最终回答：\n\n\n您好！您的输入包含两个部分，我需要分别说明：\n\n**1. 关于\"命令SET AUTOCON。\"**\n该输入不完整，无法确认您的具体意图。请问您是想：\n- 查询该命令的功能说明或使用方法？\n- 执行该命令（需注明目标网元）？\n请补充完整描述，以便我为您处理。\n\n**2. 关于\"诊断主机host108的内存温度过高告警，并给出其告警含义\"**\n我已尝试调用故障诊断接口和告警知识问答接口，但均未能成功获取结果：\n- 故障诊断接口：请求超时，未能返回诊断结果\n- 告警知识问答接口：服务暂时不可用\n\n因此，我当前无法提供主机host108内存温度过高告警的诊断结果及告警含义。\n\n**建议：**\n- 请稍后重试，或检查相关服务是否正常\n- 若您有该告警的ID或更多上下文信息，也可一并提供，有助于精准定位\n\n如有其他问题，请随时告知！"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "SET AUTOCON命令的完整语法和执行前提是什么？\n主机host108内存温度过高告警的默认阈值和硬件定位方法是什么？\n当故障诊断和告警知识接口不可用时，有哪些替代方案可以获取告警含义？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 510,
+      "total_tokens": 563,
+      "completion_tokens": 53,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 510,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 53,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 563,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 52,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n命令SET AUTOCON。诊断主机host108的内存温度过高告警，并给出其告警含义\n\n\n\n最终回答：\n\n\n您好！您的输入包含两个部分，我需要分别说明：\n\n**1. 关于\"命令SET AUTOCON。\"**\n该输入不完整，无法确认您的具体意图。请问您是想：\n- 查询该命令的功能说明或使用方法？\n- 执行该命令（需注明目标网元）？\n请补充完整描述，以便我为您处理。\n\n**2. 关于\"诊断主机host108的内存温度过高告警，并给出其告警含义\"**\n我已尝试调用故障诊断接口和告警知识问答接口，但均未能成功获取结果：\n- 故障诊断接口：请求超时，未能返回诊断结果\n- 告警知识问答接口：服务暂时不可用\n\n因此，我当前无法提供主机host108内存温度过高告警的诊断结果及告警含义。\n\n**建议：**\n- 请稍后重试，或检查相关服务是否正常\n- 若您有该告警的ID或更多上下文信息，也可一并提供，有助于精准定位\n\n如有其他问题，请随时告知！"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-24bd81a7-b376-4168-981f-0ab5c4f0b3a8"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-2c4755f5-6ad0-49a3-9e84-fa9eaa8bd354"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ae068318-3962-4871-a21c-3c82ceccac12"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2513"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10066029,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 3518,
+      "byte_offset": 10067126,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10070644,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10070849,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 3596,
+      "byte_offset": 10071674,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10075270,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10270931,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10271292,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 1443,
+      "byte_offset": 10271500,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10272943,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10273148,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10273361,
+      "path": "archive/2026-10-12/11/part-00008.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-24bd81a7-b376-4168-981f-0ab5c4f0b3a8"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-2c4755f5-6ad0-49a3-9e84-fa9eaa8bd354"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-ae068318-3962-4871-a21c-3c82ceccac12"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2463"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T11:53:21.263468+00:00",
+    "arrival_seq": 6735,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/11"
+  }
+}

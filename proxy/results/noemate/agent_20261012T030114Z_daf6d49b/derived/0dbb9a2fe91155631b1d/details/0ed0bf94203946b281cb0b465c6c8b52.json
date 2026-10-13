@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n异常模式识别：\n\n\n\n最终回答：\n### 异常模式识别框架\n\n| 异常模式 | 识别标准（严格对照您的定义） | 典型日志/指标特征 | 关联根因 | 处置策略 |\n|:---|:---|:---|:---|:---|\n| **剧烈波动** | 30分钟内波动幅度 > 15% | `N6TXBytes`突增/骤降、`CPU`瞬时触顶、`InterfaceDOWN`、`TunnelEstablishmentFailed` | 传输中断、TEID冲突、DDoS洪峰、保护性断链 | 快速隔离故障源，恢复路径可达性，启用动态TEID与PMTUD |\n| **大幅波动** | 1小时内波动幅度 > 20% | `DropRate`持续攀升、`CreatePDRReject`堆积、`ICMP FragmentationNeeded` | MTU不匹配、QoS硬限速截断、路由偏移 | 对齐MTU配置，改为动态令牌桶限速，优化ECMP哈希 |\n| **高位震荡** | 持续2小时维持在阈值上限80%以上且波动±5%以内 | `QueueUtil`卡在82%~87%、`PortUtilization`贴近阈值、`TailDrop`持续计数 | 硬限速死锁、会话未释放、队列无拥塞避免机制 | 启用WRED/HTB，上调会话阈值，配置自动扩缩容联动 |\n| **小幅波动** | 1小时内波动幅度 3%-5% | 指标回归基线、`GC_Pause`恢复正常、扩容节点生效 | 业务潮汐、策略调整后的平稳期、修复验证阶段 | 保持监控，确认无二次触发，归档抓包与临时告警 |\n\n#### 🔍 模式识别工作流\n1. **数据对齐**：将性能计数器、系统日志、抓包事件按秒级时间戳对齐。\n2. **窗口计算**：按30min/1h/2h窗口计算环比幅度与持续时长，严格匹配您的阈值定义。\n3. **特征打标**：输出波动类型标签，并关联对应根因类别（传输/配置/资源/策略）。\n4. **策略触发**：\n   - 剧烈/大幅波动 → 执行应急修复（MTU对齐、TEID动态化、链路恢复）\n   - 高位震荡 → 执行参数调优（WRED、令牌桶、会话清理、弹性扩容）\n   - 小幅波动 → 进入观察期，验证修复效果\n\n#### 📊 自动化识别命令示例\n```bash\n# 按您的定义自动打标（awk逻辑示例）\nawk -F'|' '\\{\n  amp = ($3 - prev) / prev * 100;\n  if (window==30m && amp>15) tag=\"剧烈波动\";\n  else if (window==60m && amp>20) tag=\"大幅波动\";\n  else if (window==60m && amp>=3 && amp<=5) tag=\"小幅波动\";\n  else if (dur>=120m && val>=0.8 && amp<=5) tag=\"高位震荡\";\n  print $0 \" | \" tag\n\\}' n6_perf_log.csv\n```\n\n提供实际指标序列或确认上述框架，我将输出对应模式的精确修复命令与热加载验证步骤。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何获取符合该框架要求的N6接口性能日志和指标数据？\n高位震荡场景下启用WRED和HTB的具体配置命令是什么？\n剧烈波动识别到TEID冲突时，动态分配TEID的实现步骤有哪些？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 993,
+      "total_tokens": 1043,
+      "completion_tokens": 50,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 993,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 50,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1043,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 49,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n异常模式识别：\n\n\n\n最终回答：\n### 异常模式识别框架\n\n| 异常模式 | 识别标准（严格对照您的定义） | 典型日志/指标特征 | 关联根因 | 处置策略 |\n|:---|:---|:---|:---|:---|\n| **剧烈波动** | 30分钟内波动幅度 > 15% | `N6TXBytes`突增/骤降、`CPU`瞬时触顶、`InterfaceDOWN`、`TunnelEstablishmentFailed` | 传输中断、TEID冲突、DDoS洪峰、保护性断链 | 快速隔离故障源，恢复路径可达性，启用动态TEID与PMTUD |\n| **大幅波动** | 1小时内波动幅度 > 20% | `DropRate`持续攀升、`CreatePDRReject`堆积、`ICMP FragmentationNeeded` | MTU不匹配、QoS硬限速截断、路由偏移 | 对齐MTU配置，改为动态令牌桶限速，优化ECMP哈希 |\n| **高位震荡** | 持续2小时维持在阈值上限80%以上且波动±5%以内 | `QueueUtil`卡在82%~87%、`PortUtilization`贴近阈值、`TailDrop`持续计数 | 硬限速死锁、会话未释放、队列无拥塞避免机制 | 启用WRED/HTB，上调会话阈值，配置自动扩缩容联动 |\n| **小幅波动** | 1小时内波动幅度 3%-5% | 指标回归基线、`GC_Pause`恢复正常、扩容节点生效 | 业务潮汐、策略调整后的平稳期、修复验证阶段 | 保持监控，确认无二次触发，归档抓包与临时告警 |\n\n#### 🔍 模式识别工作流\n1. **数据对齐**：将性能计数器、系统日志、抓包事件按秒级时间戳对齐。\n2. **窗口计算**：按30min/1h/2h窗口计算环比幅度与持续时长，严格匹配您的阈值定义。\n3. **特征打标**：输出波动类型标签，并关联对应根因类别（传输/配置/资源/策略）。\n4. **策略触发**：\n   - 剧烈/大幅波动 → 执行应急修复（MTU对齐、TEID动态化、链路恢复）\n   - 高位震荡 → 执行参数调优（WRED、令牌桶、会话清理、弹性扩容）\n   - 小幅波动 → 进入观察期，验证修复效果\n\n#### 📊 自动化识别命令示例\n```bash\n# 按您的定义自动打标（awk逻辑示例）\nawk -F'|' '\\{\n  amp = ($3 - prev) / prev * 100;\n  if (window==30m && amp>15) tag=\"剧烈波动\";\n  else if (window==60m && amp>20) tag=\"大幅波动\";\n  else if (window==60m && amp>=3 && amp<=5) tag=\"小幅波动\";\n  else if (dur>=120m && val>=0.8 && amp<=5) tag=\"高位震荡\";\n  print $0 \" | \" tag\n\\}' n6_perf_log.csv\n```\n\n提供实际指标序列或确认上述框架，我将输出对应模式的精确修复命令与热加载验证步骤。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f4a97c60-49e1-48ad-b83c-cb1df7de0773"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-3bcc8d9e-54ec-436b-87d8-7adbc920d6b2"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3957"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10941849,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 5446,
+      "byte_offset": 10942946,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10948392,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10948597,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 5520,
+      "byte_offset": 10949422,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10954942,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10970374,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10970735,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1419,
+      "byte_offset": 10970943,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10972362,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10972567,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10972780,
+      "path": "archive/2026-10-12/08/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f4a97c60-49e1-48ad-b83c-cb1df7de0773"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-3bcc8d9e-54ec-436b-87d8-7adbc920d6b2"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3907"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:23:13.167047+00:00",
+    "arrival_seq": 3764,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

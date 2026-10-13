@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nAMF和SMF之间通过什么接口对接？\n\n\n\n最终回答：\n\n\n在5G核心网架构中，AMF（接入与移动性管理功能）和SMF（会话管理功能）之间通过 **N11接口** 进行对接和通信。\n\n该接口的主要技术特性如下：\n\n1. **协议栈**：N11接口基于服务化架构（SBA），传输层统一采用 **HTTP/2** 协议，并通过 **TLS** 协议保障信令传输的保密性与完整性。\n2. **核心功能**：\n   - **会话管理信令转发**：UE发起PDU会话建立、修改或释放请求时，AMF通过N11接口将相关信令路由并转发给对应的SMF。\n   - **移动性事件通知**：当UE发生切换或移动性事件时，AMF通过该接口通知SMF，以便SMF调整用户面路径或会话策略。\n   - **N1/N2 消息交互**：SMF需要通过N11接口调用AMF的服务，将控制指令下发给UE（N1）或基站RAN（N2）。\n3. **主要服务化操作（Service Operation）**：\n   - **SMF提供**：`Nsmf_PDUSession` 服务（包含 `CreateSMContext`、`UpdateSMContext`、`ReleaseSMContext` 等）。\n   - **AMF提供**：`Namf_Communication` 服务（包含 `UE Specific N1N2 Message` 转发等）。\n\n通过N11接口，AMF负责的路由与移动性管理与SMF负责的会话控制得以解耦并协同工作，符合3GPP TS 29.502等标准规范。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "N11接口的协议栈具体包含哪些层次？\nAMF通过N11接口向SMF转发哪些类型的会话管理信令？\nN11接口中SMF和AMF分别提供哪些服务化操作？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 634,
+      "total_tokens": 684,
+      "completion_tokens": 50,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 634,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 50,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 684,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 49,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nAMF和SMF之间通过什么接口对接？\n\n\n\n最终回答：\n\n\n在5G核心网架构中，AMF（接入与移动性管理功能）和SMF（会话管理功能）之间通过 **N11接口** 进行对接和通信。\n\n该接口的主要技术特性如下：\n\n1. **协议栈**：N11接口基于服务化架构（SBA），传输层统一采用 **HTTP/2** 协议，并通过 **TLS** 协议保障信令传输的保密性与完整性。\n2. **核心功能**：\n   - **会话管理信令转发**：UE发起PDU会话建立、修改或释放请求时，AMF通过N11接口将相关信令路由并转发给对应的SMF。\n   - **移动性事件通知**：当UE发生切换或移动性事件时，AMF通过该接口通知SMF，以便SMF调整用户面路径或会话策略。\n   - **N1/N2 消息交互**：SMF需要通过N11接口调用AMF的服务，将控制指令下发给UE（N1）或基站RAN（N2）。\n3. **主要服务化操作（Service Operation）**：\n   - **SMF提供**：`Nsmf_PDUSession` 服务（包含 `CreateSMContext`、`UpdateSMContext`、`ReleaseSMContext` 等）。\n   - **AMF提供**：`Namf_Communication` 服务（包含 `UE Specific N1N2 Message` 转发等）。\n\n通过N11接口，AMF负责的路由与移动性管理与SMF负责的会话控制得以解耦并协同工作，符合3GPP TS 29.502等标准规范。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f7abcd1a-c81d-47f0-a2c7-2ea4ce6b6ba9"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-07288655-a1d1-469f-a584-b39cb83567f7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7b7d576a-6db9-4cbc-9f93-511e6f0f1e1d"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2774"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 6886175,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 3866,
+      "byte_offset": 6887272,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6891138,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 6891343,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 3944,
+      "byte_offset": 6892168,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 6896112,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 7309198,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 7309559,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 1347,
+      "byte_offset": 7309767,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7311114,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 7311319,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 7311532,
+      "path": "archive/2026-10-12/13/part-00025.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f7abcd1a-c81d-47f0-a2c7-2ea4ce6b6ba9"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-07288655-a1d1-469f-a584-b39cb83567f7"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7b7d576a-6db9-4cbc-9f93-511e6f0f1e1d"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2724"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:58:47.755096+00:00",
+    "arrival_seq": 8632,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

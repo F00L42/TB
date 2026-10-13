@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM002网元在今天上午发生了ALM-16028 高负荷服务禁止跟踪的告警，这个告警是什么意思，并进行诊断\n\n\n\n最终回答：\n\n\n根据知识库查询结果，为您说明ALM-16028告警的含义及诊断建议：\n\n---\n\n## 告警含义\n\n**告警名称：** ALM-16028 高负荷服务禁止跟踪\n\n**告警解释：**\n- **触发机制：** 各模块每秒检查一次系统状态，当连续5个周期虚拟机CPU、容器CPU或进程CPU（裸机POD CPU、容器CPU与进程CPU）的使用率超过软参\"TRACEAUTOLOCK(跟踪自动闭锁)\"设置的阈值（默认75%）时，系统停止对应模块的全部跟踪任务，并产生此告警。\n- **恢复机制：** 该告警需要手动恢复。\n\n**告警属性：**\n\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---|:---:|\n| 16028 | 次要告警 | 否 |\n\n**对系统的影响：**\n上报该告警的模块的跟踪任务将全部停止，从而提升系统性能，防止CPU占用率过高导致系统性能降低。\n\n**可能原因：**\n- 跟踪性能影响造成单模块CPU占用过大\n- 整系统业务量过载导致模块CPU过高\n\n---\n\n## 诊断说明\n\n调用实时诊断服务未能返回UDM002网元今天上午该告警实例的匹配结果。以下为标准处理步骤，可供参考：\n\n### 处理步骤\n\n1. **检查当前CPU使用率**\n   - 登录\"UDM MML命令\"界面，执行`LST INSP`命令查看当前告警参数中\"CPU使用率\"的值是否大于\"TRACEAUTOLOCK(跟踪自动闭锁)\"软参值。\n   - 若CPU使用率已恢复正常，联系华为技术支持确认是否可以恢复跟踪功能。\n\n2. **收集话统采集当前业务量信息**\n   - 登录MAE网管系统，查看各模块的话统统计数据，与历史数据进行比较，判断是否为业务处理增多导致的告警。\n   - 若是业务量增多，分析原因后联系华为技术支持。\n\n3. **恢复跟踪功能（需技术支持确认后执行）**\n   - 手工清除告警。\n   - 根据告警的\"模块号\"，执行`STR SFTDEBUG`命令恢复跟踪功能：\n     ```\n     STR SFTDEBUG: MID=<模块号>, EX=ACTIVE, LN=FRONT, PID=<进程号>, CTRL=28, PM0=1;\n     ```\n   - 查看跟踪功能是否恢复。\n\n4. **如上述步骤无法解决**\n   - 收集告警信息和服务日志，联系华为技术支持处理。\n\n---\n\n**建议：** 由于该告警涉及CPU高负荷保护机制，建议先确认当前UDM002网元的CPU使用率是否已回落，并检查上午告警发生时是否有大量跟踪任务正在执行。如需进一步分析，请提供告警详情中的模块号和CPU使用率参数。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "UDM002网元当前的CPU使用率是否已恢复到正常阈值以下？\n今天上午告警触发时，该网元是否配置了较多的长期跟踪任务？\n是否需要协助编写恢复指定模块跟踪功能的STR SFTDEBUG命令？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 941,
+      "total_tokens": 993,
+      "completion_tokens": 52,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 941,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 52,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 993,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 51,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUDM002网元在今天上午发生了ALM-16028 高负荷服务禁止跟踪的告警，这个告警是什么意思，并进行诊断\n\n\n\n最终回答：\n\n\n根据知识库查询结果，为您说明ALM-16028告警的含义及诊断建议：\n\n---\n\n## 告警含义\n\n**告警名称：** ALM-16028 高负荷服务禁止跟踪\n\n**告警解释：**\n- **触发机制：** 各模块每秒检查一次系统状态，当连续5个周期虚拟机CPU、容器CPU或进程CPU（裸机POD CPU、容器CPU与进程CPU）的使用率超过软参\"TRACEAUTOLOCK(跟踪自动闭锁)\"设置的阈值（默认75%）时，系统停止对应模块的全部跟踪任务，并产生此告警。\n- **恢复机制：** 该告警需要手动恢复。\n\n**告警属性：**\n\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---|:---:|\n| 16028 | 次要告警 | 否 |\n\n**对系统的影响：**\n上报该告警的模块的跟踪任务将全部停止，从而提升系统性能，防止CPU占用率过高导致系统性能降低。\n\n**可能原因：**\n- 跟踪性能影响造成单模块CPU占用过大\n- 整系统业务量过载导致模块CPU过高\n\n---\n\n## 诊断说明\n\n调用实时诊断服务未能返回UDM002网元今天上午该告警实例的匹配结果。以下为标准处理步骤，可供参考：\n\n### 处理步骤\n\n1. **检查当前CPU使用率**\n   - 登录\"UDM MML命令\"界面，执行`LST INSP`命令查看当前告警参数中\"CPU使用率\"的值是否大于\"TRACEAUTOLOCK(跟踪自动闭锁)\"软参值。\n   - 若CPU使用率已恢复正常，联系华为技术支持确认是否可以恢复跟踪功能。\n\n2. **收集话统采集当前业务量信息**\n   - 登录MAE网管系统，查看各模块的话统统计数据，与历史数据进行比较，判断是否为业务处理增多导致的告警。\n   - 若是业务量增多，分析原因后联系华为技术支持。\n\n3. **恢复跟踪功能（需技术支持确认后执行）**\n   - 手工清除告警。\n   - 根据告警的\"模块号\"，执行`STR SFTDEBUG`命令恢复跟踪功能：\n     ```\n     STR SFTDEBUG: MID=<模块号>, EX=ACTIVE, LN=FRONT, PID=<进程号>, CTRL=28, PM0=1;\n     ```\n   - 查看跟踪功能是否恢复。\n\n4. **如上述步骤无法解决**\n   - 收集告警信息和服务日志，联系华为技术支持处理。\n\n---\n\n**建议：** 由于该告警涉及CPU高负荷保护机制，建议先确认当前UDM002网元的CPU使用率是否已回落，并检查上午告警发生时是否有大量跟踪任务正在执行。如需进一步分析，请提供告警详情中的模块号和CPU使用率参数。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-16dba935-819d-449a-9e63-5fb1680f385a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1b85d066-b24f-4d1a-90d2-70186f605138"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-0155b0a4-8485-4cd7-87dd-c8e074c7db58"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4093"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 12391665,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 5626,
+      "byte_offset": 12392762,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12398388,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 12398593,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 5704,
+      "byte_offset": 12399418,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 207,
+      "byte_offset": 12405122,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 12574382,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 12574743,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 1431,
+      "byte_offset": 12574951,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12576382,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 12576587,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 12576800,
+      "path": "archive/2026-10-12/05/part-00005.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-16dba935-819d-449a-9e63-5fb1680f385a"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1b85d066-b24f-4d1a-90d2-70186f605138"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-0155b0a4-8485-4cd7-87dd-c8e074c7db58"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4043"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T05:28:45.863727+00:00",
+    "arrival_seq": 1230,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/05"
+  }
+}

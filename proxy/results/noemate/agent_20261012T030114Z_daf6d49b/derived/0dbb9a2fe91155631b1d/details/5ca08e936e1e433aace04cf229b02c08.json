@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n如果多个HSM的链路同时出故障了，告警系统会怎么显示这个情况呢？\n\n\n\n最终回答：\n根据现有的产品文档，知识库中未明确说明“多个HSM链路同时故障时告警系统的聚合显示规则”，但基于HSM链路故障告警（如 `ALM-19000`、`ALM-10020`）的定义和参数机制，告警系统通常会按以下方式显示：\n\n### 1. 逐条独立上报（默认行为）\nHSM链路故障告警是**按链路维度**触发的。告警参数中包含用于唯一标识具体链路的字段，例如：\n* `HSM链路名称` / `远端服务器名称`\n* `本端IP地址` / `对端IP地址`\n* `HSM名称` / `ALB实例ID`\n\n当多条链路同时故障时，系统会为**每一条故障链路生成一条独立的告警记录**。在告警列表中会显示多条相同告警ID的记录，可通过上述参数区分具体是哪条链路出现故障。\n\n### 2. 告警压缩/聚合（视配置而定）\n如果告警系统开启了**告警压缩**或**告警聚合**功能，且多条链路故障具有相同的告警源和触发原因，系统可能会将其合并显示为一条告警，并标注：\n* **发生次数**：显示该告警触发的总次数。\n* **关联对象**：在告警详情中列出受影响的所有链路或IP地址。\n\n### 3. 根因告警与衍生告警关联\n如果多个HSM链路同时故障是由同一底层原因引起的（如承载网中断、对端HSM设备整体宕机、本端网卡故障等），告警系统可能会：\n* 上报一个更上层的**根因告警**（如 `ALM-18710/10021 HSM状态异常` 或网络接口Down告警）。\n* 将具体的链路故障告警标记为**衍生告警**，并在拓扑或告警关联视图中建立因果关系，避免告警风暴。\n\n### 建议操作\n* 在告警管理界面使用 `告警ID` 配合 `本端IP` 或 `链路名称` 进行筛选，可快速定位所有受影响的链路。\n* 检查告警系统是否配置了告警压缩规则，以确定是否显示了聚合后的告警。\n* 结合网络拓扑视图查看，通常能直观看到多个链路同时变红（故障）的状态，并辅助判断是否为共性根因导致。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "告警系统中如何配置或开启告警压缩与聚合功能？\n如何根据根因告警与衍生告警的关联关系定位多链路同时故障的根本原因？\n在告警管理界面中有哪些高效筛选和批量处理多条HSM链路故障告警的操作方法？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 814,
+      "total_tokens": 874,
+      "completion_tokens": 60,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 814,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 60,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 874,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 59,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n如果多个HSM的链路同时出故障了，告警系统会怎么显示这个情况呢？\n\n\n\n最终回答：\n根据现有的产品文档，知识库中未明确说明“多个HSM链路同时故障时告警系统的聚合显示规则”，但基于HSM链路故障告警（如 `ALM-19000`、`ALM-10020`）的定义和参数机制，告警系统通常会按以下方式显示：\n\n### 1. 逐条独立上报（默认行为）\nHSM链路故障告警是**按链路维度**触发的。告警参数中包含用于唯一标识具体链路的字段，例如：\n* `HSM链路名称` / `远端服务器名称`\n* `本端IP地址` / `对端IP地址`\n* `HSM名称` / `ALB实例ID`\n\n当多条链路同时故障时，系统会为**每一条故障链路生成一条独立的告警记录**。在告警列表中会显示多条相同告警ID的记录，可通过上述参数区分具体是哪条链路出现故障。\n\n### 2. 告警压缩/聚合（视配置而定）\n如果告警系统开启了**告警压缩**或**告警聚合**功能，且多条链路故障具有相同的告警源和触发原因，系统可能会将其合并显示为一条告警，并标注：\n* **发生次数**：显示该告警触发的总次数。\n* **关联对象**：在告警详情中列出受影响的所有链路或IP地址。\n\n### 3. 根因告警与衍生告警关联\n如果多个HSM链路同时故障是由同一底层原因引起的（如承载网中断、对端HSM设备整体宕机、本端网卡故障等），告警系统可能会：\n* 上报一个更上层的**根因告警**（如 `ALM-18710/10021 HSM状态异常` 或网络接口Down告警）。\n* 将具体的链路故障告警标记为**衍生告警**，并在拓扑或告警关联视图中建立因果关系，避免告警风暴。\n\n### 建议操作\n* 在告警管理界面使用 `告警ID` 配合 `本端IP` 或 `链路名称` 进行筛选，可快速定位所有受影响的链路。\n* 检查告警系统是否配置了告警压缩规则，以确定是否显示了聚合后的告警。\n* 结合网络拓扑视图查看，通常能直观看到多个链路同时变红（故障）的状态，并辅助判断是否为共性根因导致。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-ef0fa46f-8335-41b0-824f-2c0d8fc6a8fe"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-a7e55d9e-4842-4f5c-b007-a45cbdfe08ea"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cc27ce00-e973-4a5e-b177-da8841ad69f9"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3617"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 11855655,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4990,
+      "byte_offset": 11856752,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 11861742,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 11861947,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 5068,
+      "byte_offset": 11862772,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 11867840,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 12065592,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 12065953,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1479,
+      "byte_offset": 12066161,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12067640,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 12067845,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 12068058,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-ef0fa46f-8335-41b0-824f-2c0d8fc6a8fe"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-a7e55d9e-4842-4f5c-b007-a45cbdfe08ea"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cc27ce00-e973-4a5e-b177-da8841ad69f9"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3567"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T11:44:48.277736+00:00",
+    "arrival_seq": 6616,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/11"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n那命令呢？\n\n\n\n最终回答：\n\n\n由于 `/service/cn-ops-monitoring/bin/abnormality-query` 是部署在运营商内部运维服务器上的脚本，**无法提供直接的网络下载命令**。该脚本不在公开代码仓库中，而是作为云核监控平台的一部分随版本发布。\n\n如果您有对应服务器的访问权限，常见的获取方式包括：\n\n1. **从运维服务器导出**\n   ```bash\n   # 使用 scp 命令从服务器拷贝\n   scp user@ops-server:/service/cn-ops-monitoring/bin/abnormality-query ./\n   \n   # 或使用 sftp\n   sftp user@ops-server\n   get /service/cn-ops-monitoring/bin/abnormality-query\n   ```\n\n2. **从版本发布包中提取**\n   - 联系华为技术支持获取对应版本的安装介质\n   - 从安装包的 `bin/` 目录中提取该脚本\n\n3. **通过内部运维平台下载**\n   - 登录运营商的运维管理平台\n   - 在脚本管理或工具下载栏目中查找\n\n**建议：** 直接联系您的华为技术支持工程师或内部运维负责人，说明使用场景，他们会提供符合规范的获取渠道。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如果没有服务器访问权限，如何向华为技术支持申请获取该脚本？\n从版本发布包中提取脚本时，需要哪些前置条件或依赖文件？\n内部运维平台的脚本管理功能通常需要何种级别的账号权限？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 514,
+      "total_tokens": 559,
+      "completion_tokens": 45,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 514,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 45,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 559,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 44,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n那命令呢？\n\n\n\n最终回答：\n\n\n由于 `/service/cn-ops-monitoring/bin/abnormality-query` 是部署在运营商内部运维服务器上的脚本，**无法提供直接的网络下载命令**。该脚本不在公开代码仓库中，而是作为云核监控平台的一部分随版本发布。\n\n如果您有对应服务器的访问权限，常见的获取方式包括：\n\n1. **从运维服务器导出**\n   ```bash\n   # 使用 scp 命令从服务器拷贝\n   scp user@ops-server:/service/cn-ops-monitoring/bin/abnormality-query ./\n   \n   # 或使用 sftp\n   sftp user@ops-server\n   get /service/cn-ops-monitoring/bin/abnormality-query\n   ```\n\n2. **从版本发布包中提取**\n   - 联系华为技术支持获取对应版本的安装介质\n   - 从安装包的 `bin/` 目录中提取该脚本\n\n3. **通过内部运维平台下载**\n   - 登录运营商的运维管理平台\n   - 在脚本管理或工具下载栏目中查找\n\n**建议：** 直接联系您的华为技术支持工程师或内部运维负责人，说明使用场景，他们会提供符合规范的获取渠道。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-9b8c004e-c5c9-4b6f-9758-48761ae899e0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-282791c5-c475-4694-9c2c-00a37744c216"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-c9cb89af-9979-4db0-b817-20de1057e8a4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2545"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10137145,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3562,
+      "byte_offset": 10138242,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10141804,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10142009,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 3640,
+      "byte_offset": 10142834,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10146474,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10159823,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10160184,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1451,
+      "byte_offset": 10160392,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10161843,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10162048,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10162261,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-9b8c004e-c5c9-4b6f-9758-48761ae899e0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-282791c5-c475-4694-9c2c-00a37744c216"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-c9cb89af-9979-4db0-b817-20de1057e8a4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2495"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T12:39:00.414139+00:00",
+    "arrival_seq": 7026,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/12"
+  }
+}

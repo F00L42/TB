@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：请诊断网元unc1224在2025-12-23 06:25:00发生的N2模式鉴权成功率低于一级门限性能告警\n\n\n\n最终回答：\n针对网元 `unc1224` 在 `2025-12-23 06:25:00` 发生的 **N2模式鉴权成功率低于一级门限性能告警**，智能诊断服务返回了以下关联告警及原因分析：\n\n### ALM-350069 AMF 指定 TAI 区域 TAU 请求突增告警原因\n1. 18点下班高峰，该TAI覆盖区域大量用户迁徙，终端集中发起跟踪区更新\n2. TAI范围内多个基站无线信号波动，终端反复重发TAU请求\n3. 同池其他AMF节点维护，此TAI下全部移动性信令汇聚到本网元\n4. 区域内海量物联网终端周期性上报位置，持续生成TAU信令\n5. 邻区TAC数据调整，终端跨越TA边界持续触发TAU流程\n6. 部分终端固件异常，切换跟踪区后循环发送TAU消息\n\n### ALM-350091 N2 接口信令队列拥塞告警原因\n1. 瞬时大量TAU信令经由N2接口传送，流量超出链路承载能力\n2. gNB与AMF之间SCTP缓存空间不足，报文堆积造成队列拥塞\n3. 防火墙深度包检测导致报文转发延迟，信令持续积压\n4. N2信令未配置专属QoS，普通业务抢占传输资源\n5. 传输交换机端口缓存溢出，报文丢包引发大量重传\n6. AMF移动性处理线程处理速率低于报文接收速率，信令持续堆积\n\n### ALM-350126 AMF 移动性处理 CPU 占用过高告警原因\n1. 峰值海量TAU并发，上下文校验、用户鉴权持续消耗CPU资源\n2. 每条TAU请求需要访问UDM查询签约TAI信息，频繁外部交互加重负载\n3. AMF全量记录移动性操作日志，磁盘IO抢占计算资源\n4. 用户切片种类较多，每条TAU请求需要多重策略匹配运算\n5. 未开启请求批量处理机制，单条报文独立执行完整信令流程\n6. 硬件散热故障造成CPU降频，同等业务量下占用率显著上升\n\n建议重点检查N2接口信令拥塞及AMF CPU负载情况，结合TAU请求突增的诱因进行针对性优化。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何缓解N2接口信令队列拥塞以提升鉴权成功率？\nAMF移动性处理CPU占用过高的具体优化方案是什么？\nTAU请求突增是否由特定区域的用户迁徙或基站信号波动引起？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 840,
+      "total_tokens": 890,
+      "completion_tokens": 50,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 840,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 50,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 890,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 48,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] User：请诊断网元unc1224在2025-12-23 06:25:00发生的N2模式鉴权成功率低于一级门限性能告警\n\n\n\n最终回答：\n针对网元 `unc1224` 在 `2025-12-23 06:25:00` 发生的 **N2模式鉴权成功率低于一级门限性能告警**，智能诊断服务返回了以下关联告警及原因分析：\n\n### ALM-350069 AMF 指定 TAI 区域 TAU 请求突增告警原因\n1. 18点下班高峰，该TAI覆盖区域大量用户迁徙，终端集中发起跟踪区更新\n2. TAI范围内多个基站无线信号波动，终端反复重发TAU请求\n3. 同池其他AMF节点维护，此TAI下全部移动性信令汇聚到本网元\n4. 区域内海量物联网终端周期性上报位置，持续生成TAU信令\n5. 邻区TAC数据调整，终端跨越TA边界持续触发TAU流程\n6. 部分终端固件异常，切换跟踪区后循环发送TAU消息\n\n### ALM-350091 N2 接口信令队列拥塞告警原因\n1. 瞬时大量TAU信令经由N2接口传送，流量超出链路承载能力\n2. gNB与AMF之间SCTP缓存空间不足，报文堆积造成队列拥塞\n3. 防火墙深度包检测导致报文转发延迟，信令持续积压\n4. N2信令未配置专属QoS，普通业务抢占传输资源\n5. 传输交换机端口缓存溢出，报文丢包引发大量重传\n6. AMF移动性处理线程处理速率低于报文接收速率，信令持续堆积\n\n### ALM-350126 AMF 移动性处理 CPU 占用过高告警原因\n1. 峰值海量TAU并发，上下文校验、用户鉴权持续消耗CPU资源\n2. 每条TAU请求需要访问UDM查询签约TAI信息，频繁外部交互加重负载\n3. AMF全量记录移动性操作日志，磁盘IO抢占计算资源\n4. 用户切片种类较多，每条TAU请求需要多重策略匹配运算\n5. 未开启请求批量处理机制，单条报文独立执行完整信令流程\n6. 硬件散热故障造成CPU降频，同等业务量下占用率显著上升\n\n建议重点检查N2接口信令拥塞及AMF CPU负载情况，结合TAU请求突增的诱因进行针对性优化。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-30f4a015-0bad-4f1a-9a99-86e98c4beacc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d59502a0-bbb9-4fe3-9c27-5861ad718575"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-648080ff-518e-4f59-9852-f6ff562f812f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3489"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 16056547,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 4822,
+      "byte_offset": 16057644,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 16062466,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 16062671,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 4896,
+      "byte_offset": 16063496,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 16068392,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 16260829,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 16261190,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 1399,
+      "byte_offset": 16261398,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 16262797,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 16263002,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 16263215,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-30f4a015-0bad-4f1a-9a99-86e98c4beacc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d59502a0-bbb9-4fe3-9c27-5861ad718575"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-648080ff-518e-4f59-9852-f6ff562f812f"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3439"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:51:47.312613+00:00",
+    "arrival_seq": 3328,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

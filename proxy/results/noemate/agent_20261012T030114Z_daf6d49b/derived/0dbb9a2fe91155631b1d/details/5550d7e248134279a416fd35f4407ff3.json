@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n为避免告警风暴和误报，需对活跃告警进行分级排序处理：\n\n\n\n最终回答：\n为实现告警的分级排序与精准管控，建议从以下四个维度构建处理机制：\n\n### 1. 告警分级策略（优先级划分）\n| 级别 | 定义 | 展示与通知策略 |\n|:---|:---|:---|\n| **P0 紧急** | 核心业务中断、硬件致命故障、安全入侵 | 绝对置顶，触发短信/电话，强制未确认标记 |\n| **P1 重要** | 性能严重劣化、冗余丢失、次要链路中断 | 高亮显示，自动派单，优先处理 |\n| **P2 次要** | 资源阈值预警、非核心组件异常 | 常规列表，定期汇总，支持批量确认 |\n| **P3 提示** | 状态变更、维护操作、瞬时抖动 | 折叠显示或仅日志记录，不干扰主视图 |\n\n### 2. 智能排序规则（多维动态排序）\n- **默认视图**：`级别降序` → `发生时间倒序` → `确认状态（未确认优先）`\n- **风暴场景**：自动切换为 `重复次数降序` 或 `源网元/业务分组`，快速聚合批量故障\n- **自定义视图**：支持按地域、业务线、告警类型拖拽排序，适配不同运维角色习惯\n\n### 3. 防风暴与误报机制（核心管控）\n- **告警抑制与屏蔽**：配置维护窗口期屏蔽计划内告警；基于拓扑依赖抑制衍生告警（如上游链路中断时自动抑制下游节点告警）\n- **去重与压缩**：相同源+相同ID的告警合并计数，仅更新最新时间与重复次数，避免界面刷屏\n- **波动阈值过滤**：结合指标监控，对瞬时抖动（如小幅波动 <3%）设置容忍窗口，持续超标后再上报\n- **根因关联分析**：利用规则引擎将多告警聚合为单一故障事件，直接定位根因节点，减少冗余告警干扰\n\n### 4. 自动化处置与闭环\n- **分级路由**：P0/P1 自动派单至对应责任人，P2/P3 进入知识库匹配或定期复盘\n- **生命周期管理**：记录 `触发 → 确认 → 处理 → 清除 → 复盘` 全链路，支持按 `AlarmClearedType` 统计清除方式有效性\n- **动态阈值调优**：基于历史误报数据自动调整上报阈值与抑制规则，持续降低噪声\n\n通过上述分级排序与管控机制，可有效压制告警风暴、过滤误报噪声，确保运维人员聚焦真实故障与核心业务恢复。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据实际业务场景定义和调整P0-P3告警级别的具体判定标准？\n告警抑制规则中的拓扑依赖关系需要哪些前置数据或配置才能生效？\n在已有监控体系中落地智能排序和去重压缩功能通常需要经过哪些实施步骤？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 857,
+      "total_tokens": 913,
+      "completion_tokens": 56,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 857,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 56,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 913,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 55,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n为避免告警风暴和误报，需对活跃告警进行分级排序处理：\n\n\n\n最终回答：\n为实现告警的分级排序与精准管控，建议从以下四个维度构建处理机制：\n\n### 1. 告警分级策略（优先级划分）\n| 级别 | 定义 | 展示与通知策略 |\n|:---|:---|:---|\n| **P0 紧急** | 核心业务中断、硬件致命故障、安全入侵 | 绝对置顶，触发短信/电话，强制未确认标记 |\n| **P1 重要** | 性能严重劣化、冗余丢失、次要链路中断 | 高亮显示，自动派单，优先处理 |\n| **P2 次要** | 资源阈值预警、非核心组件异常 | 常规列表，定期汇总，支持批量确认 |\n| **P3 提示** | 状态变更、维护操作、瞬时抖动 | 折叠显示或仅日志记录，不干扰主视图 |\n\n### 2. 智能排序规则（多维动态排序）\n- **默认视图**：`级别降序` → `发生时间倒序` → `确认状态（未确认优先）`\n- **风暴场景**：自动切换为 `重复次数降序` 或 `源网元/业务分组`，快速聚合批量故障\n- **自定义视图**：支持按地域、业务线、告警类型拖拽排序，适配不同运维角色习惯\n\n### 3. 防风暴与误报机制（核心管控）\n- **告警抑制与屏蔽**：配置维护窗口期屏蔽计划内告警；基于拓扑依赖抑制衍生告警（如上游链路中断时自动抑制下游节点告警）\n- **去重与压缩**：相同源+相同ID的告警合并计数，仅更新最新时间与重复次数，避免界面刷屏\n- **波动阈值过滤**：结合指标监控，对瞬时抖动（如小幅波动 <3%）设置容忍窗口，持续超标后再上报\n- **根因关联分析**：利用规则引擎将多告警聚合为单一故障事件，直接定位根因节点，减少冗余告警干扰\n\n### 4. 自动化处置与闭环\n- **分级路由**：P0/P1 自动派单至对应责任人，P2/P3 进入知识库匹配或定期复盘\n- **生命周期管理**：记录 `触发 → 确认 → 处理 → 清除 → 复盘` 全链路，支持按 `AlarmClearedType` 统计清除方式有效性\n- **动态阈值调优**：基于历史误报数据自动调整上报阈值与抑制规则，持续降低噪声\n\n通过上述分级排序与管控机制，可有效压制告警风暴、过滤误报噪声，确保运维人员聚焦真实故障与核心业务恢复。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5a94b030-6019-4916-ad31-a4626feac093"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-183f51de-2d51-4da2-be98-2f2edd06e894"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-aa5cfb47-b837-475d-8f2d-274ba7943597"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3811"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 5199826,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 5250,
+      "byte_offset": 5200923,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 5206173,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 5206378,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 5328,
+      "byte_offset": 5207203,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 5212531,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 6623326,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 6623687,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 1487,
+      "byte_offset": 6623895,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 6625382,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 6625587,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 6625800,
+      "path": "archive/2026-10-12/08/part-00013.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-5a94b030-6019-4916-ad31-a4626feac093"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-183f51de-2d51-4da2-be98-2f2edd06e894"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-aa5cfb47-b837-475d-8f2d-274ba7943597"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3761"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:45:51.289250+00:00",
+    "arrival_seq": 4036,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

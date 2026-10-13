@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUNC 网元上报端口故障告警对系统有什么影响？\n\n\n\n最终回答：\n\n\n根据 UNC 产品文档，UNC 网元上报的端口故障告警（告警ID：ALM-135634 网口故障）对系统的影响如下：\n\n**对系统的影响**\n节点网口状态异常，可能导致**节点网络中断**，进而引发**业务中断**。\n\n**补充说明**\n* **告警触发场景**：网口状态为 Down、工作模式非全双工、网口所在链路中断、流量过载、错包/丢包率超阈值、网口速率异常或执行命令禁用端口等。\n* **业务影响范围**：取决于故障网口所承载的业务平面（如业务网口、存储网口或管理网口），单一网口故障可能导致该节点对外服务不可用或节点间通信异常。\n* **恢复机制**：该告警支持自动清除。当网口状态恢复正常（如链路重新 Up、流量/错包率回落至阈值内或执行激活端口命令后），告警将自动恢复。\n\n建议告警产生后第一时间通过 OM Portal 查看定位信息，确认异常网口及具体原因（如物理连线、光模块、网卡硬件或配置禁用），并及时排查恢复以避免业务长时间中断。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "端口故障告警恢复后是否需要手动确认业务已完全恢复正常？\n如果多个节点同时上报端口故障告警，应如何优先排查以快速恢复业务？\n执行激活端口命令后告警仍未清除，可能的原因有哪些？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 538,
+      "total_tokens": 588,
+      "completion_tokens": 50,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 538,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 50,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 588,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 49,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nUNC 网元上报端口故障告警对系统有什么影响？\n\n\n\n最终回答：\n\n\n根据 UNC 产品文档，UNC 网元上报的端口故障告警（告警ID：ALM-135634 网口故障）对系统的影响如下：\n\n**对系统的影响**\n节点网口状态异常，可能导致**节点网络中断**，进而引发**业务中断**。\n\n**补充说明**\n* **告警触发场景**：网口状态为 Down、工作模式非全双工、网口所在链路中断、流量过载、错包/丢包率超阈值、网口速率异常或执行命令禁用端口等。\n* **业务影响范围**：取决于故障网口所承载的业务平面（如业务网口、存储网口或管理网口），单一网口故障可能导致该节点对外服务不可用或节点间通信异常。\n* **恢复机制**：该告警支持自动清除。当网口状态恢复正常（如链路重新 Up、流量/错包率回落至阈值内或执行激活端口命令后），告警将自动恢复。\n\n建议告警产生后第一时间通过 OM Portal 查看定位信息，确认异常网口及具体原因（如物理连线、光模块、网卡硬件或配置禁用），并及时排查恢复以避免业务长时间中断。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a068f5dd-b7cc-4be1-88fe-13918e3da611"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1afb261b-cbb8-4601-b6a3-15d46fa8cc8c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-2a947a93-5bea-46e8-9e2e-659a66462b53"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2637"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 12981673,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 3686,
+      "byte_offset": 12982770,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12986456,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 12986661,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 3760,
+      "byte_offset": 12987486,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12991246,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 13600113,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 13600474,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 1455,
+      "byte_offset": 13600682,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13602137,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 13602342,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 13602555,
+      "path": "archive/2026-10-12/13/part-00019.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a068f5dd-b7cc-4be1-88fe-13918e3da611"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-1afb261b-cbb8-4601-b6a3-15d46fa8cc8c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-2a947a93-5bea-46e8-9e2e-659a66462b53"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2587"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:46:07.543368+00:00",
+    "arrival_seq": 8344,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

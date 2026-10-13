@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n日志保存路径：\n\n\n\n最终回答：\n| 日志类型 | 标准保存路径 | 命名规范 | 备注 |\n|:---|:---|:---|:---|\n| **性能计数器** | `[REDACTED_PATH] | `n6_perf_<NEName>_<YYYYMMDD>.csv` | 含N6TXBytes、DropRate、QueueUtil等 |\n| **系统/故障日志** | `[REDACTED_PATH] | `upf_syslog_<NEName>_<YYYYMMDD>.log` | 含ICMP、GTP-U、PFCP、资源过载等 |\n| **抓包文件** | `[REDACTED_PATH] | `n6_capture_<NEName>_<YYYYMMDDHHMM>.pcap.gz` | 覆盖故障时段，压缩存储 |\n| **配置文件快照** | `[REDACTED_PATH] | `upf_config_<NEName>_<YYYYMMDDHHMM>.cfg` | 含N6接口、QoS、TEID、路由等 |\n\n### 📥 转储与归档命令\n```bash\n# 1. 打包压缩\ntar -czf [REDACTED_PATH] \\\n  [REDACTED_PATH] \\\n  [REDACTED_PATH] \\\n  [REDACTED_PATH] \\\n  [REDACTED_PATH]\n\n# 2. 安全转储至分析服务器\nscp [REDACTED_PATH] analyst@<分析服务器IP>:/remote/logs/20250803/\n```\n\n### 📐 导入后波动标定提示\n解压导入分析环境后，按时间窗口计算环比幅度并严格对照您的定义打标：\n- **剧烈波动**：30分钟内波动幅度 > 15%\n- **大幅波动**：1小时内波动幅度 > 20%\n- **高位震荡**：持续2小时维持在阈值上限80%以上且波动±5%以内\n- **小幅波动**：1小时内波动幅度 3%-5%\n\n提供实际路径或确认上述结构，我将输出自动化解析脚本与标定报表模板。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "实际服务器上的日志保存路径是否与表中标准路径一致？\n是否需要我根据实际路径生成自动解析脚本和标定报表模板？\n日志转储后是否需要自动校验文件完整性或生成校验报告？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 726,
+      "total_tokens": 769,
+      "completion_tokens": 43,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 726,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 43,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 769,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 42,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n日志保存路径：\n\n\n\n最终回答：\n| 日志类型 | 标准保存路径 | 命名规范 | 备注 |\n|:---|:---|:---|:---|\n| **性能计数器** | `[REDACTED_PATH] | `n6_perf_<NEName>_<YYYYMMDD>.csv` | 含N6TXBytes、DropRate、QueueUtil等 |\n| **系统/故障日志** | `[REDACTED_PATH] | `upf_syslog_<NEName>_<YYYYMMDD>.log` | 含ICMP、GTP-U、PFCP、资源过载等 |\n| **抓包文件** | `[REDACTED_PATH] | `n6_capture_<NEName>_<YYYYMMDDHHMM>.pcap.gz` | 覆盖故障时段，压缩存储 |\n| **配置文件快照** | `[REDACTED_PATH] | `upf_config_<NEName>_<YYYYMMDDHHMM>.cfg` | 含N6接口、QoS、TEID、路由等 |\n\n### 📥 转储与归档命令\n```bash\n# 1. 打包压缩\ntar -czf [REDACTED_PATH] \\\n  [REDACTED_PATH] \\\n  [REDACTED_PATH] \\\n  [REDACTED_PATH] \\\n  [REDACTED_PATH]\n\n# 2. 安全转储至分析服务器\nscp [REDACTED_PATH] analyst@<分析服务器IP>:/remote/logs/20250803/\n```\n\n### 📐 导入后波动标定提示\n解压导入分析环境后，按时间窗口计算环比幅度并严格对照您的定义打标：\n- **剧烈波动**：30分钟内波动幅度 > 15%\n- **大幅波动**：1小时内波动幅度 > 20%\n- **高位震荡**：持续2小时维持在阈值上限80%以上且波动±5%以内\n- **小幅波动**：1小时内波动幅度 3%-5%\n\n提供实际路径或确认上述结构，我将输出自动化解析脚本与标定报表模板。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7c0a0beb-3e19-4fcf-b2be-62f148a98c1c"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7308e27b-a5bd-4d19-8454-a7c9781817ef"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2842"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 3542772,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 3958,
+      "byte_offset": 3543869,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 3547827,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 3548032,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 4036,
+      "byte_offset": 3548857,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 3552893,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 3566617,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 3566978,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 1431,
+      "byte_offset": 3567186,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 3568617,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 3568822,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 3569035,
+      "path": "archive/2026-10-12/08/part-00007.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7c0a0beb-3e19-4fcf-b2be-62f148a98c1c"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7308e27b-a5bd-4d19-8454-a7c9781817ef"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2792"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:25:49.822159+00:00",
+    "arrival_seq": 3782,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：一、SMF服务实例资源不足告警含义与诊断\n\n\n\n最终回答：\n一、SMF服务实例资源不足告警含义与诊断\n\n| 字段 | 内容 |\n|:---|:---|\n| **告警名称** | SMF服务实例资源不足告警 |\n| **告警级别** | 重要（Major） |\n| **告警含义** | SMF网元内关键业务节点资源（CPU、内存、会话配额、策略规则等）使用率超过系统配置门限，实例无法安全承载新增会话或策略计算，需提前预警以防业务中断。 |\n| **诊断定位** | 通过资源监控面板确认CPU/内存/会话占用比；结合信令跟踪定位资源争用热点；检查负载均衡策略与容量规划匹配度。 |\n\n---\n\n二、触发条件与阈值\n\n| 指标名称 | 告警阈值 | 恢复阈值 | 防抖机制 |\n|:---|:---|:---|:---|\n| CPU使用率 | `>85%` | `<80%` | 持续5分钟触发 |\n| 内存占用率 | `>90%` | `<85%` | 持续5分钟触发 |\n| 会话占用比 | `>95%上限` | `<90%` | 持续5分钟触发 |\n| **剧烈波动判定** | **30分钟内波动幅度 >15%** | 回归基线±5% | 触发即时诊断流程 |\n\n---\n\n三、业务与性能影响\n\n| 影响维度 | 具体表现 |\n|:---|:---|\n| **服务影响** | 会话建立失败、QoS策略调整超时、SMF主动降级限制新会话 |\n| **性能影响** | 资源争用导致响应时延从200ms升至1s+，吞吐量下降 |\n| **级联影响** | 引发UPF资源分配失败（ALM-3002）、AMF注册异常、上下文存储超时（ALM-2005） |\n| **长期风险** | 硬件加速老化、容量规划失真、SLA违约与客诉风险 |\n\n---\n\n四、关联告警与根因分析\n\n| 关联方向 | 典型告警 | 触发逻辑 |\n|:---|:---|:---|\n| 下游UPF | `ALM-3002` UPF资源不足 | SMF会话创建卡顿导致N4隧道建立超时 |\n| 存储/缓存 | `ALM-2005` 用户上下文存储超时 | CPU/内存争用导致DB/Redis读写延迟 |\n| **根因分类** | 话务突增、资源规划不足、配置阈值过低、硬件瓶颈、资源泄漏 | 频繁触发需启动RCA，核查流量模式与扩容策略 |\n\n---\n\n五、标准处理步骤（SOP）\n\n| 阶段 | 操作项 | 具体动作 |\n|:---|:---|:---|\n| **1. 实时响应** | 扩容/限流 | 动态添加SMF实例或调整LB权重；临时限制低优先级会话，保障VoNR等核心业务 |\n| **2. 根因排查** | 指标/日志分析 | 检查CPU/内存/会话监控数据；分析定位资源争用热点（如特定QoS策略计算耗时） |\n| **3. 优化措施** | 短期 | 调整告警阈值（如CPU 85%→90%），清理僵死会话，优化老化策略 |\n|  | 长期 | 升级硬件/部署高性能实例；优化会话管理算法；规划弹性资源池支持自动扩容 |\n\n---\n\n六、关键指标监控示例\n\n| 指标名称 | 当前值 | 健康阈值 | 状态说明 |\n|:---|:---|:---|:---|\n| SMF CPU使用率 | 92% | ≤85% | 超阈，需扩容 |\n| 内存占用率 | 91% | ≤90% | 接近上限，建议优化 |\n| 会话数（当前/上限） | 11500/10000 | ≤95% | 超出设计容量 |\n| 会话建立失败率 | 5% | ≤1% | 明显异常，需优先处理 |\n\n---\n\n七、典型案例参考\n\n- **时间/网元**：2023-11-05 18:00 / SMF-03\n- **现象**：突发ALM-3001，用户投诉无法连接5G；CPU 95%+，内存 92%\n- **根因**：本地体育赛事直播导致话务激增，单实例会话超设计上限30%\n- **处理**：临时LB分流+扩容实例→清理异常会话→调整阈值→归档RCA报告\n- **结果**：15分钟内指标回落，告警清除，零业务中断升级\n\n---\n📝 **说明**：本SOP已整合触发阈值、影响分析、处理流程与监控指标。如需导出为Word/Excel模板、配置自动化扩容策略或对接现网监控平台，请提供具体平台版本或输出格式要求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据现网监控数据配置SMF服务实例的自动扩容策略？\n当SMF资源不足告警伴随UPF资源不足告警时，应优先处理哪个网元？\n如何调整SMF会话老化策略以降低内存占用率？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1417,
+      "total_tokens": 1471,
+      "completion_tokens": 54,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1417,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 54,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1471,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 53,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：一、SMF服务实例资源不足告警含义与诊断\n\n\n\n最终回答：\n一、SMF服务实例资源不足告警含义与诊断\n\n| 字段 | 内容 |\n|:---|:---|\n| **告警名称** | SMF服务实例资源不足告警 |\n| **告警级别** | 重要（Major） |\n| **告警含义** | SMF网元内关键业务节点资源（CPU、内存、会话配额、策略规则等）使用率超过系统配置门限，实例无法安全承载新增会话或策略计算，需提前预警以防业务中断。 |\n| **诊断定位** | 通过资源监控面板确认CPU/内存/会话占用比；结合信令跟踪定位资源争用热点；检查负载均衡策略与容量规划匹配度。 |\n\n---\n\n二、触发条件与阈值\n\n| 指标名称 | 告警阈值 | 恢复阈值 | 防抖机制 |\n|:---|:---|:---|:---|\n| CPU使用率 | `>85%` | `<80%` | 持续5分钟触发 |\n| 内存占用率 | `>90%` | `<85%` | 持续5分钟触发 |\n| 会话占用比 | `>95%上限` | `<90%` | 持续5分钟触发 |\n| **剧烈波动判定** | **30分钟内波动幅度 >15%** | 回归基线±5% | 触发即时诊断流程 |\n\n---\n\n三、业务与性能影响\n\n| 影响维度 | 具体表现 |\n|:---|:---|\n| **服务影响** | 会话建立失败、QoS策略调整超时、SMF主动降级限制新会话 |\n| **性能影响** | 资源争用导致响应时延从200ms升至1s+，吞吐量下降 |\n| **级联影响** | 引发UPF资源分配失败（ALM-3002）、AMF注册异常、上下文存储超时（ALM-2005） |\n| **长期风险** | 硬件加速老化、容量规划失真、SLA违约与客诉风险 |\n\n---\n\n四、关联告警与根因分析\n\n| 关联方向 | 典型告警 | 触发逻辑 |\n|:---|:---|:---|\n| 下游UPF | `ALM-3002` UPF资源不足 | SMF会话创建卡顿导致N4隧道建立超时 |\n| 存储/缓存 | `ALM-2005` 用户上下文存储超时 | CPU/内存争用导致DB/Redis读写延迟 |\n| **根因分类** | 话务突增、资源规划不足、配置阈值过低、硬件瓶颈、资源泄漏 | 频繁触发需启动RCA，核查流量模式与扩容策略 |\n\n---\n\n五、标准处理步骤（SOP）\n\n| 阶段 | 操作项 | 具体动作 |\n|:---|:---|:---|\n| **1. 实时响应** | 扩容/限流 | 动态添加SMF实例或调整LB权重；临时限制低优先级会话，保障VoNR等核心业务 |\n| **2. 根因排查** | 指标/日志分析 | 检查CPU/内存/会话监控数据；分析定位资源争用热点（如特定QoS策略计算耗时） |\n| **3. 优化措施** | 短期 | 调整告警阈值（如CPU 85%→90%），清理僵死会话，优化老化策略 |\n|  | 长期 | 升级硬件/部署高性能实例；优化会话管理算法；规划弹性资源池支持自动扩容 |\n\n---\n\n六、关键指标监控示例\n\n| 指标名称 | 当前值 | 健康阈值 | 状态说明 |\n|:---|:---|:---|:---|\n| SMF CPU使用率 | 92% | ≤85% | 超阈，需扩容 |\n| 内存占用率 | 91% | ≤90% | 接近上限，建议优化 |\n| 会话数（当前/上限） | 11500/10000 | ≤95% | 超出设计容量 |\n| 会话建立失败率 | 5% | ≤1% | 明显异常，需优先处理 |\n\n---\n\n七、典型案例参考\n\n- **时间/网元**：2023-11-05 18:00 / SMF-03\n- **现象**：突发ALM-3001，用户投诉无法连接5G；CPU 95%+，内存 92%\n- **根因**：本地体育赛事直播导致话务激增，单实例会话超设计上限30%\n- **处理**：临时LB分流+扩容实例→清理异常会话→调整阈值→归档RCA报告\n- **结果**：15分钟内指标回落，告警清除，零业务中断升级\n\n---\n📝 **说明**：本SOP已整合触发阈值、影响分析、处理流程与监控指标。如需导出为Word/Excel模板、配置自动化扩容策略或对接现网监控平台，请提供具体平台版本或输出格式要求。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b2b3f698-acb5-4968-9425-3c6531dc12ef"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f4485e15-44b9-4d0a-bd83-cf9f1ae4f354"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "5267"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 8738718,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 7190,
+      "byte_offset": 8739815,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8747005,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 8747210,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 7268,
+      "byte_offset": 8748035,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 8755303,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 8758297,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 8758658,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 1415,
+      "byte_offset": 8758866,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8760281,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 8760486,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 8760699,
+      "path": "archive/2026-10-12/09/part-00011.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b2b3f698-acb5-4968-9425-3c6531dc12ef"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f4485e15-44b9-4d0a-bd83-cf9f1ae4f354"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "5217"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:21:05.664720+00:00",
+    "arrival_seq": 4728,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

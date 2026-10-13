@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：你提到的异常下跌和D-1代表什么\n\n\n\n最终回答：\n\n\n已为您完成三项任务的查询与诊断，结果汇总如下：\n\n### 一、AMF01网元注册更新成功率查询结果\n昨日晚间时段该网元指标出现异常波动，失败率超 10% 的整点数据如下：\n| 时间 | 网元名称 | 指标名称 | TAU 失败率 |\n|---|---|---|---|\n| 2026-07-30 20:00:00 | q30034600amf01 | S1 模式 MME 内 TAU（SGW 不变更）失败率 | 11.367% |\n| 2026-07-30 21:00:00 | q30034600amf01 | S1 模式 MME 内 TAU（SGW 不变更）失败率 | 19.825% |\n| 2026-07-30 22:00:00 | q30034600amf01 | S1 模式 MME 内 TAU（SGW 不变更）失败率 | 14.591% |\n\n### 二、AMF网元注册成功率下降处理方法\n**参考范围**：AMF注册管理流程消息请求成功响应率应 ≥95%。  \n**可能原因**：UDM系统性能不佳、HTTP2链路异常、话务量超过UDM最大负荷。  \n**相关告警检查**：请检查是否存在下列告警，并参考对应告警帮助进行处理：\n- ALM-18900 微服务未就绪\n- ALM-18401 系统流控启动\n- ALM-22003 DSG SCTP链路拥塞 / ALM-22004 DSG SCTP链路故障\n- ALM-22902 DBS SCTP链路拥塞 / ALM-22903 DBS SCTP链路故障\n\n### 三、cloudse2980_new网元 IPSec丢包超门限告警诊断结果\n针对该告警的故障原因诊断如下：\n1. 后端业务服务器集群扩容完成，服务处理能力提升，资源耗尽与线程满载导致的 503 响应大幅减少。\n2. 流量分发调度策略优化，峰值请求均匀分摊，单台服务器过载缓解，503 报错显著下降。\n3. 修复上游客户端批量异常高频重试 BUG，无效请求锐减，转发压力降低。\n4. 清理过期无效接口缓存，减少无效查询占用，后端稳定性提升。\n5. 监控告警阈值基于上月高报错基准线，今日优化后 503 次数远低于历史均值，触发预警提示。\n6. 调整业务访问黑白名单，拦截恶意爬虫与高频攻击，异常压测流量消失。\n7. 数据库连接池参数调优，解决连接耗尽导致的卡死问题，间接减少 503 应答。\n\n以上为完整分析与处理建议，如需进一步定位或执行配置调整，请随时告知。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "AMF01网元在21点失败率高达19.825%，是否需要立即检查UDM系统性能和HTTP2链路状态？\ncloudse2980_new网元的IPSec丢包告警已优化，如何验证当前503响应率是否持续低于告警阈值？\n历史提到的异常下跌和D-1具体指哪些指标或时间范围，以便进一步关联分析？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 979,
+      "total_tokens": 1068,
+      "completion_tokens": 89,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 979,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 89,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1068,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 88,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：你提到的异常下跌和D-1代表什么\n\n\n\n最终回答：\n\n\n已为您完成三项任务的查询与诊断，结果汇总如下：\n\n### 一、AMF01网元注册更新成功率查询结果\n昨日晚间时段该网元指标出现异常波动，失败率超 10% 的整点数据如下：\n| 时间 | 网元名称 | 指标名称 | TAU 失败率 |\n|---|---|---|---|\n| 2026-07-30 20:00:00 | q30034600amf01 | S1 模式 MME 内 TAU（SGW 不变更）失败率 | 11.367% |\n| 2026-07-30 21:00:00 | q30034600amf01 | S1 模式 MME 内 TAU（SGW 不变更）失败率 | 19.825% |\n| 2026-07-30 22:00:00 | q30034600amf01 | S1 模式 MME 内 TAU（SGW 不变更）失败率 | 14.591% |\n\n### 二、AMF网元注册成功率下降处理方法\n**参考范围**：AMF注册管理流程消息请求成功响应率应 ≥95%。  \n**可能原因**：UDM系统性能不佳、HTTP2链路异常、话务量超过UDM最大负荷。  \n**相关告警检查**：请检查是否存在下列告警，并参考对应告警帮助进行处理：\n- ALM-18900 微服务未就绪\n- ALM-18401 系统流控启动\n- ALM-22003 DSG SCTP链路拥塞 / ALM-22004 DSG SCTP链路故障\n- ALM-22902 DBS SCTP链路拥塞 / ALM-22903 DBS SCTP链路故障\n\n### 三、cloudse2980_new网元 IPSec丢包超门限告警诊断结果\n针对该告警的故障原因诊断如下：\n1. 后端业务服务器集群扩容完成，服务处理能力提升，资源耗尽与线程满载导致的 503 响应大幅减少。\n2. 流量分发调度策略优化，峰值请求均匀分摊，单台服务器过载缓解，503 报错显著下降。\n3. 修复上游客户端批量异常高频重试 BUG，无效请求锐减，转发压力降低。\n4. 清理过期无效接口缓存，减少无效查询占用，后端稳定性提升。\n5. 监控告警阈值基于上月高报错基准线，今日优化后 503 次数远低于历史均值，触发预警提示。\n6. 调整业务访问黑白名单，拦截恶意爬虫与高频攻击，异常压测流量消失。\n7. 数据库连接池参数调优，解决连接耗尽导致的卡死问题，间接减少 503 应答。\n\n以上为完整分析与处理建议，如需进一步定位或执行配置调整，请随时告知。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a597c1d6-bd99-4303-a609-183f806ce591"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-bb99b7e7-80f7-4e82-921f-c596369de80c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-dd330dde-68cb-4db7-ae81-27c03b8436e4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3692"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 4711286,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 5090,
+      "byte_offset": 4712383,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4717473,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 4717678,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 5168,
+      "byte_offset": 4718503,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4723671,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4747319,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4747680,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 1551,
+      "byte_offset": 4747888,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4749439,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4749644,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4749857,
+      "path": "archive/2026-10-12/06/part-00011.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a597c1d6-bd99-4303-a609-183f806ce591"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-bb99b7e7-80f7-4e82-921f-c596369de80c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-dd330dde-68cb-4db7-ae81-27c03b8436e4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3642"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T06:57:21.529390+00:00",
+    "arrival_seq": 2160,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/06"
+  }
+}

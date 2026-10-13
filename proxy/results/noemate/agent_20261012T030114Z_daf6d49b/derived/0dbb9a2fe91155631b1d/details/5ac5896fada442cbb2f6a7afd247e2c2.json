@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：您说的黔北都有哪些城市？LAN口是什么\n\n\n\n最终回答：\n结合您提供的偏好与上下文，回复如下：\n\n1. **黔北范围**：根据您的区域映射偏好，黔北仅包含**遵义市**。\n2. **LAN口说明**：在云核心网虚拟化运维场景中，LAN口通常指虚拟机的**虚拟网络接口（vNIC/虚拟网卡）**，负责虚拟机内部业务通信、管理流量及东西向/南北向数据转发。\n\n确认上述定义后，是否需要我重新执行查询：**今日 00:00-00:30 遵义区域异常虚拟机 VM-001 的虚拟网卡（LAN口）状态**，若发现异常则自动触发诊断流程？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "遵义区域是否包含其他县级市或辖区？\n虚拟网卡状态异常的具体表现有哪些？\n自动诊断流程包含哪些检测步骤？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 418,
+      "total_tokens": 447,
+      "completion_tokens": 29,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 418,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 29,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 447,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 28,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n[历史信息] Assistant：您说的黔北都有哪些城市？LAN口是什么\n\n\n\n最终回答：\n结合您提供的偏好与上下文，回复如下：\n\n1. **黔北范围**：根据您的区域映射偏好，黔北仅包含**遵义市**。\n2. **LAN口说明**：在云核心网虚拟化运维场景中，LAN口通常指虚拟机的**虚拟网络接口（vNIC/虚拟网卡）**，负责虚拟机内部业务通信、管理流量及东西向/南北向数据转发。\n\n确认上述定义后，是否需要我重新执行查询：**今日 00:00-00:30 遵义区域异常虚拟机 VM-001 的虚拟网卡（LAN口）状态**，若发现异常则自动触发诊断流程？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-91c78ab7-20f0-4a4d-b4e6-cfee9765f228"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-24e7cf77-cc32-4c4e-946c-e98ef8c928ea"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-81e460d5-1ad6-4e1f-8ae6-de532f40eefe"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2109"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10896453,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 2982,
+      "byte_offset": 10897550,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10900532,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10900737,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 3056,
+      "byte_offset": 10901562,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10904618,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10914912,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10915273,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 1315,
+      "byte_offset": 10915481,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10916796,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10917001,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10917214,
+      "path": "archive/2026-10-12/06/part-00009.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-91c78ab7-20f0-4a4d-b4e6-cfee9765f228"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-24e7cf77-cc32-4c4e-946c-e98ef8c928ea"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-81e460d5-1ad6-4e1f-8ae6-de532f40eefe"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2059"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T06:47:47.008250+00:00",
+    "arrival_seq": 2080,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/06"
+  }
+}

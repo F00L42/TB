@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请列出几种可能导致被叫无响应的原因，并对每个原因进行简单的描述解释\n\n\n\n最终回答：\n\n\n根据核心网信令分析及性能指标相关文档，导致“被叫无响应”的常见原因及描述如下：\n\n| 原因分类 | 具体原因 | 描述解释 |\n|:---|:---|:---|\n| **终端状态异常** | **被叫未开机** | 被叫用户处于关机状态，系统无法建立连接。 |\n| | **不在服务区** | 被叫用户处于无覆盖区域或不在服务区内，系统无法寻呼到该用户。 |\n| **寻呼阶段超时** | **寻呼无响应** | 系统对被叫用户发起寻呼请求，但在规定的定时器时间内未收到任何寻呼响应消息，导致系统判定用户不可及。 |\n| **接续阶段超时** | **久无信息/久不振铃** | 被叫侧在正常时间段内未响应呼叫接续消息（如未返回 Alerting 振铃消息），导致主叫侧网元定时器超时拆线。 |\n| **振铃阶段超时** | **久不应答/用户无应答** | 被叫终端已经开始振铃，但用户一直未接听（未响应 Connect 消息），直到网元内部持有的呼叫定时器超时，系统自动拆除呼叫。 |\n| **协议交互超时** | **用户无响应** | 在呼叫建立过程中，网元等待被叫侧返回关键的确认消息（如 \"Call Confirmed\" 或 \"Alerting\"）时发生内部定时器超时。 |\n\n**总结建议：**\n如果在现网中统计到较多的“被叫无响应”指标，通常需要先区分是无响应发生的**阶段**（寻呼阶段、振铃阶段还是接续阶段），再结合具体的**失败原因码**（如 `CV_NO_RESPOND`、`CV_LONG_TIME_NO_ANSWER` 等）进行针对性的无线覆盖、终端状态或信令链路排查。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何根据信令流程区分被叫无响应具体发生在寻呼、接续还是振铃阶段？\n常见的被叫无响应失败原因码（如 CV_NO_RESPOND）分别对应哪些具体的网元超时场景？\n当统计到大量被叫无响应告警时，应如何结合无线覆盖数据和终端状态进行针对性排查？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 676,
+      "total_tokens": 748,
+      "completion_tokens": 72,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 676,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 72,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 748,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 71,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n请列出几种可能导致被叫无响应的原因，并对每个原因进行简单的描述解释\n\n\n\n最终回答：\n\n\n根据核心网信令分析及性能指标相关文档，导致“被叫无响应”的常见原因及描述如下：\n\n| 原因分类 | 具体原因 | 描述解释 |\n|:---|:---|:---|\n| **终端状态异常** | **被叫未开机** | 被叫用户处于关机状态，系统无法建立连接。 |\n| | **不在服务区** | 被叫用户处于无覆盖区域或不在服务区内，系统无法寻呼到该用户。 |\n| **寻呼阶段超时** | **寻呼无响应** | 系统对被叫用户发起寻呼请求，但在规定的定时器时间内未收到任何寻呼响应消息，导致系统判定用户不可及。 |\n| **接续阶段超时** | **久无信息/久不振铃** | 被叫侧在正常时间段内未响应呼叫接续消息（如未返回 Alerting 振铃消息），导致主叫侧网元定时器超时拆线。 |\n| **振铃阶段超时** | **久不应答/用户无应答** | 被叫终端已经开始振铃，但用户一直未接听（未响应 Connect 消息），直到网元内部持有的呼叫定时器超时，系统自动拆除呼叫。 |\n| **协议交互超时** | **用户无响应** | 在呼叫建立过程中，网元等待被叫侧返回关键的确认消息（如 \"Call Confirmed\" 或 \"Alerting\"）时发生内部定时器超时。 |\n\n**总结建议：**\n如果在现网中统计到较多的“被叫无响应”指标，通常需要先区分是无响应发生的**阶段**（寻呼阶段、振铃阶段还是接续阶段），再结合具体的**失败原因码**（如 `CV_NO_RESPOND`、`CV_LONG_TIME_NO_ANSWER` 等）进行针对性的无线覆盖、终端状态或信令链路排查。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7fb75880-424e-41f6-94da-8b0377871da6"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-52f0f0ce-ccb5-42a3-9ac7-498b0ebd50df"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4e4d2f7d-44c1-4402-a79a-73755faa338b"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3186"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 4543148,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 4418,
+      "byte_offset": 4544245,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4548663,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 4548868,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 4492,
+      "byte_offset": 4549693,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 4554185,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 4991332,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 4991693,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1547,
+      "byte_offset": 4991901,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 4993448,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 4993653,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 4993866,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-7fb75880-424e-41f6-94da-8b0377871da6"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-52f0f0ce-ccb5-42a3-9ac7-498b0ebd50df"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4e4d2f7d-44c1-4402-a79a-73755faa338b"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3136"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:05:22.861266+00:00",
+    "arrival_seq": 8800,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n                      端口状态  =  正常\n\n\n\n最终回答：\n\n\n✅ **结论判定**\n端口 `1` 本地环回测试正常，说明**本端接口板及本端 E1 线缆完好**。故障范围已明确缩小至**对端设备**或**中间传输链路**。\n\n---\n\n### 🔍 下一步操作建议\n1. **停止本端自环（必须执行）**\n   ```bash\n   STOP PORTLOP: PORTID=1;\n   ```\n   停止后执行 `DSP PORT: PORTID=1;` 确认环回类型恢复为 `无`，端口状态保持 `正常`。\n2. **核对两端配置一致性**\n   确保本端与对端以下参数严格一致，否则会导致同步失败或滑码持续增长：\n   - 帧格式（`CRC4` / `NOCRC4`）\n   - 线路编码（`HDB3` / `AMI`）\n   - 时钟同步模式（主/从/同步源）\n3. **联合对端与传输侧排查**\n   - 联系对端执行相同的本地环回测试。若对端异常，故障在对端物理层。\n   - 若两端自环均正常，请联系传输团队检查中间链路的衰减、中继设备同步状态及滑码指标。\n\n---\n\n### 📊 恢复后的监控建议\n链路恢复后，建议持续观察滑码与会话指标：\n- 若出现 **剧烈波动**（30分钟内波动幅度 > 15%）或 **高位震荡**（持续2小时维持在阈值上限80%以上且波动±5%以内），需立即检查时钟同步源及传输质量。\n- 若仅为 **小幅波动**（一小时内波动幅度 3%-5%），属于正常业务起伏，可保持现状观察。\n\n请提供对端测试结果或两端配置参数，我将为您做进一步定位。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何确认端口1的环回类型已恢复为无？\n如果帧格式或线路编码不一致会导致什么具体故障现象？\n对端设备执行本地环回测试的具体命令是什么？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 674,
+      "total_tokens": 715,
+      "completion_tokens": 41,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 674,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 41,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 715,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 40,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n                      端口状态  =  正常\n\n\n\n最终回答：\n\n\n✅ **结论判定**\n端口 `1` 本地环回测试正常，说明**本端接口板及本端 E1 线缆完好**。故障范围已明确缩小至**对端设备**或**中间传输链路**。\n\n---\n\n### 🔍 下一步操作建议\n1. **停止本端自环（必须执行）**\n   ```bash\n   STOP PORTLOP: PORTID=1;\n   ```\n   停止后执行 `DSP PORT: PORTID=1;` 确认环回类型恢复为 `无`，端口状态保持 `正常`。\n2. **核对两端配置一致性**\n   确保本端与对端以下参数严格一致，否则会导致同步失败或滑码持续增长：\n   - 帧格式（`CRC4` / `NOCRC4`）\n   - 线路编码（`HDB3` / `AMI`）\n   - 时钟同步模式（主/从/同步源）\n3. **联合对端与传输侧排查**\n   - 联系对端执行相同的本地环回测试。若对端异常，故障在对端物理层。\n   - 若两端自环均正常，请联系传输团队检查中间链路的衰减、中继设备同步状态及滑码指标。\n\n---\n\n### 📊 恢复后的监控建议\n链路恢复后，建议持续观察滑码与会话指标：\n- 若出现 **剧烈波动**（30分钟内波动幅度 > 15%）或 **高位震荡**（持续2小时维持在阈值上限80%以上且波动±5%以内），需立即检查时钟同步源及传输质量。\n- 若仅为 **小幅波动**（一小时内波动幅度 3%-5%），属于正常业务起伏，可保持现状观察。\n\n请提供对端测试结果或两端配置参数，我将为您做进一步定位。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a1d74a4a-e208-4cd3-97a8-73ee72d61a05"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-b545b3ad-3611-4850-bcb1-c4de5d3bb7dc"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3ec6b3c7-d690-406a-a9cd-316edceb98c5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2987"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 10471549,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 4150,
+      "byte_offset": 10472646,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10476796,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 10477001,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 4228,
+      "byte_offset": 10477826,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 10482054,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 10905466,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 10905827,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 1371,
+      "byte_offset": 10906035,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 10907406,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 10907611,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 10907824,
+      "path": "archive/2026-10-12/09/part-00005.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a1d74a4a-e208-4cd3-97a8-73ee72d61a05"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-b545b3ad-3611-4850-bcb1-c4de5d3bb7dc"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-3ec6b3c7-d690-406a-a9cd-316edceb98c5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2937"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:07:52.565379+00:00",
+    "arrival_seq": 4498,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

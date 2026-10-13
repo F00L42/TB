@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nN6PacketDropRate: 2.1% (正常值<0.5%)\n\n\n\n最终回答：\n已记录性能计数器：\n`N6PacketDropRate: 2.1% (正常值<0.5%)`\n\n### 📐 波动标定\n| 指标变化 | 波动类型判定 | 判定依据 |\n|:---|:---|:---|\n| **丢包率激增 320%** | **剧烈波动** / **大幅波动** | 远超30分钟内>15%与一小时内>20%阈值，且突破正常阈值4倍 |\n\n### 🔗 关联分析（结合前述数据）\n`TX/RX突增300%` → `队列积压/资源耗尽` → `丢包率飙升至2.1%` → `触发TTL=0与GTP-U建链失败`\n典型**拥塞诱导型故障链**：外部流量洪峰或路由偏移导致N6接口瞬时过载，尾部丢弃/WRED触发，控制面隧道建立受阻。\n\n### 🛠 根因定位与排查指引\n| 可能原因 | 诊断方法 | 解决措施 |\n|:---|:---|:---|\n| **传输队列拥塞丢弃** | 检查`QueueUtilization`是否持续>85%，查看Tail-Drop/WRED计数 | 扩容发送缓冲区，启用HTB/WFQ流量整形，配置平滑速率阈值 |\n| **DDoS/异常业务注入** | 导出五元组流量画像，统计Top Source IP与协议分布 | 部署ACL限速，启用DPI识别拦截，触发动态防攻击策略 |\n| **PFCP会话资源耗尽** | 查询`SessionCount`与`CreatePDRReject`日志，核对内存/CPU水位 | 扩容UPF会话配额，优化会话超时参数，清理僵死会话 |\n| **MTU不匹配分片丢弃** | 抓取N6接口报文，统计`Fragmentation Needed`与`IP Reasm Fail` | 统一UPF/DN接口MTU为1500，开启PMTUD探测与DF位校验 |\n\n### 📌 下一步操作\n1. 执行 `upf_perf show N6 queue detail` 确认队列积压水位与丢弃策略触发记录。\n2. 导出该时段流量画像（Top Talker、协议占比），核对是否匹配已知业务计划或攻击特征。\n3. 若丢包伴随 `QueueUtilization` 持续2小时≥80%且波动±5%以内，标记为**高位震荡**，优先调整流量整形参数。\n\n提供队列详情或流量画像结果，我将完成最终根因确认与恢复方案输出。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "当前N6接口的队列利用率具体是多少？\n该时段流量画像中Top Source IP的分布情况如何？\n是否抓取到MTU不匹配导致的分片丢弃报文？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 848,
+      "total_tokens": 887,
+      "completion_tokens": 39,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 848,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 39,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 887,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 38,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nN6PacketDropRate: 2.1% (正常值<0.5%)\n\n\n\n最终回答：\n已记录性能计数器：\n`N6PacketDropRate: 2.1% (正常值<0.5%)`\n\n### 📐 波动标定\n| 指标变化 | 波动类型判定 | 判定依据 |\n|:---|:---|:---|\n| **丢包率激增 320%** | **剧烈波动** / **大幅波动** | 远超30分钟内>15%与一小时内>20%阈值，且突破正常阈值4倍 |\n\n### 🔗 关联分析（结合前述数据）\n`TX/RX突增300%` → `队列积压/资源耗尽` → `丢包率飙升至2.1%` → `触发TTL=0与GTP-U建链失败`\n典型**拥塞诱导型故障链**：外部流量洪峰或路由偏移导致N6接口瞬时过载，尾部丢弃/WRED触发，控制面隧道建立受阻。\n\n### 🛠 根因定位与排查指引\n| 可能原因 | 诊断方法 | 解决措施 |\n|:---|:---|:---|\n| **传输队列拥塞丢弃** | 检查`QueueUtilization`是否持续>85%，查看Tail-Drop/WRED计数 | 扩容发送缓冲区，启用HTB/WFQ流量整形，配置平滑速率阈值 |\n| **DDoS/异常业务注入** | 导出五元组流量画像，统计Top Source IP与协议分布 | 部署ACL限速，启用DPI识别拦截，触发动态防攻击策略 |\n| **PFCP会话资源耗尽** | 查询`SessionCount`与`CreatePDRReject`日志，核对内存/CPU水位 | 扩容UPF会话配额，优化会话超时参数，清理僵死会话 |\n| **MTU不匹配分片丢弃** | 抓取N6接口报文，统计`Fragmentation Needed`与`IP Reasm Fail` | 统一UPF/DN接口MTU为1500，开启PMTUD探测与DF位校验 |\n\n### 📌 下一步操作\n1. 执行 `upf_perf show N6 queue detail` 确认队列积压水位与丢弃策略触发记录。\n2. 导出该时段流量画像（Top Talker、协议占比），核对是否匹配已知业务计划或攻击特征。\n3. 若丢包伴随 `QueueUtilization` 持续2小时≥80%且波动±5%以内，标记为**高位震荡**，优先调整流量整形参数。\n\n提供队列详情或流量画像结果，我将完成最终根因确认与恢复方案输出。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-1db9c198-323f-4790-a6f1-9720ec198945"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-42416f45-d1dd-4c6a-8d2e-bbe392d6277a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3433"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 930837,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 4746,
+      "byte_offset": 931934,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 936680,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 936885,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 4824,
+      "byte_offset": 937710,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 942534,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 955018,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 955379,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1343,
+      "byte_offset": 955587,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 956930,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 957135,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 957348,
+      "path": "archive/2026-10-12/08/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-1db9c198-323f-4790-a6f1-9720ec198945"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-42416f45-d1dd-4c6a-8d2e-bbe392d6277a"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-cea20a8b-0827-4ac4-bd83-66265afee8f5"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3383"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:07:06.257134+00:00",
+    "arrival_seq": 3615,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

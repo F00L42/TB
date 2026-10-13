@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n场景：\n\n\n\n最终回答：\n\n\n**场景：N2接口信令拥塞与衍生告警风暴**\n\n### 📋 场景背景\n- **时间**：2023-10-10 10:00 ~ 11:30\n- **网元**：AMF01-N2-01（N2接口代理服务器/Envoy集群）\n- **业务场景**：早间注册高峰，SMF会话建立请求激增\n- **初始状态**：N2接口信令处理延迟基准 `8ms`，阈值上限 `60ms`，吞吐量基准 `12000 msg/s`\n\n---\n\n### 📥 阶段一：原始告警触发（未降噪前）\n| 时间 | 指标 | 数值 | 原始告警 |\n|:---|:---|:---|:---|\n| 10:05 | 信令延迟 | 10ms | 无 |\n| 10:12 | 信令延迟 | 11ms | ALM-2001（次要） |\n| 10:15 | 信令延迟 | 45ms | ALM-2001（重要） |\n| 10:18 | 吞吐量 | 9500 msg/s | ALM-2007（重要） |\n| 10:20 | 信令延迟 | 48ms | ALM-2001（重要） |\n| 10:25 | 信令延迟 | 62ms | ALM-2001（严重） |\n| 10:28 | 下游UE注册成功率 | 78% | ALM-2009（重要） |\n\n👉 **原始上报**：7条告警，含瞬时抖动、同源重复、上下游衍生告警，直接推送将触发告警风暴。\n\n---\n\n### 🛡️ 阶段二：降噪策略应用\n| 规则 | 应用结果 |\n|:---|:---|\n| **小幅波动过滤**（1小时内3%-5%） | 10:05→10:12 延迟 `+10%` 但绝对值 `+1ms`，判定为正常抖动，**过滤** |\n| **同源聚合**（5分钟窗口） | 10:15~10:20 两条 ALM-2001 合并为 **1条**，重复计数=2 |\n| **剧烈波动识别**（30分钟内>15%） | 10:15(45ms)→10:25(62ms) 波动 `+37.7%`，触发 **剧烈波动**，升级为 P1 |\n| **根因抑制**（拓扑依赖） | ALM-2007（吞吐量下降）、ALM-2009（注册成功率下降）判定为N2拥塞衍生告警，**自动抑制** |\n| **环比异常校验**（±20%） | 吞吐量 `12000→9500` 环比 `-20.8%`，满足异常阈值，但受根因抑制规则覆盖，仅记录不推送 |\n\n✅ **降噪后输出**：仅保留 **2条有效告警**\n1. `10:15` ALM-2001（P2 重要，聚合计数2）\n2. `10:25` ALM-2001（P1 严重，剧烈波动标记）\n\n---\n\n### 📈 阶段三：分级排序与响应\n| 告警 | 级别 | 排序位置 | 响应动作 |\n|:---|:---|:---|:---|\n| ALM-2001 (10:25) | 🔴 P1 严重 | 置顶 | 自动创建P1工单 → 短信+IM通知值班工程师 → 15分钟SLA倒计时 |\n| ALM-2001 (10:15) | 🟠 P2 重要 | 二级 | 合并至P2工单队列 → 24小时响应窗口 → 纳入早间复盘报告 |\n\n---\n\n### 🛠️ 阶段四：处置与闭环\n- **10:30** 值班工程师接收P1通知，检查Envoy代理服务器连接池，发现某SMF节点响应超时导致连接堆积\n- **10:45** 执行连接池扩容与超时阈值调整，延迟回落至 `15ms`\n- **11:00** 系统校验连续2个周期正常，触发 `AutoCleared` 自动清除\n- **11:05** 工单闭环，生成根因报告，同步更新拓扑抑制规则\n\n---\n\n### 📌 案例价值\n| 维度 | 效果 |\n|:---|:---|\n| **告警压降** | 7条 → 2条（压降71%） |\n| **风暴规避** | 根因抑制成功屏蔽3条衍生告警，避免运维干扰 |\n| **策略验证** | 小幅波动过滤、剧烈波动识别、环比异常校验均按阈值精准生效 |\n| **可优化点** | 建议将Envoy连接池水位纳入前置预警（>75%触发P3），避免触及P1阈值 |\n\n是否需要继续输出其他典型场景（如**RAID磁盘组高位震荡**、**License即将过期提示压缩**），或直接将本案归档至《告警分级响应与降噪SOP》？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "请输出RAID磁盘组高位震荡的告警降噪场景案例\n请输出License即将过期提示压缩的告警降噪场景案例\n请将本案例归档至《告警分级响应与降噪SOP》并生成目录索引",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1510,
+      "total_tokens": 1559,
+      "completion_tokens": 49,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1510,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 49,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1559,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 48,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n场景：\n\n\n\n最终回答：\n\n\n**场景：N2接口信令拥塞与衍生告警风暴**\n\n### 📋 场景背景\n- **时间**：2023-10-10 10:00 ~ 11:30\n- **网元**：AMF01-N2-01（N2接口代理服务器/Envoy集群）\n- **业务场景**：早间注册高峰，SMF会话建立请求激增\n- **初始状态**：N2接口信令处理延迟基准 `8ms`，阈值上限 `60ms`，吞吐量基准 `12000 msg/s`\n\n---\n\n### 📥 阶段一：原始告警触发（未降噪前）\n| 时间 | 指标 | 数值 | 原始告警 |\n|:---|:---|:---|:---|\n| 10:05 | 信令延迟 | 10ms | 无 |\n| 10:12 | 信令延迟 | 11ms | ALM-2001（次要） |\n| 10:15 | 信令延迟 | 45ms | ALM-2001（重要） |\n| 10:18 | 吞吐量 | 9500 msg/s | ALM-2007（重要） |\n| 10:20 | 信令延迟 | 48ms | ALM-2001（重要） |\n| 10:25 | 信令延迟 | 62ms | ALM-2001（严重） |\n| 10:28 | 下游UE注册成功率 | 78% | ALM-2009（重要） |\n\n👉 **原始上报**：7条告警，含瞬时抖动、同源重复、上下游衍生告警，直接推送将触发告警风暴。\n\n---\n\n### 🛡️ 阶段二：降噪策略应用\n| 规则 | 应用结果 |\n|:---|:---|\n| **小幅波动过滤**（1小时内3%-5%） | 10:05→10:12 延迟 `+10%` 但绝对值 `+1ms`，判定为正常抖动，**过滤** |\n| **同源聚合**（5分钟窗口） | 10:15~10:20 两条 ALM-2001 合并为 **1条**，重复计数=2 |\n| **剧烈波动识别**（30分钟内>15%） | 10:15(45ms)→10:25(62ms) 波动 `+37.7%`，触发 **剧烈波动**，升级为 P1 |\n| **根因抑制**（拓扑依赖） | ALM-2007（吞吐量下降）、ALM-2009（注册成功率下降）判定为N2拥塞衍生告警，**自动抑制** |\n| **环比异常校验**（±20%） | 吞吐量 `12000→9500` 环比 `-20.8%`，满足异常阈值，但受根因抑制规则覆盖，仅记录不推送 |\n\n✅ **降噪后输出**：仅保留 **2条有效告警**\n1. `10:15` ALM-2001（P2 重要，聚合计数2）\n2. `10:25` ALM-2001（P1 严重，剧烈波动标记）\n\n---\n\n### 📈 阶段三：分级排序与响应\n| 告警 | 级别 | 排序位置 | 响应动作 |\n|:---|:---|:---|:---|\n| ALM-2001 (10:25) | 🔴 P1 严重 | 置顶 | 自动创建P1工单 → 短信+IM通知值班工程师 → 15分钟SLA倒计时 |\n| ALM-2001 (10:15) | 🟠 P2 重要 | 二级 | 合并至P2工单队列 → 24小时响应窗口 → 纳入早间复盘报告 |\n\n---\n\n### 🛠️ 阶段四：处置与闭环\n- **10:30** 值班工程师接收P1通知，检查Envoy代理服务器连接池，发现某SMF节点响应超时导致连接堆积\n- **10:45** 执行连接池扩容与超时阈值调整，延迟回落至 `15ms`\n- **11:00** 系统校验连续2个周期正常，触发 `AutoCleared` 自动清除\n- **11:05** 工单闭环，生成根因报告，同步更新拓扑抑制规则\n\n---\n\n### 📌 案例价值\n| 维度 | 效果 |\n|:---|:---|\n| **告警压降** | 7条 → 2条（压降71%） |\n| **风暴规避** | 根因抑制成功屏蔽3条衍生告警，避免运维干扰 |\n| **策略验证** | 小幅波动过滤、剧烈波动识别、环比异常校验均按阈值精准生效 |\n| **可优化点** | 建议将Envoy连接池水位纳入前置预警（>75%触发P3），避免触及P1阈值 |\n\n是否需要继续输出其他典型场景（如**RAID磁盘组高位震荡**、**License即将过期提示压缩**），或直接将本案归档至《告警分级响应与降噪SOP》？"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c1f28dbb-c190-4c12-b9a6-554a8b6e82a4"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e5d74bc3-5c0a-46c6-b405-89b22148e9c9"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4889"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 15564018,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 6686,
+      "byte_offset": 15565115,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15571801,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 15572006,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 6764,
+      "byte_offset": 15572831,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 15579595,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 15956632,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 15956993,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 1399,
+      "byte_offset": 15957201,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 15958600,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 15958805,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 15959018,
+      "path": "archive/2026-10-12/08/part-00014.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c1f28dbb-c190-4c12-b9a6-554a8b6e82a4"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e5d74bc3-5c0a-46c6-b405-89b22148e9c9"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-9d5860ad-b2f8-4a8c-9621-82f2d5d7e747"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4839"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:49:46.887081+00:00",
+    "arrival_seq": 4101,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n专用QoS Flow是如何建立的？\n\n\n\n最终回答：\n在5G核心网中，**专用（专有）QoS Flow** 的建立通常由业务触发（如上行数据流到达UPF并匹配到特定规则，或PCF策略通知）。整个流程涉及 UE、RAN、AMF、SMF、UPF 和 PCF 等多个网元。\n\n以下是专用 QoS Flow 建立的标准信令流程：\n\n### 1. 预定义规则下发（可选）\n* 若部署动态PCC，PCF 向 SMF 下发预定义规则。SMF 通过 `PFCP Session Modification Request` 将规则名称下发给 UPF，UPF 匹配本地配置后响应。\n\n### 2. 业务检测与上报\n* 上行数据流到达 UPF，UPF 对报文进行规则匹配。\n* 当匹配到预定义规则且需创建专用 QoS Flow 时，UPF 向 SMF 发送 `PFCP Session Report Request`（携带 URR ID、Rule Information 等）。\n* SMF 处理上报事件，基于 QoS 策略触发建立流程，并回复 `PFCP Session Report Response`。\n\n### 3. N4 会话更新（SMF → UPF）\n* SMF 向 UPF 发送 `PFCP Session Modification Request`，携带 QoS Flow Identifier (QFI)、QER ID、Gate Status、CN 隧道信息等，用于配置数据监测和转发规则。UPF 响应确认。\n\n### 4. N1/N2 消息组装与转发（SMF → AMF）\n* SMF 向 AMF 发送 `Namf_Communication_N1N2MessageTransfer` 请求，携带：\n  * **N2 SM Information**（给 RAN）：包含 QFI、QoS Profile、CN Tunnel Info 等。\n  * **N1 SM Container**（给 UE）：包含 PDU Session Modification Command 及 QoS Rule 等。\n\n### 5. RAN 资源建立（AMF → RAN）\n* AMF 向 RAN 发送 `PDU Session Resource Setup Request`，请求建立专用 QoS Flow 的无线侧资源。\n\n### 6. UE 侧配置（RAN ↔ UE）\n* RAN 与 UE 进行空口信令交互，将 N1 SM Container 转发给 UE，指示 UE 建立专用的 QoS Flow 并更新本地 QoS 信息。\n\n### 7. RAN 响应与上下文更新（RAN → AMF → SMF）\n* RAN 完成资源分配后，向 AMF 发送 `PDU Session Resource Setup Response`，包含 AN Tunnel Info 和接受/拒绝的 QFI 列表。\n* AMF 通过 `Nsmf_PDUSession_UpdateSMContext Request` 将 RAN 返回的 N2 SM Information 转发给 SMF。\n\n### 8. 最终转发规则下发（SMF → UPF）\n* SMF 获取到 AN 隧道信息后，再次向 UPF 发送 `PFCP Session Modification Request`，下发完整的端到端转发规则。UPF 响应 `PFCP Session Modification Response`。\n* SMF 向 AMF 返回最终响应，专用 QoS Flow 建立完成。\n\n---\n\n### 关键参数说明\n| 参数 | 作用 |\n|:---|:---|\n| **QFI (QoS Flow Identifier)** | PDU Session 中标识 QoS Flow 的唯一标签，用于数据包分类和转发。 |\n| **5QI (5QI)** | 定义 QoS Flow 的类型（如语音、视频、最佳努力等），决定调度权重和丢包延迟特性。 |\n| **QoS Profile** | 包含 5QI、ARP（分配和保留优先级）、GFBR/MFBR 等完整 QoS 参数集合。 |\n\n该流程确保了用户面数据能够按照策略控制网（PCF）定义的 QoS 要求，在 UE、RAN 和 UPF 之间建立端到端的专用传输通道。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "专用QoS Flow建立过程中，如果RAN资源分配失败，SMF和UPF会如何进行状态回退和错误处理？\n在动态PCC场景下，PCF是通过何种机制和接口向SMF实时通知策略变更从而触发专用QoS Flow建立的？\n专用QoS Flow建立完成后，UPF是如何利用QFI和URR对上下行数据包进行持续监测、计费以及QoS合规性检查的？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1154,
+      "total_tokens": 1247,
+      "completion_tokens": 93,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1154,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 93,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1247,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 92,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n专用QoS Flow是如何建立的？\n\n\n\n最终回答：\n在5G核心网中，**专用（专有）QoS Flow** 的建立通常由业务触发（如上行数据流到达UPF并匹配到特定规则，或PCF策略通知）。整个流程涉及 UE、RAN、AMF、SMF、UPF 和 PCF 等多个网元。\n\n以下是专用 QoS Flow 建立的标准信令流程：\n\n### 1. 预定义规则下发（可选）\n* 若部署动态PCC，PCF 向 SMF 下发预定义规则。SMF 通过 `PFCP Session Modification Request` 将规则名称下发给 UPF，UPF 匹配本地配置后响应。\n\n### 2. 业务检测与上报\n* 上行数据流到达 UPF，UPF 对报文进行规则匹配。\n* 当匹配到预定义规则且需创建专用 QoS Flow 时，UPF 向 SMF 发送 `PFCP Session Report Request`（携带 URR ID、Rule Information 等）。\n* SMF 处理上报事件，基于 QoS 策略触发建立流程，并回复 `PFCP Session Report Response`。\n\n### 3. N4 会话更新（SMF → UPF）\n* SMF 向 UPF 发送 `PFCP Session Modification Request`，携带 QoS Flow Identifier (QFI)、QER ID、Gate Status、CN 隧道信息等，用于配置数据监测和转发规则。UPF 响应确认。\n\n### 4. N1/N2 消息组装与转发（SMF → AMF）\n* SMF 向 AMF 发送 `Namf_Communication_N1N2MessageTransfer` 请求，携带：\n  * **N2 SM Information**（给 RAN）：包含 QFI、QoS Profile、CN Tunnel Info 等。\n  * **N1 SM Container**（给 UE）：包含 PDU Session Modification Command 及 QoS Rule 等。\n\n### 5. RAN 资源建立（AMF → RAN）\n* AMF 向 RAN 发送 `PDU Session Resource Setup Request`，请求建立专用 QoS Flow 的无线侧资源。\n\n### 6. UE 侧配置（RAN ↔ UE）\n* RAN 与 UE 进行空口信令交互，将 N1 SM Container 转发给 UE，指示 UE 建立专用的 QoS Flow 并更新本地 QoS 信息。\n\n### 7. RAN 响应与上下文更新（RAN → AMF → SMF）\n* RAN 完成资源分配后，向 AMF 发送 `PDU Session Resource Setup Response`，包含 AN Tunnel Info 和接受/拒绝的 QFI 列表。\n* AMF 通过 `Nsmf_PDUSession_UpdateSMContext Request` 将 RAN 返回的 N2 SM Information 转发给 SMF。\n\n### 8. 最终转发规则下发（SMF → UPF）\n* SMF 获取到 AN 隧道信息后，再次向 UPF 发送 `PFCP Session Modification Request`，下发完整的端到端转发规则。UPF 响应 `PFCP Session Modification Response`。\n* SMF 向 AMF 返回最终响应，专用 QoS Flow 建立完成。\n\n---\n\n### 关键参数说明\n| 参数 | 作用 |\n|:---|:---|\n| **QFI (QoS Flow Identifier)** | PDU Session 中标识 QoS Flow 的唯一标签，用于数据包分类和转发。 |\n| **5QI (5QI)** | 定义 QoS Flow 的类型（如语音、视频、最佳努力等），决定调度权重和丢包延迟特性。 |\n| **QoS Profile** | 包含 5QI、ARP（分配和保留优先级）、GFBR/MFBR 等完整 QoS 参数集合。 |\n\n该流程确保了用户面数据能够按照策略控制网（PCF）定义的 QoS 要求，在 UE、RAN 和 UPF 之间建立端到端的专用传输通道。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f0c34358-b968-401d-9d39-07c272203bcc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e9e6c01f-e214-4bcd-b621-e694b805dfac"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-f6c03555-5b0d-4198-b672-3174bba830ba"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4492"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 1132894,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 6158,
+      "byte_offset": 1133991,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 1140149,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 1140354,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 6236,
+      "byte_offset": 1141179,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 1147415,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 362,
+      "byte_offset": 2145201,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 2145563,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 1623,
+      "byte_offset": 2145771,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 2147394,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 2147599,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    },
+    {
+      "byte_length": 411,
+      "byte_offset": 2147812,
+      "path": "archive/2026-10-12/14/part-00003.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-f0c34358-b968-401d-9d39-07c272203bcc"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-e9e6c01f-e214-4bcd-b621-e694b805dfac"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-f6c03555-5b0d-4198-b672-3174bba830ba"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4442"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T14:04:51.730829+00:00",
+    "arrival_seq": 8790,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/14"
+  }
+}

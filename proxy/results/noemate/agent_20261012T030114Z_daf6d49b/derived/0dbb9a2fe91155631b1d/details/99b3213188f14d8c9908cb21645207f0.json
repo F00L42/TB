@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n5G Core中的UDM产品，HSM设备在负荷高的时候主要负责处理啥？\n\n\n\n最终回答：\n\n\n根据知识库信息，在5G Core的UDM产品中，**HSM（硬件安全模块）在负荷高时主要负责处理鉴权相关的密码学运算**，具体包括：\n\n### 核心处理任务\n1. **SUCI解密**：将终端上报的加密标识SUCI解密为SUPI（提取MSIN）\n2. **鉴权向量计算**：生成鉴权五元组 `\\{RAND, XRES, CK, IK, AUTN\\}`\n3. **KI二次加密**：使用K2对鉴权密钥KI进行重新加密\n4. **鉴权重同步**：计算MAC、AK，重新生成SQN和鉴权向量\n\n### 负荷过高的成因\n- ALB（鉴权负载均衡模块）向HSM发送鉴权请求的**速度超过HSM最大处理能力**\n- 消息积压在UDM内部队列，导致ALB队列负荷量过高\n- 当队列消息数超过`ADD HSMLKSPARA`配置的\"拥塞告警上报阈值\"时，上报**ALM-19002 HSM链路拥塞**告警\n\n### 常见诱因\n| 原因 | 说明 |\n|:---|:---|\n| 部分链路故障 | 剩余HSM链路分担负荷过高 |\n| 业务量过大 | 网络繁忙时段鉴权请求激增 |\n| 网络带宽不足 | 承载网带宽瓶颈导致传输延迟 |\n| HSM性能瓶颈 | CPU占用率超过70% |\n\n### 处理建议\n1. 检查是否存在HSM链路故障告警（ALM-19000）\n2. 执行`DSP HSMSTATE`查看HSM CPU占用率\n3. 执行`LST HSMLKSPARA`确认链路数是否达到上限\n4. 必要时执行`ADD HSMRSRV`增加链路并激活\n5. 长期解决方案：拓宽承载网带宽或进行HSM设备扩容"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何执行DSP HSMSTATE命令来查看当前HSM设备的CPU占用率？\n当出现ALM-19002 HSM链路拥塞告警时，如何通过LST HSMLKSPARA命令检查链路配置？\n在业务高峰期，除了扩容HSM设备外，还有哪些优化措施可以缓解鉴权负荷？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 706,
+      "total_tokens": 778,
+      "completion_tokens": 72,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 706,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 72,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 778,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 71,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n5G Core中的UDM产品，HSM设备在负荷高的时候主要负责处理啥？\n\n\n\n最终回答：\n\n\n根据知识库信息，在5G Core的UDM产品中，**HSM（硬件安全模块）在负荷高时主要负责处理鉴权相关的密码学运算**，具体包括：\n\n### 核心处理任务\n1. **SUCI解密**：将终端上报的加密标识SUCI解密为SUPI（提取MSIN）\n2. **鉴权向量计算**：生成鉴权五元组 `\\{RAND, XRES, CK, IK, AUTN\\}`\n3. **KI二次加密**：使用K2对鉴权密钥KI进行重新加密\n4. **鉴权重同步**：计算MAC、AK，重新生成SQN和鉴权向量\n\n### 负荷过高的成因\n- ALB（鉴权负载均衡模块）向HSM发送鉴权请求的**速度超过HSM最大处理能力**\n- 消息积压在UDM内部队列，导致ALB队列负荷量过高\n- 当队列消息数超过`ADD HSMLKSPARA`配置的\"拥塞告警上报阈值\"时，上报**ALM-19002 HSM链路拥塞**告警\n\n### 常见诱因\n| 原因 | 说明 |\n|:---|:---|\n| 部分链路故障 | 剩余HSM链路分担负荷过高 |\n| 业务量过大 | 网络繁忙时段鉴权请求激增 |\n| 网络带宽不足 | 承载网带宽瓶颈导致传输延迟 |\n| HSM性能瓶颈 | CPU占用率超过70% |\n\n### 处理建议\n1. 检查是否存在HSM链路故障告警（ALM-19000）\n2. 执行`DSP HSMSTATE`查看HSM CPU占用率\n3. 执行`LST HSMLKSPARA`确认链路数是否达到上限\n4. 必要时执行`ADD HSMRSRV`增加链路并激活\n5. 长期解决方案：拓宽承载网带宽或进行HSM设备扩容"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6c8470bf-98d4-4e09-811b-ad7312fb1ecf"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-606434bc-0c28-45c2-b239-4ad71672ee7c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4d8b742d-3ff8-47e2-a3f8-c156e0b2c661"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2964"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 13916320,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4122,
+      "byte_offset": 13917417,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13921539,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 13921744,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 4196,
+      "byte_offset": 13922569,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 13926765,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 13963060,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 13963421,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1479,
+      "byte_offset": 13963629,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13965108,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 13965313,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 13965526,
+      "path": "archive/2026-10-12/11/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-6c8470bf-98d4-4e09-811b-ad7312fb1ecf"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-606434bc-0c28-45c2-b239-4ad71672ee7c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-4d8b742d-3ff8-47e2-a3f8-c156e0b2c661"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2914"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T11:45:13.252999+00:00",
+    "arrival_seq": 6623,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/11"
+  }
+}

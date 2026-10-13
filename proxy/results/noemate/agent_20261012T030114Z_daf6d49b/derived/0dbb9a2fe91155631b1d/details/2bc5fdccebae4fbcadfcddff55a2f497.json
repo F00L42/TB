@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nALM-20350 CSDB表定义丢失告警包含哪些参数及其含义？\n\n\n\n最终回答：\n\n\n根据知识库查询结果，**ALM-20350 实际为 \"TLS证书一致性校验失败\" 告警**，而非 \"CSDB表定义丢失\" 告警。以下是该告警的参数及含义：\n\n### ALM-20350 TLS证书一致性校验失败\n\n| 参数名称 | 参数含义 |\n|:---|:---|\n| 证书场景名称 | 证书的场景名称。 |\n\n---\n\n### 补充说明\n\n知识库中 **CSDB表定义丢失** 告警的编号分别为以下（不同产品/版本编号不同）：\n\n| 告警ID | 告警名称 | 典型参数 |\n|:---|:---|:---|\n| ALM-20178 | CSDB 表定义丢失 | 子实例ID、VNFCID、告警上报原因、VNFC名称、告警实例号 |\n| ALM-20218 | CSDB 表定义丢失 | 子实例ID、VNFCID、告警上报原因、VNFC名称、告警实例号 |\n| ALM-30512 | CSDB表定义丢失 | 子实例ID、模块号、告警上报原因 |\n| ALM-18010 | CSDB表定义丢失 | 子实例ID、模块号、告警上报原因 |\n| ALM-80183 | CSDB表定义丢失 | 子实例ID、模块号、告警上报原因 |\n\n**建议您确认：**\n1. 告警ID是否为 ALM-20350，还是上述CSDB相关告警ID之一？\n2. 所属产品和版本（如USC、CSCF、ATS9900等），不同产品告警ID定义可能不同。\n\n提供更多信息后，我可以为您查询准确的参数详情。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "ALM-20178 CSDB表定义丢失告警的各个参数具体含义是什么？\n不同产品版本中CSDB表定义丢失告警的参数差异有哪些？\n收到CSDB表定义丢失告警后应如何处理和恢复？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 688,
+      "total_tokens": 741,
+      "completion_tokens": 53,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 688,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 53,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 741,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 52,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nALM-20350 CSDB表定义丢失告警包含哪些参数及其含义？\n\n\n\n最终回答：\n\n\n根据知识库查询结果，**ALM-20350 实际为 \"TLS证书一致性校验失败\" 告警**，而非 \"CSDB表定义丢失\" 告警。以下是该告警的参数及含义：\n\n### ALM-20350 TLS证书一致性校验失败\n\n| 参数名称 | 参数含义 |\n|:---|:---|\n| 证书场景名称 | 证书的场景名称。 |\n\n---\n\n### 补充说明\n\n知识库中 **CSDB表定义丢失** 告警的编号分别为以下（不同产品/版本编号不同）：\n\n| 告警ID | 告警名称 | 典型参数 |\n|:---|:---|:---|\n| ALM-20178 | CSDB 表定义丢失 | 子实例ID、VNFCID、告警上报原因、VNFC名称、告警实例号 |\n| ALM-20218 | CSDB 表定义丢失 | 子实例ID、VNFCID、告警上报原因、VNFC名称、告警实例号 |\n| ALM-30512 | CSDB表定义丢失 | 子实例ID、模块号、告警上报原因 |\n| ALM-18010 | CSDB表定义丢失 | 子实例ID、模块号、告警上报原因 |\n| ALM-80183 | CSDB表定义丢失 | 子实例ID、模块号、告警上报原因 |\n\n**建议您确认：**\n1. 告警ID是否为 ALM-20350，还是上述CSDB相关告警ID之一？\n2. 所属产品和版本（如USC、CSCF、ATS9900等），不同产品告警ID定义可能不同。\n\n提供更多信息后，我可以为您查询准确的参数详情。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b1ef9e49-d2e7-4fed-8535-31971144af05"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d6903d4f-3023-4695-886a-016c435e6869"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7848e0ed-c81f-46e9-bcbf-1563260f4d57"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2809"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 8818572,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 3914,
+      "byte_offset": 8819669,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8823583,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 8823788,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 3992,
+      "byte_offset": 8824613,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 8828605,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 8877062,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 8877423,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 1395,
+      "byte_offset": 8877631,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8879026,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 8879231,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 8879444,
+      "path": "archive/2026-10-12/13/part-00005.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-b1ef9e49-d2e7-4fed-8535-31971144af05"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-d6903d4f-3023-4695-886a-016c435e6869"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-7848e0ed-c81f-46e9-bcbf-1563260f4d57"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2759"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:14:10.513899+00:00",
+    "arrival_seq": 7547,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

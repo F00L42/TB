@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nHTTP或HTTPS链路故障\n\n\n\n最终回答：\n\n\n以下是关于 **ALM-20091 HTTP或HTTPS链路故障** 的详细说明与处理指南：\n\n### 🔍 告警解释\nATS实体与对端OMU/OSG/SPG/MRFC/MAGCF实体之间建立有HTTP或HTTPS链路，用于消息交互。\n- **告警触发**：执行 `DEA HTTPLNK` 命令时产生；或链路探测（默认周期300秒）连续3次未收到响应，识别为故障后上报。\n- **告警恢复**：执行 `ACT HTTPLNK` 命令时自动恢复；或在下一探测周期收到对端响应码后自动恢复。\n- **注意**：ATS作为服务端时无法主动发起探测，因此无法主动上报该告警。\n\n### 📊 告警属性\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---:|:---:|\n| 20091 | 重要告警 | 是 |\n\n### ⚠️ 对系统的影响\n如果ATS实体和对端实体之间仅配置了一条HTTP或HTTPS链路，链路故障将导致双方交互的业务无法正常使用。\n\n### 🧩 可能原因\n- 该HTTP或HTTPS链路处于去激活状态。\n- ATS实体的分发配置数据不正确。\n- 网络路径故障（双平面/CSLB组网场景）。\n\n### 🛠️ 处理步骤\n1. **激活链路**：登录OM Portal，进入 `应用管理 > MML > ATS`，执行 `ACT HTTPLNK` 激活告警链路。\n2. **检查状态**：执行 `DSP HTTPLNK` 检查链路状态是否为“去激活”。\n   - **是** → 执行第3步\n   - **否** → 执行第6步\n3. **确认链路类型**：执行 `LST HTTPLNK` 获取链路信息，检查是否为HTTPS类型。\n   - **是** → 执行第7步\n   - **否** → 执行第4步\n4. **检查分发配置**：执行 `LST PORTCFG` 查询HTTP链路分发配置，与 `LST HTTPLNK` 结果对比。\n   - **配置正确** → 执行第7步\n   - **配置错误** → 执行第5步\n5. **重新配置**：执行 `RMV HTTPLNK` 删除故障链路，使用 `ADD HTTPLNK` 重新配置并 `ACT HTTPLNK` 激活，再次检查状态。\n   - **状态正常** → 执行第6步\n   - **仍去激活** → 执行第7步\n6. **确认恢复**：在告警台检查告警是否恢复。\n   - **是** → 处理完毕\n   - **否** → 执行第7步\n7. **高级排查（CSLB/双平面）**：\n   - 执行 `LST CSLBMODE` 确认CSLB模式是否开启。若未开启或平面ID为`NULL`，请联系华为技术支持。\n   - 若平面ID非空，根据平面ID参考 `故障管理 > 故障定界定位 > 典型故障定位思路 > 故障物理路径查询` 排除网络路径故障。\n   - 故障仍未消除，请联系华为技术支持。\n\n如需进一步排查特定网元或提供具体告警参数，可补充详细信息以便精准定位。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何判断当前故障链路是处于去激活状态还是网络路径不可达？\n在双平面或CSLB组网场景下，如何根据平面ID查询并排除故障物理路径？\n执行ACT HTTPLNK命令后告警仍未恢复，应如何检查ATS的分发配置数据是否正确？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1016,
+      "total_tokens": 1079,
+      "completion_tokens": 63,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1016,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 63,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1079,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 62,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nHTTP或HTTPS链路故障\n\n\n\n最终回答：\n\n\n以下是关于 **ALM-20091 HTTP或HTTPS链路故障** 的详细说明与处理指南：\n\n### 🔍 告警解释\nATS实体与对端OMU/OSG/SPG/MRFC/MAGCF实体之间建立有HTTP或HTTPS链路，用于消息交互。\n- **告警触发**：执行 `DEA HTTPLNK` 命令时产生；或链路探测（默认周期300秒）连续3次未收到响应，识别为故障后上报。\n- **告警恢复**：执行 `ACT HTTPLNK` 命令时自动恢复；或在下一探测周期收到对端响应码后自动恢复。\n- **注意**：ATS作为服务端时无法主动发起探测，因此无法主动上报该告警。\n\n### 📊 告警属性\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---:|:---:|\n| 20091 | 重要告警 | 是 |\n\n### ⚠️ 对系统的影响\n如果ATS实体和对端实体之间仅配置了一条HTTP或HTTPS链路，链路故障将导致双方交互的业务无法正常使用。\n\n### 🧩 可能原因\n- 该HTTP或HTTPS链路处于去激活状态。\n- ATS实体的分发配置数据不正确。\n- 网络路径故障（双平面/CSLB组网场景）。\n\n### 🛠️ 处理步骤\n1. **激活链路**：登录OM Portal，进入 `应用管理 > MML > ATS`，执行 `ACT HTTPLNK` 激活告警链路。\n2. **检查状态**：执行 `DSP HTTPLNK` 检查链路状态是否为“去激活”。\n   - **是** → 执行第3步\n   - **否** → 执行第6步\n3. **确认链路类型**：执行 `LST HTTPLNK` 获取链路信息，检查是否为HTTPS类型。\n   - **是** → 执行第7步\n   - **否** → 执行第4步\n4. **检查分发配置**：执行 `LST PORTCFG` 查询HTTP链路分发配置，与 `LST HTTPLNK` 结果对比。\n   - **配置正确** → 执行第7步\n   - **配置错误** → 执行第5步\n5. **重新配置**：执行 `RMV HTTPLNK` 删除故障链路，使用 `ADD HTTPLNK` 重新配置并 `ACT HTTPLNK` 激活，再次检查状态。\n   - **状态正常** → 执行第6步\n   - **仍去激活** → 执行第7步\n6. **确认恢复**：在告警台检查告警是否恢复。\n   - **是** → 处理完毕\n   - **否** → 执行第7步\n7. **高级排查（CSLB/双平面）**：\n   - 执行 `LST CSLBMODE` 确认CSLB模式是否开启。若未开启或平面ID为`NULL`，请联系华为技术支持。\n   - 若平面ID非空，根据平面ID参考 `故障管理 > 故障定界定位 > 典型故障定位思路 > 故障物理路径查询` 排除网络路径故障。\n   - 故障仍未消除，请联系华为技术支持。\n\n如需进一步排查特定网元或提供具体告警参数，可补充详细信息以便精准定位。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c5c2806c-7e75-46b8-be3a-2c103972e499"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-80aa1c91-a491-48b6-8930-c938f4257978"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-99e2ff6d-0aef-4522-ab06-cf8f4e72f8d4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4087"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 516475,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 5618,
+      "byte_offset": 517572,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 523190,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 523395,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 5696,
+      "byte_offset": 524220,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 529916,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 781217,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 781578,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 1491,
+      "byte_offset": 781786,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 783277,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 783482,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 783695,
+      "path": "archive/2026-10-12/13/part-00023.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-c5c2806c-7e75-46b8-be3a-2c103972e499"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-80aa1c91-a491-48b6-8930-c938f4257978"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-99e2ff6d-0aef-4522-ab06-cf8f4e72f8d4"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4037"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T13:52:53.816499+00:00",
+    "arrival_seq": 8501,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/13"
+  }
+}

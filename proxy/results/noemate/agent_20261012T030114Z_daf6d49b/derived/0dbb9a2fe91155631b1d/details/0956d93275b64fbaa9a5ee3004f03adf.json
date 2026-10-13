@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nN2接口信令丢失 \n\n\n\n最终回答：\n\n\n**N2接口信令丢失** 是指5G核心网中无线接入网（RAN/gNB）与接入和移动性管理功能（AMF）之间的N2控制面接口在传输信令消息时发生丢包、超时或消息无法到达对端的现象。\n\n- **接口定位**：N2接口负责RAN与AMF之间的控制面信令交互，承载注册、初始UE消息、下行NAS通知、移动性管理等功能。\n- **常见成因**：\n  - 传输链路质量劣化或SCTP关联异常\n  - 两端接口配置不一致（IP、端口、TEID、NAS信令映射错误）\n  - 设备过载或流控策略导致信令被丢弃\n  - 协议版本不兼容或可选IE解析失败\n- **业务影响**：终端注册/附着失败、PDU会话建立异常、切换中断、NAS信令循环重试，直接导致用户面断连或接入成功率下降。\n- **定位建议**：两端同步抓包核对SCTP序列与NAS消息流，检查传输路径丢包/时延，复核接口配置与版本兼容性，必要时调整重传参数或触发负载均衡。\n\n如需结合具体网元、告警或信令样例进一步分析，请提供详细信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何抓包分析N2接口的SCTP关联状态和NAS信令丢失点？\nN2接口配置不一致时，哪些参数最容易导致信令丢包？\n设备过载引发N2信令丢弃时，如何调整流控策略缓解问题？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 546,
+      "total_tokens": 603,
+      "completion_tokens": 57,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 546,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 57,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 603,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 56,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nN2接口信令丢失 \n\n\n\n最终回答：\n\n\n**N2接口信令丢失** 是指5G核心网中无线接入网（RAN/gNB）与接入和移动性管理功能（AMF）之间的N2控制面接口在传输信令消息时发生丢包、超时或消息无法到达对端的现象。\n\n- **接口定位**：N2接口负责RAN与AMF之间的控制面信令交互，承载注册、初始UE消息、下行NAS通知、移动性管理等功能。\n- **常见成因**：\n  - 传输链路质量劣化或SCTP关联异常\n  - 两端接口配置不一致（IP、端口、TEID、NAS信令映射错误）\n  - 设备过载或流控策略导致信令被丢弃\n  - 协议版本不兼容或可选IE解析失败\n- **业务影响**：终端注册/附着失败、PDU会话建立异常、切换中断、NAS信令循环重试，直接导致用户面断连或接入成功率下降。\n- **定位建议**：两端同步抓包核对SCTP序列与NAS消息流，检查传输路径丢包/时延，复核接口配置与版本兼容性，必要时调整重传参数或触发负载均衡。\n\n如需结合具体网元、告警或信令样例进一步分析，请提供详细信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-db1575d9-bc4a-49da-8925-6fd20659a6c0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-5bf15771-cac8-437b-82ac-67d71d90e980"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-44a7ad78-e725-4660-b01e-4a920875e3c9"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2584"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 12821059,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 3614,
+      "byte_offset": 12822156,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12825770,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 12825975,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 3692,
+      "byte_offset": 12826800,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12830492,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 13148444,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 13148805,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 1407,
+      "byte_offset": 13149013,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13150420,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 13150625,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 13150838,
+      "path": "archive/2026-10-12/07/part-00024.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-db1575d9-bc4a-49da-8925-6fd20659a6c0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-5bf15771-cac8-437b-82ac-67d71d90e980"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-44a7ad78-e725-4660-b01e-4a920875e3c9"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2534"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T07:51:24.375324+00:00",
+    "arrival_seq": 3315,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/07"
+  }
+}

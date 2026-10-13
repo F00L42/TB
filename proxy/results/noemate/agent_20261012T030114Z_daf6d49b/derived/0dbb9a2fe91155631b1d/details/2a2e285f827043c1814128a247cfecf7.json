@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n要保证该产品的正常运行，20Mbit/s的宽带可以用于哪些地方？\n\n\n\n最终回答：\n\n\n20Mbit/s 宽带的理论下载速度约为 **2.5MB/s**，在日常使用中可以覆盖以下典型场景：\n\n### ✅ 适用场景\n1. **基础办公与网页浏览**：多标签页浏览、邮件收发、云端文档编辑等轻量级应用。\n2. **高清视频流媒体**：单设备流畅播放 1080p 视频（通常需 5~10Mbit/s），如爱奇艺、B站、YouTube 等。\n3. **在线会议与语音通话**：支持 Zoom、Teams、钉钉等 1080p 视频會議或高清语音通话。\n4. **轻度智能家居接入**：连接 5~10 个 IoT 设备（摄像头、智能音箱、传感器等）并发运行。\n5. **小型门店/分支机构**：满足 POS 结算、企业微信/钉钉通讯、轻量级 ERP 访问等基础业务。\n\n### ⚠️ 局限性与不适用场景\n- **大文件传输**：下载/上传数百 MB 或 GB 级文件耗时较长。\n- **4K/8K 超高清流媒体**：单路 4K 通常需 25Mbit/s 以上，多设备并发易卡顿。\n- **专业直播/高频上传**：上行带宽通常仅为下载的 1/5~1/10（约 4~6Mbit/s），难以支撑高清推流。\n- **多人高负载并发**：5 人以上同时看高清视频或进行大型在线协作体验会明显下降。\n\n如果您是在做分支局点、门店或家庭办公的网络规划，可以根据实际终端数量、业务类型（是否含视频/大文件/上行需求）评估是否需要升级至 50M/100M 带宽。如有具体的网络架构或带宽规划问题，可以提供详细场景，我会协助分析。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "20Mbit/s宽带的实际上传速度一般是多少，是否会影响视频会议或文件上传体验？\n如果家中同时有3人分别观看高清视频、玩游戏和下载文件，20Mbit/s宽带能否保证不卡顿？\n在小型门店部署监控摄像头和POS系统时，20Mbit/s宽带是否需要为不同设备划分优先级？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 682,
+      "total_tokens": 757,
+      "completion_tokens": 75,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 682,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 75,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 757,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 74,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n要保证该产品的正常运行，20Mbit/s的宽带可以用于哪些地方？\n\n\n\n最终回答：\n\n\n20Mbit/s 宽带的理论下载速度约为 **2.5MB/s**，在日常使用中可以覆盖以下典型场景：\n\n### ✅ 适用场景\n1. **基础办公与网页浏览**：多标签页浏览、邮件收发、云端文档编辑等轻量级应用。\n2. **高清视频流媒体**：单设备流畅播放 1080p 视频（通常需 5~10Mbit/s），如爱奇艺、B站、YouTube 等。\n3. **在线会议与语音通话**：支持 Zoom、Teams、钉钉等 1080p 视频會議或高清语音通话。\n4. **轻度智能家居接入**：连接 5~10 个 IoT 设备（摄像头、智能音箱、传感器等）并发运行。\n5. **小型门店/分支机构**：满足 POS 结算、企业微信/钉钉通讯、轻量级 ERP 访问等基础业务。\n\n### ⚠️ 局限性与不适用场景\n- **大文件传输**：下载/上传数百 MB 或 GB 级文件耗时较长。\n- **4K/8K 超高清流媒体**：单路 4K 通常需 25Mbit/s 以上，多设备并发易卡顿。\n- **专业直播/高频上传**：上行带宽通常仅为下载的 1/5~1/10（约 4~6Mbit/s），难以支撑高清推流。\n- **多人高负载并发**：5 人以上同时看高清视频或进行大型在线协作体验会明显下降。\n\n如果您是在做分支局点、门店或家庭办公的网络规划，可以根据实际终端数量、业务类型（是否含视频/大文件/上行需求）评估是否需要升级至 50M/100M 带宽。如有具体的网络架构或带宽规划问题，可以提供详细场景，我会协助分析。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-474686ce-e069-4dc2-8b08-dce3f2e2fe10"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f7ae17cc-1687-4ffb-b5a3-cc68f482481c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-bef889a6-c1bf-4996-be63-6d9682a76f9a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "3052"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 12895474,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4238,
+      "byte_offset": 12896571,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 12900809,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 12901014,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 4316,
+      "byte_offset": 12901839,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 12906155,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 13510828,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 13511189,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 1563,
+      "byte_offset": 13511397,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 13512960,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 13513165,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 13513378,
+      "path": "archive/2026-10-12/12/part-00004.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-474686ce-e069-4dc2-8b08-dce3f2e2fe10"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-f7ae17cc-1687-4ffb-b5a3-cc68f482481c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-bef889a6-c1bf-4996-be63-6d9682a76f9a"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "3002"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T12:39:34.879688+00:00",
+    "arrival_seq": 7037,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/12"
+  }
+}

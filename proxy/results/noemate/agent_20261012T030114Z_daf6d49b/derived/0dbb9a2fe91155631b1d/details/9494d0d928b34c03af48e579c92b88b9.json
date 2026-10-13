@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n#### （1）根因总结  \n\n\n\n最终回答：\n#### （1）根因总结\n\n- **直接触发点**：`21:58:33` AMF与gNB(`10.1.2.64`) N2传输层关联建立失败，初始上下文请求交付中断。\n- **核心放大因素**：\n  - **定时器配置偏差**：`T3560=5s` 低于现网P95延迟(`~6.4s`)，导致正常请求被误判超时。\n  - **重试机制缺失**：固定间隔重传未启用指数退避，5分钟内累积重传`>32000`次，引发重试风暴。\n  - **算力硬瓶颈**：AMF仅预留`2 vCPU`，无法吸收突发流量与补偿请求，CPU在5分钟内由`62%→94%`，符合**剧烈波动**定义（30分钟内波动幅度>15%）。\n  - **UPF配置缺失**：未加载`PFCP Rule 2025-NC`，导致New Calling会话建立被挂起/拒绝。\n  - **带宽策略限制**：N6接口硬限制`100Mbps`（实际需求`300Mbps`），引发用户面拥塞与上游PFCP确认延迟。\n- **级联演化路径**：N2关联断裂 → 定时器误判触发重试风暴 → AMF/UPF负载**剧烈波动** → 消息队列溢出(`~10000`) → N4 PFCP心跳/会话超时 → SMF连接池枯竭返回`503`熔断。\n- **业务影响映射**：控制面与用户面双阻塞精准命中`SID=100072`切片，导致语音建立失败率由`0.5%`骤升至`23%`，现网体验严重受损。\n\n如需输出 `#### （2）修复方案与验证计划` 或生成可执行的MML/CLI配置脚本，请回复序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "生成修复方案与验证计划\n输出AMF定时器与重试机制的MML配置脚本\n提供UPF加载PFCP Rule及调整N6带宽的CLI命令",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 708,
+      "total_tokens": 745,
+      "completion_tokens": 37,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 708,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 37,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 745,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 36,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n#### （1）根因总结  \n\n\n\n最终回答：\n#### （1）根因总结\n\n- **直接触发点**：`21:58:33` AMF与gNB(`10.1.2.64`) N2传输层关联建立失败，初始上下文请求交付中断。\n- **核心放大因素**：\n  - **定时器配置偏差**：`T3560=5s` 低于现网P95延迟(`~6.4s`)，导致正常请求被误判超时。\n  - **重试机制缺失**：固定间隔重传未启用指数退避，5分钟内累积重传`>32000`次，引发重试风暴。\n  - **算力硬瓶颈**：AMF仅预留`2 vCPU`，无法吸收突发流量与补偿请求，CPU在5分钟内由`62%→94%`，符合**剧烈波动**定义（30分钟内波动幅度>15%）。\n  - **UPF配置缺失**：未加载`PFCP Rule 2025-NC`，导致New Calling会话建立被挂起/拒绝。\n  - **带宽策略限制**：N6接口硬限制`100Mbps`（实际需求`300Mbps`），引发用户面拥塞与上游PFCP确认延迟。\n- **级联演化路径**：N2关联断裂 → 定时器误判触发重试风暴 → AMF/UPF负载**剧烈波动** → 消息队列溢出(`~10000`) → N4 PFCP心跳/会话超时 → SMF连接池枯竭返回`503`熔断。\n- **业务影响映射**：控制面与用户面双阻塞精准命中`SID=100072`切片，导致语音建立失败率由`0.5%`骤升至`23%`，现网体验严重受损。\n\n如需输出 `#### （2）修复方案与验证计划` 或生成可执行的MML/CLI配置脚本，请回复序号。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-4361d8d2-25c4-4872-8da9-28e9d84af616"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fc794c54-7448-43e5-ad26-e1bbf18d3d6c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2858"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 3641473,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 3978,
+      "byte_offset": 3642570,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 3646548,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 3646753,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 4056,
+      "byte_offset": 3647578,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 3651634,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 3661370,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 3661731,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 1299,
+      "byte_offset": 3661939,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 3663238,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 3663443,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 3663656,
+      "path": "archive/2026-10-12/08/part-00005.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-4361d8d2-25c4-4872-8da9-28e9d84af616"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-fc794c54-7448-43e5-ad26-e1bbf18d3d6c"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-5b808908-f0bf-402d-becd-f302c8bebbbb"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2808"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T08:17:13.385177+00:00",
+    "arrival_seq": 3709,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/08"
+  }
+}

@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n• 如果有，更换E1线。\n\n\n\n最终回答：\n\n\n是的，更换E1线是正确的下一步。更换后请按以下要点验证：\n\n1. **观察告警/误码**：更换后等待1-2分钟，检查对应端口的告警是否清除、误码计数是否停止增长。\n2. **确认链路状态**：执行端口状态查询命令，确认物理层已UP且无持续滑码。\n3. **若问题依旧**：\n   - 检查对端设备对应端口是否有告警或配置不匹配\n   - 尝试本端端口自环测试，定位故障在本端还是传输线路\n   - 检查接口板（如ETIA0/ETIA2）硬件状态及时钟配置\n\n如更换线缆后恢复正常，建议同步检查配线架及对端接头，避免隐性接触不良导致反复故障。需要进一步排查命令或日志分析可随时提供。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "更换E1线后具体执行哪些命令来查询端口状态和误码计数？\n如果更换线缆后告警未清除，如何进行本端端口自环测试以定位故障范围？\n检查对端设备时除了配置匹配外，还需要重点确认哪些硬件状态或时钟参数？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 453,
+      "total_tokens": 515,
+      "completion_tokens": 62,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 453,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 62,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 515,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 61,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\n• 如果有，更换E1线。\n\n\n\n最终回答：\n\n\n是的，更换E1线是正确的下一步。更换后请按以下要点验证：\n\n1. **观察告警/误码**：更换后等待1-2分钟，检查对应端口的告警是否清除、误码计数是否停止增长。\n2. **确认链路状态**：执行端口状态查询命令，确认物理层已UP且无持续滑码。\n3. **若问题依旧**：\n   - 检查对端设备对应端口是否有告警或配置不匹配\n   - 尝试本端端口自环测试，定位故障在本端还是传输线路\n   - 检查接口板（如ETIA0/ETIA2）硬件状态及时钟配置\n\n如更换线缆后恢复正常，建议同步检查配线架及对端接头，避免隐性接触不良导致反复故障。需要进一步排查命令或日志分析可随时提供。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a8092660-6990-47eb-a5a9-f6b995f35dc0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ccb2f7c2-1d56-47c8-9f2c-55597e2e78ff"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-59835324-1178-4c0c-aff7-bc117936d860"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "2243"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1097,
+      "byte_offset": 7565470,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 3158,
+      "byte_offset": 7566567,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 7569725,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 7569930,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 3236,
+      "byte_offset": 7570755,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 7573991,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 8104682,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 8105043,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 1487,
+      "byte_offset": 8105251,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 8106738,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 8106943,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 8107156,
+      "path": "archive/2026-10-12/09/part-00022.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-a8092660-6990-47eb-a5a9-f6b995f35dc0"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-ccb2f7c2-1d56-47c8-9f2c-55597e2e78ff"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-59835324-1178-4c0c-aff7-bc117936d860"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "2193"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T09:52:12.312946+00:00",
+    "arrival_seq": 5223,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/09"
+  }
+}

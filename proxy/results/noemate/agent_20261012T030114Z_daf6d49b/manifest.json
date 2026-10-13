@@ -1,0 +1,104 @@
+{
+  "schema": "agent_observation.capture.v1",
+  "capture_id": "agent_20261012T030114Z_daf6d49b",
+  "experiment_role": "agent_distribution",
+  "started_at_utc": "2026-10-12T03:01:14.987963+00:00",
+  "config": {
+    "listen": {
+      "host": "71.77.153.223",
+      "port": 9000
+    },
+    "upstream": {
+      "base_url": "http://127.0.0.1:9001",
+      "auth_mode": "forward",
+      "auth_env": null,
+      "trust_env": false,
+      "request_body_max_bytes": 33554432,
+      "path_mapping": {
+        "incoming_prefix": "/",
+        "upstream_prefix": "/"
+      },
+      "timeout": {
+        "connect_seconds": 30,
+        "read_seconds": null,
+        "write_seconds": 30,
+        "pool_seconds": 30
+      }
+    },
+    "capture": {
+      "output_root": "/opt/p00906181/260707/TB/artifacts/captures",
+      "label": "agent-observation",
+      "labels": {
+        "agent": "noemate",
+        "scenario": "agent",
+        "variant": "dtb_750clse"
+      },
+      "bucket": "hour_utc",
+      "shard_max_bytes": 16777216,
+      "queue_max_bytes": 67108864,
+      "control_queue_max_events": 4096,
+      "on_overflow": "drop_capture",
+      "body_fragment_bytes": 65536,
+      "flush_interval_ms": 250,
+      "fsync_interval_ms": 1000,
+      "metadata_only_paths": [
+        "/metrics",
+        "/health",
+        "/v1/models"
+      ],
+      "redact_query_keys": [
+        "api_key",
+        "key",
+        "token",
+        "access_token"
+      ]
+    },
+    "protocols": {
+      "chat_completions": {
+        "paths": [
+          "/v1/chat/completions"
+        ],
+        "reasoning_fields": [
+          "reasoning_content",
+          "reasoning"
+        ]
+      }
+    },
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "tokenizer": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "local_files_only": true,
+      "trust_remote_code": false
+    },
+    "report": {
+      "timezone": "Asia/Shanghai",
+      "thresholds": [
+        256,
+        512,
+        850,
+        1024,
+        2048,
+        4096
+      ],
+      "live_interval_seconds": 0,
+      "max_body_bytes": 33554432
+    },
+    "trajectories": {
+      "enabled": true,
+      "matching": "exact",
+      "projection_profiles": [],
+      "show_prompt_history": true
+    }
+  },
+  "config_hash": "e9f34b1b12ac207cd15b134e7c4266b9c0b9884aeaab113220d3ac44395f53e9",
+  "packages": {
+    "httpx": "0.28.1",
+    "uvicorn": "0.52.3",
+    "transformers": "5.5.4",
+    "tokenizers": "0.22.2"
+  },
+  "repo_commit": "f5512aa35152a13a9ee164a64928674badc26ceb",
+  "repo_status": "M dtb/config/budget_config.yaml\n D dtb/config/budget_config_noemate_750.yaml\n M vllm_gateway/example.yaml\n?? docs/log/\n?? dtb/config/budget_config.yaml.bak\n?? proxy/"
+}

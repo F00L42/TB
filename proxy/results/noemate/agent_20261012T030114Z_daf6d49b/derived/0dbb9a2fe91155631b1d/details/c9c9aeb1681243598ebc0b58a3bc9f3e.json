@@ -1,0 +1,335 @@
+{
+  "request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nGTPC路径故障\n\n\n\n最终回答：\n\n\n根据知识库信息，**GTPC路径故障**主要对应以下两个告警。您可以根据实际场景参考对应的告警定义、影响及处理步骤：\n\n---\n\n### 🚨 ALM-80610 GTPC路径故障\n**告警解释**  \nGTP-C模块的路径管理功能检测到GTP-C隧道路径中断时产生该告警。当路径通信恢复正常或路径被删除时，告警会自动清除。\n\n**告警属性**\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---:|:---:|\n| 80610 | 重要告警 | 是 |\n\n**告警参数**\n| 参数名称 | 参数含义 |\n|:---|:---|\n| 本端IP | GTP-C路径本端网元侧的信令面IP地址 |\n| 对端IP | GTP-C路径对端网元侧的信令面IP地址 |\n| 路径接口类型 | 表示是G/U网络还是EPC网络的GTP-C路径 |\n| PLMN网元间的接口 | 本端网元与对端网元之间的接口类型 |\n\n**对系统的影响**\n- 该路径上承载的信令将被丢弃。\n- 已激活的用户业务不受影响，可正常进行。\n- 不能在该路径上激活新用户，也不允许用户从其他网元切换至本端网元。\n\n**可能原因**\n1. 网络故障\n2. 对端设备故障\n\n**处理步骤**\n1. 检查是否存在 `CPU使用率过载` 告警。若存在，先排查CPU过载问题并观察是否恢复。\n2. 执行 `PING` 命令检查本端IP与对端IP之间的IP层链路是否连通。若不连通，按“IP链路故障”定位。\n3. 执行 `TST GTPCPATH`（或 `TST GTPCPATHINFO`）检查周边网元GTP信令面IP通信是否正常。若正常，可手工恢复告警。\n4. 确认对端设备是否可使用告警参数中的对端IP建立GTP-C路径。若对端重建路径后告警未恢复，请联系华为技术支持。\n\n---\n\n### 🚨 ALM-80656 Gp接口GTPC路径故障\n**告警解释**  \n检测到Gp接口GTP-C隧道路径中断时产生。仅当GTP-C路径自定义管理策略的“漫游路径告警ID控制”设置为 `INDEP（独立告警ID）` 时上报。路径恢复后自动清除。\n\n**告警属性**\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---:|:---:|\n| 80656 | 重要告警 | 是 |\n\n**对系统的影响**\n- 在该路径上承载的隧道将被去激活。\n\n**处理步骤**\n1. 确认是否因未配置到外部GSN设备的路由导致。若外网GSN报文被中间网络或防火墙丢弃，可执行 `ADD GTPALMMSK` 屏蔽该对端IP告警，并手工恢复。\n2. 执行 `PING` 检查IP层链路连通性。\n3. 执行 `TST GTPCPATH` 检查对端GSN GTP信令面通信是否正常。正常则手工恢复告警。\n4. 若上述步骤无效，请联系华为技术支持。\n\n---\n\n### 📖 参考机制：路径故障判定原理\nGTP-C路径管理模块采用 **ECHO（路径维护信令模式）** 判定路径中断：\n- 发送 `Echo Request` 后，若在配置的重发间隔（如 `T3-RESPONSE`）内未收到 `Echo Response`，连续重试达到配置次数（如 `N3-REQUESTS`）后，即判定为路径故障。\n- 相关超时与重试次数可通过 `SET GTPCFUNCPARA` 或 `SET GTPPUB` 等命令配置。\n\n如需针对具体网元、IP或接口类型进一步定位，请提供详细告警参数或日志信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "enable_think_budget": true
+  },
+  "response": {
+    "streaming": false,
+    "parse_status": "complete",
+    "model": "netmo-qwen3.6-27b",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "如何执行TST GTPCPATH命令检查GTP信令面IP通信是否正常？\nGTPC路径故障期间已激活的用户业务是否真的不受影响？\n如何配置T3-RESPONSE和N3-REQUESTS参数来调整路径故障判定阈值？",
+          "refusal": null,
+          "annotations": null,
+          "audio": null,
+          "reasoning": null
+        },
+        "finish_reason": "stop",
+        "warnings": [],
+        "reasoning": null,
+        "reasoning_field": null
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 1194,
+      "total_tokens": 1252,
+      "completion_tokens": 58,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": null
+    },
+    "warnings": []
+  },
+  "tokens": {
+    "model": "netmo-qwen3.6-27b",
+    "tokenizer_ref": {
+      "path": "/opt/foundation_model/NetGPT-Qwen3.6-27B-40K-R27.1.5-MTP",
+      "files_sha256": "91ae2258051bde630cd81ee08255178e513cd39bee8bef3cca3903e5ef897c2e",
+      "transformers": "5.5.4",
+      "add_special_tokens": false
+    },
+    "api": {
+      "prompt": {
+        "value": 1194,
+        "source": "usage.prompt_tokens",
+        "status": "known"
+      },
+      "completion": {
+        "value": 58,
+        "source": "usage.completion_tokens",
+        "status": "known"
+      },
+      "total": {
+        "value": 1252,
+        "source": "usage.total_tokens",
+        "status": "known"
+      },
+      "cached_prompt": {
+        "value": null,
+        "source": "usage.prompt_tokens_details.cached_tokens",
+        "status": "missing"
+      },
+      "reasoning": {
+        "value": null,
+        "source": "usage.completion_tokens_details.reasoning_tokens",
+        "status": "missing"
+      }
+    },
+    "choices": [
+      {
+        "reasoning": {
+          "value": null,
+          "source": "local_reencode",
+          "status": "not_observable"
+        },
+        "content": {
+          "value": 57,
+          "source": "local_reencode",
+          "status": "known"
+        },
+        "tool_name": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "tool_arguments": {
+          "value": 0,
+          "source": "local_component_sum",
+          "status": "known"
+        },
+        "output_text": {
+          "value": null,
+          "source": "local_component_sum",
+          "status": "missing"
+        },
+        "visible_reasoning_share": null,
+        "choice_index": 0
+      }
+    ],
+    "hidden_probe_tokens": null,
+    "total_model_generated_tokens": null,
+    "output_scope": "complete_output"
+  },
+  "original_request": {
+    "model": "netmo-qwen3.6-27b",
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "top_p": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。\n\n选择规则：\n1. 优先推荐当前任务最自然的下一步操作、分析或诊断问题。\n2. 其次推荐用于验证回答、确认影响范围或补充关键条件的问题。\n3. 如果上下文不足，不要返回空内容；改为提出具体的澄清问题。\n4. 每个问题只表达一个意图，保持当前会话的语言和术语，不重复、不宽泛。\n5. 不得编造输入中不存在的事实，可以通过问题询问缺失事实。\n\n输出规则：\n- 恰好输出三行，每行仅包含一个完整、自然、可直接点击追问的问题。\n- 不要输出序号、标题、解释、Markdown、代码块或推理过程。"
+      },
+      {
+        "role": "user",
+        "content": "请基于以下本轮对话上下文生成 3 个后续问题。输出语言必须与用户问题一致；用户问题未提供时跟随最终回答的语言；两者都未提供时使用中文。即使部分字段未提供，也必须围绕已有主题提出具体的澄清或下一步问题，不得返回空内容。\n\n用户问题：\nGTPC路径故障\n\n\n\n最终回答：\n\n\n根据知识库信息，**GTPC路径故障**主要对应以下两个告警。您可以根据实际场景参考对应的告警定义、影响及处理步骤：\n\n---\n\n### 🚨 ALM-80610 GTPC路径故障\n**告警解释**  \nGTP-C模块的路径管理功能检测到GTP-C隧道路径中断时产生该告警。当路径通信恢复正常或路径被删除时，告警会自动清除。\n\n**告警属性**\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---:|:---:|\n| 80610 | 重要告警 | 是 |\n\n**告警参数**\n| 参数名称 | 参数含义 |\n|:---|:---|\n| 本端IP | GTP-C路径本端网元侧的信令面IP地址 |\n| 对端IP | GTP-C路径对端网元侧的信令面IP地址 |\n| 路径接口类型 | 表示是G/U网络还是EPC网络的GTP-C路径 |\n| PLMN网元间的接口 | 本端网元与对端网元之间的接口类型 |\n\n**对系统的影响**\n- 该路径上承载的信令将被丢弃。\n- 已激活的用户业务不受影响，可正常进行。\n- 不能在该路径上激活新用户，也不允许用户从其他网元切换至本端网元。\n\n**可能原因**\n1. 网络故障\n2. 对端设备故障\n\n**处理步骤**\n1. 检查是否存在 `CPU使用率过载` 告警。若存在，先排查CPU过载问题并观察是否恢复。\n2. 执行 `PING` 命令检查本端IP与对端IP之间的IP层链路是否连通。若不连通，按“IP链路故障”定位。\n3. 执行 `TST GTPCPATH`（或 `TST GTPCPATHINFO`）检查周边网元GTP信令面IP通信是否正常。若正常，可手工恢复告警。\n4. 确认对端设备是否可使用告警参数中的对端IP建立GTP-C路径。若对端重建路径后告警未恢复，请联系华为技术支持。\n\n---\n\n### 🚨 ALM-80656 Gp接口GTPC路径故障\n**告警解释**  \n检测到Gp接口GTP-C隧道路径中断时产生。仅当GTP-C路径自定义管理策略的“漫游路径告警ID控制”设置为 `INDEP（独立告警ID）` 时上报。路径恢复后自动清除。\n\n**告警属性**\n| 告警ID | 告警级别 | 可自动清除 |\n|:---:|:---:|:---:|\n| 80656 | 重要告警 | 是 |\n\n**对系统的影响**\n- 在该路径上承载的隧道将被去激活。\n\n**处理步骤**\n1. 确认是否因未配置到外部GSN设备的路由导致。若外网GSN报文被中间网络或防火墙丢弃，可执行 `ADD GTPALMMSK` 屏蔽该对端IP告警，并手工恢复。\n2. 执行 `PING` 检查IP层链路连通性。\n3. 执行 `TST GTPCPATH` 检查对端GSN GTP信令面通信是否正常。正常则手工恢复告警。\n4. 若上述步骤无效，请联系华为技术支持。\n\n---\n\n### 📖 参考机制：路径故障判定原理\nGTP-C路径管理模块采用 **ECHO（路径维护信令模式）** 判定路径中断：\n- 发送 `Echo Request` 后，若在配置的重发间隔（如 `T3-RESPONSE`）内未收到 `Echo Response`，连续重试达到配置次数（如 `N3-REQUESTS`）后，即判定为路径故障。\n- 相关超时与重试次数可通过 `SET GTPCFUNCPARA` 或 `SET GTPPUB` 等命令配置。\n\n如需针对具体网元、IP或接口类型进一步定位，请提供详细告警参数或日志信息。"
+      }
+    ],
+    "enable_thinking": false,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "request_transform": {
+    "policy": "top_level_override",
+    "append_body": {
+      "enable_think_budget": true
+    },
+    "headers": [
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-9c840ccc-5afb-43a2-9ad6-eabcafc994b3"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7a43d629-bb07-4ba8-a3a9-f6257a820f9e"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-64752bd3-353e-492a-8bd9-8017224674b1"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "content-length",
+        "4644"
+      ]
+    ]
+  },
+  "warnings": [],
+  "raw_refs": [
+    {
+      "byte_length": 1098,
+      "byte_offset": 14729242,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 6362,
+      "byte_offset": 14730340,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14736702,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 825,
+      "byte_offset": 14736907,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 6436,
+      "byte_offset": 14737732,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 206,
+      "byte_offset": 14744168,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 361,
+      "byte_offset": 14744374,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 208,
+      "byte_offset": 14744735,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 1419,
+      "byte_offset": 14744943,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 205,
+      "byte_offset": 14746362,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 213,
+      "byte_offset": 14746567,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    },
+    {
+      "byte_length": 410,
+      "byte_offset": 14746780,
+      "path": "archive/2026-10-12/16/part-00006.jsonl"
+    }
+  ],
+  "request_metadata": {
+    "method": "POST",
+    "path": "/v1/chat/completions",
+    "query": "",
+    "headers": [
+      [
+        "host",
+        "71.77.153.223:9000"
+      ],
+      [
+        "connection",
+        "keep-alive"
+      ],
+      [
+        "authorization",
+        "[REDACTED]"
+      ],
+      [
+        "content-type",
+        "application/json"
+      ],
+      [
+        "user-agent",
+        "ai/6.0.235 ai-sdk/provider-utils/4.0.40 runtime/node.js/22"
+      ],
+      [
+        "x-nextagent-agent-id",
+        "AICOServiceAgent"
+      ],
+      [
+        "x-nextagent-request-id",
+        "request-9c840ccc-5afb-43a2-9ad6-eabcafc994b3"
+      ],
+      [
+        "x-nextagent-run-id",
+        "run-7a43d629-bb07-4ba8-a3a9-f6257a820f9e"
+      ],
+      [
+        "x-nextagent-session-id",
+        "session-64752bd3-353e-492a-8bd9-8017224674b1"
+      ],
+      [
+        "accept",
+        "*/*"
+      ],
+      [
+        "accept-language",
+        "*"
+      ],
+      [
+        "sec-fetch-mode",
+        "cors"
+      ],
+      [
+        "accept-encoding",
+        "gzip, deflate"
+      ],
+      [
+        "content-length",
+        "4594"
+      ]
+    ],
+    "labels": {
+      "agent": "noemate",
+      "scenario": "agent",
+      "variant": "dtb_750clse"
+    },
+    "metadata_only": false,
+    "started_at_utc": "2026-10-12T16:27:30.764638+00:00",
+    "arrival_seq": 11391,
+    "process_id": "16249d260f4d48e49ef9c387af5b7a63",
+    "bucket": "2026-10-12/16"
+  }
+}
