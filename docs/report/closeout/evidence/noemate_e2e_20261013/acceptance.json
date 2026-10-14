@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-13",
+  "accepted_claim_zh": "端到端测试确认长请求加速，短请求性能非劣",
+  "acceptance_level": "fixed_initial_business_input_system_observational_closeout",
+  "user_confirmed_conditions": {
+    "all_initial_business_inputs_fixed": true,
+    "same_model_weights": true,
+    "formal_DTB_observability": "off",
+    "phase_smoke_only_verified_compression": true,
+    "user_accepts_observed_closeout": true
+  },
+  "metric": "gateway_single_model_HTTP_request_E2E",
+  "short_definition": "Vanilla median observed initial reasoning <=750, reused unchanged for DTB; mean repeats within business question, then question equal weight",
+  "short_cases": 1475,
+  "short_vanilla_rows": 1866,
+  "short_dtb_rows": 1866,
+  "short_e2e_ratio": 0.7213132480640164,
+  "short_ratio_ci95": [0.6998883204019882, 0.742922211086666],
+  "short_observed_no_slowdown_accepted": true,
+  "short_formal_preregistered_noninferiority": false,
+  "preregistered_noninferiority_margin": null,
+  "long_initial_cases": 8,
+  "long_initial_e2e_ratio": 0.29543451431286477,
+  "long_initial_ratio_ci95": [0.2240806342246568, 0.4003260140452599],
+  "over_800_valid_main_reasoning": {
+    "vanilla": {"count": 316, "denominator": 8277},
+    "dtb": {"count": 0, "denominator": 8018}
+  },
+  "pure_DTB_causal_effect_identified": false,
+  "quality_noninferiority_confirmed": false,
+  "all_tool_protocol_cases_passed": false,
+  "full_user_task_wall_time_measured": false,
+  "limitations": [
+    "Two historical runs; request bootstrap does not include run-level drift",
+    "Fixed initial business inputs do not imply all generated downstream prompts are identical",
+    "Native same-input control is also faster, so all acceleration cannot be attributed solely to DTB",
+    "No independent task/answer quality labels; two empty-tool-arguments anomalies remain"
+  ],
+  "previous_analysis_snapshot": "comparison.json retains the earlier stricter causal/noninferiority flags; its numeric results are unchanged"
+}

@@ -181,3 +181,25 @@ git show 32ab2268335e00d79e0aeda4395c6ecdc06d81eb:docs/report/agent_dtb_demo_dat
 早退定义的源码边界沿用 **C06 272–295 行**与 **C05 665–668 行**：自然完成、模型边界、进入 probe、预算耗尽 final 是不同结果；probe 还须核对接受并转 final。只有 capture 思考大于 750 或输出约为 750，均不能代替实际状态证据。
 
 本节是补充来源索引，未改写既有 `evidence/source_manifest.json` 或提取脚本。2026-10-08 离线核对的完整数值、配对 ID 及所读数据 blob SHA-256 留在本地审计产物 `artifacts/closeout-review/20261008/noemate-trigger-audit.json`；该 ignored 文件不作为交付依赖，以上固定 Git 来源与字段可独立复算。质量问题和未闭合项只记录在大纲审阅、讲者备注中，不新增演示页脚声明。
+
+## 本轮固定初始输入端到端测试（2026-10-13）
+
+用户确认新旧模型权重相同、所有初始业务输入固定、压缩功能已先验证，正式完整E2E已切回off。
+本轮采用“固定初始业务输入下长请求加速、短请求性能非劣”的模型HTTP E2E整体观测口径。
+它与历史50对长请求回放分别取数；演示r10只补结论与博客入口，详细定义和归因边界见博客。
+
+| ID | 固定来源或交付路径 | 核对字段 / 用途 |
+| --- | --- | --- |
+| S34 | [DTB capture manifest](https://github.com/F00L42/TB/blob/03d9ec6c3d7b48dc7925fc024b63462bd9fe7855/proxy/results/noemate/agent_20261012T030114Z_daf6d49b/manifest.json) | 网关append_body.enable_think_budget=true，无fixed；模型别名与部署源码身份 |
+| S35 | [DTB requests.jsonl](https://github.com/F00L42/TB/blob/03d9ec6c3d7b48dc7925fc024b63462bd9fe7855/proxy/results/noemate/agent_20261012T030114Z_daf6d49b/derived/0dbb9a2fe91155631b1d/requests.jsonl) | 11,441全部请求及同目录details；E2E、token、结束、异常 |
+| S36 | [Vanilla requests.jsonl](https://github.com/F00L42/TB/blob/60f2d7c01faa3268874893dc42f850ad86086c7c/proxy/results/noemate/agent_20260917T123724Z_7bac2ba7/derived/27c30b983f78c49b86f3/requests.jsonl) | 12,214全部请求及同目录details；Git blob与旧32ab2268来源相同 |
+| S37 | [详细 Markdown 博客](noemate_e2e_20261013.md) | 完整实验叙述、采纳口径、公式、边界、异常与复现 |
+| S38 | [comparison.json](evidence/noemate_e2e_20261013/comparison.json)、[acceptance.json](evidence/noemate_e2e_20261013/acceptance.json) | 复算分母/区间；原分析快照与本轮观测验收分开记录 |
+| S39 | [初始问题表](evidence/noemate_e2e_20261013/initial_root_cases.csv) | Vanilla定层的共同问题，重复数、耗时、prompt、finish |
+| S40 | [原生同输入负对照](evidence/noemate_e2e_20261013/native_same_input_cases.csv) | 114case、126→128调用；耗时与输出背景变化 |
+| S41 | [源文件清单](evidence/noemate_e2e_20261013/source_files.json)、[证据使用说明](evidence/noemate_e2e_20261013/README.md) | Git源、投影gzip、hash与不依赖ignored产物的重算命令 |
+
+本轮主平均E2E14.971→10.685秒，P9541.774→28.415秒；正常可观察main>800思考316/8277→0/8018，最大1841→755。
+初始短层1475共同问题case等权E2E9.361→6.752秒，D/V=.721、95%CI[.700,.743]。
+本轮非劣指该固定业务初始输入实验的性能观测，不声称事前注册的5%界限、业务质量非劣或纯DTB独立因果效应。
+上下文/轨迹差异、同输入原生负对照35.4%改善以及所有异常保留于S37–S41，不从成功快速子集删去失败来构造结论。

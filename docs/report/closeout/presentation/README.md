@@ -1,10 +1,14 @@
 # DTB 五页汇报
 
-打开最新版 [DTB_closeout_20260930_r9.pptx](DTB_closeout_20260930_r9.pptx)。
+打开最新版 [DTB_closeout_20260930_r10.pptx](DTB_closeout_20260930_r10.pptx)。
+
+2026-10-13 修订：仅在第4页 **Noemate 长请求回放（50对）** 下补充
+“端到端测试确认：长请求加速，短请求性能非劣（固定初始输入）”，并加入[详细实验博客](../noemate_e2e_20261013.md)链接。
+该结论采用本轮固定初始业务输入的模型HTTP E2E整体观测口径，具体分层、证据和边界在博客；不改旧50对图的数值或分母。
 
 2026-10-08 修订：第 4 页采用 Noemate 全部 50 对长请求回放的平均 E2E，24.87→18.51 秒，下降 25.58%。
 沿用第 3 页分段轴位置、短请求空心描边点与页脚说明移入备注的修复。
-以 `49ff2f8d` 中的 r5 为基础，保留手工调整的连接线与绑定；r3、r5、r8 保留为历史版本。
+本轮以r9为基础保留手工调整的连接线与绑定；r3、r5、r8、r9保留为历史版本。
 
 正文为背景 1 页、实现 2 页、效果 1 页、交付 1 页，没有封面、章节页或演示附录。
 第 4 页展示 Noemate 5 个输入 × 10 对回放，以及研发 Vanilla-06/run-08 的 9 任务汇总；178/a1 退入备注与备查。
@@ -18,22 +22,24 @@ Noemate 精确均值为 24.8744579→18.51114568 秒，按 `1−ΣDTB E2E/ΣVani
 - 研发分布使用两个相接的等高绘图区：下段 0–850、上段 850–3,500，合计 380＋11 个点，保留真实 token 值。各段内线性，不跨段比较视觉距离或斜率；Noemate 仍为连续线性轴。
 - 两个耗时条形图都以零为起点。百分比从完整精度计算，展示值保留两位小数。
 - 字体为 Microsoft YaHei，画布 16:9。缺少该字体的环境可能发生替换和换行变化。
-- 第 3 页分段轴与空心标记已在 r8 的本机 Microsoft PowerPoint 放映中检查，r9 沿用这些修复；r9 的第 4 页已在本机 PowerPoint 放映中检查。图表仍为原生可编辑对象，显示效果以 PowerPoint 为准。
+- 第 3 页分段轴与空心标记已在 r8 的本机 Microsoft PowerPoint 放映中检查，r9 沿用这些修复；r9 的第 4 页已在本机 PowerPoint 放映中检查。r10本轮经渲染逐页检查及结构/图表/字体校验，尚未在本机PowerPoint实开检查。图表仍为原生可编辑对象，显示效果以PowerPoint为准。
 
 ## 重建
 
-本版修订入口为 [revise_presentation.mjs](../sources/revise_presentation.mjs)，保留 Office 手工修订的对象，更新第 4 页 Noemate 耗时图及其内嵌工作簿，并沿用图表布局和页脚修复。
+本版修订入口为 [add_e2e_confirmation.mjs](../sources/add_e2e_confirmation.mjs)，用Artifact Tool制作可编辑说明，只修改第4页正文/博客链接/备注，保留其他页与所有工作簿。
+图表缓存中Office保存产生的≤1e-13末位文本差异按工作簿同步，使用[缓存同步脚本](../sources/refresh_presentation_caches.py)，不改变图值或布局。
+历史r9的入口为 [revise_presentation.mjs](../sources/revise_presentation.mjs)。
 原始从零构建入口 [build_presentation.mjs](../sources/build_presentation.mjs) 用于重建初稿，不包含 r5 中的手工连线形状调整。
 使用 Codex 捆绑的 Node、Python、`@oai/artifact-tool` 与 presentations 技能工具；不依赖仓库 node_modules。
 
 在仓库根目录，用 Windows PowerShell 执行：
 
 ```powershell
-& "$env:USERPROFILE\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" docs/report/closeout/sources/revise_presentation.mjs r10
+& "$env:USERPROFILE\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" docs/report/closeout/sources/add_e2e_confirmation.mjs r11
 ```
 
-每次指定新的修订号，不覆盖已有 PPT。默认自动查找本机最新可用的 presentations 技能目录；可通过 `RUNTIME_ROOT` 和 `PRESENTATIONS_SKILL` 显式指定捆绑运行时/技能目录。
-本版构建草稿、渲染及校验记录写入 Git 忽略的 `artifacts/closeout-build/20261008/`。
+每次指定新的修订号，不覆盖已有PPT。本轮基于r9的固定SHA；可通过 `RUNTIME_ROOT` 和 `PRESENTATIONS_SKILL` 显式指定捆绑运行时/技能目录。
+本版构建草稿、渲染及校验记录写入Git忽略的 `artifacts/closeout-build/20261013/`，历史r9记录在20261008目录。
 [revise_presentation.py](../sources/revise_presentation.py) 固定核对 r5 哈希，修复绝对绘图区位置、为轴标签留出空间、设置空心标记并迁移页脚；第 4 页 Noemate 图按全部 50 对回放取数。
 Noemate 耗时图及其内嵌工作簿同步更新，其他图表工作簿保持原样；各图表数值缓存与其工作簿一致，消除 Office 保存产生的末位浮点文本差异。
 原始构建脚本使用的 [repair_chart_markers.py](../sources/repair_chart_markers.py) 同步修正了布局与标记样式。
