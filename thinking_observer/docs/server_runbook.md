@@ -3,7 +3,7 @@
 状态：**pending_remote**。本地没有目标模型/设备；下面命令尚未在 Ascend 服务执行。
 不要把 SDK 的 CPU PASS、历史 DTB 成功率或 token 阈值 fixture 写成重复检测准确率或性能收益。
 
-## 1. 固定部署身份
+## 1. 安装 observer
 
 使用独立 TB 分支及独立 vLLM 部署 checkout；不要在其他 session 的服务上叠加补丁。
 
@@ -12,22 +12,18 @@
 - vLLM-Ascend：`v0.23.0rc1`，SHA `f4a08bddd0cc65a0bd8c3d377b158ae5ca7527db`。
 - 同时记录权重路径/版本/hash、chat template、tokenizer、PyTorch、torch-npu、CANN、设备、启动命令、APC/并发/到达方式、采样/seed、数据集 hash、factory/cue 配置。
 
-两个上游源码以仓库记录的 SHA 为准。下述 VLLM_DEPLOY 是服务器可写的部署 checkout；TB 的 `third_party/` 仍只读。
+上述 SHA 是补丁来源记录。下述 VLLM_DEPLOY 是目标 vLLM 0.23 部署源码；
+不要求检查其精确 HEAD，不依赖初始化或检查 TB 的 `third_party/`。
 
 ```bash
 set -euo pipefail
 export SDK=/absolute/path/to/TB/thinking_observer
 export VLLM_DEPLOY=/absolute/path/to/separate/vllm
 export MODEL_PATH=/absolute/path/to/qwen/model
-test "$(git -C "$VLLM_DEPLOY" rev-parse HEAD)" = 0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665
-test -z "$(git -C "$VLLM_DEPLOY" status --porcelain)"
-python -m pip install "$SDK"
-python -m unittest discover -s "$SDK/tests" -v
-python "$SDK/tools/verify_patch.py" "$VLLM_DEPLOY"
-python "$SDK/tools/verify_native.py" "$VLLM_DEPLOY"
+python -m pip install -e "$SDK"
 ```
 
-任何步骤失败都停止，先核对固定版本。`verify_native.py` 用数据 stub 执行原生 parser/serving 源码，不导入设备运行时；即使在服务器通过也不等同于模型服务通过。
+接着直接应用下面的 patch。SDK 单测、原生源码检查与 wheel/sdist 验证均为[可选维护工具](validation.md)，不是部署前置。
 
 ## 2. 应用独立补丁
 
@@ -49,7 +45,7 @@ sha256sum "$SDK"/patches/vllm-v0.23.0/*.patch
 
 随后按已有、已验证的 vLLM-Ascend 环境构建/安装该 checkout；本 SDK 不规定通用 CANN 编译命令。确认 `python -c 'import vllm; print(vllm.__file__)'` 指向实际已应用补丁的代码，记录安装包版本和 dirty diff。
 
-## 3. 最小启动与外部算法替换
+## 3. 最小启动与直接修改算法
 
 先使用 NoopDetector 验证同 child 路径，再使用确定阈值接管 fixture。下面是最小单 DP、无 KV transfer/PD 的 Qwen 服务启动例；模型路径、设备/TP 等沿用目标环境的已验证值。
 
@@ -78,11 +74,17 @@ export OBSERVER_DEMO_LIMIT=128
 export THINKING_OBSERVER_CUE=$'\n请根据已有推理直接给出完整答案。\n'
 ```
 
-示例 state 传了自己的 answer_cue，优先于环境默认 cue。正式替换时复制 `examples/custom_detector.py`，移除演示阈值，接上自己的增量算法，再让 factory 返回它。factory 是服务器配置，不能由请求客户端指定任意导入路径。自定义 detector state 不可复用到别的请求。
+示例 state 传了自己的 answer_cue，优先于环境默认 cue。正式算法可直接修改
+`src/thinking_observer/detectors.py`；接管和压缩流程可直接修改 `controller.py`，配置/接线可修改 `integration.py`。
+不要求另建外部 detector 包。使用现有接口时，让 `THINKING_OBSERVER_FACTORY` 指向包内自己的类/工厂即可；
+复制示例并配置外部 factory 也是可选方式。factory 是服务器配置，不能由请求客户端指定任意导入路径；每请求状态独立。
+editable 安装后修改 observer 源码并重启服务；普通安装则先重新安装。修改 vLLM patch 后需同步部署源码并按目标环境重新安装、重启。
 
 可配置变量：`ENABLED`、`FACTORY`、`CUE`、`TELEMETRY=off|summary`、`CALLBACK_MS=10`、`ABORT_TIMEOUT_S=10`（全部加 `THINKING_OBSERVER_` 前缀）。其他有界限制见 ObserverConfig；改动上限需作为部署身份记录。
 
-## 4. 顺序验收与停止条件
+## 4. 真实服务验证参考
+
+以下是服务器协议与效果的验证参考，不要求为直接集成先执行本地完整验收。
 
 每项先保存完整请求、sampling/seed、raw engine text/token deltas、SSE/完整响应、request→child 关系、summary，再做语义核对。raw token/body 只用于隔离的合成测试数据，SDK summary 本身不记录正文。
 
@@ -107,6 +109,10 @@ export THINKING_OBSERVER_CUE=$'\n请根据已有推理直接给出完整答案�
 完全卸载：先停服务，在**独立部署 checkout** 对三份补丁执行 `git apply --reverse --check`，核对无其他改动后逆序移除并按环境重装 vLLM，再卸载 SDK、重启。不要在未核对的 checkout 上 reset/clean 或覆盖其他人的补丁。
 
 ## 6. 交付变更记录
+
+- 2026-10-23：集成入口简化为安装 observer、向 vLLM 0.23 直接应用三份 patch、启用并重启。
+  取消本地完整验收与 `third_party/` 检查前置；验证工具按需运行，patch 检查不再依赖精确 SHA 或生成器一致性。
+  压缩算法允许直接修改 observer 实现，外部 factory 可选。本次没有运行服务器或完整本地验收。
 
 - 2026-10-21：SDK 分支裁剪旧算法、根 patch、旧工具/测试和实验树；独立 SDK 源码、测试、三份 patch 不变。
   当前部署只读取本 SDK 的 `patches/vllm-v0.23.0/`；历史来源见 [索引](history.md)，裁剪后的本地复核见 [记录](validation.md)。

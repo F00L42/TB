@@ -1,58 +1,68 @@
-# Thinking Observer SDK 交付分支
+# Thinking Observer：vLLM 0.23 集成与二次开发
 
-本分支 `codex/thinking-observer` 交付独立的思维链观察与受控续写 SDK。开发入口是
-[`thinking_observer/`](thinking_observer/README.md)，本分支已移除旧 DTB / DEER 实验树。
-SDK 允许读取增量 reasoning 文本和 token ID，并返回停止思考、引导答案续写的意图；
-没有实现重复检测算法。当前适配 vLLM `v0.23.0` / vLLM-Ascend `v0.23.0rc1`。
+本分支 `codex/thinking-observer` 提供思考流观察、停止思考和引导答案续写的实现。
+向 vLLM `v0.23.0` 应用三份 patch，并安装 `thinking_observer` 即可接入；Ascend 环境沿用 `v0.23.0rc1`。
+压缩算法直接在 observer 源码上修改即可，当前尚未实现重复检测算法。
 
-| 接手任务 | 阅读与执行入口 |
+## 直接集成
+
+在目标 vLLM 0.23 部署源码上执行，路径换成实际值：
+
+```bash
+export SDK=/absolute/path/to/TB/thinking_observer
+export VLLM_DEPLOY=/absolute/path/to/vllm
+python -m pip install -e "$SDK"
+git -C "$VLLM_DEPLOY" apply --check \
+  "$SDK/patches/vllm-v0.23.0/observer_serving.patch" \
+  "$SDK/patches/vllm-v0.23.0/qwen3_coder_parser.patch" \
+  "$SDK/patches/vllm-v0.23.0/qwen3_reasoning_parser.patch"
+git -C "$VLLM_DEPLOY" apply \
+  "$SDK/patches/vllm-v0.23.0/observer_serving.patch" \
+  "$SDK/patches/vllm-v0.23.0/qwen3_coder_parser.patch" \
+  "$SDK/patches/vllm-v0.23.0/qwen3_reasoning_parser.patch"
+export THINKING_OBSERVER_ENABLED=1
+export THINKING_OBSERVER_FACTORY=thinking_observer.detectors:NoopDetector
+export THINKING_OBSERVER_TELEMETRY=off
+# 按目标环境安装已打 patch 的 vLLM 并重启服务。
+# 请求 JSON 增加："enable_thinking_observer": true
+```
+
+SDK 需要 Python 3.11+，自身无第三方运行时依赖。默认 `NoopDetector` 只观察、不压缩；
+启动与请求示例见[服务器手册](thinking_observer/docs/server_runbook.md)。
+集成不要求本地完整验收，不要求初始化或检查 `third_party/`，也不需要先构建 wheel/sdist。
+三份 patch 的唯一入口是 `thinking_observer/patches/vllm-v0.23.0/`；不能与 DTB serving patch 叠加。
+
+## 直接修改压缩算法
+
+修改 `thinking_observer/src/thinking_observer/`：
+
+| 修改内容 | 入口 |
 | --- | --- |
-| 了解交付范围及验证边界 | [RESULT](RESULT.md)、[SDK 导航](thinking_observer/AGENTS.md) |
-| 安装、配置和部署 | [SDK README](thinking_observer/README.md)、[服务器手册](thinking_observer/docs/server_runbook.md) |
-| 获取观察器流过的文本/token，开发自己的检测器 | [开发示例与契约](thinking_observer/docs/detector_development.md)、[API](thinking_observer/docs/api.md) |
-| 理解生命周期、接管和原生回退 | [设计](thinking_observer/docs/design.md)、[controller](thinking_observer/src/thinking_observer/controller.py) |
-| vLLM 版本变化时定位接口与 patch | [SDK 导航](thinking_observer/AGENTS.md) 的版本适配表、[集成层](thinking_observer/src/thinking_observer/integration.py) |
-| 重跑无模型验证 | [验证记录和命令](thinking_observer/docs/validation.md) |
+| 增量判断何时结束思考、选择 cue | [detectors.py](thinking_observer/src/thinking_observer/detectors.py) |
+| 接管、abort/drain、续写和预算处理 | [controller.py](thinking_observer/src/thinking_observer/controller.py) |
+| 默认工厂、服务配置及 vLLM 接线 | [integration.py](thinking_observer/src/thinking_observer/integration.py)、[config.py](thinking_observer/src/thinking_observer/config.py) |
+
+可以直接侵入式修改上述实现，不要求另建外部 detector 包。`THINKING_OBSERVER_FACTORY` 指向包内自己的类或工厂即可；
+外部 factory 只是可选接入方式。使用上面的 editable 安装后，源码修改完成重启服务即可生效。
+保留请求隔离、已输出 text/token 连续性、原生 parser、取消与 completion 额度语义。
+
+## 按需检查与资料
+
+从 TB 仓库根目录按需运行与修改相关的检查，不作为部署前置：
 
 ```bash
-python -m pip install ./thinking_observer
 python -m unittest discover -s thinking_observer/tests -v
 python thinking_observer/examples/observe_window.py
 ```
 
-需要 Python 3.11+。最后一条命令仅构造 SDK 事件并验证有界观察窗口，不启动 vLLM、不访问模型。
-设备、真实 tokenizer、HTTP/SSE、质量、性能与真实并发仍为 `pending_remote`。
+patch/原生 parser/发行包工具的可选用法见[验证说明](thinking_observer/docs/validation.md)。
+它们不检查 `third_party/`；上游源码检查使用调用者显式提供的路径。
 
-## 两个分支的关系
+- [交付状态](RESULT.md)、[SDK 导航](thinking_observer/AGENTS.md)、[API](thinking_observer/docs/api.md)
+- [算法开发入口](thinking_observer/docs/detector_development.md)、[设计](thinking_observer/docs/design.md)
+- [历史来源](thinking_observer/docs/history.md)：旧 DTB/DEER 与实验材料保留在 Git 历史。
 
-- 特性分支 `codex/dtb-static-refactor`：生产 DTB 思考预算/压缩、场景路由和相应 vLLM patch。
-- 本分支 `codex/thinking-observer`：独立 SDK 和可替换的 detector 接口，不依赖 DTB 预算算法。
-
-两分支的 serving patch 是替代关系，不能叠加。SDK 的独立发行内容位于 `thinking_observer/`。
-本分支只保留根导航、`thinking_observer/` 与固定上游子模块身份；旧 `dtb/`、`deer/`、
-`think_budget/`、`proxy/`、`lightcode/`、根 `patches/`、旧测试/工具及实验文档已退出交付树。
-历史设计、实验与关键演示材料的固定来源见 [历史索引](thinking_observer/docs/history.md)，
-清理范围与本次验收见 [RESULT](RESULT.md)。不要为了新功能恢复旧接口或叠加另一分支的 patch。
-
-上游固定依赖位于 `third_party/`，仅用于源码核对；应用补丁时使用独立部署 checkout。
-新运行产物统一放入 Git 忽略的 `artifacts/perf/<run_id>/` 或 `artifacts/replay/<run_id>/`。
-
-## 本地完整验收
-
-从仓库根执行；已安装 SDK 后，以下检查只需要 Python、Git、uv 和固定上游源码：
-
-```bash
-git submodule update --init --recursive
-python -m pip install ./thinking_observer
-python -m unittest discover -s thinking_observer/tests -v
-python thinking_observer/examples/observe_window.py
-python thinking_observer/tools/verify_patch.py third_party/vllm
-python thinking_observer/tools/verify_native.py third_party/vllm
-uv build thinking_observer --out-dir artifacts/dist
-python thinking_observer/tools/verify_distribution.py artifacts/dist/thinking_observer-0.1.0-py3-none-any.whl
-```
-
-`third_party/vllm/.git` 必须存在，不能仅用 `git -C third_party/vllm rev-parse HEAD` 判断子模块已初始化：
-空目录会使 Git 向上找到 TB 仓库。也可向两个 verify 工具传入另一份已初始化、干净的固定版本源码路径。
-三份 SDK patch 均来自 `thinking_observer/patches/vllm-v0.23.0/`；原根 `patches/` 不再是部署入口。
-完整 clone 的 Git 历史体积不因本次裁剪减少；只需当前源码可浅克隆，需要原始档案时再补齐固定提交。
+本分支交付 observer；`codex/dtb-static-refactor` 交付 DTB，两套 serving patch 是独立集成方案。
+`third_party/` 的 gitlink 仅保留上游来源信息，不参与上述集成流程。
+新运行产物写入 Git 忽略的 `artifacts/perf/<run_id>/` 或 `artifacts/replay/<run_id>/`。
+真实设备、HTTP/SSE、质量与性能仍为 `pending_remote`；历史本地结果不代表服务器效果。

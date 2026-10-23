@@ -1,11 +1,12 @@
 # Thinking Observer SDK 修改导航
 
 先读本目录 [README](README.md) 与 [API](docs/api.md)。本 SDK 可独立安装；不需要阅读或安装
-已退出当前树的 `dtb/`、`deer/`、`think_budget/`；历史资料见 [来源索引](docs/history.md)。新 Agent 开发检测器先运行
-[观察窗口示例](docs/detector_development.md)，不要从 DTB 观察状态复制一部分代码重新拼接。
+已退出当前树的 `dtb/`、`deer/`、`think_budget/`；历史资料见 [来源索引](docs/history.md)。
+压缩算法直接在 observer 实现中修改即可，不要求另建外部包；[观察窗口示例](docs/detector_development.md)可按需参考。
 
-| 修改目标 | 首查符号或文件 | 验证 |
+| 修改目标 | 首查符号或文件 | 按需检查 |
 | --- | --- | --- |
+| 直接修改压缩/接管流程 | `controller.py::ThinkingObserver.stream`、`integration.py::VllmObserver` | 与修改相关的接管、parser、取消和额度场景 |
 | 自己的增量检测算法 | `api.py::Detector/DetectorState/ReasoningDelta`、`examples/observe_window.py` | 合成 delta、空文本/text-only/边界、跨请求隔离；再接真实服务 |
 | 返回停止与答案引导 | `api.py::StopAndAnswer`、`controller.py::ThinkingObserver.stream` | `tests/test_observer.py` 的接管、自然竞态、drain、额度测试 |
 | 服务开关、工厂与成本限制 | `integration.py::VllmObserver.from_env`、`config.py::ObserverConfig` | 关闭态不导入 factory、错误/超时软检查 |
@@ -19,8 +20,11 @@
 
 ## vLLM 版本变化时
 
-当前工具固定到 vLLM `0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`，不是通用新版本 patch 生成器。
-不要只改 `VLLM_SHA` 或放宽检查后声称适配完成。先在独立部署 checkout 比较下列接口，再提出新版本目录的 patch 方案。
+当前 patch 基于 vLLM 0.23.0（`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`）。
+日常集成直接 `git apply`，不检查 `third_party/`，不要求精确 HEAD 或补丁生成器输出一致。
+可选 `verify_patch.py` / `verify_native.py` 使用显式指定的源码路径，不查询 Git 身份。
+`build_patch.py` 仅用于从原始固定基线重新生成 serving patch，仍保留生成器的 SHA 约束；日常修改与部署无需调用它。
+升级到新版本时比较下列接口，再维护新版本目录；patch 可应用不代表语义已适配。
 
 | 上游变化点 | 本 SDK 受影响位置 | 必须保持的行为 |
 | --- | --- | --- |
@@ -34,11 +38,14 @@
 `build_patch.py`、`verify_patch.py`、`verify_native.py` 及 `parser_fixtures.py` 含固定版本假设，升级时一起审查。
 每个新版本记录准确 commit、patch hash、模型/tokenizer/parser 身份与能力矩阵；旧版本制品仍须可复现。
 
-本地顺序：SDK 单测 → 新版本 patch 应用/编译 → 原生 parser 与 patched serving 路由 → 独立安装检查。
-随后按 [服务器手册](docs/server_runbook.md) 做真实 tokenizer、SSE/JSON、取消/并发/额度验收。
+按修改范围选择 SDK 单测、patch 应用/编译、原生 parser/serving 或独立安装检查，不要求本地完整验收。
+真实模型验证参考[服务器手册](docs/server_runbook.md)，不作为直接应用 patch 的前置步骤。
 本地 PASS 不能替代 `pending_remote`，也不能证明重复检测准确率或净收益。
 
-## 扩展边界
+## 直接修改与接口约定
+
+允许直接修改 `detectors.py`、`controller.py`、`integration.py` 与配置；外部 factory 是可选方式。
+下面描述现有 detector 回调契约，不限制算法必须写在外部回调中。controller 的修改仍须保留原生协议与请求生命周期。
 
 每个请求由 `start(context)` 创建新状态；同请求 `observe(delta)` 有序同步调用，结束 `close(outcome)` 一次。
 回调只做有界增量 CPU 工作，不写文件、不联网、不调用模型、不持有 engine/parser。

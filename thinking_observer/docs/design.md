@@ -11,7 +11,7 @@
 三个主要取舍：
 
 1. **位置和文本分开。** token ID 前缀是续写权威。detokenizer 文本可能迟到或一段对应多个 token，不能用字符位置裁 token。保留完整已接受 batch 和 drain 尾部；较早的 repeat_start 仅诊断。这样 parser 和引擎上下文具有相同的公开前缀。
-2. **接管由框架独占。** 扩展只返回意图，不持有 engine/parser。自然边界和终止优先；先 abort 并 drain 到确认终态，才允许新的 final child。无法保留上下文或 completion 额度时，abort 前回退原生；abort 后则报错，不能静默丢掉最终答案。
+2. **接管由 controller 管理。** 使用 Detector 回调协议时，回调只返回意图，不持有 engine/parser；压缩算法也可直接修改 observer 的 controller 实现，并保留下面的生命周期语义。自然边界和终止优先；先 abort 并 drain 到确认终态，才允许新的 final child。无法保留上下文或 completion 额度时，abort 前回退原生；abort 后则报错，不能静默丢掉最终答案。
 3. **薄封装原生响应。** 核心 yield vLLM-compatible DELTA 对象，不复制整个 DTB facade。流式进入原生 SSE/parser，非流式累积一次再进入原生 full parser。没有额外 producer task/无界 SDK queue；下游消费形成背压。detector 同步增量运行，不支持异步网络检查。
 
 ```mermaid

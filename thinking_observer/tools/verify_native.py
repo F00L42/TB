@@ -1,5 +1,6 @@
-"""Run SDK outputs through pinned, patched native parser AND serving sources.
+"""Optionally run SDK outputs through supplied vLLM 0.23 parser/serving sources.
 
+No Git metadata or third_party checkout is required.
 No GPU/HTTP/vLLM installation. Data types and engine are CPU test doubles;
 native Qwen reasoning/tool and DelegatingParser algorithms execute unchanged.
 """
@@ -214,8 +215,9 @@ async def run(upstream, patched):
 
 
 if __name__ == "__main__":
-    cli = argparse.ArgumentParser()
-    cli.add_argument("upstream", type=Path)
+    cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument("upstream", type=Path,
+                     help="vLLM 0.23 source directory; Git metadata is not required")
     args = cli.parse_args()
     with tempfile.TemporaryDirectory(prefix="observer-native-") as directory:
         patched = Path(directory)

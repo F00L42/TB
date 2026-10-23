@@ -9,17 +9,21 @@ Session D 的独立二次开发交付：增量观察模型思考，在合法位�
 接手修改先读 [Agent 导航](AGENTS.md)；读取实际流过的文本/Token 并开发检测器见
 [可运行的有界窗口示例](docs/detector_development.md)。
 
-## 安装与最小使用
+## 安装与直接集成
 
 此目录可单独复制、安装、运行测试；不需要仓库的 `dtb/`、`deer/` 或预算 YAML。
 
 ```bash
-python -m pip install /path/to/TB/thinking_observer
-python -m unittest discover -s /path/to/TB/thinking_observer/tests -v
+python -m pip install -e /path/to/TB/thinking_observer
 ```
 
 Python ≥3.11。SDK 本身没有第三方运行时依赖；vLLM 及设备依赖由服务器环境管理。
-部署补丁与启动命令见 [服务器手册](docs/server_runbook.md)。
+安装后向目标 vLLM 0.23 源码直接 `git apply` 本目录的三份 patch，命令见[根 README](../README.md)和[服务器手册](docs/server_runbook.md)。
+不要求本地完整验收、初始化或检查 `third_party/`。
+
+压缩算法可以直接侵入式修改 `src/thinking_observer/detectors.py`、`controller.py` 和 `integration.py`，
+无需另建外部 detector 包。`THINKING_OBSERVER_FACTORY` 可指向包内自己的类/工厂，外部 factory 只是可选方式。
+editable 安装后修改源码并重启服务即可生效；普通安装则需重新安装。下面展示的是现有 detector 接口用法。
 
 ```python
 from thinking_observer import CONTINUE, StopAndAnswer
@@ -80,8 +84,8 @@ export THINKING_OBSERVER_TELEMETRY=off
 
 - [设计与依赖提取表](docs/design.md)
 - [API、位置与生命周期](docs/api.md)
-- [部署、替换算法、回滚、服务器验收](docs/server_runbook.md)
-- [本地验证记录](docs/validation.md)
+- [部署、修改算法、回滚、服务器验收](docs/server_runbook.md)
+- [可选检查与历史验证记录](docs/validation.md)
 - [历史设计、实验与最终演示来源](docs/history.md)
 - [独立补丁](patches/vllm-v0.23.0/observer_serving.patch)，不与 DTB serving patch 叠加。
 

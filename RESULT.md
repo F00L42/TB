@@ -1,5 +1,20 @@
 # SDK 交付状态
 
+## 2026-10-23 集成流程简化
+
+日常集成为：安装 observer → 向目标 vLLM 0.23 直接 `git apply` 三份 patch → 启用并重启服务。
+取消本地完整验收、`third_party/` 初始化/存在检查以及发行包验证前置。压缩算法可直接修改 observer 源码，
+外部 detector factory 为可选接入方式。
+
+README、开发导航与服务器手册已统一。可选 patch/原生源码检查不再绑定精确 HEAD 或生成器输出；
+保留补丁应用、Python 编译及既有协议检查。补丁和生产逻辑本轮未改，未执行完整本地验收或服务器测试；
+真实协议、质量和净 E2E 收益仍为 `pending_remote`。
+
+针对性检查通过：50 个本地文档链接、2 个改动 Python 工具的语法检查；3 个合成 patch 检查场景
+覆盖无 Git 元数据源码可用、错误补丁拒绝、无效 Python 拒绝。未读取或检查 `third_party/`。
+
+## 历史裁剪交付记录
+
 2026-10-21：按确认的交付范围完成 SDK 分支裁剪。基线为
 `codex/thinking-observer@7ccd6b99eb7a435c2d0d1f66dce24affe0728a0d`。
 2026-10-23：整理内容随独立交付提交固定；最终源码身份以本分支 Git 提交为准，服务器验收仍为 `pending_remote`。
@@ -20,7 +35,7 @@
 另外清理包内 3 个可重建的旧 ignored 发行文件；新构建仅保留于 `artifacts/dist/`，未删除未归档的唯一实验结果。
 
 新开发从 [SDK 导航](thinking_observer/AGENTS.md) 和 [观察窗口示例](thinking_observer/docs/detector_development.md)开始。
-SDK 的 `src/`、`tests/`、`patches/`、`tools/` 本轮无差异；仅补文档、源码包的 AGENTS 收录和仓库交付范围。
+上次裁剪时 SDK 的 `src/`、`tests/`、`patches/`、`tools/` 无差异；当时仅补文档、源码包的 AGENTS 收录和仓库交付范围。
 Python 3.11+，SDK 无第三方运行时依赖。DTB 与 SDK 的 serving patch 仍是独立方案，不直接叠加。
 
 ## 裁剪后本地验证
@@ -37,7 +52,7 @@ Windows / CPython 3.12.13：
 | wheel 隔离安装 | 无依赖安装后，仓库外 34 项测试通过（1.725 秒） |
 | 导航与源码包一致性 | 源码 50 个本地链接、sdist 24 个本地链接通过；sdist 所有交付源文件逐字节匹配当前树 |
 
-完整命令见根 [README](README.md)，验证细节与历史结果见 [记录](thinking_observer/docs/validation.md)。
+这些是裁剪时的历史验证结果；可选命令和证据范围见[验证说明](thinking_observer/docs/validation.md)，不再作为日常集成前置。
 本机 SDK 子模块未初始化，原生源码检查使用主特性工作区同 SHA 的只读 vLLM checkout；未修改上游。
 发行产物在本工作区 `artifacts/dist/`，不进 Git。详细恢复/验证清单保存在主工作区
 `artifacts/delivery-audit/sdk-trim/`；交付的历史恢复不依赖这些本地日志。

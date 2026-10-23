@@ -1,13 +1,12 @@
-"""Apply patches only in a temporary fixture, then compile all touched Python.
+"""Optional patch/compile check against explicitly supplied vLLM 0.23 sources.
 
-The supplied upstream checkout remains read-only. No vLLM import is required.
+The source directory remains read-only; no Git metadata, pinned HEAD,
+third_party checkout, patch regeneration or vLLM import is required.
 """
 import argparse
 from pathlib import Path
 import subprocess
 import tempfile
-
-from build_patch import VLLM_SHA, build
 
 PACKAGE = Path(__file__).resolve().parents[1]
 PATCHES = [PACKAGE / "patches/vllm-v0.23.0" / name for name in (
@@ -21,9 +20,6 @@ def command(args, cwd):
 
 
 def patched_tree(upstream, destination):
-    expected = build(upstream)
-    if expected != PATCHES[0].read_text(encoding="utf-8"):
-        raise ValueError("serving patch differs from build_patch.py output")
     paths = set()
     for patch in PATCHES:
         for line in patch.read_text(encoding="utf-8").splitlines():
@@ -46,9 +42,10 @@ def patched_tree(upstream, destination):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("upstream", type=Path)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("upstream", type=Path,
+                        help="vLLM 0.23 source directory; Git metadata is not required")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="observer-patch-") as temp:
         paths = patched_tree(args.upstream.resolve(), Path(temp))
-    print(f"PASS: 3 patches applied and Python compiled; upstream={VLLM_SHA}; files={len(paths)}")
+    print(f"PASS: 3 patches applied and Python compiled; source={args.upstream.resolve()}; files={len(paths)}")

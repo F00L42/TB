@@ -1,4 +1,22 @@
-# SDK 本地验证记录
+# 可选检查与历史验证记录
+
+## 当前使用方式（2026-10-23）
+
+日常集成按[根 README](../../README.md)直接安装 observer 并向 vLLM 0.23 应用三份 patch。
+不要求本地完整验收，不初始化或检查 `third_party/`，不要求先构建发行包。下列工具按修改范围选择：
+
+| 修改内容 | 可选命令 |
+| --- | --- |
+| observer 算法/生命周期 | `python -m unittest discover -s thinking_observer/tests -v` |
+| 观察接口示例 | `python thinking_observer/examples/observe_window.py` |
+| patch 应用与语法 | `python thinking_observer/tools/verify_patch.py /path/to/vllm-0.23-source` |
+| 原生 parser/serving 源码场景 | `python thinking_observer/tools/verify_native.py /path/to/vllm-0.23-source` |
+| 发布发行包 | `uv build thinking_observer --out-dir artifacts/dist`，再按需运行 `verify_distribution.py` |
+
+两个上游源码检查工具只读取显式提供的路径并在临时目录应用补丁，不查 `.git`、HEAD 或 `third_party/`。
+`verify_patch.py` 不再调用 `build_patch.py` 或要求 patch 与生成器输出相同；应用失败与 Python 编译错误仍会报错。
+`build_patch.py` 仅是从原始固定基线重建 serving patch 的可选维护工具，其 SHA 约束不属于部署检查。
+以下历史结果保留原证据范围，不构成每次开发或集成都要重跑的清单。
 
 ## 2026-10-21 裁剪后的完整复核
 
@@ -16,8 +34,8 @@ SDK 源码、协议测试、三份 patch 与验证工具没有改变。删除旧
 
 本机 SDK worktree 的 `third_party/` 是未初始化占位，本次两个验证工具显式使用另一份已初始化的
 只读 checkout：`C:/Users/F-O-O/Projects/TB/third_party/vllm`，HEAD 为
-`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。普通接手先执行 `git submodule update --init --recursive`，
-或向工具传入等价、干净的固定源码路径。没有修改子模块或服务实例。
+`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。这是当时的验证来源记录，日常接手无需初始化子模块。
+当时没有修改子模块或服务实例。
 
 Windows 非交互子进程显式 `stdin=subprocess.DEVNULL`；验证在正常主机权限下执行。
 新构建输出使用仓库根 `artifacts/dist/`；源代码树与 Git 历史的体积不包含这些忽略的本地制品。

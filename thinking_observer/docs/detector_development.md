@@ -1,11 +1,22 @@
-# 从文本和 Token 观察开始开发检测器
+# 直接修改 observer 与开发检测器
+
+压缩算法可以直接侵入式修改 `src/thinking_observer/`，无需另建外部 detector 包：
+
+- `detectors.py`：增量停止判断与 cue 策略。
+- `controller.py`：接管、abort/drain、压缩与答案续写流程。
+- `integration.py` / `config.py`：默认工厂、配置与 vLLM 适配。
+
+使用 `pip install -e ./thinking_observer` 后直接改源码并重启服务。使用现有 detector 接口时，
+`THINKING_OBSERVER_FACTORY` 指向包内自己的类或工厂；外部 factory 只是可选方式。
+直接修改仍要保留请求隔离、原生 parser、已输出 text/token 连续性、取消和额度语义。
+不要求先执行完整本地验收或检查 `third_party/`。以下介绍现有回调接口，便于按需复用。
 
 扩展点是 `Detector.start(context)` 返回的请求状态的 `observe(delta)`，不需要从 HTTP/SSE 文本重新分词。
 `delta.token_ids` 已经是本次新增的 reasoning token ID；`delta.text` 是原生 detokenizer 的新增片段。
 可直接运行 [有界窗口示例](../examples/observe_window.py)：
 
 ```bash
-python -m pip install ./thinking_observer
+python -m pip install -e ./thinking_observer
 python thinking_observer/examples/observe_window.py
 ```
 
@@ -46,8 +57,8 @@ return StopAndAnswer(
 不会回剪到重复起点；实际接管点在 `close(outcome)` 的 `actual_handoff`，可能晚于检测点。
 自然结束或工具边界优先；cue 仅进入内部续写 prompt，不能包含结构 token。详细额度与失败语义见 [API](api.md)。
 
-4. 本地验证不同 chunk 切分、跨 chunk 重复候选、空 ID/text、`text=None`、边界/终态、超长输入、两个请求交错与 close 清理。
-   再通过 SDK 的引擎 fake 测试接管意图，最后按 [服务器手册](server_runbook.md) 验证真实协议、算法质量和耗时。
+4. 按改动范围选择 chunk 切分、跨 chunk 候选、空 ID/text、`text=None`、边界/终态、请求隔离或 close 清理检查。
+   接管改动可使用 SDK 引擎 fake 场景；真实协议、算法质量和耗时参考[服务器手册](server_runbook.md)。
 
 在服务器仅观察窗口时可这样绑定示例；配置后重启服务：
 
