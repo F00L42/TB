@@ -619,7 +619,7 @@ python tools/dtb/check_static.py
 | 接管和原生协议 | [token 续写](../../design/dtb_token_authoritative_prompt.md)、[Qwen 边界](../../design/dtb_reasoning_boundary_token_stop.md)、[patch](../../../patches/vllm/v0.23.0/README.md) |
 | Noemate 完整运行方法 | [专项实验博客](noemate_e2e_20261013.md)、[冻结证据](evidence/noemate_e2e_20261013/README.md) |
 | 历史长回放与研发任务 | [精简证据 README](evidence/README.md)、[不可变来源索引](sources.md) |
-| 新服务器验证 | [replay 手册](../../../validation/replay/README.md)、[性能 runbook](../../debug/deer_performance_analysis.md) |
+| 新服务器验证 | [replay 手册](../../../validation/replay/README.md)、[性能 runbook](../../debug/dtb_performance_analysis.md) |
 | 原结项内容与演示 | [outlines](outlines.md)、[演示稿说明](presentation/README.md) |
 
 本文引用的设计、源码、冻结实验和 Agent 记录分别支撑其对应结论；参考方案中的未核验目标、其他模型结果和个人经历不作为本项目实测成果。

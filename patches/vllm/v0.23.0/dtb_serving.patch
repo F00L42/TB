@@ -1,13 +1,6 @@
 --- a/vllm/entrypoints/openai/chat_completion/protocol.py
 +++ b/vllm/entrypoints/openai/chat_completion/protocol.py
-@@ -423,1 +423,17 @@
-+    # --8<-- [start:deer-extra-params]
-+    enable_deer: bool | None = Field(default=False)
-+    deer_initial_thought_limit: int | None = Field(default=None, ge=0)
-+    deer_think_stride: int | None = Field(default=None, ge=0)
-+    deer_task_is_code: bool | None = Field(default=None)
-+    # --8<-- [end:deer-extra-params]
-+
+@@ -423,1 +423,10 @@
 +    # --8<-- [start:think-budget-extra-params]
 +    enable_think_budget: bool | None = Field(default=False)
 +    fixed_budget_tokens: int = Field(default=0, ge=0)
@@ -20,16 +13,14 @@
      # --8<-- [end:chat-completion-extra-params]
 --- a/vllm/entrypoints/openai/chat_completion/serving.py
 +++ b/vllm/entrypoints/openai/chat_completion/serving.py
-@@ -77,1 +77,4 @@
-+from deer.cot_controller import CoTController
+@@ -77,1 +77,3 @@
 +from dtb import DtbRequestController
 +
  if TYPE_CHECKING:
-@@ -169,1 +172,3 @@
-+        self.cot_controller = CoTController()
+@@ -169,1 +171,2 @@
 +        self.dtb_request_controller = DtbRequestController()
          self.python_tool = None
-@@ -271,1 +276,77 @@
+@@ -271,1 +274,69 @@
 +        # Server-side master switch: when disabled, continue through native
 +        # vLLM as a single generation without constructing controller state.
 +        if (request.enable_think_budget
@@ -98,12 +89,4 @@
 +                    self, conversation, engine_inputs,
 +                    request, request_id, tokenizer, request_metadata, prepared=prepared)
 +
-+        # DTB wins when both flags are true. If its server switch is
-+        # disabled, fall through to native vLLM rather than another controller.
-+        if request.enable_deer and not request.enable_think_budget:
-+            logger.info("Request %s is using DEER CoT Controller.", request_id)
-+            return await self.cot_controller.handle_request(
-+                self, conversation, engine_inputs,
-+                request, request_id, tokenizer, request_metadata,
-+                model_name, lora_request, data_parallel_rank)
          # Schedule the request and get the result generator.

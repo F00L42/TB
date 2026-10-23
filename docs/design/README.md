@@ -3,6 +3,17 @@
 本目录描述清理后的交付版本；历史提案和完整实验过程可在 Git `cb6d67de` 查阅。
 新 Session 从根 [RESULT](../../RESULT.md) 获取状态，再按下表定位，不需要遍历历史日志。
 
+## 阅读顺序与信息归属
+
+1. 先读 [DTB 结构与请求执行入口](../../dtb/README.md)，了解 native 分流、流式 observation 和 thinking/probe/final。
+2. 按 [模块导航](../../dtb/AGENTS.md) 找实现符号与对应测试，再读下表的专题设计。
+3. 部署只按[当前部署手册](dtb_system_routing_deployment.md)；升级按[版本迁移手册](../maintenance/vllm_upgrade.md)。
+4. 查看收益时读[技术博客](../report/closeout/dtb_project_technical_blog.md)及[完整 E2E 证据](../report/closeout/noemate_e2e_20261013.md)，不要把历史实验当作当前 checkout 的服务器验收。
+
+本文统一导航，不删除或合并专题正文。职责分为：源码/配置决定当前行为，专题设计解释约束和取舍，
+部署手册负责操作顺序，实验契约负责裁决，报告负责固定版本的历史证据。出现冲突时先核对源码与版本，
+修正当前入口并保留历史依据；不要从旧方案恢复已经退出交付的功能。
+
 | 主题 | 当前文档 | 状态 |
 | --- | --- | --- |
 | CPU 静态优化与并发边界 | [静态优化](dtb_static_cpu_refactor.md) | 已实现；目标 E2E 待测 |

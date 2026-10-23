@@ -213,7 +213,7 @@ def test_phase_route_only_and_off_no_clock_or_event():
 
 
 @pytest.fixture(scope="module")
-def patched_serving(tmp_path_factory):
+def patched_chat_sources(tmp_path_factory):
     directory = tmp_path_factory.mktemp("serving")
     relative = Path("vllm/entrypoints/openai/chat_completion")
     (directory / relative).mkdir(parents=True)
@@ -221,8 +221,14 @@ def patched_serving(tmp_path_factory):
         shutil.copyfile(ROOT / "third_party/vllm" / relative / name, directory / relative / name)
     subprocess.run(["git", "apply", str(ROOT / "patches/vllm/v0.23.0/dtb_serving.patch")],
                    cwd=directory, stdin=subprocess.DEVNULL, check=True, capture_output=True)
-    tree = ast.parse((directory / relative / "serving.py").read_text(encoding="utf8"))
-    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "OpenAIServingChat")
+    return NS(**{name: ast.parse((directory / relative / f"{name}.py").read_text(encoding="utf8"))
+                 for name in ("protocol", "serving")})
+
+
+@pytest.fixture(scope="module")
+def patched_serving(patched_chat_sources):
+    cls = next(node for node in patched_chat_sources.serving.body
+               if isinstance(node, ast.ClassDef) and node.name == "OpenAIServingChat")
     method = next(node for node in cls.body if isinstance(node, ast.AsyncFunctionDef) and node.name == "_create_chat_completion")
     module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0), method], type_ignores=[])
     ns = {"ErrorResponse": type("ErrorResponse", (), {}), "RequestResponseMetadata": NS,
@@ -231,11 +237,52 @@ def patched_serving(tmp_path_factory):
     return ns["_create_chat_completion"]
 
 
+def test_patched_serving_initializes_without_deer_and_protocol_has_no_deer_fields(patched_chat_sources):
+    tree = patched_chat_sources.serving
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            assert not (node.module or "").startswith("deer")
+        elif isinstance(node, ast.Import):
+            assert all(alias.name.split(".")[0] != "deer" for alias in node.names)
+    protocol = next(node for node in patched_chat_sources.protocol.body
+                    if isinstance(node, ast.ClassDef) and node.name == "ChatCompletionRequest")
+    fields = {node.target.id for node in protocol.body
+              if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)}
+    assert "enable_think_budget" in fields
+    assert not {"enable_deer", "deer_initial_thought_limit", "deer_think_stride", "deer_task_is_code"} & fields
+
+    # Execute the actual patched initializer with native dependencies stubbed;
+    # there is deliberately no DEER symbol or module in this environment.
+    class NativeServing:
+        def __init__(self, **kwargs):
+            self.model_config = NS(model="model", generation_config="vllm",
+                                   hf_config=NS(model_type="qwen3"), get_diff_sampling_param=lambda: {})
+
+    cls = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "OpenAIServingChat")
+    initializer = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == "__init__")
+    minimal_class = ast.ClassDef(name=cls.name, bases=[ast.Name(id="OpenAIServing", ctx=ast.Load())],
+                                keywords=[], body=[initializer], decorator_list=[])
+    module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
+                              minimal_class], type_ignores=[])
+    constructor = Mock(return_value=object())
+    ns = {"OpenAIServing": NativeServing, "DtbRequestController": constructor,
+          "ParserManager": NS(get_reasoning_parser=lambda **kwargs: None, get_tool_parser=lambda **kwargs: None,
+                              get_parser=lambda **kwargs: None),
+          "is_mistral_tool_parser": lambda parser: False, "get_tool_call_id_type": lambda config: "random"}
+    exec(compile(ast.fix_missing_locations(module), "patched-serving-init", "exec"), ns)
+    serving = ns[cls.name](object(), object(), "assistant", openai_serving_render=object(),
+                           request_logger=None, chat_template=None, chat_template_content_format="auto")
+    constructor.assert_called_once_with()
+    assert serving.dtb_request_controller is constructor.return_value
+    assert not hasattr(serving, "cot_controller")
+
+
 @pytest.mark.parametrize("stream", [False, True])
 @pytest.mark.parametrize("prefix", ["unknown", "你是对话后续问题推荐助手。你的唯一任务是根据用户消息提供的本轮对话上下文，生成 3 个可直接点击追问的问题。"])
 @pytest.mark.parametrize("failure", [None, "error", "cancel"])
-def test_actual_patched_native_branch_matches_disabled(patched_serving, stream, prefix, failure):
-    async def run(enabled):
+@pytest.mark.parametrize("retired_fields", [False, True])
+def test_actual_patched_native_branch_matches_disabled(patched_serving, stream, prefix, failure, retired_fields):
+    async def run(mode):
         ctl = controller()
         ctl.handle_request = AsyncMock(side_effect=AssertionError("DTB handle"))
         ctl.budget_resolver.resolve = Mock(side_effect=AssertionError("budget"))
@@ -274,16 +321,19 @@ def test_actual_patched_native_branch_matches_disabled(patched_serving, stream, 
                      _extract_prompt_len=lambda p: 1, _log_inputs=lambda *a, **k: None,
                      _get_trace_headers=AsyncMock(return_value={"traceparent": "trace"}),
                      engine_client=engine, parser_cls=Mock(return_value=object()),
-                     chat_completion_stream_generator=streaming, chat_completion_full_generator=full,
-                     cot_controller=NS(handle_request=AsyncMock(side_effect=AssertionError("DEER"))))
-        req = request(prefix, stream=stream, enable_think_budget=enabled, enable_deer=True,
+                     chat_completion_stream_generator=streaming, chat_completion_full_generator=full)
+        req = request(prefix, stream=stream, enable_think_budget=mode != "request_disabled",
                       request_id="test", max_completion_tokens=None, max_tokens=100,
                       truncate_prompt_tokens=None, use_beam_search=False, priority=7,
                       include_reasoning=True, _grammar_from_tool_parser=False,
                       to_sampling_params=lambda *a: NS(max_tokens=100))
+        if retired_fields:
+            # Native OpenAIBaseModel permits extras. Old DEER extras have no
+            # serving behavior and cannot enable DTB or another controller.
+            req.enable_deer, req.deer_initial_thought_limit = True, 1
+            req.deer_think_stride, req.deer_task_is_code = 1, True
         # Disabled DTB retains the true request flag when only the service switch is off.
-        if not enabled:
-            req.enable_think_budget = True
+        if mode == "server_disabled":
             ctl.service_config = replace(ctl.service_config, algorithm=replace(ctl.service_config.algorithm, budget_enabled=False))
         with patch("dtb.request_controller.DtbRequestContext", side_effect=AssertionError("context")), \
              patch.object(ctl.observability, "create_phase_recorder", side_effect=AssertionError("recorder")):
@@ -298,7 +348,6 @@ def test_actual_patched_native_branch_matches_disabled(patched_serving, stream, 
         assert closed == [True]
         ctl.handle_request.assert_not_called()
         ctl.budget_resolver.resolve.assert_not_called()
-        serving.cot_controller.handle_request.assert_not_called()
         engine.generate.assert_called_once()
         kwargs = engine.generate.call_args.kwargs
         assert kwargs == {"lora_request": "lora", "trace_headers": {"traceparent": "trace"},
@@ -307,7 +356,53 @@ def test_actual_patched_native_branch_matches_disabled(patched_serving, stream, 
         assert serving.parser_cls.call_count == 1
         return status, kwargs
 
-    assert asyncio.run(run(True)) == asyncio.run(run(False))
+    expected = asyncio.run(run("native"))
+    assert expected == asyncio.run(run("server_disabled"))
+    assert expected == asyncio.run(run("request_disabled"))
+
+
+@pytest.mark.parametrize("stream", [False, True])
+@pytest.mark.parametrize("fixed_budget", [0, 100])
+def test_actual_patched_dtb_branch_keeps_prepared_context(patched_serving, stream, fixed_budget):
+    async def run():
+        ctl = controller()
+        ctl.prepare_request_route = Mock(wraps=ctl.prepare_request_route)
+        expected = object()
+        ctl.handle_request = AsyncMock(return_value=expected)
+
+        async def render(req):
+            return req.messages, [{"prompt_token_ids": [1]}]
+
+        parser = NS(is_reasoning_end=lambda ids: False)
+        engine = NS(generate=Mock(side_effect=AssertionError("native generate before DTB")))
+        serving = NS(dtb_request_controller=ctl, renderer=NS(tokenizer=object()),
+                     _effective_chat_template_kwargs=lambda r: {"enable_thinking": True},
+                     reasoning_parser_cls=lambda *a, **k: parser, render_chat_request=render,
+                     _base_request_id=lambda *a: "test", _maybe_get_adapters=lambda *a, **k: "lora",
+                     models=NS(model_name=lambda l: "model"), _get_data_parallel_rank=lambda r: 3,
+                     model_config=NS(max_model_len=2048), default_sampling_params={}, override_max_tokens=None,
+                     _extract_prompt_components=lambda p: NS(token_ids=p["prompt_token_ids"], text="prompt"),
+                     _extract_prompt_len=lambda p: 1,
+                     _get_trace_headers=AsyncMock(return_value={"traceparent": "trace"}),
+                     engine_client=engine, parser_cls=Mock(return_value=object()))
+        req = request("unknown" if fixed_budget else None, stream=stream,
+                      fixed_budget_tokens=fixed_budget, request_id="test", max_completion_tokens=None,
+                      max_tokens=100, truncate_prompt_tokens=None, include_reasoning=True,
+                      _grammar_from_tool_parser=False)
+        assert await patched_serving(serving, req, NS(headers={}, state=NS())) is expected
+        ctl.prepare_request_route.assert_called_once()
+        ctl.handle_request.assert_awaited_once()
+        prepared = ctl.handle_request.call_args.kwargs["prepared"]
+        assert prepared.route.action == "dtb"
+        assert prepared.route.reason == ("fixed_budget" if fixed_budget else "scene_match")
+        assert req._dtb_route_identity["completion_token_limit"] == 100
+        assert req._dtb_route_identity["lora_request"] == "lora"
+        assert req._dtb_route_identity["data_parallel_rank"] == 3
+        assert req._dtb_route_identity["trace_headers"] == {"traceparent": "trace"}
+        assert req._dtb_route_identity["reasoning_parser"] is parser
+        engine.generate.assert_not_called()
+
+    asyncio.run(run())
 
 
 def test_route_extraction_keeps_native_missing_and_duplicate_distinct(tmp_path):

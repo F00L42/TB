@@ -27,6 +27,15 @@ If any check fails, stop and reconcile the checkout/patch version. Do not
 continue with `--reject`, because a partially applied serving/parser contract
 is not a valid DTB deployment.
 
+The 2026-10-21 delivery retires the DEER debugging integration. The serving
+patch no longer imports or constructs a DEER controller, declares its request
+fields, or routes requests to it. Remove those debugging fields from clients.
+The pinned upstream request model allows extra fields, so old DEER keys may
+still be accepted as unknown extensions; they have no routing effect.
+Apply this patch set to a clean fixed upstream checkout and reinstall/restart
+the actual server environment; do not apply it on top of the older DEER-enabled
+serving patch. See the [retirement upgrade steps](../../../docs/design/dtb_system_routing_deployment.md#deer-调试接口退役后的升级).
+
 - `dtb_serving.patch` adds the external `enable_think_budget` protocol field
   and routes enabled requests to `DtbRequestController`. A false request flag
   or false server master switch remains on vLLM's native single-generate path.

@@ -32,6 +32,27 @@ sha256sum dtb/config/budget_config.yaml patches/vllm/v0.23.0/*.patch
 
 ## 验收和回滚
 
+### DEER 调试接口退役后的升级
+
+2026-10-21 起，当前 patch 移除 `enable_deer`、`deer_initial_thought_limit`、`deer_think_stride`、
+`deer_task_is_code`，以及 DEER 的导入、controller 初始化和路由。客户端应删除这些调试字段；
+它们不再具有服务功能，也不会作为 DTB 开关的别名。DTB 开关和 fixed 字段保持原有语义。
+固定版本的原生 `OpenAIBaseModel` 使用 `extra="allow"`；旧字段仍可能作为未知扩展被接受，
+不能把 HTTP 200 当成 DEER 接口仍受支持，也不能承诺这些字段一定返回 4xx。
+
+1. 停服，记录现有 DTB commit、已安装 vLLM 源码、三份旧 patch/YAML 的 hash、启动命令和模型身份。
+2. 新建独立部署 checkout，检出固定 vLLM `0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`，
+   确认源码干净；不要在本仓库只读子模块上修改，也不要把新 patch 叠在含 DEER 的旧 serving 上。
+3. 按 [patch README](../../patches/vllm/v0.23.0/README.md) 检查并应用当前三份 patch，
+   安装/更新服务器实际使用的 vLLM 环境与本分支 DTB 包，记录新的源码路径与 hash。
+4. 保留原部署选择的 YAML，完整重启相关进程；分别检查 native、请求关闭、服务关闭与 DTB 的 SSE/JSON 请求，
+   再执行下述 replay。确认实际加载的 serving 不再导入 `deer`，不能只看本仓库文件。
+
+旧版本回滚点是完整的 `c716f588` 交付状态，包括旧 patch 所需 `deer/`；回滚旧 patch 时也须恢复对应包，
+不能混用新精简树和旧 DEER serving。历史文件可直接从该 Git 提交查阅，无需把旧实现复制回当前源码树。
+
+### 当前版本验收
+
 先跑 [本地门禁](../../README.md#本地验证)，再用 [7 条合成 replay](../../validation/replay/README.md)
 测试自动/固定预算/probe、流式/非流式、工具与 tool 历史。合成 system 前缀仅测试路由接口，不代表实际 Agent 质量。
 自动路由语义必须在单独 phase run 审计；正式性能使用 off。

@@ -1,7 +1,9 @@
 # DTB 交付仓库工程指南
 
 先读 [README](README.md) 和 [RESULT](RESULT.md)；修改 DTB 时继续读 [dtb/AGENTS.md](dtb/AGENTS.md)。
-通用采集入口是 [vllm_gateway](vllm_gateway/AGENTS.md)，DEER 单独遵循 [deer/AGENTS.md](deer/AGENTS.md)。
+接手路线见[维护导航](docs/maintenance/README.md)；升级 vLLM 先读[接口与 patch 迁移手册](docs/maintenance/vllm_upgrade.md)。
+本分支交付 DTB；观察器 SDK 在 `codex/thinking-observer`，不要把两套 serving patch 直接叠加。
+通用采集入口是 [vllm_gateway](vllm_gateway/AGENTS.md)。DEER 调试实现及接口已退回 Git 历史，不再作为 patch 依赖。
 API 转发 `think_budget`、LightCode 接口和历史实验大数据已退出交付；不要从旧设计恢复它们。
 
 ## 算法与协议边界

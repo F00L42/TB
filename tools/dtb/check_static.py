@@ -16,6 +16,7 @@ PATCHES = ("dtb_serving.patch", "qwen3_coder_parser.patch", "qwen3_reasoning_par
 NAVIGATION = ("README.md", "AGENTS.md", "RESULT.md", "dtb/README.md", "dtb/AGENTS.md",
               "vllm_gateway/README.md", "vllm_gateway/AGENTS.md", "validation/replay/README.md",
               *[str(p.relative_to(ROOT)) for p in (ROOT / "docs").rglob("*.md")])
+FROZEN_EVIDENCE = Path("docs/report/closeout/evidence/noemate_e2e_20261013")
 
 
 def check_navigation():
@@ -44,7 +45,27 @@ def check_fixtures():
     print(f"PASS: {len(manifest['files'])} preserved fixture hashes", flush=True)
 
 
-def check_line_endings():
+def check_evidence():
+    """Check every listed report file before allowing its original CSV bytes."""
+    directory = ROOT / FROZEN_EVIDENCE
+    manifest = json.loads((directory / "bundle_manifest.json").read_text(encoding="utf-8"))
+    if not isinstance(manifest.get("files"), dict) or not manifest["files"]:
+        raise RuntimeError("Frozen evidence manifest must list files")
+    frozen_csv = set()
+    for name, entry in manifest["files"].items():
+        if Path(name).name != name or name in (".", ".."):
+            raise RuntimeError(f"Invalid frozen evidence filename: {name}")
+        path = directory / name
+        data = path.read_bytes()
+        if len(data) != entry["bytes"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
+            raise RuntimeError(f"Frozen evidence changed: {path.relative_to(ROOT)}")
+        if path.suffix == ".csv":
+            frozen_csv.add(path.relative_to(ROOT).as_posix())
+    print(f"PASS: {len(manifest['files'])} frozen report hashes", flush=True)
+    return frozen_csv
+
+
+def check_line_endings(frozen_csv=()):
     """Reject CR in text files; frozen CSV prompt bytes have their own hash gate."""
     names = run(["git", "ls-files", "-z"], capture=True).stdout.split("\0")
     checked = 0
@@ -61,6 +82,8 @@ def check_line_endings():
             continue
         if name.startswith("tests/fixtures/") and path.suffix == ".csv":
             continue  # Original prompt CRLF and whitespace must not be rewritten.
+        if name in frozen_csv:
+            continue  # Original CSV bytes were authenticated by check_evidence().
         if b"\r" in data:
             raise RuntimeError(f"Non-LF text: {name}; save with LF line endings")
         checked += 1
@@ -81,7 +104,8 @@ def main():
     args = parser.parse_args()
     check_navigation()
     check_fixtures()
-    check_line_endings()
+    frozen_csv = check_evidence()
+    check_line_endings(frozen_csv)
     # Check the checkout against this commit's gitlink, not a moving branch/tag.
     for name in ("vllm", "vllm-ascend"):
         relative = f"third_party/{name}"
@@ -99,12 +123,14 @@ def main():
              ROOT / "patches/vllm/v0.23.0" / name])
     # A unique task-local path avoids shared Windows pytest temp permissions;
     # pytest may clear --basetemp, so never accept an arbitrary user directory.
-    temporary = ROOT / ".pytest_cache" / ("dtb-check-" + uuid4().hex)
+    run_root = ROOT / "artifacts" / "checks" / ("dtb-" + uuid4().hex)
+    run_root.mkdir(parents=True)
+    temporary = run_root / "tmp"
     run([sys.executable, "-X", "utf8", "-m", "pytest", "-q", "tests",
-         f"--basetemp={temporary}", "--tb=short"])
+         f"--basetemp={temporary}", "-o", f"cache_dir={run_root / 'cache'}", "--tb=short"])
     if args.benchmark:
         run([sys.executable, "-X", "utf8", "tools/dtb/static_cpu_benchmark.py",
-             "--replay", "--output", ROOT / ".pytest_cache/dtb-static-cpu.json"])
+             "--replay", "--output", run_root / "dtb-static-cpu.json"])
     print("PASS: local static/no-model gate. Target-server validation is pending_remote.")
 
 

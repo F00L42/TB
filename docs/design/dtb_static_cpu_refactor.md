@@ -25,4 +25,4 @@ python tools/dtb/check_static.py --benchmark
 微基准读取 Git 中旧实现，比较合成局部操作及 633 条冻结输入的**完整路由字典**。
 结果在 `.pytest_cache/dtb-static-cpu.json`，只代表本机 Python 操作成本，不能换算模型 E2E。
 冻结问题位于 `tests/fixtures/scenes/`；来源/哈希见 [fixture 清单](../../tests/fixtures/provenance.json)。
-服务器验收见 [runbook](../debug/deer_performance_analysis.md)。
+服务器验收见 [runbook](../debug/dtb_performance_analysis.md)。
