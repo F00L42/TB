@@ -1,9 +1,29 @@
-# Session D 本地验证记录
+# SDK 本地验证记录
 
-日期：2026-09-22。平台：Windows，CPython 3.12.13。
-提取基线：TB `f342e127`。本次只提交 `thinking_observer/` 与设计入口文档，不修改生产 DTB 或只读上游源码。
+## 2026-10-21 裁剪后的完整复核
 
-## 验证结果与重跑
+平台：Windows / CPython 3.12.13。裁剪基线为 `7ccd6b99eb7a435c2d0d1f66dce24affe0728a0d`；
+SDK 源码、协议测试、三份 patch 与验证工具没有改变。删除旧实验树后重新执行：
+
+| 验证 | 本次结果与范围 |
+| --- | --- |
+| `unittest` | 34 项通过，1.711 秒；真实 asyncio 与 fake engine |
+| `examples/observe_window.py` | PASS：有界 token/text 窗口、text-only/缺失文本、token 偏移、请求隔离和清理 |
+| `tools/verify_patch.py` | PASS：3 patch 组合应用、5 个修改文件编译；固定 vLLM 源码保持只读 |
+| `tools/verify_native.py` | PASS：7 组原生 parser 场景、8 条 patched serving 路由；数据/engine/HTTP 为 stub |
+| wheel + sdist | PASS：从源码分发包构建 wheel；sdist 包含 AGENTS、完整 docs、两例子、tests、patches、tools |
+| wheel 独立安装 | PASS：新虚拟环境、无依赖安装；复制测试至仓库外再跑 34 项通过，1.725 秒 |
+
+本机 SDK worktree 的 `third_party/` 是未初始化占位，本次两个验证工具显式使用另一份已初始化的
+只读 checkout：`C:/Users/F-O-O/Projects/TB/third_party/vllm`，HEAD 为
+`0fc695fc6d1d82e9a5ac6835ac8e4e1c83703665`。普通接手先执行 `git submodule update --init --recursive`，
+或向工具传入等价、干净的固定源码路径。没有修改子模块或服务实例。
+
+Windows 非交互子进程显式 `stdin=subprocess.DEVNULL`；验证在正常主机权限下执行。
+新构建输出使用仓库根 `artifacts/dist/`；源代码树与 Git 历史的体积不包含这些忽略的本地制品。
+真实模型、HTTP/SSE、Ascend、真实并发、质量及净 E2E 收益仍为 `pending_remote`。
+
+## 2026-09-22 历史验证结果与重跑
 
 SDK 安装后运行（也可令 PYTHONPATH 指向本目录 `src/`）：
 
@@ -27,7 +47,7 @@ python thinking_observer/tools/verify_distribution.py \
 
 `verify_native.py` 的 7 组：原生工具、强制 plain final、强制工具 final、drain 已进入工具、同 batch 工具边界优先、drain 自然终态优先、text-only abort 尾部。每组将 SDK 产出的 raw deltas 分别送入真实增量 parser 和完整 parser，比对 reasoning/content/工具名/JSON 参数，并核对唯一终态。
 
-两个 parser 补丁与基线 `patches/vllm/v0.23.0/` 的 Git blob 一致，制品固定 LF 换行；`tools/parser_fixtures.py` 只提取旧工具的测试数据/import stub，不包含或替代原生 parser 算法。来源写在文件头；没有运行时 DTB 依赖。
+两个 parser 补丁与 SDK 基线提交 `7ccd6b99` 中 `patches/vllm/v0.23.0/` 的 Git blob 一致（旧根目录已裁剪，运行不依赖它），制品固定 LF 换行；`tools/parser_fixtures.py` 只提取旧工具的测试数据/import stub，不包含或替代原生 parser 算法。来源写在文件头；没有运行时 DTB 依赖。
 
 SHA-256（本地文件字节）：
 

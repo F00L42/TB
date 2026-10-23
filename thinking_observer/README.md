@@ -6,6 +6,9 @@ Session D 的独立二次开发交付：增量观察模型思考，在合法位�
 目标：vLLM `v0.23.0` + vLLM-Ascend `v0.23.0rc1`。
 本地验证是 CPU 协议与固定源码执行，设备运行、真实 tokenizer/HTTP/性能均为 **pending_remote**。
 
+接手修改先读 [Agent 导航](AGENTS.md)；读取实际流过的文本/Token 并开发检测器见
+[可运行的有界窗口示例](docs/detector_development.md)。
+
 ## 安装与最小使用
 
 此目录可单独复制、安装、运行测试；不需要仓库的 `dtb/`、`deer/` 或预算 YAML。
@@ -79,6 +82,7 @@ export THINKING_OBSERVER_TELEMETRY=off
 - [API、位置与生命周期](docs/api.md)
 - [部署、替换算法、回滚、服务器验收](docs/server_runbook.md)
 - [本地验证记录](docs/validation.md)
+- [历史设计、实验与最终演示来源](docs/history.md)
 - [独立补丁](patches/vllm-v0.23.0/observer_serving.patch)，不与 DTB serving patch 叠加。
 
 可选日志 `THINKING_OBSERVER_SUMMARY` schema 1 包含接管位置、超出 token、回调/abort/接管耗时和两个 child 的 token/wall 账本；不记录正文。`off` 不写成功事件。

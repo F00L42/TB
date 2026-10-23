@@ -100,8 +100,14 @@ export THINKING_OBSERVER_CUE=$'\n请根据已有推理直接给出完整答案�
 
 先以 summary 单独验证真实分支，再切 telemetry=off 重启做正式比较。原生、Noop、确定阈值 fixture、外部真实算法分别记录；不能混用观测模式或旧 DTB baseline。报告逐请求 E2E/TTFT、P50/P95、更快请求比例、任务正确性、公开 completion 和两个 child 的完整工作量。SDK summary 没有 queue/prefill/decode 分解；需要服务器 profiler/engine metrics 补齐，不能用全局吞吐率归因。
 
-归档至 `docs/log/perf/<actual_observer_run>/`：manifest、安装/源码身份、补丁和配置 hash、客户端请求/响应/任务级结果、raw 测试轨迹、诊断日志、RESULT.md。记录本 run 实际数据集和评判标准；不复用历史成功率。
+归档至 `artifacts/perf/<actual_observer_run>/`：manifest、安装/源码身份、补丁和配置 hash、客户端请求/响应/任务级结果、raw 测试轨迹、诊断日志、RESULT.md。记录本 run 实际数据集和评判标准；不复用历史成功率。
 
 功能回滚：请求置 `enable_thinking_observer=false` 即原生；服务器置 `THINKING_OBSERVER_ENABLED=0` 并重启，不导入算法 factory。保留 SDK 安装，因为 serving patch 的模块导入仍需要它。
 
 完全卸载：先停服务，在**独立部署 checkout** 对三份补丁执行 `git apply --reverse --check`，核对无其他改动后逆序移除并按环境重装 vLLM，再卸载 SDK、重启。不要在未核对的 checkout 上 reset/clean 或覆盖其他人的补丁。
+
+## 6. 交付变更记录
+
+- 2026-10-21：SDK 分支裁剪旧算法、根 patch、旧工具/测试和实验树；独立 SDK 源码、测试、三份 patch 不变。
+  当前部署只读取本 SDK 的 `patches/vllm-v0.23.0/`；历史来源见 [索引](history.md)，裁剪后的本地复核见 [记录](validation.md)。
+  本次无服务器部署或效果测试，仍按上面的真实验收步骤执行。

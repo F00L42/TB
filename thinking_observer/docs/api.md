@@ -2,6 +2,8 @@
 
 导出入口：`thinking_observer`。稳定范围是 0.1 的 frozen dataclasses、Detector/DetectorState Protocol 和 CONTINUE/StopAndAnswer；engine 适配仅支持固定 vLLM 版本。
 
+可运行的文本/Token 获取与窗口示例见 [检测器开发](detector_development.md)。
+
 ## 调用次序和线程
 
 服务启动一次构造 Detector 工厂、复用 tokenizer。每个支持的请求调用 `start(context)`；同一请求内 `observe` 有序、无并发重入；返回有效 state 后结束时 `close(outcome)` 一次。不同请求各有 state，工厂不应把可变算法状态放在服务共享字段中。
