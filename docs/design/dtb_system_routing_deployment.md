@@ -6,6 +6,10 @@
 
 ## 配置选择
 
+字段默认值、阈值优先级、请求覆盖和置信度计算见[配置与置信度参考](dtb_configuration_reference.md)。
+部署时同时记录 `logprobs_mode` 与实际 sampler 路径；当前置信度要求归一化 log 概率，
+不能把 logits 模式当作等价参数。固定 Ascend 路径存在默认 sampler 构造，修改启动模式后须确认实际生效。
+
 | YAML | 用途 | 状态 |
 | --- | --- | --- |
 | budget_config.yaml | 既有 legacy_text 默认策略 | 本次不改默认算法/参数 |
@@ -61,3 +65,9 @@ sha256sum dtb/config/budget_config.yaml patches/vllm/v0.23.0/*.patch
 
 回滚时停服，恢复备份 YAML 及部署前成套 controller/patch，重启并做原生 smoke。
 不要只改 YAML 来掩盖 controller 与 serving 不兼容。记录回滚 SHA 和本次失败样本。
+
+## 变更记录
+
+| 日期 | 变更 |
+| --- | --- |
+| 2026-11-02 | 补配置与置信度参考入口，以及 logprobs_mode/实际 sampler 的部署记录要求；未改变代码或默认参数 |

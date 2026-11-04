@@ -2,6 +2,7 @@
 
 本文件补充根 `AGENTS.md`，只描述生产包的入口和边界。实现/设计状态索引见
 [`../docs/design/README.md`](../docs/design/README.md)；配置/部署见 [`README.md`](README.md)。
+配置字段、置信度公式与回退、阈值优先级见[配置与置信度参考](../docs/design/dtb_configuration_reference.md)。
 
 ## 按问题定位
 

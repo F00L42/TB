@@ -16,6 +16,7 @@ DTB 在 vLLM 服务内控制思考预算，目标是在保持答案质量和原�
 | 任务 | 从哪里开始 |
 | --- | --- |
 | 修改生产代码 | [DTB 导航与所有权](dtb/AGENTS.md)、[配置说明](dtb/README.md) |
+| 配置置信度算法、阈值和思考预算 | [配置与置信度参考](docs/design/dtb_configuration_reference.md)：公式、覆盖优先级、请求字段、采样前提与源码索引 |
 | 部署、system 路由与回滚 | [路由部署手册](docs/design/dtb_system_routing_deployment.md)、[patch 说明](patches/vllm/v0.23.0/README.md) |
 | 理解实现及设计依据 | [当前设计索引](docs/design/README.md) |
 | 升级 vLLM 或调整接口 | [升级手册：上游差异→包内接口→patch→验收](docs/maintenance/vllm_upgrade.md) |

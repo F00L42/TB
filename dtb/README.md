@@ -50,6 +50,11 @@ Qwen 流式协议需要绑定并验证 parser；其他模型必须单独验收�
 
 ## 配置生命周期
 
+字段含义、默认值、请求覆盖、置信度公式和试答行为见
+[配置与置信度参考](../docs/design/dtb_configuration_reference.md)。默认使用本轮隐藏试答的采样 token
+概率平均值，Value-Min 默认关闭；`confidence_threshold: 0.95` 不强制覆盖场景阈值，
+`fixed_prob_th: 0` 表示不覆盖。配置前先核对该文档的优先级和 vLLM 返回概率语义。
+
 `config/loader.py` 只在 controller 构造时加载并校验 YAML，进程运行期间不检查 mtime、不做
 隐式 reload，也没有内嵌 fallback 表。配置错误会阻止服务启动；修改配置后必须重启。
 `HISTORY_STORE` 保存可选 history 的路径、保留上限和异步队列容量；history 关闭时不会配置、

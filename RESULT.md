@@ -1,5 +1,17 @@
 # 交付结果
 
+## 2026-11-02 配置说明补充
+
+新增[配置与置信度参考](docs/design/dtb_configuration_reference.md)，集中说明配置层级、默认值、
+平均概率/Value-Min 公式、缺失值与 fail-open、阈值优先级、probe 采样/长度/跳过条件、
+上游 logprobs 模式及固定 Ascend sampler 接线限制，并补齐源码和测试索引。
+根 README、DTB README/AGENTS、设计索引、接手导航和部署手册均已加入入口。
+本轮仅补文档，不改变生产代码、YAML、patch 或冻结证据；服务器验证仍为 `pending_remote`。
+本地完整门禁通过：**567 项测试、1,980 个子测试**，330 个本地导航目标、22 个 fixture 哈希、
+20 个冻结报告哈希及 3 个 patch 检查通过。另核对 38 个 RUNTIME 字段的说明覆盖，
+实际执行三组阈值优先级示例、YAML/请求片段和缺失值/零覆盖示例，结果符合文档。
+日志：`artifacts/delivery-audit/confidence-docs-gate-20261102.log`；本轮未执行新的服务器请求。
+
 ## 当前交付状态（2026-10-21）
 
 按用户确认的范围，DEER 调试实现已退回历史；当前 serving patch 移除四个 DEER 请求字段、

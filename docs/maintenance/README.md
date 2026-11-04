@@ -8,8 +8,9 @@
 | 要完成的工作 | 先读 | 应当能产出的结果 |
 | --- | --- | --- |
 | 理解当前请求路径 | [DTB README](../../dtb/README.md)、[模块导航](../../dtb/AGENTS.md) | 画出 native / 流式 observation / 非流式三状态分支，找到实现与回归 |
+| 调整置信度算法或排查配置未生效 | [配置与置信度参考](../design/dtb_configuration_reference.md) | 区分平均概率/Value-Min、最终阈值来源、请求覆盖、probe 跳过与 fail-open，定位实现和回归 |
 | 升级 vLLM / Ascend | [版本迁移手册](vllm_upgrade.md)、[当前 patch](../../patches/vllm/v0.23.0/README.md) | 固定目标 SHA、接口差异表、最小 patch、包内适配和验收清单 |
-| 修改场景或预算 | [路由设计](../design/dtb_system_scene_native_routing.md)、[部署手册](../design/dtb_system_routing_deployment.md) | 明确改规范 YAML 还是 controller；记录优先级、重启及回滚 |
+| 修改场景或预算 | [配置参考](../design/dtb_configuration_reference.md)、[路由设计](../design/dtb_system_scene_native_routing.md)、[部署手册](../design/dtb_system_routing_deployment.md) | 明确改规范 YAML 还是 controller；记录优先级、重启及回滚 |
 | 修改输入/输出/parser 接口 | [token 权威输入](../design/dtb_token_authoritative_prompt.md)、[边界契约](../design/dtb_reasoning_boundary_token_stop.md) | 保护原生 token/text 连续性、child 快照、结束和取消语义 |
 | 在 SDK 上开发重复检测 | 切到 `codex/thinking-observer`，读 `thinking_observer/docs/detector_development.md`，运行 `python thinking_observer/examples/observe_window.py` | 从 `Detector.start(context)` 返回的请求状态的 `observe(ReasoningDelta)` 获取增量，使用有界窗口；算法独立实现 |
 | 复核演示与收益 | [最终演示](../report/closeout/presentation/README.md)、[技术博客](../report/closeout/dtb_project_technical_blog.md)、[E2E 博客](../report/closeout/noemate_e2e_20261013.md) | 找到分母、固定来源、反例和结论边界 |
