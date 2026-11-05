@@ -1,5 +1,9 @@
 # 最小服务器 replay
 
+首次集成或升级后，先读[8-token 功能冒烟](../../docs/maintenance/integration_smoke.md)：
+复用细粒度 replay 做一对原生/短预算请求，直观确认预算收束，另跑 probe 检查置信度链路。
+该演示不是本页的完整答案/协议验收，也不改变下述正式矩阵的参数或默认值。
+
 `cases.jsonl` 是本次构造的 7 条合成输入，约几 KiB，不依赖已删除的历史日志或任何评测平台。
 模型收到的工具仅有无副作用的 schema；replay 不执行工具，tool 返回值由样本预置。
 

@@ -4,7 +4,7 @@
 初始入口：[RESULT](../../RESULT.md)、[replay](../../validation/replay/README.md)、[实验契约](../design/think_budget_generalization_plan.md)。
 
 1. 记录实际两个服务仓库 SHA/dirty、Python/torch/torch-npu/CANN/模型修订、DTB commit、YAML/patch hash 与完整启动命令。
-2. 升级成套 controller/patch，先做原生与 DTB 流式/非流式 smoke。错误、截断、JSON/XML、终态或答案失败即停止。
+2. 升级成套 controller/patch，可先用 [8-token 功能冒烟](../maintenance/integration_smoke.md) 确认预算收束，再做实际参数的原生与 DTB 流式/非流式 smoke。正式验收遇到错误、响应截断、JSON/XML、终态或答案失败即停止；8-token 演示的答案正确性单列，不用于质量晋级。
 3. 独立 phase run 确认 main/native/拒识/fixed 路由，以及 direct-final/probe 真实发生和 hidden token 闭合。
    未达到阈值而自然结束只能说路径未覆盖；不能为了通过检查篡改统计。
 4. 切回 off 并重启，保留相同请求、模型/seed、并发、到达节奏与 cache，对 Vanilla/候选作重复配对。
@@ -19,6 +19,7 @@ final 方法提取不改变算法；history、prompt 所有权和 producer/consu
 
 ## 变更记录
 
+- 2026-11-05：加入[集成/升级功能冒烟](../maintenance/integration_smoke.md)，以 8-token 请求覆盖、原生对照及 phase 账本确认实际收束；probe 评分和实际自动路由单独验证。沿用现有工具，未改变生产默认参数；8-token 结果不作为质量或性能证据，服务器验证仍待执行。
 - 2026-10-21（交付范围确认后）：DEER 作为调试遗留退役，移除目录及 serving patch 的字段/导入/初始化/路由；手册更名为 dtb_performance_analysis.md。567 测试/1,980 子测试和三个 patch 检查通过；仍需服务器验收。部署从干净的固定上游应用当前三份 patch，不能覆盖旧 DEER patch 后直接重启；详见[升级步骤](../design/dtb_system_routing_deployment.md#deer-调试接口退役后的升级)。
 - 2026-10-21：补齐[交付接手导航](../maintenance/README.md)与[vLLM 迁移手册](../maintenance/vllm_upgrade.md)，清理可从固定 Git 恢复的采集副本；冻结证据、回归输入与生产行为不变。静态门禁增加冻结报告哈希检查，临时输出迁至 artifacts/checks；550 测试/1,980 子测试通过。最终 DEER/SDK 分支裁剪见[交付梳理](../maintenance/delivery_review.md)。
 - 2026-09-22：加入关键词有界缓存、局部文本折叠、饱和扫描、非流式 join 与 final 职责提取。

@@ -20,6 +20,7 @@ DTB 在 vLLM 服务内控制思考预算，目标是在保持答案质量和原�
 | 部署、system 路由与回滚 | [路由部署手册](docs/design/dtb_system_routing_deployment.md)、[patch 说明](patches/vllm/v0.23.0/README.md) |
 | 理解实现及设计依据 | [当前设计索引](docs/design/README.md) |
 | 升级 vLLM 或调整接口 | [升级手册：上游差异→包内接口→patch→验收](docs/maintenance/vllm_upgrade.md) |
+| 集成或升级后直观确认 DTB 生效 | [8-token 功能冒烟](docs/maintenance/integration_smoke.md)：原生对照、预算收束、phase 账本与独立置信度检查 |
 | 通用 vLLM 透传、记录、离线阅读 | [vllm_gateway](vllm_gateway/README.md) |
 | 服务器流式/非流式、质量和配对耗时检查 | [7 条 replay 数据与矩阵](validation/replay/README.md) |
 | 无模型回归与数据来源 | [fixtures](tests/fixtures/README.md)、[测试门禁](tools/dtb/check_static.py) |

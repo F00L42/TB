@@ -93,6 +93,6 @@ python tools/dtb/reasoning_tail_fidelity.py --apply-repo-patch \
 
 回归至少覆盖 disabled/native 单次生成、自动与 fixed 路由、流式/非流式、短请求不介入、probe 与 direct-final、abort/drain 尾流、取消/异常、自然结束竞争、token-only 边界、工具调用、多轮、总 completion 额度与 child 身份。XML 泄漏、工具标记重复/丢失、JSON 不完整、role 尾流或 finish_reason 偏离均是 hard failure。
 
-本地检查通过后，按 [replay 手册](../../validation/replay/README.md) 在目标服务器完成 HTTP/SSE 矩阵、真实 parser 绑定、独立 phase 归属审计，再以 `off` 模式配对比较 E2E 与质量。新模型必须重跑 Vanilla。源码检查、冻结链、HTTP 200 或少发 token 都不等于质量及净 E2E 收益；未执行项目写 `pending_remote`。
+本地检查通过后，先按 [8-token 功能冒烟](integration_smoke.md) 用原生对照和 phase 账本确认实际介入，另行确认 probe 评分可用；8-token 参数只作直观诊断。随后按 [replay 手册](../../validation/replay/README.md) 在目标服务器完成 HTTP/SSE 矩阵、真实 parser 绑定、独立 phase 归属审计，再以 `off` 模式配对比较 E2E 与质量。新模型必须重跑 Vanilla。源码检查、冻结链、HTTP 200 或少发 token 都不等于质量及净 E2E 收益；未执行项目写 `pending_remote`。
 
 交付迁移结果时保留：目标身份与 hash 清单、接口差异表、最终 patch 与 DTB 改动、各门禁命令/结果/未覆盖范围，以及可执行的旧版本恢复和重启步骤。部署必须同步更新 DTB 包、已安装 vLLM 的 patch、规范 YAML，并完整重启相关进程；只切换此仓库分支不会改变运行中的服务。

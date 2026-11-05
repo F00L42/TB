@@ -1,6 +1,8 @@
 # 验证与分析工具
 
 默认从仓库根目录运行，输出放 artifacts/（Git 忽略）。当前可执行验收入口见 [RESULT](../RESULT.md)。
+首次集成/升级的 [8-token 功能冒烟](../docs/maintenance/integration_smoke.md) 使用现有
+replay fixed 参数和 phase 账本；不需要新增 profile，也不替代正式矩阵的答案检查。
 
 | 工具 | 输入 / 用途 |
 | --- | --- |

@@ -57,6 +57,9 @@ sha256sum dtb/config/budget_config.yaml patches/vllm/v0.23.0/*.patch
 
 ### 当前版本验收
 
+首次集成/升级先用 [8-token 功能冒烟](../maintenance/integration_smoke.md) 直观看到预算干预，
+按请求 ID 核对 phase 账本，再独立验证置信度评分；短预算样例不作为质量或性能结论。
+
 先跑 [本地门禁](../../README.md#本地验证)，再用 [7 条合成 replay](../../validation/replay/README.md)
 测试自动/固定预算/probe、流式/非流式、工具与 tool 历史。合成 system 前缀仅测试路由接口，不代表实际 Agent 质量。
 自动路由语义必须在单独 phase run 审计；正式性能使用 off。

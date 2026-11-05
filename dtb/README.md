@@ -89,6 +89,9 @@ Agent 可选择 `ROUTING.mode: system_prefix`，启动编译有界 system/首 us
 
 ## Telemetry
 
+部署后确认功能生效，按[8-token 功能冒烟](../docs/maintenance/integration_smoke.md)运行原生/DTB
+对照并核对下述 phase 事件；该流程分别验证预算收束、可见思考缩短和置信度链路。
+
 `OBSERVABILITY.mode` 有三种服务级模式，请求不能覆盖：
 
 - `off`（默认）：不创建 event writer、phase recorder 或 stream audit。phase/delta 边界只检查

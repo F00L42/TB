@@ -1,5 +1,20 @@
 # 交付结果
 
+## 2026-11-05 集成/升级功能验证说明
+
+新增[8-token 功能冒烟](docs/maintenance/integration_smoke.md)：复用现有 replay 的请求覆盖，
+以原生对照、phase 账本和可见 reasoning 确认预算干预；说明 abort/drain 尾部超出阈值、
+最终答案额度、未覆盖分支，以及独立 probe 的有效置信值与 fail-open 判定。
+补齐根 README、DTB、配置/部署、接手/升级、replay、工具和服务器 runbook 的入口。
+本轮仅修改文档，保持算法、生产 YAML、patch 和验收工具不变；8-token 仅作功能演示，
+不作为质量或性能结论，真实服务器验证仍为 `pending_remote`。
+
+本轮完整本地门禁通过：**567 项测试、1,980 个子测试**，355 个本地导航目标、22 个 fixture
+哈希、20 个冻结报告哈希、固定上游及 3 个 patch 检查通过。文档内两组命令已离线解析并
+构造请求，确认 8/8 与 2048/128 参数、原生侧关闭/移除 fixed、两侧输入和 completion 额度一致；
+未发送服务器请求。日志：`artifacts/delivery-audit/integration-smoke-docs-20261105-verified.log`，
+命令预览：`artifacts/delivery-audit/integration-smoke-docs-command-preview-20261105.json`。
+
 ## 2026-11-02 配置说明补充
 
 新增[配置与置信度参考](docs/design/dtb_configuration_reference.md)，集中说明配置层级、默认值、
