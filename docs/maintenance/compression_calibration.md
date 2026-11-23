@@ -61,7 +61,26 @@ sampling/seed 配对。分组、异常和缺失的处理规则要在所有轮次
 输入特征先选能解释差异的几类：调用角色/system 身份、任务类别、prompt 长度、历史轮数、
 工具数量及是否处于工具返回之后、输出格式约束。**不要仅按输入长短猜思考难度**；画输入
 长度与原生思考长度/正确性的分组统计，确认哪些特征确有区分度后再建立 scene。
-新 scene 的身份/关键词路由也要测混淆、误拒识和误匹配，不能只调预算。
+
+### 把离线场景分组映射到线上路由
+
+服务启动时通过 `ROUTING.mode` 选择一种模式。先确定业务场景由稳定的 Agent 身份区分，
+还是由当前用户任务区分，再按对应的消息来源提取特征。
+
+| 场景依据 | 路由模式 | 线上匹配规则 |
+| --- | --- | --- |
+| Agent 身份或调用角色有稳定的 system 前缀 | `system_prefix` | 精确匹配原始 `messages` 开头的 system 文本，配置 `SCENES.<scene>.match.system_prefix`。可加 `first_user_prefix` 校验首条 user 的前缀，或用 `tools_empty` 校验工具是否为空。 |
+| 当前用户任务有关键词或固定结构 | `legacy_text`（默认） | 读取最近一条非空 user 文本，缺少时回退到 serving prompt。用 `SCENES.<scene>.indicators` 配置必需、强、弱关键词，分类器还会为部分内置场景加入结构分。 |
+
+例如，区分 Noemate 主 Agent、追问和上下文压缩，可以基于各自稳定的 system 前缀。
+多轮对话中按当前问题识别场景，可以基于最新非空 user 文本配置关键词。
+`first_user_prefix` 始终检查首条 user。两种模式各有独立的匹配规则，当前配置没有
+同时对 system 和最新 user 做关键词评分的模式，且同一个 system 前缀不能配成多条规则。
+
+prompt token 长度、历史轮数等特征可用于离线统计分布、解释失败和选择预算。
+把离线分组落成 YAML 前，先核对它能否用所选模式的条件表达。用留出请求对照预期场景，
+记录易混淆身份、误匹配和未命中结果，并核对 `ROUTING.on_unmatched` 对应的回退动作。
+消息提取、字段限制与路由优先级见[场景路由设计](../design/dtb_system_scene_native_routing.md)。
 
 统计时至少列以下两张表：
 
