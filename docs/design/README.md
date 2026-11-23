@@ -17,6 +17,7 @@
 | 主题 | 当前文档 | 状态 |
 | --- | --- | --- |
 | 配置层级、置信度与试答行为 | [配置与置信度参考](dtb_configuration_reference.md) | 当前源码参考；包含默认值、覆盖优先级与上游采样前提 |
+| 测试集到压缩配置 | [选参与交付指南](../maintenance/compression_calibration.md) | 候选公式、Agent 长尾阈值、历史案例和推荐/迭代报告模板；新数据需实测 |
 | CPU 静态优化与并发边界 | [静态优化](dtb_static_cpu_refactor.md) | 已实现；目标 E2E 待测 |
 | final 职责和结束契约 | [final 结构](dtb_final_answer_state_refactor.md) | 等价方法提取已实现 |
 | system 身份、动作及原生分流 | [路由设计](dtb_system_scene_native_routing.md)、[部署](dtb_system_routing_deployment.md) | 已合入 34f39983；自动候选待服务器验收 |

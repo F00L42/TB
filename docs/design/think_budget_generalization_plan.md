@@ -1,5 +1,8 @@
 # 性能实验与证据契约
 
+从输入/正确率评测开始标定参数，按[选参与交付指南](../maintenance/compression_calibration.md)
+执行；最终交付独立的推荐参数与持续更新的迭代报告。本契约继续约束其证据和判定方式。
+
 当前交付不携带历史实验大数据。新 run 写 artifacts/perf/<run_id>，小型验证写 artifacts/replay/<run_id>。
 历史 13 场景问题保留于 tests/fixtures/scenes，作为路由回归；问题本身不是质量参考答案或性能结果。
 

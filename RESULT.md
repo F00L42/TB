@@ -1,5 +1,20 @@
 # 交付结果
 
+## 2026-11-23 压缩参数标定与交付流程
+
+新增[从测试集得到配置](docs/maintenance/compression_calibration.md)，覆盖输入与正确率契约、
+原生长度/角色分布、现有候选公式、搜索与配对质量/净 E2E、Agent 介入阈值及自动配置验收。
+用默认 13 场景、量化 v4/v5、Noemate 750/native 说明历史迭代与证据限制，明确不能将旧参数
+或旧质量结果直接迁移到新模型。配套[建议参数](docs/maintenance/templates/compression_parameters.md)
+和[持续迭代报告](docs/maintenance/templates/compression_iteration_report.md)两份模板，并补齐索引。
+本轮仅文档；未修改 YAML、算法、patch 或工具，未执行服务器调参，新数据效果为 `pending_remote`。
+
+本地完整门禁通过：**567 项测试、1,980 个子测试**，395 个导航目标、22 个 fixture 哈希、
+20 个冻结报告哈希、固定上游及三份 patch 检查通过。另调用真实候选构造函数复核三组
+T50 例子，并离线解析原生采集、候选配对、种子构造命令；未发送模型请求。
+日志：`artifacts/delivery-audit/calibration-docs-gate-20261123.log`；
+公式/命令核验：`artifacts/delivery-audit/calibration-docs-preview-20261123.json`。
+
 ## 2026-11-05 集成/升级功能验证说明
 
 新增[8-token 功能冒烟](docs/maintenance/integration_smoke.md)：复用现有 replay 的请求覆盖，

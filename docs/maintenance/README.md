@@ -9,6 +9,7 @@
 | --- | --- | --- |
 | 理解当前请求路径 | [DTB README](../../dtb/README.md)、[模块导航](../../dtb/AGENTS.md) | 画出 native / 流式 observation / 非流式三状态分支，找到实现与回归 |
 | 调整置信度算法或排查配置未生效 | [配置与置信度参考](../design/dtb_configuration_reference.md) | 区分平均概率/Value-Min、最终阈值来源、请求覆盖、probe 跳过与 fail-open，定位实现和回归 |
+| 为新测试集/模型标定压缩配置 | [从测试集得到配置](compression_calibration.md) | 原生分布与候选推导、迭代质量/净 E2E；输出[建议参数](templates/compression_parameters.md)和[迭代报告](templates/compression_iteration_report.md) |
 | 升级 vLLM / Ascend | [版本迁移手册](vllm_upgrade.md)、[当前 patch](../../patches/vllm/v0.23.0/README.md) | 固定目标 SHA、接口差异表、最小 patch、包内适配和验收清单 |
 | 确认部署后的 DTB 确实介入 | [8-token 功能冒烟](integration_smoke.md) | 成对请求、按 ID 核对预算收束、区分文本缩短与置信度计算及质量验收 |
 | 修改场景或预算 | [配置参考](../design/dtb_configuration_reference.md)、[路由设计](../design/dtb_system_scene_native_routing.md)、[部署手册](../design/dtb_system_routing_deployment.md) | 明确改规范 YAML 还是 controller；记录优先级、重启及回滚 |

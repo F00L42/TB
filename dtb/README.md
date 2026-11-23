@@ -50,6 +50,9 @@ Qwen 流式协议需要绑定并验证 parser；其他模型必须单独验收�
 
 ## 配置生命周期
 
+新模型或测试集的选参流程见[从测试集得到压缩配置](../docs/maintenance/compression_calibration.md)，
+按原生基线、质量与净 E2E 迭代，输出推荐参数及持续更新的测试报告。
+
 字段含义、默认值、请求覆盖、置信度公式和试答行为见
 [配置与置信度参考](../docs/design/dtb_configuration_reference.md)。默认使用本轮隐藏试答的采样 token
 概率平均值，Value-Min 默认关闭；`confidence_threshold: 0.95` 不强制覆盖场景阈值，
