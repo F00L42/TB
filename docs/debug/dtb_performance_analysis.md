@@ -20,6 +20,7 @@ final 方法提取不改变算法；history、prompt 所有权和 producer/consu
 
 ## 变更记录
 
+- 2026-11-23：简化标定指南及两份模板的准备要求，区分测试集输入/评测、工具运行记录、整轮配置与按目标补充的验收；正式质量/性能结论的证据要求保持。
 - 2026-11-23：新增[测试集到配置的交付指南](../maintenance/compression_calibration.md)，补充默认/量化/Noemate 历史选参案例与推荐参数、迭代报告模板；保持历史证据限制和 `pending_remote`，本轮无生产参数变更。
 - 2026-11-05：加入[集成/升级功能冒烟](../maintenance/integration_smoke.md)，以 8-token 请求覆盖、原生对照及 phase 账本确认实际收束；probe 评分和实际自动路由单独验证。沿用现有工具，未改变生产默认参数；8-token 结果不作为质量或性能证据，服务器验证仍待执行。
 - 2026-10-21（交付范围确认后）：DEER 作为调试遗留退役，移除目录及 serving patch 的字段/导入/初始化/路由；手册更名为 dtb_performance_analysis.md。567 测试/1,980 子测试和三个 patch 检查通过；仍需服务器验收。部署从干净的固定上游应用当前三份 patch，不能覆盖旧 DEER patch 后直接重启；详见[升级步骤](../design/dtb_system_routing_deployment.md#deer-调试接口退役后的升级)。
